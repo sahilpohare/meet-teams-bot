@@ -130,6 +130,62 @@ export async function server() {
         res.send('ok')
     })
 
+    // retrocompat TODO: delete this
+    app.post('/start_record/zoom', jsonParser, async (req, res) => {
+        await setProtection(true)
+        const data: MeetingParams = req.body
+        try {
+            let logger = LOGGER.new({
+                user_id: data.user_id,
+                meeting_url: data.meeting_url,
+            })
+            logger.info(`Start record`, {
+                human_transcription: data.human_transcription,
+                use_my_vocabulary: data.use_my_vocabulary,
+                language: data.language,
+                project_name: data.project_name,
+                email: data.email,
+            })
+            meeting.setInitalParams(data, logger)
+            meeting
+                .recordMeeting(data)
+                .then(async (project) => {
+                    if (data.event != null) {
+                        try {
+                            await patchEvent(data.user_token, {
+                                status: 'Recording',
+                                id: data.event?.id,
+                                session_id: data.api_session_id,
+                                project_id: project.id,
+                            })
+                        } catch (e) {
+                            console.error('error patching event: ', e)
+                        }
+                    }
+                })
+                .catch(async (e) => {
+                    if (data.event != null) {
+                        try {
+                            await notifyApp(
+                                'Error',
+                                data,
+                                { error: JSON.stringify(e) },
+                                { error: JSON.stringify(e) },
+                            )
+                        } catch (e) {
+                            console.error(
+                                'error in start_record_event catch handler, terminating instance',
+                                e,
+                            )
+                        }
+                    }
+                })
+            res.send('ok')
+        } catch (e) {
+            res.status(500).send(JSON.stringify(e))
+        }
+    })
+
     app.post('/start_record', jsonParser, async (req, res) => {
         await setProtection(true)
         const data: MeetingParams = req.body

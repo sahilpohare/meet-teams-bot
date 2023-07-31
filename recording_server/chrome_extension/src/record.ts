@@ -183,7 +183,7 @@ export async function startRecording(
             name: projectName,
             project_id: project.id,
             uploading: true,
-            is_zoom: true,
+            is_meeting_bot: true,
         },
         true,
     )
