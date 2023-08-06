@@ -1,0 +1,178 @@
+import * as record from './record'
+import { api, setConfig } from 'spoke_api_js'
+import { Project, Note } from 'spoke_api_js'
+import axios from 'axios'
+
+type Speaker = {
+    name: string
+    timestamp: number
+}
+
+addListener()
+export var SPEAKERS: Speaker[] = []
+
+export * from './state'
+import * as State from './state'
+import { sleep } from './utils'
+import * as streaming from './Transcribe/streaming'
+
+export function addDefaultHeader(name: string, value: string) {
+    axios.defaults.headers.common[name] = value
+}
+
+console.log('USER AGENT BEFORE', navigator.userAgent)
+
+function setUserAgent(window, userAgent) {
+    // Works on Firefox, Chrome, Opera and IE9+
+    if ((navigator as any).__defineGetter__) {
+        ;(navigator as any).__defineGetter__('userAgent', function () {
+            return userAgent
+        })
+    } else if (Object.defineProperty) {
+        Object.defineProperty(navigator, 'userAgent', {
+            get: function () {
+                return userAgent
+            },
+        })
+    }
+    // Works on Safari
+    if (window.navigator.userAgent !== userAgent) {
+        var userAgentProp = {
+            get: function () {
+                return userAgent
+            },
+        }
+        try {
+            Object.defineProperty(window.navigator, 'userAgent', userAgentProp)
+        } catch (e) {
+            window.navigator = Object.create(navigator, {
+                userAgent: userAgentProp,
+            })
+        }
+    }
+}
+setUserAgent(
+    window,
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36',
+)
+
+console.log('USER AGENT AFTER', navigator.userAgent)
+
+function addListener() {
+    chrome.runtime.onMessage.addListener(function (
+        request,
+        _sender,
+        _sendResponse,
+    ) {
+        switch (request.type) {
+            case 'REFRESH_SPEAKERS': {
+                SPEAKERS = request.payload
+                break
+            }
+            case 'OBSERVE_SPEAKERS': {
+                observeSpeakers()
+                break
+            }
+            case 'RECORD': {
+                State.parameters.language = 'en'
+                State.parameters.rev_api_key =
+                    '0240x0Bj4Wv4pBaSe7xYjIfrkOFAaH1x76u4w1mpZ4zY1bt9Ov8njsjJOWhYLmqtlwMxQAU5Lxg9ULKdDgtV3sve-wwM8'
+                record.initMediaRecorder()
+                break
+            }
+            default: {
+                console.log('UNKNOWN_REQUEST', request)
+                break
+            }
+        }
+    })
+}
+
+function observeSpeakers() {
+    chrome.tabs.executeScript(
+        {
+            code: `var BOT_NAME = ${JSON.stringify(
+                State.parameters.bot_name,
+            )}; var MEETING_PROVIDER=${JSON.stringify(
+                State.parameters.meeting_provider,
+            )}`,
+        },
+        function () {
+            chrome.tabs.executeScript({ file: './js/observeSpeakers.js' })
+        },
+    )
+}
+
+// make startRecording accessible from puppeteer
+// Start recording the current tab
+export async function startRecording(
+    meetingParams: State.MeetingParams,
+): Promise<Project | undefined> {
+    try {
+        State.addMeetingParams(meetingParams)
+
+        console.log('TOKEN', State.parameters.user_token)
+
+        addDefaultHeader('Authorization', State.parameters.user_token)
+        setConfig({
+            api_server_internal_url: State.parameters.api_server_baseurl,
+            api_download_internal_url: State.parameters.api_download_baseurl,
+            authorizationToken: State.parameters.user_token,
+            logError: () => {},
+        })
+
+        observeSpeakers()
+        await sleep(1000)
+        await record.initMediaRecorder()
+        const project = await record.startRecording(
+            meetingParams.project_name,
+            meetingParams.agenda,
+        )
+        return project
+    } catch (e) {
+        console.log('ERROR', e)
+        console.log(JSON.stringify(e))
+    }
+    // setTimeout(() => { record.stopRecording() }, 60000)
+}
+
+export async function stopMediaRecorder() {
+    await record.stop()
+    await streaming.stop()
+}
+
+export async function waitForUpload() {
+    await record.waitUntilComplete()
+    await streaming.waitUntilComplete()
+}
+
+export async function markMoment(
+    timestamp: number,
+    duration: number,
+    label_id: number | undefined,
+    notes?: Note[],
+) {
+    State.markMoment({ date: timestamp, duration, label_id, notes })
+}
+
+export type ChangeLanguage = {
+    meeting_url: string
+    human_transcription: boolean
+    use_my_vocabulary: boolean
+    language: string
+}
+
+export async function changeLanguage(data: ChangeLanguage) {
+    console.log('[changeLnaugage]', data)
+    if (State.parameters.language !== data.language) {
+        State.changeLanguage(data)
+        await streaming.changeLanguage()
+    }
+}
+
+const w = window as any
+w.startRecording = startRecording
+w.markMoment = markMoment
+w.stopMediaRecorder = stopMediaRecorder
+w.waitForUpload = waitForUpload
+w.changeLanguage = changeLanguage
