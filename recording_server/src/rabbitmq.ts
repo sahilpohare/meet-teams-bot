@@ -22,7 +22,6 @@ export class Consumer {
         await channel.assertQueue(Consumer.QUEUE_NAME, { durable: true });
         channel.prefetch(Consumer.PREFETCH_COUNT);
 
-        await channel.purgeQueue(Consumer.QUEUE_NAME);
         return new Consumer(channel);
     }
 
