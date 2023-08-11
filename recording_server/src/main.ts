@@ -1,13 +1,40 @@
 import { getExtensionId } from "./puppeteer";
-import { server } from "./server";
+import { server, LOGGER } from "./server";
+import { generateBranding } from './branding'
+import { recordMeetingToEnd } from './meeting'
 import { summarize } from './test_summarize'
+import { getCachedExtensionId, openBrowser } from './puppeteer'
+import { Consumer } from './rabbitmq'
 
-// console.log(process.argv);
-if (process.argv[2]?.includes('get_extension_id')) {
-    getExtensionId().then(x => console.log(x))
-} else if (process.argv[2]?.includes('summarize')) {
+(async () => {
+    if (process.argv[2]?.includes('get_extension_id')) {
+        getExtensionId().then(x => console.log(x))
+    } else if (process.argv[2]?.includes('summarize')) {
+        summarize()
+    } else {
+        try {
+            await triggerCache()
+        } catch (e) {
+            LOGGER.error(`Failed to trigger cache: ${e}`)
+        }
 
-    summarize()
-} else {
-    server()
+        await server()
+
+        const consumer: Consumer = await Consumer.init();
+        while (true) {
+            const meetingParams = await consumer.consume(Consumer.handleStartRecord);
+            console.log("params", meetingParams);
+            await recordMeetingToEnd();
+        }
+    }
+})();
+
+/// open the browser a first time to speed up the next openings
+async function triggerCache() {
+    const extensionId = await getCachedExtensionId()
+    const [browser] = await Promise.all([
+        openBrowser(extensionId),
+        generateBranding('cache').wait,
+    ])
+    await browser.close()
 }
