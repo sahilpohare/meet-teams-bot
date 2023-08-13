@@ -9,7 +9,7 @@ import {
     getCachedExtensionId,
 } from './puppeteer'
 import { sleep } from './utils'
-import { setProtection } from './instance'
+import { delSessionInRedis, setProtection } from './instance'
 import { Agenda, Note, MeetingProvider } from 'spoke_api_js'
 import { Logger, uploadLog } from './logger'
 
@@ -198,7 +198,10 @@ export async function startRecordMeeting(meetingParams: MeetingParams) {
     CURRENT_MEETING.param = meetingParams
 
     try {
-        if (meetingParams.bot_branding || meetingParams.custom_branding_bot_path) {
+        if (
+            meetingParams.bot_branding ||
+            meetingParams.custom_branding_bot_path
+        ) {
             CURRENT_MEETING.brandingGenerateProcess = generateBranding(
                 meetingParams.bot_name,
                 meetingParams.custom_branding_bot_path,
@@ -211,15 +214,14 @@ export async function startRecordMeeting(meetingParams: MeetingParams) {
         CURRENT_MEETING.meeting.browser = await openBrowser(extensionId)
         CURRENT_MEETING.meeting.backgroundPage = await findBackgroundPage(
             CURRENT_MEETING.meeting.browser,
-            extensionId
+            extensionId,
         )
         CURRENT_MEETING.logger.info('Extension found', { extensionId })
 
-        const { meetingId, password } =
-            await MEETING_PROVIDER.parseMeetingUrl(
-                CURRENT_MEETING.meeting.browser,
-                meetingParams.meeting_url,
-            )
+        const { meetingId, password } = await MEETING_PROVIDER.parseMeetingUrl(
+            CURRENT_MEETING.meeting.browser,
+            meetingParams.meeting_url,
+        )
         CURRENT_MEETING.logger.info('meeting id found', { meetingId })
 
         const meetingLink = MEETING_PROVIDER.getMeetingLink(
@@ -240,17 +242,23 @@ export async function startRecordMeeting(meetingParams: MeetingParams) {
             4 * 60 * 60 * 1000, // 4 hours
         )
 
-        await MEETING_PROVIDER.joinMeeting(CURRENT_MEETING.meeting.page, meetingParams)
+        await MEETING_PROVIDER.joinMeeting(
+            CURRENT_MEETING.meeting.page,
+            meetingParams,
+        )
         listenPage(CURRENT_MEETING.meeting.backgroundPage)
 
         meetingParams.api_server_baseurl = process.env.API_SERVER_BASEURL
         meetingParams.api_download_baseurl = process.env.API_DOWNLOAD_BASEURL
         meetingParams.rev_api_key = process.env.REV_API_KEY
 
-        const project = await CURRENT_MEETING.meeting.backgroundPage.evaluate(async (meetingParams) => {
-            const w = window as any
-            return await w.startRecording(meetingParams)
-        }, meetingParams)
+        const project = await CURRENT_MEETING.meeting.backgroundPage.evaluate(
+            async (meetingParams) => {
+                const w = window as any
+                return await w.startRecording(meetingParams)
+            },
+            meetingParams,
+        )
 
         if (project == null) {
             throw 'failed creating project'
@@ -285,10 +293,14 @@ async function cleanEverything(failed: boolean) {
     } catch (e) {
         CURRENT_MEETING.logger.error(`failed to unset protection: ${e}`)
     }
+    delSessionInRedis(CURRENT_MEETING.param.api_session_id)
 }
 
 export async function recordMeetingToEnd() {
-    await MEETING_PROVIDER.waitForEndMeeting(CURRENT_MEETING.param, CURRENT_MEETING.meeting.page)
+    await MEETING_PROVIDER.waitForEndMeeting(
+        CURRENT_MEETING.param,
+        CURRENT_MEETING.meeting.page,
+    )
     CURRENT_MEETING.logger.info('after waitForEndMeeting')
 
     try {
@@ -363,12 +375,7 @@ async function stopRecordingInternal(param: Session) {
                 { session_id: CURRENT_MEETING.param.api_session_id },
             )
         } catch (e) {}
-        let {
-            page,
-            meetingTimeoutInterval,
-            browser,
-            backgroundPage,
-        } = meeting
+        let { page, meetingTimeoutInterval, browser, backgroundPage } = meeting
         await backgroundPage.evaluate(async () => {
             const w = window as any
             await w.stopMediaRecorder()

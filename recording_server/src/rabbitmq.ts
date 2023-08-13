@@ -1,51 +1,50 @@
-import { connect, Channel } from 'amqplib';
+import { connect, Channel } from 'amqplib'
 import { MeetingParams, startRecordMeeting, setInitalParams } from './meeting'
-import { LOGGER } from "./server";
-import { setProtection } from './instance'
-import { sleep } from './utils'
+import { LOGGER } from './server'
+import { LOCK_INSTANCE_AT_STARTUP, setProtection } from './instance'
 import { notifyApp, patchEvent } from './calendar'
+import { setLoggerProjectId } from './logger'
 
-//
-// TODO HANDLE ERRORS
-//
+const POD_NAME = process.env.POD_NAME
 
 export class Consumer {
-    static readonly QUEUE_NAME = "worker_bot_queue";
-    static readonly PREFETCH_COUNT = 1;
+    static readonly QUEUE_NAME = LOCK_INSTANCE_AT_STARTUP
+        ? POD_NAME
+        : 'worker_bot_queue'
+    static readonly PREFETCH_COUNT = 1
 
     private constructor(private channel: Channel) {}
 
     static async init(): Promise<Consumer> {
-        const connection = await connect(process.env.AMQP_ADDRESS);
+        const connection = await connect(process.env.AMQP_ADDRESS)
 
-        const channel = await connection.createChannel();
-        await channel.assertQueue(Consumer.QUEUE_NAME, { durable: true });
-        channel.prefetch(Consumer.PREFETCH_COUNT);
+        const channel = await connection.createChannel()
+        await channel.assertQueue(Consumer.QUEUE_NAME, { durable: true })
+        channel.prefetch(Consumer.PREFETCH_COUNT)
 
-        return new Consumer(channel);
+        return new Consumer(channel)
     }
 
     async consume(handler): Promise<MeetingParams> {
         return new Promise((resolve, reject) => {
             this.channel.consume(Consumer.QUEUE_NAME, async (message) => {
-              if (message !== null) {
-                  await this.channel.cancel(message.fields.consumerTag);
+                if (message !== null) {
+                    await this.channel.cancel(message.fields.consumerTag)
 
-                  const meetingParams = JSON.parse(message.content);
-                  await handler(meetingParams);
-                  this.channel.ack(message);
-                  resolve(meetingParams);
-              } else {
-                  console.log('Consumer cancelled by server');
-                  reject(); // TODO errors
-              }
-            });
-        });
+                    const meetingParams = JSON.parse(message.content)
+                    await handler(meetingParams)
+                    this.channel.ack(message)
+                    resolve(meetingParams)
+                } else {
+                    console.log('Consumer cancelled by server')
+                    reject() // TODO errors
+                }
+            })
+        })
     }
 
     static async handleStartRecord(data: MeetingParams) {
         // Prevent instance for beeing scaled down
-        await setProtection(true)
 
         let logger = LOGGER.new({
             user_id: data.user_id,
@@ -53,6 +52,10 @@ export class Consumer {
         })
 
         try {
+            await setProtection(true)
+            if (LOCK_INSTANCE_AT_STARTUP) {
+                await notifyApp('PrepareRecording', data, {}, {})
+            }
             logger.info(`Start record`, {
                 human_transcription: data.human_transcription,
                 use_my_vocabulary: data.use_my_vocabulary,
@@ -64,14 +67,35 @@ export class Consumer {
             setInitalParams(data, logger)
 
             try {
-                const project = await startRecordMeeting(data);
+                const project = await startRecordMeeting(data)
+                setLoggerProjectId(project?.id)
 
+                if (
+                    LOCK_INSTANCE_AT_STARTUP &&
+                    !(
+                        data.has_installed_extension &&
+                        data.meetingProvider === 'Meet'
+                    )
+                ) {
+                    await notifyApp(
+                        'Recording',
+                        data,
+                        {
+                            session_id: data.api_session_id,
+                            project_id: project.id,
+                        },
+                        {
+                            session_id: data.api_session_id,
+                            project,
+                        },
+                    )
+                }
                 if (data.event != null) {
                     try {
                         await patchEvent(data.user_token, {
                             status: 'Recording',
                             session_id: data.api_session_id,
-                id: data.event?.id,
+                            id: data.event?.id,
                             project_id: project.id,
                         })
                     } catch (e) {
@@ -88,7 +112,10 @@ export class Consumer {
                             { error: JSON.stringify(e) },
                         )
                     } catch (e) {
-                        logger.error(`error in start_record_event catch handler, terminating instance`, e)
+                        logger.error(
+                            `error in start_record_event catch handler, terminating instance`,
+                            e,
+                        )
                     }
                 }
             }

@@ -8,16 +8,17 @@ import {
     StopRecordParams,
 } from './meeting'
 import { Logger } from './logger'
-import { notifyApp, patchEvent } from './calendar'
-import {
-    terminateInstance,
-    setProtection,
-} from './instance'
+import { notifyApp } from './calendar'
+import { terminateInstance } from './instance'
 import { PORT } from './instance'
+import * as redis from 'redis'
 import { sleep } from './utils'
 
-export let PROJECT_ID: number | undefined = undefined
 export const LOGGER = new Logger({})
+
+export const clientRedis = redis.createClient({
+    url: process.env.REDIS_URL,
+})
 
 // Constants
 const HOST = '0.0.0.0'
@@ -60,69 +61,6 @@ export async function server() {
         }
 
         next()
-    })
-
-    app.post('/start_record_event', jsonParser, async (req, res) => {
-        // await setProtection(true)
-        const data: MeetingParams = req.body
-
-        await notifyApp('PrepareRecording', data, {}, {})
-        let logger = LOGGER.new({
-            user_id: data.user_id,
-            meeting_url: data.meeting_url,
-        })
-        logger.info(`Start record`, {
-            human_transcription: data.human_transcription,
-            use_my_vocabulary: data.use_my_vocabulary,
-            language: data.language,
-            project_name: data.project_name,
-            email: data.email,
-        })
-        meeting.setInitalParams(data, logger)
-        meeting
-            .startRecordMeeting(data)
-            .then(async (project) => {
-                PROJECT_ID = project?.id
-                if (
-                    !(
-                        data.has_installed_extension &&
-                        data.meetingProvider === 'Meet'
-                    )
-                ) {
-                    await notifyApp(
-                        'Recording',
-                        data,
-                        {
-                            session_id: data.api_session_id,
-                            project_id: project.id,
-                        },
-                        {
-                            session_id: data.api_session_id,
-                            project,
-                        },
-                    )
-                }
-            })
-            .catch(async (e) => {
-                try {
-                    await notifyApp(
-                        'Error',
-                        data,
-                        { error: JSON.stringify(e) },
-                        { error: JSON.stringify(e) },
-                    )
-                    // res.status(500).send(JSON.stringify(e));
-                } catch (e) {
-                    console.error(
-                        'error in start_record_event catch handler, terminating instance',
-                        e,
-                    )
-                } finally {
-                    await sleep(30000)
-                    await terminateInstance()
-                }
-            })
-        res.send('ok')
     })
 
     app.post('/status', jsonParser, async (req, res) => {

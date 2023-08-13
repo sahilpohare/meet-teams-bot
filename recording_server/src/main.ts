@@ -1,16 +1,15 @@
-import { getExtensionId } from "./puppeteer";
-import { server, LOGGER } from "./server";
+import { getExtensionId } from './puppeteer'
+import { server, LOGGER } from './server'
 import { generateBranding } from './branding'
 import { recordMeetingToEnd } from './meeting'
 import { summarize } from './test_summarize'
 import { getCachedExtensionId, openBrowser } from './puppeteer'
 import { Consumer } from './rabbitmq'
-
-(async () => {
+import { LOCK_INSTANCE_AT_STARTUP, terminateInstance } from './instance'
+import { sleep } from './utils'
+;(async () => {
     if (process.argv[2]?.includes('get_extension_id')) {
-        getExtensionId().then(x => console.log(x))
-    } else if (process.argv[2]?.includes('summarize')) {
-        summarize()
+        getExtensionId().then((x) => console.log(x))
     } else {
         try {
             await triggerCache()
@@ -20,14 +19,21 @@ import { Consumer } from './rabbitmq'
 
         await server()
 
-        const consumer: Consumer = await Consumer.init();
+        const consumer: Consumer = await Consumer.init()
         while (true) {
-            const meetingParams = await consumer.consume(Consumer.handleStartRecord);
-            console.log("params", meetingParams);
-            await recordMeetingToEnd();
+            const meetingParams = await consumer.consume(
+                Consumer.handleStartRecord,
+            )
+            console.log('params', meetingParams)
+            await recordMeetingToEnd()
+
+            if (LOCK_INSTANCE_AT_STARTUP) {
+                await sleep(30000)
+                await terminateInstance()
+            }
         }
     }
-})();
+})()
 
 /// open the browser a first time to speed up the next openings
 async function triggerCache() {
