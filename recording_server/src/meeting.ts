@@ -64,7 +64,13 @@ let MEETING_PROVIDER = {
 }
 
 export const CURRENT_MEETING: MeetingHandle = {
-    meeting: null,
+    meeting: {
+        page: null,
+        backgroundPage: null,
+        browser: null,
+        meetingTimeoutInterval: null,
+        session_id: null,
+    },
     param: null,
     status: null,
     project: null,
@@ -137,20 +143,15 @@ function getMeetingGlobal(): Meeting | null {
     return CURRENT_MEETING.meeting
 }
 
-function setMeetingGlobal(
-    param: MeetingParams,
-    data: Meeting | null,
-    logger: Logger,
-) {
-    CURRENT_MEETING.meeting = data
-    CURRENT_MEETING.param = param
-    CURRENT_MEETING.status = 'Recording'
-    CURRENT_MEETING.logger = logger
-}
-
 export function unsetMeetingGlobal() {
     CURRENT_MEETING.logger.info(`Deregistering meeting`)
-    CURRENT_MEETING.meeting = null
+    CURRENT_MEETING.meeting = {
+        page: null,
+        backgroundPage: null,
+        browser: null,
+        meetingTimeoutInterval: null,
+        session_id: null,
+    }
     CURRENT_MEETING.param = null
     CURRENT_MEETING.status = null
     CURRENT_MEETING.error = null
@@ -188,7 +189,9 @@ export function setInitalParams(meetingParams: MeetingParams, logger: Logger) {
     )
     unsetMeetingGlobal()
     setMeetingProvide(meetingParams.meetingProvider)
-    setMeetingGlobal(meetingParams, null, logger)
+    CURRENT_MEETING.param = meetingParams
+    CURRENT_MEETING.status = 'Recording'
+    CURRENT_MEETING.logger = logger
 }
 
 // Starts the record
@@ -292,7 +295,11 @@ async function cleanEverything(failed: boolean) {
     } catch (e) {
         CURRENT_MEETING.logger.error(`failed to unset protection: ${e}`)
     }
-    delSessionInRedis(CURRENT_MEETING.param.session_id)
+    try {
+        await delSessionInRedis(CURRENT_MEETING.param.session_id)
+    } catch (e) {
+        CURRENT_MEETING.logger.error(`failed to del session in redis: ${e}`)
+    }
 }
 
 export async function recordMeetingToEnd() {

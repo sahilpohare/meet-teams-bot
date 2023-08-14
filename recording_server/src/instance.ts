@@ -17,17 +17,17 @@ export type MeetingBotSession = {
 
 export const REDIS_SESSION_EXPIRATION = 60 * 60 * 4
 
-export function setSessionInRedis(
+export async function setSessionInRedis(
     session_id: string,
     session: MeetingBotSession,
 ): Promise<string> {
-    const res = clientRedis.set(session_id, JSON.stringify(session))
-    clientRedis.expire(session_id, REDIS_SESSION_EXPIRATION)
+    const res = await clientRedis.set(session_id, JSON.stringify(session))
+    await clientRedis.expire(session_id, REDIS_SESSION_EXPIRATION)
     return res
 }
 
-export function delSessionInRedis(session_id: string): Promise<number> {
-    return clientRedis.del(session_id)
+export async function delSessionInRedis(session_id: string): Promise<number> {
+    return await clientRedis.del(session_id)
 }
 
 export function setProtection(enabled: boolean): Promise<void> {

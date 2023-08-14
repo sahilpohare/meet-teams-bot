@@ -102,6 +102,7 @@ export class Consumer {
                     }
                 }
             } catch (e) {
+                logger.error(`Unknown error`, e)
                 if (data.event != null) {
                     try {
                         await notifyApp(
