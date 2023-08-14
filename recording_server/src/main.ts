@@ -24,9 +24,11 @@ import { sleep } from './utils'
         }
 
         await server()
+        console.log('after server started')
 
         const consumer: Consumer = await Consumer.init()
         while (true) {
+            console.log('start consuming rabbitmq messages')
             const data = await consumer.consume(Consumer.handleStartRecord)
             let meetingSession = {
                 bot_ip: POD_IP,

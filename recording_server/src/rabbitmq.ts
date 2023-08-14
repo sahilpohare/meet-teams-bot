@@ -1,12 +1,7 @@
 import { connect, Channel } from 'amqplib'
 import { MeetingParams, startRecordMeeting, setInitalParams } from './meeting'
 import { LOGGER } from './server'
-import {
-    LOCK_INSTANCE_AT_STARTUP,
-    POD_IP,
-    setProtection,
-    setSessionInRedis,
-} from './instance'
+import { LOCK_INSTANCE_AT_STARTUP, setProtection } from './instance'
 import { notifyApp, patchEvent } from './calendar'
 import { setLoggerProjectId } from './logger'
 
