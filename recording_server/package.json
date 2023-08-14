@@ -16,7 +16,7 @@
     "puppeteer-extra": "^3.2.3",
     "puppeteer-extra-plugin-stealth": "^2.9.0",
     "ramda": "^0.28.0",
-    "redis": "^4.0.0-rc.1",
+    "redis": "^4.6.7",
     "retry-axios": "^2.6.0",
     "spoke_api_js": "file:../../spoke_api_js",
     "tslib": "^2.3.1",

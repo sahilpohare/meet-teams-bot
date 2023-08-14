@@ -1,15 +1,8 @@
 import * as meeting from './meeting'
 import * as express from 'express'
 import * as bodyParser from 'body-parser'
-import {
-    ChangeLanguage,
-    MeetingParams,
-    MarkMomentParams,
-    StopRecordParams,
-} from './meeting'
+import { ChangeLanguage, MarkMomentParams, StopRecordParams } from './meeting'
 import { Logger } from './logger'
-import { notifyApp } from './calendar'
-import { terminateInstance } from './instance'
 import { PORT } from './instance'
 import * as redis from 'redis'
 import { sleep } from './utils'

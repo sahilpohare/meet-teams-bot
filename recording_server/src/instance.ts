@@ -7,15 +7,27 @@ export const PORT = 8080
 export const LOCK_INSTANCE_AT_STARTUP =
     process.env.LOCK_INSTANCE_AT_STARTUP === 'true'
 export const API_SERVER_BASEURL = process.env.API_SERVER_BASEURL
-const POD_IP = `${process.env.POD_IP}:${PORT}`
-export const MEETING_BOT_SESSION_KEY = 'meeting_bot_session'
+export const POD_IP = `${process.env.POD_IP}:${PORT}`
 
-export function setSessionInRedis(session_id: string) {
-    return clientRedis.hset(MEETING_BOT_SESSION_KEY, session_id, POD_IP)
+export type MeetingBotSession = {
+    user_id: number
+    bot_ip: string
+    meeting_url: string
 }
 
-export function delSessionInRedis(session_id: string) {
-    return clientRedis.hdel(MEETING_BOT_SESSION_KEY, session_id)
+export const REDIS_SESSION_EXPIRATION = 60 * 60 * 4
+
+export function setSessionInRedis(
+    session_id: string,
+    session: MeetingBotSession,
+): Promise<string> {
+    const res = clientRedis.set(session_id, JSON.stringify(session))
+    clientRedis.expire(session_id, REDIS_SESSION_EXPIRATION)
+    return res
+}
+
+export function delSessionInRedis(session_id: string): Promise<number> {
+    return clientRedis.del(session_id)
 }
 
 export function setProtection(enabled: boolean): Promise<void> {

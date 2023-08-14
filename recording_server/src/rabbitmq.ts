@@ -1,7 +1,12 @@
 import { connect, Channel } from 'amqplib'
 import { MeetingParams, startRecordMeeting, setInitalParams } from './meeting'
 import { LOGGER } from './server'
-import { LOCK_INSTANCE_AT_STARTUP, setProtection } from './instance'
+import {
+    LOCK_INSTANCE_AT_STARTUP,
+    POD_IP,
+    setProtection,
+    setSessionInRedis,
+} from './instance'
 import { notifyApp, patchEvent } from './calendar'
 import { setLoggerProjectId } from './logger'
 
@@ -57,7 +62,6 @@ export class Consumer {
                 await notifyApp('PrepareRecording', data, {}, {})
             }
             logger.info(`Start record`, {
-                human_transcription: data.human_transcription,
                 use_my_vocabulary: data.use_my_vocabulary,
                 language: data.language,
                 project_name: data.project_name,
@@ -81,11 +85,11 @@ export class Consumer {
                         'Recording',
                         data,
                         {
-                            session_id: data.api_session_id,
+                            session_id: data.session_id,
                             project_id: project.id,
                         },
                         {
-                            session_id: data.api_session_id,
+                            session_id: data.session_id,
                             project,
                         },
                     )
@@ -94,7 +98,7 @@ export class Consumer {
                     try {
                         await patchEvent(data.user_token, {
                             status: 'Recording',
-                            session_id: data.api_session_id,
+                            session_id: data.session_id,
                             id: data.event?.id,
                             project_id: project.id,
                         })

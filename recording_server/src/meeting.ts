@@ -92,7 +92,7 @@ type Meeting = {
     backgroundPage: Page
     browser: puppeteer.Browser
     meetingTimeoutInterval: NodeJS.Timeout
-    api_session_id: string
+    session_id: string
 }
 type Session = {
     meeting_url: string
@@ -105,7 +105,6 @@ export type StatusParams = {
 }
 
 export type MeetingParams = {
-    human_transcription: boolean
     use_my_vocabulary: boolean
     language: string
     meeting_url: string
@@ -113,7 +112,7 @@ export type MeetingParams = {
     bot_name: string
     project_name: string
     user_id: number
-    api_session_id: string
+    session_id: string
     email: string
     meetingProvider: MeetingProvider
     api_server_baseurl?: string
@@ -293,7 +292,7 @@ async function cleanEverything(failed: boolean) {
     } catch (e) {
         CURRENT_MEETING.logger.error(`failed to unset protection: ${e}`)
     }
-    delSessionInRedis(CURRENT_MEETING.param.api_session_id)
+    delSessionInRedis(CURRENT_MEETING.param.session_id)
 }
 
 export async function recordMeetingToEnd() {
@@ -314,7 +313,6 @@ export async function recordMeetingToEnd() {
 
 export type ChangeLanguage = {
     meeting_url: string
-    human_transcription: boolean
     use_my_vocabulary: boolean
     language: string
     user_id: number
@@ -372,7 +370,7 @@ async function stopRecordingInternal(param: Session) {
                 'EndRecording',
                 CURRENT_MEETING.param,
                 {},
-                { session_id: CURRENT_MEETING.param.api_session_id },
+                { session_id: CURRENT_MEETING.param.session_id },
             )
         } catch (e) {}
         let { page, meetingTimeoutInterval, browser, backgroundPage } = meeting

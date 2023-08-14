@@ -14,7 +14,6 @@ import {
 import { Asset, Project, api } from 'spoke_api_js'
 
 import { EditorWrapper } from 'spoke_api_js'
-import { MeetingProvider } from 'spoke_api_js'
 import { SPEAKERS } from './background'
 import { newSerialQueue } from './queue'
 import { parameters } from './background'
@@ -424,7 +423,7 @@ export async function sendDataChunks(
                 60 * 60 * 3
         ) {
             let params = {
-                session_id: parameters.api_session_id,
+                session_id: parameters.session_id,
                 user_token: parameters.user_token,
             }
             console.log('no speaker since too long')

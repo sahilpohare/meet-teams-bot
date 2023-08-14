@@ -157,7 +157,6 @@ export async function markMoment(
 
 export type ChangeLanguage = {
     meeting_url: string
-    human_transcription: boolean
     use_my_vocabulary: boolean
     language: string
 }

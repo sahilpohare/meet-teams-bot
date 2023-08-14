@@ -2,7 +2,6 @@ import { ChangeLanguage } from './background'
 import { MeetingProvider, Marker, Agenda } from 'spoke_api_js'
 
 export type MeetingParams = {
-    human_transcription: boolean
     use_my_vocabulary: boolean
     language: string
     user_token: string
@@ -14,7 +13,7 @@ export type MeetingParams = {
     meetingProvider: MeetingProvider
     api_server_baseurl: string
     api_download_baseurl: string
-    api_session_id: string
+    session_id: string
     rev_api_key: string
     agenda?: Agenda
 }
@@ -31,21 +30,19 @@ export type State = {
     meeting_provider: MeetingProvider
     api_server_baseurl: string
     api_download_baseurl: string
-    api_session_id: string
+    session_id: string
     rev_api_key: string
     user_id: number
     agenda?: Agenda
 }
 
 export type Preferences = {
-    human_transcription: boolean
     use_my_vocabulary: boolean
     audio_only: boolean
 }
 
 export const parameters: State = {
     preferences: {
-        human_transcription: false,
         use_my_vocabulary: false,
         audio_only: false,
     },
@@ -59,15 +56,13 @@ export const parameters: State = {
     email: '',
     meeting_url: '',
     meeting_provider: 'Zoom',
-    api_session_id: '',
+    session_id: '',
     rev_api_key: '',
     user_id: 0,
     agenda: undefined,
 }
 
 export function addMeetingParams(meetingParams: MeetingParams) {
-    parameters.preferences.human_transcription =
-        meetingParams.human_transcription
     parameters.preferences.use_my_vocabulary = meetingParams.use_my_vocabulary
     parameters.language = meetingParams.language
     parameters.user_token = meetingParams.user_token
@@ -77,7 +72,7 @@ export function addMeetingParams(meetingParams: MeetingParams) {
     parameters.meeting_provider = meetingParams.meetingProvider
     parameters.api_server_baseurl = meetingParams.api_server_baseurl
     parameters.api_download_baseurl = meetingParams.api_download_baseurl
-    parameters.api_session_id = meetingParams.api_session_id
+    parameters.session_id = meetingParams.session_id
     parameters.rev_api_key = meetingParams.rev_api_key
     parameters.user_id = meetingParams.user_id
     parameters.agenda = meetingParams.agenda
@@ -86,8 +81,6 @@ export function addMeetingParams(meetingParams: MeetingParams) {
 }
 
 export function changeLanguage(changeLanguage: ChangeLanguage) {
-    parameters.preferences.human_transcription =
-        changeLanguage.human_transcription
     parameters.preferences.use_my_vocabulary = changeLanguage.use_my_vocabulary
     parameters.language = changeLanguage.language
     console.log('setting language to: ', changeLanguage.language)

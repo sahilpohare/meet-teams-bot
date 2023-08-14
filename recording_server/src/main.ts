@@ -5,7 +5,13 @@ import { recordMeetingToEnd } from './meeting'
 import { summarize } from './test_summarize'
 import { getCachedExtensionId, openBrowser } from './puppeteer'
 import { Consumer } from './rabbitmq'
-import { LOCK_INSTANCE_AT_STARTUP, terminateInstance } from './instance'
+import {
+    LOCK_INSTANCE_AT_STARTUP,
+    POD_IP,
+    delSessionInRedis,
+    setSessionInRedis,
+    terminateInstance,
+} from './instance'
 import { sleep } from './utils'
 ;(async () => {
     if (process.argv[2]?.includes('get_extension_id')) {
@@ -21,12 +27,29 @@ import { sleep } from './utils'
 
         const consumer: Consumer = await Consumer.init()
         while (true) {
-            const meetingParams = await consumer.consume(
-                Consumer.handleStartRecord,
-            )
-            console.log('params', meetingParams)
+            const data = await consumer.consume(Consumer.handleStartRecord)
+            let meetingSession = {
+                bot_ip: POD_IP,
+                user_id: data.user_id,
+                meeting_url: data.meeting_url,
+            }
+            console.log('recording started with params', data, meetingSession)
+            try {
+                await setSessionInRedis(data.session_id, meetingSession)
+            } catch (e) {
+                console.error('fail to set session in redis: ', e)
+            }
             await recordMeetingToEnd()
+            console.log(
+                'meeting record done deleting session in redis',
+                meetingSession,
+            )
 
+            try {
+                await delSessionInRedis(data.session_id)
+            } catch (e) {
+                console.error('fail delete session in redis: ', e)
+            }
             if (LOCK_INSTANCE_AT_STARTUP) {
                 await sleep(30000)
                 await terminateInstance()
