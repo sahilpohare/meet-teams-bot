@@ -9,6 +9,7 @@ import { sleep } from './utils'
 
 export const LOGGER = new Logger({})
 
+console.log('redis url: ', process.env.REDIS_URL)
 export const clientRedis = redis.createClient({
     url: process.env.REDIS_URL,
 })
@@ -74,14 +75,6 @@ export async function server() {
                 meeting_url: data.meeting_url,
                 current_meeting: meeting.CURRENT_MEETING,
             })
-            if (
-                meeting.CURRENT_MEETING.param?.meeting_url != null &&
-                meeting.CURRENT_MEETING.param?.meeting_url !== '' &&
-                meeting.CURRENT_MEETING.param?.meeting_url !== data.meeting_url
-            ) {
-                res.status(500).send('bad meeting url')
-                return
-            }
             for (let i = 0; i < 100; i++) {
                 if (statusReady()) {
                     if (meeting.CURRENT_MEETING.error != null) {

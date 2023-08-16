@@ -2,10 +2,15 @@ import { connect, Channel } from 'amqplib'
 import { MeetingParams, startRecordMeeting, setInitalParams } from './meeting'
 import { LOGGER } from './server'
 import { LOCK_INSTANCE_AT_STARTUP, setProtection } from './instance'
-import { notifyApp, patchEvent } from './calendar'
+import { notify, notifyApp, patchEvent } from './calendar'
 import { setLoggerProjectId } from './logger'
 
 const POD_NAME = process.env.POD_NAME
+
+export type StartRecordingResult = {
+    params: MeetingParams
+    error: any | null
+}
 
 export class Consumer {
     static readonly QUEUE_NAME = LOCK_INSTANCE_AT_STARTUP
@@ -25,16 +30,22 @@ export class Consumer {
         return new Consumer(channel)
     }
 
-    async consume(handler): Promise<MeetingParams> {
+    async consume(handler): Promise<StartRecordingResult> {
         return new Promise((resolve, reject) => {
             this.channel.consume(Consumer.QUEUE_NAME, async (message) => {
                 if (message !== null) {
                     await this.channel.cancel(message.fields.consumerTag)
 
                     const meetingParams = JSON.parse(message.content)
-                    await handler(meetingParams)
+                    let error = null
+                    try {
+                        await handler(meetingParams)
+                    } catch (e) {
+                        error = e
+                    }
+                    //TODO: retry in rabbitmq
                     this.channel.ack(message)
-                    resolve(meetingParams)
+                    resolve({ params: meetingParams, error: error })
                 } else {
                     console.log('Consumer cancelled by server')
                     reject() // TODO errors
@@ -43,6 +54,7 @@ export class Consumer {
         })
     }
 
+    // throw error if start recoridng fail
     static async handleStartRecord(data: MeetingParams) {
         // Prevent instance for beeing scaled down
 
@@ -51,76 +63,46 @@ export class Consumer {
             meeting_url: data.meeting_url,
         })
 
-        try {
-            await setProtection(true)
-            if (LOCK_INSTANCE_AT_STARTUP) {
-                await notifyApp('PrepareRecording', data, {}, {})
-            }
-            logger.info(`Start record`, {
-                use_my_vocabulary: data.use_my_vocabulary,
-                language: data.language,
-                project_name: data.project_name,
-                email: data.email,
-            })
-
-            setInitalParams(data, logger)
-
+        await setProtection(true)
+        if (LOCK_INSTANCE_AT_STARTUP) {
             try {
-                const project = await startRecordMeeting(data)
-                setLoggerProjectId(project?.id)
-
-                if (
-                    LOCK_INSTANCE_AT_STARTUP &&
-                    !(
-                        data.has_installed_extension &&
-                        data.meetingProvider === 'Meet'
-                    )
-                ) {
-                    await notifyApp(
-                        'Recording',
-                        data,
-                        {
-                            session_id: data.session_id,
-                            project_id: project.id,
-                        },
-                        {
-                            session_id: data.session_id,
-                            project,
-                        },
-                    )
-                }
-                if (data.event != null) {
-                    try {
-                        await patchEvent(data.user_token, {
-                            status: 'Recording',
-                            session_id: data.session_id,
-                            id: data.event?.id,
-                            project_id: project.id,
-                        })
-                    } catch (e) {
-                        logger.error(`error patching event`, e)
-                    }
-                }
+                await notifyApp('PrepareRecording', data, {}, {})
             } catch (e) {
-                logger.error(`Unknown error`, e)
-                if (data.event != null) {
-                    try {
-                        await notifyApp(
-                            'Error',
-                            data,
-                            { error: JSON.stringify(e) },
-                            { error: JSON.stringify(e) },
-                        )
-                    } catch (e) {
-                        logger.error(
-                            `error in start_record_event catch handler, terminating instance`,
-                            e,
-                        )
-                    }
-                }
+                logger.error(`fail to nitfy app`, e)
             }
+        }
+
+        setInitalParams(data, logger)
+
+        const project = await startRecordMeeting(data)
+        setLoggerProjectId(project?.id)
+        try {
+            await notify(data.user_token, {
+                message: 'BotEntered',
+                user_id: data.user_id,
+                payload: {
+                    session: data.session_id,
+                    project,
+                },
+            })
         } catch (e) {
-            logger.error(`Unknown error`, e)
+            logger.error(`fail to nitfy app`, e)
+        }
+        try {
+            await notifyApp(
+                'Recording',
+                data,
+                {
+                    session_id: data.session_id,
+                    project_id: project.id,
+                },
+                {
+                    session_id: data.session_id,
+                    project,
+                },
+            )
+        } catch (e) {
+            logger.error(`fail to nitfy app`, e)
         }
     }
 }
