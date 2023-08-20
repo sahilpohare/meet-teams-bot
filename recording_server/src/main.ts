@@ -79,6 +79,7 @@ import { exit } from 'process'
         if (LOCK_INSTANCE_AT_STARTUP) {
             await terminateInstance()
         }
+        console.log('exiting instance')
         exit(0)
     }
 })()

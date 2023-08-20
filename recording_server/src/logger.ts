@@ -1,7 +1,7 @@
 import { LOGGER } from './server'
 import { exec } from 'child_process'
 import axios from 'axios'
-import { truncate, rmdir, unlink } from 'fs/promises'
+import { rmdir, unlink } from 'fs/promises'
 import { CURRENT_MEETING } from './meeting'
 import { s3cp, BUCKET_NAME } from './s3'
 import { getFiles } from './utils'
@@ -95,7 +95,6 @@ export async function uploadLog() {
     try {
         await s3cp(process.env.LOG_FILE, link)
         const s3File = `https://${BUCKET_NAME}.s3.amazonaws.com/${link}`
-        await truncate(process.env.LOG_FILE, 0)
         const allScreenshotFiles = []
         console.log('get screenshot files')
         for await (const f of getFiles('./screenshot')) {
