@@ -291,11 +291,6 @@ async function cleanEverything(failed: boolean) {
     }
     await cleanMeeting(CURRENT_MEETING.meeting)
     try {
-        await setProtection(false)
-    } catch (e) {
-        CURRENT_MEETING.logger.error(`failed to unset protection: ${e}`)
-    }
-    try {
         await delSessionInRedis(CURRENT_MEETING.param.session_id)
     } catch (e) {
         CURRENT_MEETING.logger.error(`failed to del session in redis: ${e}`)
