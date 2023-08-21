@@ -9,14 +9,14 @@ import {
     getCachedExtensionId,
 } from './puppeteer'
 import { sleep } from './utils'
-import { setProtection, unlockInstance, detachZoomSession } from './instance'
+import { delSessionInRedis } from './instance'
 import { Agenda, Note, MeetingProvider } from 'spoke_api_js'
 import { Logger, uploadLog } from './logger'
 
 import * as TeamsProvider from './meeting/teams'
 import * as ZoomProvider from './meeting/zoom'
 import * as MeetProvider from './meeting/meet'
-import { generateBranding, playBranding } from './branding'
+import { BrandingHandle, generateBranding, playBranding } from './branding'
 
 function detectMeetingProvider(url: string) {
     if (url.includes('https://teams')) {
@@ -64,12 +64,20 @@ let MEETING_PROVIDER = {
 }
 
 export const CURRENT_MEETING: MeetingHandle = {
-    meeting: null,
+    meeting: {
+        page: null,
+        backgroundPage: null,
+        browser: null,
+        meetingTimeoutInterval: null,
+        session_id: null,
+    },
     param: null,
     status: null,
     project: null,
     error: null,
     logger: new Logger({ owner_id: -1 }),
+    brandingGenerateProcess: null,
+    brandingPlayProcess: null,
 }
 
 type MeetingHandle = {
@@ -79,6 +87,8 @@ type MeetingHandle = {
     error: any | null
     meeting: Meeting | null
     param: MeetingParams | null
+    brandingGenerateProcess: BrandingHandle | null
+    brandingPlayProcess: BrandingHandle | null
 }
 
 type MeetingStatus = 'Recording' | 'Cleanup' | 'Done'
@@ -86,10 +96,9 @@ type MeetingStatus = 'Recording' | 'Cleanup' | 'Done'
 type Meeting = {
     page: Page
     backgroundPage: Page
-    intervalId: NodeJS.Timeout
     browser: puppeteer.Browser
     meetingTimeoutInterval: NodeJS.Timeout
-    api_session_id: string
+    session_id: string
 }
 type Session = {
     meeting_url: string
@@ -102,7 +111,6 @@ export type StatusParams = {
 }
 
 export type MeetingParams = {
-    human_transcription: boolean
     use_my_vocabulary: boolean
     language: string
     meeting_url: string
@@ -110,7 +118,7 @@ export type MeetingParams = {
     bot_name: string
     project_name: string
     user_id: number
-    api_session_id: string
+    session_id: string
     email: string
     meetingProvider: MeetingProvider
     api_server_baseurl?: string
@@ -135,20 +143,15 @@ function getMeetingGlobal(): Meeting | null {
     return CURRENT_MEETING.meeting
 }
 
-function setMeetingGlobal(
-    param: MeetingParams,
-    data: Meeting | null,
-    logger: Logger,
-) {
-    CURRENT_MEETING.meeting = data
-    CURRENT_MEETING.param = param
-    CURRENT_MEETING.status = 'Recording'
-    CURRENT_MEETING.logger = logger
-}
-
 export function unsetMeetingGlobal() {
     CURRENT_MEETING.logger.info(`Deregistering meeting`)
-    CURRENT_MEETING.meeting = null
+    CURRENT_MEETING.meeting = {
+        page: null,
+        backgroundPage: null,
+        browser: null,
+        meetingTimeoutInterval: null,
+        session_id: null,
+    }
     CURRENT_MEETING.param = null
     CURRENT_MEETING.status = null
     CURRENT_MEETING.error = null
@@ -174,11 +177,6 @@ async function cleanMeeting(meeting: Meeting) {
         console.error(e)
     }
     try {
-        clearTimeout(meeting.intervalId)
-    } catch (e) {
-        console.error(e)
-    }
-    try {
         clearTimeout(meeting.meetingTimeoutInterval)
     } catch (e) {
         console.error(e)
@@ -191,175 +189,132 @@ export function setInitalParams(meetingParams: MeetingParams, logger: Logger) {
     )
     unsetMeetingGlobal()
     setMeetingProvide(meetingParams.meetingProvider)
-    setMeetingGlobal(meetingParams, null, logger)
+    CURRENT_MEETING.param = meetingParams
+    CURRENT_MEETING.status = 'Recording'
+    CURRENT_MEETING.logger = logger
 }
 
-export async function recordMeeting(meetingParams: MeetingParams) {
-    let page: puppeteer.Page
-    let backgroundPage: puppeteer.Page
-    let browser: puppeteer.Browser
-    let meetingTimeoutInterval: NodeJS.Timeout
-    let intervalId: NodeJS.Timeout
-    let api_session_id = meetingParams.api_session_id
-    let brandingGenerateProcess
-    let brandingPlayProcess
+// Starts the record
+// Returns when the bot is accepted in the meeting
+export async function startRecordMeeting(meetingParams: MeetingParams) {
+    CURRENT_MEETING.param = meetingParams
+
     try {
-        let start = Date.now()
         if (
             meetingParams.bot_branding ||
             meetingParams.custom_branding_bot_path
         ) {
-            brandingGenerateProcess = await generateBranding(
+            CURRENT_MEETING.brandingGenerateProcess = generateBranding(
                 meetingParams.bot_name,
                 meetingParams.custom_branding_bot_path,
-            ).wait
-
-            console.log(
-                `Execution time (generate_branding): ${Date.now() - start} ms`,
             )
-            start = Date.now()
-            brandingPlayProcess = playBranding()
-            console.log(
-                `Execution time (generate_branding): ${Date.now() - start} ms`,
-            )
+            await CURRENT_MEETING.brandingGenerateProcess.wait
+            CURRENT_MEETING.brandingPlayProcess = playBranding()
         }
-        start = Date.now()
+
         const extensionId = await getCachedExtensionId()
-        console.log(
-            `Execution time (getCachedExtensionId): ${Date.now() - start} ms`,
+        CURRENT_MEETING.meeting.browser = await openBrowser(extensionId)
+        CURRENT_MEETING.meeting.backgroundPage = await findBackgroundPage(
+            CURRENT_MEETING.meeting.browser,
+            extensionId,
         )
-        start = Date.now()
-        browser = await openBrowser(extensionId)
-        console.log(`Execution time (openBrowser): ${Date.now() - start} ms`)
-        start = Date.now()
-        backgroundPage = await findBackgroundPage(browser, extensionId)
-        console.log(
-            `Execution time (findBackgroundPage): ${Date.now() - start} ms`,
-        )
-        start = Date.now()
         CURRENT_MEETING.logger.info('Extension found', { extensionId })
 
-        const { meetingId: meeting_id, password } =
-            await MEETING_PROVIDER.parseMeetingUrl(
-                browser,
-                meetingParams.meeting_url,
-            )
-        CURRENT_MEETING.logger.info('meeting id found', { meeting_id })
+        const { meetingId, password } = await MEETING_PROVIDER.parseMeetingUrl(
+            CURRENT_MEETING.meeting.browser,
+            meetingParams.meeting_url,
+        )
+        CURRENT_MEETING.logger.info('meeting id found', { meetingId })
 
         const meetingLink = MEETING_PROVIDER.getMeetingLink(
-            meeting_id,
+            meetingId,
             password,
             0,
             meetingParams.bot_name,
         )
         CURRENT_MEETING.logger.info('Meeting link found', { meetingLink })
-        page = await MEETING_PROVIDER.openMeetingPage(browser, meetingLink)
-        console.log(
-            `Execution time (openMeetingPage): ${Date.now() - start} ms`,
+
+        CURRENT_MEETING.meeting.page = await MEETING_PROVIDER.openMeetingPage(
+            CURRENT_MEETING.meeting.browser,
+            meetingLink,
         )
-        let i = 0
-        intervalId = setInterval(() => {
-            i++
-        }, 10000)
-        meetingTimeoutInterval = setTimeout(
+
+        CURRENT_MEETING.meeting.meetingTimeoutInterval = setTimeout(
             () => stopRecording('timeout'),
-            4 * 60 * 60 * 1000,
+            4 * 60 * 60 * 1000, // 4 hours
         )
-        setMeetingGlobal(
+
+        await MEETING_PROVIDER.joinMeeting(
+            CURRENT_MEETING.meeting.page,
             meetingParams,
-            {
-                page,
-                backgroundPage,
-                intervalId,
-                browser,
-                meetingTimeoutInterval,
-                api_session_id,
-            },
-            CURRENT_MEETING.logger,
         )
-        await MEETING_PROVIDER.joinMeeting(page, meetingParams)
-        listenPage(backgroundPage)
+        listenPage(CURRENT_MEETING.meeting.backgroundPage)
 
         meetingParams.api_server_baseurl = process.env.API_SERVER_BASEURL
         meetingParams.api_download_baseurl = process.env.API_DOWNLOAD_BASEURL
         meetingParams.rev_api_key = process.env.REV_API_KEY
-        console.log({ meetingParams })
-        const project = await backgroundPage.evaluate(async (meetingParams) => {
-            const w = window as any
-            return await w.startRecording(meetingParams)
-            // w.startRecordingTest()
-        }, meetingParams)
-        recordMeetingToEnd(page, meetingParams, cleanEverything)
+
+        const project = await CURRENT_MEETING.meeting.backgroundPage.evaluate(
+            async (meetingParams) => {
+                const w = window as any
+                return await w.startRecording(meetingParams)
+            },
+            meetingParams,
+        )
+
         if (project == null) {
             throw 'failed creating project'
         }
+
         CURRENT_MEETING.project = project
         return project
     } catch (e) {
         console.error('setting current_meeting error')
         CURRENT_MEETING.error = e
-        console.error('after set curent meeting error')
+        console.error('after set current meeting error')
         await cleanEverything(true)
         throw e
     }
-    async function cleanEverything(failed: boolean) {
-        console.log(failed)
-        try {
-            await uploadLog()
-        } catch (e) {
-            CURRENT_MEETING.logger.error(`failed to upload logs: ${e}`)
-        }
-        try {
-            brandingGenerateProcess?.kill()
-            brandingPlayProcess?.kill()
-        } catch (e) {
-            CURRENT_MEETING.logger.error(`failed to kill process: ${e}`)
-        }
-        await cleanMeeting({
-            page,
-            backgroundPage,
-            browser,
-            intervalId,
-            meetingTimeoutInterval,
-            api_session_id,
-        })
-        try {
-            await setProtection(false)
-        } catch (e) {
-            CURRENT_MEETING.logger.error(`failed to unset protection: ${e}`)
-        }
-        try {
-            await unlockInstance()
-        } catch (e) {
-            CURRENT_MEETING.logger.error(`failed to unlock instance: ${e}`)
-        }
+}
+
+async function cleanEverything(failed: boolean) {
+    try {
+        await uploadLog()
+    } catch (e) {
+        CURRENT_MEETING.logger.error(`failed to upload logs: ${e}`)
+    }
+    try {
+        CURRENT_MEETING.brandingGenerateProcess?.kill()
+        CURRENT_MEETING.brandingPlayProcess?.kill()
+    } catch (e) {
+        CURRENT_MEETING.logger.error(`failed to kill process: ${e}`)
+    }
+    await cleanMeeting(CURRENT_MEETING.meeting)
+    try {
+        await delSessionInRedis(CURRENT_MEETING.param.session_id)
+    } catch (e) {
+        CURRENT_MEETING.logger.error(`failed to del session in redis: ${e}`)
     }
 }
 
-export async function recordMeetingToEnd(
-    page: Page,
-    meetingParams: MeetingParams,
-    cleanEverything: (failed: boolean) => Promise<void>,
-) {
-    await MEETING_PROVIDER.waitForEndMeeting(meetingParams, page)
+export async function recordMeetingToEnd() {
+    await MEETING_PROVIDER.waitForEndMeeting(
+        CURRENT_MEETING.param,
+        CURRENT_MEETING.meeting.page,
+    )
     CURRENT_MEETING.logger.info('after waitForEndMeeting')
+
     try {
-        await stopRecordingInternal(meetingParams)
+        await stopRecordingInternal(CURRENT_MEETING.param)
     } catch (e) {
         CURRENT_MEETING.logger.error(`Failed to stop recording: ${e}`)
     } finally {
-        try {
-            await detachZoomSession(meetingParams.api_session_id)
-        } catch (e) {
-            CURRENT_MEETING.logger.error(`Detach zoom session failed: ${e}`)
-        }
         await cleanEverything(false)
     }
 }
 
 export type ChangeLanguage = {
     meeting_url: string
-    human_transcription: boolean
     use_my_vocabulary: boolean
     language: string
     user_id: number
@@ -417,25 +372,14 @@ async function stopRecordingInternal(param: Session) {
                 'EndRecording',
                 CURRENT_MEETING.param,
                 {},
-                { session_id: CURRENT_MEETING.param.api_session_id },
+                { session_id: CURRENT_MEETING.param.session_id },
             )
         } catch (e) {}
-        let {
-            page,
-            meetingTimeoutInterval,
-            intervalId,
-            browser,
-            backgroundPage,
-        } = meeting
+        let { page, meetingTimeoutInterval, browser, backgroundPage } = meeting
         await backgroundPage.evaluate(async () => {
             const w = window as any
             await w.stopMediaRecorder()
         })
-        try {
-            clearTimeout(intervalId)
-        } catch (e) {
-            console.error(e)
-        }
         try {
             clearTimeout(meetingTimeoutInterval)
         } catch (e) {

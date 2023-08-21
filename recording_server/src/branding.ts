@@ -1,9 +1,12 @@
 import { spawn, } from "child_process"
 
-export function generateBranding(botname: string, custom_branding_path?: string) {
-    try {
+export type BrandingHandle = {
+    wait: Promise<void>;
+    kill: () => void;
+};
 
-        console.log('ENV: ', process.env)
+export function generateBranding(botname: string, custom_branding_path?: string): BrandingHandle {
+    try {
         const command = (custom_branding_path != null) ? spawn('../generate_custom_branding.sh', [custom_branding_path], { env: { ...process.env } }) : spawn('../generate_branding.sh', [botname], { env: { ...process.env } })
         command.stderr.addListener("data", data => { console.log(data.toString()); });
         return {
@@ -11,7 +14,8 @@ export function generateBranding(botname: string, custom_branding_path?: string)
                 command.on('close', () => {
                     res()
                 })
-            }), kill: () => {
+            }),
+            kill: () => {
                 command.kill()
             }
         }
@@ -22,7 +26,7 @@ export function generateBranding(botname: string, custom_branding_path?: string)
     }
 }
 
-export function playBranding() {
+export function playBranding(): BrandingHandle {
     try {
         // await (new Promise<void>((res, _rej) => {
 
@@ -33,7 +37,8 @@ export function playBranding() {
                 command.on('close', () => {
                     res()
                 })
-            }), kill: () => {
+            }),
+            kill: () => {
                 console.log('kill branding')
                 command.kill("SIGKILL")
             }

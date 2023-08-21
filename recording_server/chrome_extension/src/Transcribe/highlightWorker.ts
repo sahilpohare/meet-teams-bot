@@ -8,9 +8,8 @@ import {
     SummaryParam,
     WordHighlight,
     WordSummary,
-    Label
+    Label,
 } from 'spoke_api_js'
-
 
 const MAX_TOKEN = 3450
 // in milis seconds
@@ -147,7 +146,7 @@ function collectSentenceToHighlight(
     if (
         SESSION &&
         SESSION.next_editor_index_to_highlight <
-        SESSION.video_informations.length
+            SESSION.video_informations.length
     ) {
         const video_infos = SESSION.video_informations
         let next_index_to_highlight = SESSION.next_editor_index_to_highlight
@@ -221,9 +220,6 @@ async function collectSentenceToSummarizeClip(
                     video_info.speaker_name +
                     ':' +
                     words.map((w) => w.text).join(' ')
-                if ((await api.countToken(newFullSentence)) > MAX_TOKEN) {
-                    break
-                }
                 if (words.length > 0) {
                     res.sentences.push({
                         speaker: video_info.speaker_name,
