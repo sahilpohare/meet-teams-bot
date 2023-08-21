@@ -9,7 +9,7 @@ import {
     getCachedExtensionId,
 } from './puppeteer'
 import { sleep } from './utils'
-import { delSessionInRedis, setProtection } from './instance'
+import { delSessionInRedis } from './instance'
 import { Agenda, Note, MeetingProvider } from 'spoke_api_js'
 import { Logger, uploadLog } from './logger'
 
