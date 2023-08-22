@@ -214,7 +214,7 @@ export async function startRecording(
     MEDIA_RECORDER.onerror = function (e) {
         console.error('media recorder error', e)
     }
-    START_RECORD_OFFSET = CONTEXT.currentTime
+    START_RECORD_OFFSET = now
     START_RECORD_TIMESTAMP = now
     console.log(`after media recorder start`)
 

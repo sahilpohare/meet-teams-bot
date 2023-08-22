@@ -39,9 +39,10 @@ export async function streamingTranscribe(
         parameters.language,
         (w) => addWords(w, workerVersion),
         () => {
-            MAX_TS_PREVIOUS_WORKER =
-                audioContext.currentTime - START_TRANSCRIBE_OFFSET
-            START_TRANSCRIBE_OFFSET = audioContext.currentTime
+            const date = new Date()
+            const now = date.getTime()
+            MAX_TS_PREVIOUS_WORKER = now - START_TRANSCRIBE_OFFSET
+            START_TRANSCRIBE_OFFSET = now
         },
         token,
         (l) => languageDetected(audioContext, l),
@@ -71,13 +72,10 @@ export async function languageDetected(
     audioContext: AudioContext,
     lang: string,
 ) {
-    console.log(
-        'language detected: ',
-        lang,
-        audioContext.currentTime - START_TRANSCRIBE_OFFSET,
-    )
+    const now = new Date().getTime()
+    console.log('language detected: ', lang, now - START_TRANSCRIBE_OFFSET)
     if (
-        audioContext.currentTime - START_TRANSCRIBE_OFFSET > 30 &&
+        now - START_TRANSCRIBE_OFFSET > 50 &&
         (lang === '' || lang === 'unknown')
     ) {
         console.log('no speech detected since 30 secs')
