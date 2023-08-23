@@ -151,9 +151,9 @@ export async function refreshInstance() {
         } catch (e) {
             console.error(
                 'refresh instance failed: ',
-                { PROJECT_ID, REFRESH_INSTANCE_FAILED_COUNTER },
-                'error: ',
-                e,
+                // { PROJECT_ID, REFRESH_INSTANCE_FAILED_COUNTER },
+                // 'error: ',
+                // e,
             )
             REFRESH_INSTANCE_FAILED_COUNTER += 1
             if (REFRESH_INSTANCE_FAILED_COUNTER > 10 && PROJECT_ID == null) {

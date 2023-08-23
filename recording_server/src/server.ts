@@ -2,19 +2,19 @@ import * as meeting from './meeting'
 import * as express from 'express'
 import * as bodyParser from 'body-parser'
 import {
-    ChangeLanguage,
-    MeetingParams,
-    MarkMomentParams,
-    StopRecordParams,
+  ChangeLanguage,
+  MeetingParams,
+  MarkMomentParams,
+  StopRecordParams,
 } from './meeting'
 import { Logger } from './logger'
 import { notifyApp, patchEvent } from './calendar'
 import {
-    terminateInstance,
-    setProtection,
-    deregisterInstance,
-    refreshInstance,
-    registerInstance,
+  terminateInstance,
+  setProtection,
+  deregisterInstance,
+  refreshInstance,
+  registerInstance,
 } from './instance'
 import { PORT } from './instance'
 import { sleep } from './utils'
@@ -29,343 +29,353 @@ const HOST = '0.0.0.0'
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN
 
 export async function server() {
-    const app = express()
+  const app = express()
 
-    const jsonParser = bodyParser.json({ limit: '50mb' })
+  const jsonParser = bodyParser.json({ limit: '50mb' })
+  const allowed_origin = 'http://localhost:3000' // TODO ALLOWED_ORIGIN
 
-    app.options('*', (_req, res) => {
-        res.header('Access-Control-Allow-Origin', ALLOWED_ORIGIN)
-        res.header('Access-Control-Allow-Credentials', 'true')
-        res.header(
-            'Access-Control-Allow-Methods',
-            'OPTIONS, GET, PUT, POST, DELETE',
-        )
-        res.header(
-            'Access-Control-Allow-Headers',
-            'Authorization2, Content-Type',
-        )
-        res.sendStatus(204)
+  app.options('*', (_req, res) => {
+    res.header('Access-Control-Allow-Origin', allowed_origin)
+    res.header('Access-Control-Allow-Credentials', 'true')
+    res.header(
+      'Access-Control-Allow-Methods',
+      'OPTIONS, GET, PUT, POST, DELETE',
+    )
+    res.header(
+      'Access-Control-Allow-Headers',
+      'Authorization2, Content-Type',
+    )
+    res.sendStatus(204)
+  })
+
+  app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', allowed_origin)
+    res.header('Access-Control-Allow-Credentials', 'true')
+    res.header(
+      'Access-Control-Allow-Methods',
+      'OPTIONS, GET, PUT, POST, DELETE',
+    )
+    res.header(
+      'Access-Control-Allow-Headers',
+      'Authorization2, Content-Type',
+    )
+
+    // trim meeting url
+    if ((req.body as { meeting_url: string })?.meeting_url != null) {
+      req.body.meeting_url = req.body.meeting_url.trim()
+    }
+
+    next()
+  })
+
+  app.post('/transcribe', jsonParser, (req, res) => {
+    console.log(req.body)
+    res.send('ok')
+  })
+
+  app.post('/start_record_event', jsonParser, async (req, res) => {
+    // await setProtection(true)
+    const data: MeetingParams = req.body
+
+    await notifyApp('PrepareRecording', data, {}, {})
+    let logger = LOGGER.new({
+      user_id: data.user_id,
+      meeting_url: data.meeting_url,
     })
-
-    app.use((req, res, next) => {
-        res.header('Access-Control-Allow-Origin', ALLOWED_ORIGIN)
-        res.header('Access-Control-Allow-Credentials', 'true')
-        res.header(
-            'Access-Control-Allow-Methods',
-            'OPTIONS, GET, PUT, POST, DELETE',
-        )
-        res.header(
-            'Access-Control-Allow-Headers',
-            'Authorization2, Content-Type',
-        )
-
-        // trim meeting url
-        if ((req.body as { meeting_url: string })?.meeting_url != null) {
-            req.body.meeting_url = req.body.meeting_url.trim()
-        }
-
-        next()
+    logger.info(`Start record`, {
+      human_transcription: data.human_transcription,
+      use_my_vocabulary: data.use_my_vocabulary,
+      language: data.language,
+      project_name: data.project_name,
+      email: data.email,
     })
-
-    app.post('/start_record_event', jsonParser, async (req, res) => {
-        // await setProtection(true)
-        const data: MeetingParams = req.body
-
-        await notifyApp('PrepareRecording', data, {}, {})
-        let logger = LOGGER.new({
-            user_id: data.user_id,
-            meeting_url: data.meeting_url,
-        })
-        logger.info(`Start record`, {
-            human_transcription: data.human_transcription,
-            use_my_vocabulary: data.use_my_vocabulary,
-            language: data.language,
-            project_name: data.project_name,
-            email: data.email,
-        })
-        meeting.setInitalParams(data, logger)
-        meeting
-            .recordMeeting(data)
-            .then(async (project) => {
-                PROJECT_ID = project?.id
-                if (
-                    !(
-                        data.has_installed_extension &&
-                        data.meetingProvider === 'Meet'
-                    )
-                ) {
-                    await notifyApp(
-                        'Recording',
-                        data,
-                        {
-                            session_id: data.api_session_id,
-                            project_id: project.id,
-                        },
-                        {
-                            session_id: data.api_session_id,
-                            project,
-                        },
-                    )
-                }
-            })
-            .catch(async (e) => {
-                try {
-                    await notifyApp(
-                        'Error',
-                        data,
-                        { error: JSON.stringify(e) },
-                        { error: JSON.stringify(e) },
-                    )
-                    // res.status(500).send(JSON.stringify(e));
-                } catch (e) {
-                    console.error(
-                        'error in start_record_event catch handler, terminating instance',
-                        e,
-                    )
-                } finally {
-                    await sleep(30000)
-                    await terminateInstance()
-                }
-            })
-        res.send('ok')
-    })
-
-    // retrocompat TODO: delete this
-    app.post('/start_record/zoom', jsonParser, async (req, res) => {
-        await setProtection(true)
-        const data: MeetingParams = req.body
-        try {
-            let logger = LOGGER.new({
-                user_id: data.user_id,
-                meeting_url: data.meeting_url,
-            })
-            logger.info(`Start record`, {
-                human_transcription: data.human_transcription,
-                use_my_vocabulary: data.use_my_vocabulary,
-                language: data.language,
-                project_name: data.project_name,
-                email: data.email,
-            })
-            meeting.setInitalParams(data, logger)
-            meeting
-                .recordMeeting(data)
-                .then(async (project) => {
-                    if (data.event != null) {
-                        try {
-                            await patchEvent(data.user_token, {
-                                status: 'Recording',
-                                id: data.event?.id,
-                                session_id: data.api_session_id,
-                                project_id: project.id,
-                            })
-                        } catch (e) {
-                            console.error('error patching event: ', e)
-                        }
-                    }
-                })
-                .catch(async (e) => {
-                    if (data.event != null) {
-                        try {
-                            await notifyApp(
-                                'Error',
-                                data,
-                                { error: JSON.stringify(e) },
-                                { error: JSON.stringify(e) },
-                            )
-                        } catch (e) {
-                            console.error(
-                                'error in start_record_event catch handler, terminating instance',
-                                e,
-                            )
-                        }
-                    }
-                })
-            res.send('ok')
-        } catch (e) {
-            res.status(500).send(JSON.stringify(e))
-        }
-    })
-
-    app.post('/start_record', jsonParser, async (req, res) => {
-        await setProtection(true)
-        const data: MeetingParams = req.body
-        try {
-            let logger = LOGGER.new({
-                user_id: data.user_id,
-                meeting_url: data.meeting_url,
-            })
-            logger.info(`Start record`, {
-                human_transcription: data.human_transcription,
-                use_my_vocabulary: data.use_my_vocabulary,
-                language: data.language,
-                project_name: data.project_name,
-                email: data.email,
-            })
-            meeting.setInitalParams(data, logger)
-            meeting
-                .recordMeeting(data)
-                .then(async (project) => {
-                    if (data.event != null) {
-                        try {
-                            await patchEvent(data.user_token, {
-                                status: 'Recording',
-                                id: data.event?.id,
-                                session_id: data.api_session_id,
-                                project_id: project.id,
-                            })
-                        } catch (e) {
-                            console.error('error patching event: ', e)
-                        }
-                    }
-                })
-                .catch(async (e) => {
-                    if (data.event != null) {
-                        try {
-                            await notifyApp(
-                                'Error',
-                                data,
-                                { error: JSON.stringify(e) },
-                                { error: JSON.stringify(e) },
-                            )
-                        } catch (e) {
-                            console.error(
-                                'error in start_record_event catch handler, terminating instance',
-                                e,
-                            )
-                        }
-                    }
-                })
-            res.send('ok')
-        } catch (e) {
-            res.status(500).send(JSON.stringify(e))
-        }
-    })
-
-    app.post('/status', jsonParser, async (req, res) => {
-        function statusReady() {
-            return (
-                meeting.CURRENT_MEETING.error != null ||
-                meeting.CURRENT_MEETING.project != null
-            )
-        }
-        const data: meeting.StatusParams = req.body
-        try {
-            let logger = LOGGER.new({
-                user_id: data.user_id,
-                meeting_url: data.meeting_url,
-            })
-            logger.info(`status request`, {
-                user_id: data.user_id,
-                meeting_url: data.meeting_url,
-                current_meeting: meeting.CURRENT_MEETING,
-            })
-            if (
-                meeting.CURRENT_MEETING.param?.meeting_url != null &&
-                meeting.CURRENT_MEETING.param?.meeting_url !== '' &&
-                meeting.CURRENT_MEETING.param?.meeting_url !== data.meeting_url
-            ) {
-                res.status(500).send('bad meeting url')
-                return
-            }
-            for (let i = 0; i < 100; i++) {
-                if (statusReady()) {
-                    if (meeting.CURRENT_MEETING.error != null) {
-                        logger.info('status ready, returning error')
-                        const error = meeting.CURRENT_MEETING.error
-                        res.status(500).send(JSON.stringify(error))
-                        return
-                    } else if (meeting.CURRENT_MEETING.project != null) {
-                        logger.info('status ready, returning project')
-                        res.json(meeting.CURRENT_MEETING.project)
-                        return
-                    }
-                }
-                await sleep(50)
-            }
-            logger.info('status not ready, returning null')
-            res.json(null)
-            return
-        } catch (e) {
-            res.status(500).send(JSON.stringify(e))
-        }
-    })
-
-    app.post('/change_language', jsonParser, async (req, res) => {
-        const data: ChangeLanguage = req.body
-        try {
-            await meeting.changeLanguage(data)
-            res.send('ok')
-        } catch (e) {
-            res.status(500).send(JSON.stringify(e))
-        }
-    })
-
-    app.post('/stop_record', jsonParser, async (req, res) => {
-        const data: StopRecordParams = req.body
-        console.log('stop record request: ', data)
+    meeting.setInitalParams(data, logger)
+    meeting
+      .recordMeeting(data)
+      .then(async (project) => {
+        PROJECT_ID = project?.id
         if (
-            meeting.CURRENT_MEETING.param?.meeting_url != null &&
-            meeting.CURRENT_MEETING.param?.meeting_url !== '' &&
-            meeting.CURRENT_MEETING.param?.meeting_url !== data.meeting_url
+          !(
+            data.has_installed_extension &&
+            data.meetingProvider === 'Meet'
+          )
         ) {
-            res.send('ok')
-            return
+          await notifyApp(
+            'Recording',
+            data,
+            {
+              session_id: data.api_session_id,
+              project_id: project.id,
+            },
+            {
+              session_id: data.api_session_id,
+              project,
+            },
+          )
         }
-        meeting.stopRecording('API request')
-        res.send('ok')
-    })
-    app.post('/mark_moment', jsonParser, async (req, res) => {
-        const data: MarkMomentParams = req.body
+      })
+      .catch(async (e) => {
         try {
-            await meeting.markMoment(data)
-            res.send('ok')
+          await notifyApp(
+            'Error',
+            data,
+            { error: JSON.stringify(e) },
+            { error: JSON.stringify(e) },
+          )
+          // res.status(500).send(JSON.stringify(e));
         } catch (e) {
-            res.status(500).send(JSON.stringify(e))
+          console.error(
+            'error in start_record_event catch handler, terminating instance',
+            e,
+          )
+        } finally {
+          await sleep(30000)
+          await terminateInstance()
         }
-    })
+      })
+    res.send('ok')
+  })
 
-    app.get('/', jsonParser, (_req, res) => {
-        res.send('hello node')
-    })
-
-    app.get('/liveness', async (_req, res) => {
-        refreshInstance()
-        res.send('ok')
-    })
-
-    app.get('/shutdown', async (_req, res) => {
-        LOGGER.warn('Shutdown requested')
-        await deregisterInstance()
-        res.send('ok')
-        process.exit(0)
-    })
-
+  // retrocompat TODO: delete this
+  app.post('/start_record/zoom', jsonParser, async (req, res) => {
+    await setProtection(true)
+    const data: MeetingParams = req.body
     try {
-        await triggerCache()
-    } catch (e) {
-        LOGGER.error(`Failed to trigger cache: ${e}`)
-    }
-    try {
-        await registerInstance()
-        app.listen(PORT, HOST)
-        setInterval(async () => {
+      let logger = LOGGER.new({
+        user_id: data.user_id,
+        meeting_url: data.meeting_url,
+      })
+      logger.info(`Start record`, {
+        human_transcription: data.human_transcription,
+        use_my_vocabulary: data.use_my_vocabulary,
+        language: data.language,
+        project_name: data.project_name,
+        email: data.email,
+      })
+      meeting.setInitalParams(data, logger)
+      meeting
+        .recordMeeting(data)
+        .then(async (project) => {
+          if (data.event != null) {
             try {
-                await refreshInstance()
+              await patchEvent(data.user_token, {
+                status: 'Recording',
+                id: data.event?.id,
+                session_id: data.api_session_id,
+                project_id: project.id,
+              })
             } catch (e) {
-                console.error('failed to refresh instance: ')
+              console.error('error patching event: ', e)
             }
-        }, 5000)
-        LOGGER.info(`Running on http://${HOST}:${PORT}`)
+          }
+        })
+        .catch(async (e) => {
+          if (data.event != null) {
+            try {
+              await notifyApp(
+                'Error',
+                data,
+                { error: JSON.stringify(e) },
+                { error: JSON.stringify(e) },
+              )
+            } catch (e) {
+              console.error(
+                'error in start_record_event catch handler, terminating instance',
+                e,
+              )
+            }
+          }
+        })
+      res.send('ok')
     } catch (e) {
-        LOGGER.error(`Failed to register instance: ${e}`)
+      res.status(500).send(JSON.stringify(e))
     }
+  })
+
+  app.post('/start_record', jsonParser, async (req, res) => {
+    await setProtection(true)
+    const data: MeetingParams = req.body
+    try {
+      let logger = LOGGER.new({
+        user_id: data.user_id,
+        meeting_url: data.meeting_url,
+      })
+      logger.info(`Start record`, {
+        human_transcription: data.human_transcription,
+        use_my_vocabulary: data.use_my_vocabulary,
+        language: data.language,
+        project_name: data.project_name,
+        email: data.email,
+      })
+      meeting.setInitalParams(data, logger)
+      meeting
+        .recordMeeting(data)
+        .then(async (project) => {
+          if (data.event != null) {
+            try {
+              await patchEvent(data.user_token, {
+                status: 'Recording',
+                id: data.event?.id,
+                session_id: data.api_session_id,
+                project_id: project.id,
+              })
+            } catch (e) {
+              console.error('error patching event: ', e)
+            }
+          }
+        })
+        .catch(async (e) => {
+          if (data.event != null) {
+            try {
+              await notifyApp(
+                'Error',
+                data,
+                { error: JSON.stringify(e) },
+                { error: JSON.stringify(e) },
+              )
+            } catch (e) {
+              console.error(
+                'error in start_record_event catch handler, terminating instance',
+                e,
+              )
+            }
+          }
+        })
+      res.send('ok')
+    } catch (e) {
+      res.status(500).send(JSON.stringify(e))
+    }
+  })
+
+  app.post('/status', jsonParser, async (req, res) => {
+    function statusReady() {
+      return (
+        meeting.CURRENT_MEETING.error != null ||
+        meeting.CURRENT_MEETING.project != null
+      )
+    }
+    const data: meeting.StatusParams = req.body
+    try {
+      let logger = LOGGER.new({
+        user_id: data.user_id,
+        meeting_url: data.meeting_url,
+      })
+      logger.info(`status request`, {
+        user_id: data.user_id,
+        meeting_url: data.meeting_url,
+        current_meeting: meeting.CURRENT_MEETING,
+      })
+      if (
+        meeting.CURRENT_MEETING.param?.meeting_url != null &&
+        meeting.CURRENT_MEETING.param?.meeting_url !== '' &&
+        meeting.CURRENT_MEETING.param?.meeting_url !== data.meeting_url
+      ) {
+        res.status(500).send('bad meeting url')
+        return
+      }
+      for (let i = 0; i < 100; i++) {
+        if (statusReady()) {
+          if (meeting.CURRENT_MEETING.error != null) {
+            logger.info('status ready, returning error')
+            const error = meeting.CURRENT_MEETING.error
+            res.status(500).send(JSON.stringify(error))
+            return
+          } else if (meeting.CURRENT_MEETING.project != null) {
+            logger.info('status ready, returning project')
+            res.json(meeting.CURRENT_MEETING.project)
+            return
+          }
+        }
+        await sleep(50)
+      }
+      logger.info('status not ready, returning null')
+      res.json(null)
+      return
+    } catch (e) {
+      res.status(500).send(JSON.stringify(e))
+    }
+  })
+
+  app.post('/change_language', jsonParser, async (req, res) => {
+    const data: ChangeLanguage = req.body
+    try {
+      await meeting.changeLanguage(data)
+      res.send('ok')
+    } catch (e) {
+      res.status(500).send(JSON.stringify(e))
+    }
+  })
+
+  app.post('/stop_record', jsonParser, async (req, res) => {
+    const data: StopRecordParams = req.body
+    console.log('stop record request: ', data)
+    if (
+      meeting.CURRENT_MEETING.param?.meeting_url != null &&
+      meeting.CURRENT_MEETING.param?.meeting_url !== '' &&
+      meeting.CURRENT_MEETING.param?.meeting_url !== data.meeting_url
+    ) {
+      res.send('ok')
+      return
+    }
+    meeting.stopRecording('API request')
+    res.send('ok')
+  })
+  app.post('/mark_moment', jsonParser, async (req, res) => {
+    const data: MarkMomentParams = req.body
+    try {
+      await meeting.markMoment(data)
+      res.send('ok')
+    } catch (e) {
+      res.status(500).send(JSON.stringify(e))
+    }
+  })
+
+  app.get('/', jsonParser, (_req, res) => {
+    res.send('hello node')
+  })
+
+  app.get('/liveness', async (_req, res) => {
+    refreshInstance()
+    res.send('ok')
+  })
+
+  app.get('/shutdown', async (_req, res) => {
+    LOGGER.warn('Shutdown requested')
+    await deregisterInstance()
+    res.send('ok')
+    process.exit(0)
+  })
+
+  try {
+    await triggerCache()
+  } catch (e) {
+    LOGGER.error(`Failed to trigger cache: ${e}`)
+  }
+  try {
+    // await registerInstance()
+    setInterval(async () => {
+      try {
+        // await refreshInstance()
+      } catch (e) {
+        console.error('failed to refresh instance: ')
+      }
+    }, 5000)
+
+    // TODO use PORT HOST
+    const port = 8080
+    const host = '127.0.0.1'
+    app.listen(port, host)
+    LOGGER.info(`Running on http://${host}:${port}`)
+  } catch (e) {
+    LOGGER.error(`Failed to register instance: ${e}`)
+  }
 }
 /// open the browser a first time to speed up the next openings
 async function triggerCache() {
-    const extensionId = await getCachedExtensionId()
-    const [browser] = await Promise.all([
-        openBrowser(extensionId),
-        generateBranding('cache').wait,
-    ])
-    await browser.close()
+  const extensionId = await getCachedExtensionId()
+  const [browser] = await Promise.all([
+    openBrowser(extensionId),
+    generateBranding('cache').wait,
+  ])
+  await browser.close()
 }

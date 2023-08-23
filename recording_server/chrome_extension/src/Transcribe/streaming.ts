@@ -30,7 +30,7 @@ export let STREAMING_TRANSCRIBE: StreamingTranscribe = null
 export async function streamingTranscribe(
     stream,
     audioContext,
-    workerVersion: number = 0,
+    workerVersion = 0,
 ) {
     console.log('[streaming transcribe]')
     const token = await api.requestAuthorizationToken()
