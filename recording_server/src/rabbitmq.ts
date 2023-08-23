@@ -23,34 +23,48 @@ export class Consumer {
     static async init(): Promise<Consumer> {
         const connection = await connect(process.env.AMQP_ADDRESS)
 
+        console.log('connected to rabbitmq: ', process.env.AMQP_ADDRESS)
         const channel = await connection.createChannel()
         await channel.assertQueue(Consumer.QUEUE_NAME, { durable: true })
+
+        console.log('declaring queue: ', Consumer.QUEUE_NAME)
         channel.prefetch(Consumer.PREFETCH_COUNT)
 
         return new Consumer(channel)
     }
 
-    async consume(handler): Promise<StartRecordingResult> {
+    async consume(
+        handler: (data: MeetingParams) => void,
+    ): Promise<StartRecordingResult> {
         return new Promise((resolve, reject) => {
-            this.channel.consume(Consumer.QUEUE_NAME, async (message) => {
-                if (message !== null) {
-                    await this.channel.cancel(message.fields.consumerTag)
+            this.channel
+                .consume(Consumer.QUEUE_NAME, async (message) => {
+                    if (message !== null) {
+                        await this.channel.cancel(message.fields.consumerTag)
 
-                    const meetingParams = JSON.parse(message.content)
-                    let error = null
-                    try {
-                        await handler(meetingParams)
-                    } catch (e) {
-                        error = e
+                        const meetingParams = JSON.parse(
+                            message.content.toString(),
+                        )
+                        let error = null
+                        try {
+                            await handler(meetingParams)
+                        } catch (e) {
+                            error = e
+                        }
+                        //TODO: retry in rabbitmq
+                        this.channel.ack(message)
+                        resolve({ params: meetingParams, error: error })
+                    } else {
+                        console.log('Consumer cancelled by server')
+                        reject() // TODO errors
                     }
-                    //TODO: retry in rabbitmq
-                    this.channel.ack(message)
-                    resolve({ params: meetingParams, error: error })
-                } else {
-                    console.log('Consumer cancelled by server')
+                })
+                .then((consumer) => {
+                    console.log('consumer started: ', consumer.consumerTag)
+                })
+                .catch((e) => {
                     reject() // TODO errors
-                }
-            })
+                })
         })
     }
 
