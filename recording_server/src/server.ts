@@ -20,8 +20,10 @@ import { PORT } from './instance'
 import { sleep } from './utils'
 import { getCachedExtensionId, openBrowser } from './puppeteer'
 import { generateBranding } from './branding'
-export let PROJECT_ID: number | undefined = undefined
+import { Recognizer, RecognizerSession } from './recognizer'
+import { api, setConfig, RecognizerWord } from 'spoke_api_js'
 
+export let PROJECT_ID: number | undefined = undefined
 export const LOGGER = new Logger({})
 
 // Constants
@@ -33,6 +35,11 @@ export async function server() {
 
   const jsonParser = bodyParser.json({ limit: '50mb' })
   const allowed_origin = 'http://localhost:3000' // TODO ALLOWED_ORIGIN
+
+  setConfig({
+    api_server_internal_url: process.env.API_SERVER_BASEURL,
+    logError: null,
+  })
 
   app.options('*', (_req, res) => {
     res.header('Access-Control-Allow-Origin', allowed_origin)
@@ -68,9 +75,31 @@ export async function server() {
     next()
   })
 
-  app.post('/transcribe', jsonParser, (req, res) => {
-    console.log(req.body)
+  const recognizerSession = new RecognizerSession([]);
+
+  app.post('/recognizer/start', jsonParser, async (req, res) => {
+    const { lang, sampleRate }: { lang: string, sampleRate: number } = req.body
+    const [token, region] = await api.requestAuthorizationToken()
+
+    await recognizerSession.start({ lang, token, region, sampleRate })
     res.send('ok')
+  })
+
+  app.post('/recognizer/write', jsonParser, async (req, res) => {
+    const bytes: number[] = req.body.bytes
+    const buffer = new Uint8Array(bytes).buffer
+
+    recognizerSession.write(buffer)
+    res.send('ok')
+  })
+
+  app.post('/recognizer/stop', jsonParser, async (_, res) => {
+    await recognizerSession.stop()
+    res.send('ok')
+  })
+
+  app.post('/recognizer/flush', jsonParser, (_, res) => {
+    res.json(recognizerSession.flush())
   })
 
   app.post('/start_record_event', jsonParser, async (req, res) => {
