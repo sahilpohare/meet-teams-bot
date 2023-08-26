@@ -13,6 +13,10 @@ console.log('redis url: ', process.env.REDIS_URL)
 export const clientRedis = redis.createClient({
     url: process.env.REDIS_URL,
 })
+clientRedis.on('error', (err) => {
+    console.error('Redis error:', err)
+    // Handle the error appropriately here.
+})
 
 // Constants
 const HOST = '0.0.0.0'
