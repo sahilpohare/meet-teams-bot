@@ -119,8 +119,10 @@ export async function initMediaRecorder(): Promise<void> {
           return
         }
 
+        console.log("Initing")
         Transcriber.init(new MediaStream(stream.getAudioTracks()))
           .then(() => {
+            console.log("Inited")
             MEDIA_RECORDER.ondataavailable =
               handleDataAvailable()
             MEDIA_RECORDER.onstop = handleStop
@@ -142,7 +144,6 @@ export async function startRecording(
   projectName: string,
   agenda?: Agenda,
 ): Promise<Project> {
-  console.log('START RECORDING')
   const newSessionId = await api.startRecordingSession()
   console.log(`[startRecording]`, { newSessionId })
 

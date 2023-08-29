@@ -38,26 +38,32 @@ export async function summarizeWorker(): Promise<void> {
   }
 }
 
-export async function trySummarizeNext(isFinal: boolean) {
+export async function trySummarizeNext(isFinal: boolean): Promise<boolean> {
   if (SESSION) {
     const labels = parameters.agenda ? extractLabels(parameters.agenda) : []
     const collect = await collectSentenceToAutoHighlight(isFinal, labels)
+
     if (collect != null && collect.length > 0) {
       if (parameters.agenda) {
         await autoHighlight(parameters.agenda, collect)
       } else {
-        const agenda = await detectTemplate(collect)
-        parameters.agenda = agenda
+        parameters.agenda = await detectTemplate(collect)
 
         await api.patchProject({
           id: SESSION.project.id,
-          template: agenda.json,
-          original_agenda_id: agenda.id,
+          template: parameters.agenda.json,
+          original_agenda_id: parameters.agenda.id,
         })
+
         await autoHighlight(parameters.agenda, collect)
       }
+
+      return true
+    } else {
+      return false
     }
   }
+
   return false
 }
 

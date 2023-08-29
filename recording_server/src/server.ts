@@ -20,7 +20,7 @@ import { PORT } from './instance'
 import { sleep } from './utils'
 import { getCachedExtensionId, openBrowser } from './puppeteer'
 import { generateBranding } from './branding'
-import { Recognizer, RecognizerSession } from './recognizer'
+import { RecognizerSession } from './recognizer'
 import { api, setConfig, RecognizerWord } from 'spoke_api_js'
 
 export let PROJECT_ID: number | undefined = undefined
@@ -78,10 +78,10 @@ export async function server() {
   const recognizerSession = new RecognizerSession([]);
 
   app.post('/recognizer/start', jsonParser, async (req, res) => {
-    const { lang, sampleRate }: { lang: string, sampleRate: number } = req.body
+    const { language, sampleRate }: { language: string, sampleRate: number } = req.body
     const [token, region] = await api.requestAuthorizationToken()
 
-    await recognizerSession.start({ lang, token, region, sampleRate })
+    await recognizerSession.start({ language, token, region, sampleRate })
     res.send('ok')
   })
 
@@ -98,8 +98,8 @@ export async function server() {
     res.send('ok')
   })
 
-  app.post('/recognizer/flush', jsonParser, (_, res) => {
-    res.json(recognizerSession.flush())
+  app.get('/recognizer/results', jsonParser, (_, res) => {
+    res.json(recognizerSession.getResults())
   })
 
   app.post('/start_record_event', jsonParser, async (req, res) => {
@@ -406,5 +406,6 @@ async function triggerCache() {
     openBrowser(extensionId),
     generateBranding('cache').wait,
   ])
+  console.log("browser.version():", await browser.version())
   await browser.close()
 }
