@@ -4,7 +4,7 @@ import { generateBranding } from './branding'
 import { CURRENT_MEETING, MeetingParams, recordMeetingToEnd } from './meeting'
 import { getCachedExtensionId, openBrowser } from './puppeteer'
 import { Consumer } from './rabbitmq'
-import { api, setConfig, setDefaultAxios } from 'spoke_api_js'
+import { api, setConfig } from 'spoke_api_js'
 import axios from 'axios'
 import {
     API_SERVER_BASEURL,

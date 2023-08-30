@@ -1,76 +1,67 @@
 import { sleep } from '../utils'
-import {
-    api,
-    RevWord,
-} from 'spoke_api_js'
+import { api, RecognizerWord } from 'spoke_api_js'
 import * as R from 'ramda'
 import { SESSION } from '../record'
-import { STREAMING_TRANSCRIBE, STOPED } from './streaming'
+import { Transcriber } from './streaming'
 
-
-export async function wordPosterWorker(workerVersion: number) {
+export async function wordPosterWorker() {
     async function routine() {
-        const spokeSession = SESSION
-        if (spokeSession) {
-            // console.log('[wordPosterWorker]', 'start: ', spokeSession.words)
-            try {
-                if (spokeSession != null) {
-                    const [pushable, nonPushable]: [RevWord[], RevWord[]] =
-                        R.partition((w: RevWord) => {
-                            const v = R.find((v) => {
-                                return w.ts >= v.tcin && w.ts <= v.tcout
-                            }, spokeSession.video_informations)
-                            return v != null && v.complete_editor != null
-                        }, spokeSession.words)
-                    // console.log('[wordPosterWorker] pushable, non pushable', pushable, nonPushable)
-                    spokeSession.words = nonPushable
-                    const pushableClone = [...pushable]
-                    await pushWords(pushableClone)
-                    if (pushable.length > 0) {
-                        for (const v of spokeSession.video_informations) {
-                            const video = v.complete_editor?.video
-                            if (
-                                video != null &&
-                                video.transcription_completed === false &&
-                                spokeSession.transcribed_until >= v.tcout
-                            ) {
-                                await api.patchVideo({
-                                    id: video.id,
-                                    transcription_completed: true,
-                                })
-                                video.transcription_completed = true
-                            }
-                        }
+        const session = SESSION
+        if (!session) return
+
+        try {
+            const [pushable, nonPushable]: [
+                RecognizerWord[],
+                RecognizerWord[],
+            ] = R.partition((w: RecognizerWord) => {
+                const v = R.find((v) => {
+                    return w.ts >= v.tcin && w.ts <= v.tcout
+                }, session.video_informations)
+                return v != null && v.complete_editor != null
+            }, session.words)
+
+            session.words = nonPushable
+            const pushableClone = [...pushable]
+            await pushWords(pushableClone)
+
+            if (pushable.length > 0) {
+                for (const v of session.video_informations) {
+                    const video = v.complete_editor?.video
+                    if (
+                        video != null &&
+                        video.transcription_completed === false &&
+                        session.transcribed_until >= v.tcout
+                    ) {
+                        await api.patchVideo({
+                            id: video.id,
+                            transcription_completed: true,
+                        })
+                        video.transcription_completed = true
                     }
                 }
-            } catch (e) {
-                console.error('[wordPosterWorker]', e)
             }
+        } catch (e) {
+            console.error('[wordPosterWorker]', e)
         }
     }
-    let i = 0
-    while (!STOPED) {
-        if (
-            STREAMING_TRANSCRIBE &&
-            workerVersion !== STREAMING_TRANSCRIBE.workerVersion
-        ) {
-            console.log('returning from worker wordPoster')
-            return
-        }
+
+    while (!Transcriber.STOPPED) {
         await routine()
-        await sleep(5000)
-        i++
+        await sleep(5_000)
     }
+
     await routine()
 }
 
-async function pushWords(pushable: RevWord[]) {
+async function pushWords(pushable: RecognizerWord[]) {
     for (const v of SESSION!.video_informations) {
         if (pushable.length === 0) {
             break
         }
-        const [wordsWithin, wordNotWithin]: [RevWord[], RevWord[]] =
-            R.partition((w) => w.ts >= v.tcin && w.ts <= v.tcout, pushable)
+        const [wordsWithin, wordNotWithin]: [
+            RecognizerWord[],
+            RecognizerWord[],
+        ] = R.partition((w) => w.ts >= v.tcin && w.ts <= v.tcout, pushable)
         pushable = wordNotWithin
         if (wordsWithin.length > 0) {
             const transcript_id = v.complete_editor?.video.transcripts[0].id!
