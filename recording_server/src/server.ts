@@ -78,10 +78,10 @@ export async function server() {
   const recognizerSession = new RecognizerSession([]);
 
   app.post('/recognizer/start', jsonParser, async (req, res) => {
-    const { language, sampleRate }: { language: string, sampleRate: number } = req.body
+    const { language, sampleRate, offset }: { language: string, sampleRate: number, offset: number } = req.body
     const [token, region] = await api.requestAuthorizationToken()
 
-    await recognizerSession.start({ language, token, region, sampleRate })
+    await recognizerSession.start({ language, token, region, sampleRate, offset })
     res.send('ok')
   })
 

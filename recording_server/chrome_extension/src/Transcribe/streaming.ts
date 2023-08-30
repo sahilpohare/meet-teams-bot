@@ -1,4 +1,4 @@
-import { axiosRetry, api, RecognizerWord, RecognizerResults } from 'spoke_api_js'
+import { api, RecognizerWord, RecognizerResult } from 'spoke_api_js'
 import * as R from 'ramda'
 import axios from 'axios'
 import { parameters } from '../background'
@@ -8,12 +8,6 @@ import { trySummarizeNext, summarizeWorker } from './summarizeWorker'
 import { calcHighlights, highlightWorker } from './highlightWorker'
 import RecordRTC, { StereoAudioRecorder } from 'recordrtc'
 
-// const date = new Date()
-// const now = date.getTime()
-// MAX_TS_PREVIOUS_WORKER = now - START_TRANSCRIBE_OFFSET
-// START_TRANSCRIBE_OFFSET = now
-let START_TRANSCRIBE_OFFSET = 0
-let MAX_TS_PREVIOUS_WORKER = 0
 const OFFSET_MICROSOFT_BUG = 0.00202882151
 
 const tryOrLog = async <T>(message: string, fn: () => Promise<T>) => {
@@ -29,11 +23,11 @@ const tryOrLog = async <T>(message: string, fn: () => Promise<T>) => {
  */
 class RecognizerClient {
   /** Calls POST `/recognizer/start`. */
-  static async start({ language, sampleRate }: { language: string, sampleRate: number }): Promise<void> {
+  static async start({ language, sampleRate, offset }: { language: string, sampleRate: number, offset: number }): Promise<void> {
     await axios({
       method: 'post',
       url: 'http://127.0.0.1:8080/recognizer/start',
-      data: { language, sampleRate }
+      data: { language, sampleRate, offset }
     })
   }
 
@@ -55,7 +49,7 @@ class RecognizerClient {
   }
 
   /** Calls GET `/recognizer/results`. */
-  static async getResults(): Promise<RecognizerResults> {
+  static async getResults(): Promise<RecognizerResult[]> {
     return (await axios({
       method: 'get',
       url: 'http://127.0.0.1:8080/recognizer/results',
@@ -73,11 +67,13 @@ export class Transcriber {
   private audioStream: MediaStream
   private sampleRate: number
   private recorder: RecordRTC | undefined
+  private offset: number
+  private bufferAudioData: boolean
+  private bufferedAudioData: ArrayBuffer[]
   private wordPosterWorker: Promise<void>
   private summarizeWorker: Promise<void>
   private highlightWorker: Promise<void>
   private pollTimer: NodeJS.Timer | undefined
-  // TODO buffer the audio data inbetween stops and starts here
 
   /** Inits the transcriber. */
   static async init(audioStream: MediaStream): Promise<void> {
@@ -90,22 +86,18 @@ export class Transcriber {
     Transcriber.TRANSCRIBER.pollResults(1_000)
   }
 
-  /** Stops and restarts the recognizer (to update its tokens and language). */
+  /** Stops and restarts the recorder (to free some memory) and the recognizer (to update its tokens and language). */
   static async reboot(): Promise<void> {
     if (Transcriber.TRANSCRIBER == null) throw 'Transcriber not inited'
 
-    // TODO Transcriber.TRANSCRIBER.startBuffering()
-
-    // We reboot the  recorder as well to (hopefully) reduce memory usage
+    // We reboot the recorder as well to (hopefully) reduce memory usage
     // We restart instantly to (hopefully) resume where we just left off
     Transcriber.TRANSCRIBER.stopRecorder()
     Transcriber.TRANSCRIBER.startRecorder()
 
-    // Reboot the recognizer
+    // Reboot the recognizer (audio data is buffered in the meantime)
     await Transcriber.TRANSCRIBER.stopRecognizer()
     await Transcriber.TRANSCRIBER.startRecognizer()
-
-    // TODO Transcriber.TRANSCRIBER.stopBuffering()
   }
 
   /**  Ends the transcribing, and destroys resources. */
@@ -116,7 +108,7 @@ export class Transcriber {
     tryOrLog("Stop audio stream", async () => Transcriber.TRANSCRIBER?.audioStream.getAudioTracks()[0].stop())
     tryOrLog("Stop transcription", async () => await Transcriber.TRANSCRIBER?.stopRecognizer())
 
-    // One last time, to make sure (TODO redo workers, do this last getResults in waitUntilComplete?)
+    // Retreive last results that weren't polled
     await Transcriber.getResults()
   }
 
@@ -167,12 +159,23 @@ export class Transcriber {
 
     // Releases memory?
     Transcriber.TRANSCRIBER = undefined
+
+    console.log("=================================================================================")
+    console.log("=================================================================================")
+    console.log("=================================================================================")
+    console.log(SESSION?.words)
+    console.log("=================================================================================")
+    console.log("=================================================================================")
+    console.log("=================================================================================")
   }
 
   /** Returns a new `Transcriber`. */
   private constructor(audioStream: MediaStream) {
     this.audioStream = audioStream
     this.sampleRate = audioStream.getAudioTracks()[0].getSettings().sampleRate ?? 0
+    this.offset = 0
+    this.bufferAudioData = true
+    this.bufferedAudioData = []
 
     // Simply not to have undefined properties
     this.wordPosterWorker = new Promise(resolve => resolve())
@@ -198,10 +201,17 @@ export class Transcriber {
       numberOfAudioChannels: 1, // real-time requires only one channel
       bufferSize: 4096,
       audioBitsPerSecond: this.sampleRate * 16,
-      ondataavailable: async (blob: Blob) => await RecognizerClient.write(Array.from(new Uint8Array(await blob.arrayBuffer()))),
+      ondataavailable: async (blob: Blob) => {
+        if (this.bufferAudioData) {
+          this.bufferedAudioData.push(await blob.arrayBuffer())
+        } else {
+          await RecognizerClient.write(Array.from(new Uint8Array(await blob.arrayBuffer())))
+        }
+      },
       disableLogs: true,
     })
     this.recorder.startRecording()
+    this.offset = new Date().getTime()
   }
 
   /** Stops the recorder. */
@@ -214,11 +224,18 @@ export class Transcriber {
 
   /** Starts the recognizer. */
   private async startRecognizer(): Promise<void> {
-    await RecognizerClient.start({ language: parameters.language, sampleRate: this.sampleRate })
+    await RecognizerClient.start({ language: parameters.language, sampleRate: this.sampleRate, offset: this.offset })
+
+    for (const buffer of this.bufferedAudioData.splice(0)) {
+      await RecognizerClient.write(Array.from(new Uint8Array(buffer)))
+    }
+
+    this.bufferAudioData = false
   }
 
   /** Stops the recognizer. */
   private async stopRecognizer(): Promise<void> {
+    this.bufferAudioData = true
     await RecognizerClient.stop()
   }
 
@@ -243,28 +260,34 @@ export class Transcriber {
 
   /** Gets and handles recognizer results. */
   private static async getResults(): Promise<void> {
-    for (const { language, words } of await RecognizerClient.getResults()) {
-      if (language != null) await Transcriber.handleLanguage(language)
-      if (words != null) Transcriber.handleWords(words)
-    }
-  }
+    for (const { offset, json } of await RecognizerClient.getResults()) {
+      const result: {
+        PrimaryLanguage?: { Language?: string }
+        NBest?: {
+          Words?: { Word: string, Offset: number, Duration: number }[]
+          Display?: string
+          Confidence?: number
+        }[]
+      } = JSON.parse(json)
+      const language = result.PrimaryLanguage?.Language
+      const best = result.NBest ? result.NBest[0] : undefined
+      const text = best?.Display
+      const words = best?.Words
+      const confidence = best?.Confidence
 
-  /** Handles recognized words. */
-  private static handleWords(words: RecognizerWord[]): void {
-    // if (!(SESSION && START_TRANSCRIBE_OFFSET !== 0 && START_RECORD_OFFSET !== 0)) return
-    if (!SESSION) return
+      if (language) {
+        Transcriber.handleLanguage(language)
+      }
 
-    for (const word of words) {
-      word.ts -= OFFSET_MICROSOFT_BUG * word.ts
-      word.end_ts -= OFFSET_MICROSOFT_BUG * word.end_ts
-      word.ts += START_TRANSCRIBE_OFFSET - START_RECORD_OFFSET
-      word.end_ts += START_TRANSCRIBE_OFFSET - START_RECORD_OFFSET
-      SESSION.words.push(word)
+      if (text && words && confidence) {
+        Transcriber.handleResult(offset, text, words, confidence)
+      }
     }
   }
 
   /** Handles detected language. */
   private static async handleLanguage(language: string): Promise<void> {
+    console.log("------------>", language)
     if (language === '' || parameters.language === language) return
 
     parameters.language = language
@@ -273,5 +296,51 @@ export class Transcriber {
       user_id: parameters.user_id,
       payload: { language },
     })
+  }
+
+  /** Handles detected language. */
+  private static async handleResult(offset: number, text: string, words: { Word: string, Offset: number, Duration: number }[], confidence: number): Promise<void> {
+    // if (!(SESSION && START_TRANSCRIBE_OFFSET !== 0 && START_RECORD_OFFSET !== 0)) return
+    if (!SESSION) return
+
+    // MS trim punctuation from `Words`, but it's kept in `Display`
+    const splitted = (() => {
+      const res: string[] = []
+      const splitted = text.split(' ')
+
+      for (let i = 0; i < splitted.length; i++) {
+        if (res.length > 0 && !!splitted[i].match(/^[.,:!?]/)) {
+          res[res.length - 1] = `${res[res.length - 1]}\xa0${splitted[i]}`
+        } else {
+          res.push(splitted[i])
+        }
+      }
+
+      return res
+    })()
+
+    for (let [i, word] of words.entries()) {
+      const value = (() => {
+        if (splitted[i] == null || !splitted[i].toLowerCase().startsWith(word.Word.toLowerCase())) {
+          return word.Word
+        } else {
+          return splitted[i]
+        }
+      })()
+
+      // MS returns offsets in ticks:
+      // "One tick represents one hundred nanoseconds or one ten-millionth of a second."
+      const TEN_MILLION = 10_000_000
+
+      let ts = word.Offset / TEN_MILLION
+      let end_ts = word.Offset / TEN_MILLION + word.Duration / TEN_MILLION
+      ts -= OFFSET_MICROSOFT_BUG * ts
+      end_ts -= OFFSET_MICROSOFT_BUG * end_ts
+      ts += offset - START_RECORD_OFFSET
+      end_ts += offset - START_RECORD_OFFSET
+
+      SESSION.words.push({ type: 'text', value, ts, end_ts, confidence })
+      console.log("------------>", value, ts)
+    }
   }
 }
