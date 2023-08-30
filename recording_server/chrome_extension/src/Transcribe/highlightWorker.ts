@@ -64,7 +64,7 @@ export async function calcHighlights(isFinal: boolean) {
                         console.log('[calcHighlights] posting clip: ', clips)
                         try {
                             let summaryClipitem = ''
-                            let startTime: number | null = clip.start_time
+                            let startTime: number | undefined = clip.start_time
                             while (startTime != null) {
                                 const collect =
                                     await collectSentenceToSummarizeClip(
@@ -191,7 +191,7 @@ async function collectSentenceToSummarizeClip(
     inTime: number,
     endTime: number,
 ): Promise<
-    { summaryParam: SummaryParam; newEndTime: number | null } | undefined
+    { summaryParam: SummaryParam; newEndTime: number | undefined } | undefined
 > {
     const res: SummaryParam & { fullSentence: string } = {
         sentences: [],
@@ -199,7 +199,7 @@ async function collectSentenceToSummarizeClip(
         max_token: 100,
         lang: parameters.language,
     }
-    let newEndTime = null
+    let newEndTime: undefined | number = undefined
 
     if (SESSION) {
         const video_infos = SESSION.video_informations

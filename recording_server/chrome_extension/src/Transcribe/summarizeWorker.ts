@@ -13,11 +13,9 @@ import {
     Label,
 } from 'spoke_api_js'
 
-const MIN_TOKEN = 3000
-const MAX_TOKEN = 3450
-
-const MIN_TOKEN_GPT4 = 6000
-const MAX_TOKEN_GPT4 = 6500
+const MIN_TOKEN_GPT4 = 1000
+const MAX_TOKEN_GPT4 = 2500
+const CONTEXT: AutoHighlightResponse = { clips: [] }
 
 export async function summarizeWorker(workerVersion: number) {
     let i = 0
@@ -31,7 +29,7 @@ export async function summarizeWorker(workerVersion: number) {
         }
         const spokeSession = SESSION
         if (spokeSession) {
-            if (i % 100 === 0) {
+            if (i % 10 === 0) {
                 try {
                     await trySummarizeNext(false)
                 } catch (e) {
@@ -40,7 +38,7 @@ export async function summarizeWorker(workerVersion: number) {
             }
             i++
         }
-        await sleep(5000)
+        await sleep(3)
     }
 }
 
@@ -63,7 +61,7 @@ export async function trySummarizeNext(isFinal: boolean) {
                 await autoHighlight(parameters.agenda, collect)
             }
             try {
-                await api.notify(parameters.user_token, {
+                await api.notifyApp(parameters.user_token, {
                     message: 'RefreshProject',
                     user_id: parameters.user_id,
                     payload: { project_id: SESSION.project.id },
@@ -194,8 +192,10 @@ async function autoHighlight(agenda: Agenda, sentences: Sentence[]) {
             labels: labels,
             sentences,
             lang: parameters.language,
+            context: CONTEXT,
         }
         const highlights: AutoHighlightResponse = await api.autoHighlight(res)
+        CONTEXT.clips = R.concat(CONTEXT.clips, highlights.clips)
         console.log('[autoHighlight]', highlights)
 
         for (const clip of highlights.clips) {
@@ -223,13 +223,15 @@ async function autoHighlight(agenda: Agenda, sentences: Sentence[]) {
 }
 
 export function findLabel(agenda: Agenda, label: string): Label | undefined {
-    return R.find(
-        (b: any) =>
-            b.type === 'talkingpoint' &&
-            b.data.name !== '' &&
-            b.data.name === label,
-        agenda.json.blocks,
-    )?.data.label
+    return (
+        R.find(
+            (b: any) =>
+                b.type === 'talkingpoint' &&
+                b.data.name !== '' &&
+                b.data.name === label,
+            agenda.json.blocks,
+        )?.data as any
+    ).label
 }
 export function extractLabels(agenda: Agenda): string[] {
     return agenda.json.blocks
