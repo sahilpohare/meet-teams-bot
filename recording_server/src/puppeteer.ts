@@ -14,7 +14,7 @@ const StealthPlugin = require('puppeteer-extra-plugin-stealth')
 const EXTENSION_NAME = 'spoke'
 // NOTE: local scripts sed this! (correct value: '<slash>usr<slash>bin<slash>google-chrome')
 // TODO: make an env for this, stop overriding with local scripts...
-const GOOGLE_CHROME_EXECTUTABLE_PATH = '/usr/bin/google-chrome'
+const GOOGLE_CHROME_EXECTUTABLE_PATH = '/Applications/Google Chrome v92.app/Contents/MacOS/Google Chrome'
 
 puppeteer.use(StealthPlugin())
 

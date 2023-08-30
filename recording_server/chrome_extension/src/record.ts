@@ -14,9 +14,6 @@ import {
     Project,
     api,
 } from 'spoke_api_js'
-import { Asset, Project, api } from 'spoke_api_js'
-import { EditorWrapper } from 'spoke_api_js'
-import { SPEAKERS } from './background'
 import { SPEAKERS, parameters } from './background'
 import { newSerialQueue } from './queue'
 import { sleep } from './utils'

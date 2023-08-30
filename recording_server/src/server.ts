@@ -29,7 +29,7 @@ export async function server() {
     const app = express()
 
     const jsonParser = bodyParser.json({ limit: '50mb' })
-    const allowed_origin = 'http://localhost:3000' // TODO ALLOWED_ORIGIN
+    const allowed_origin = ALLOWED_ORIGIN
 
     setConfig({
         api_server_internal_url: process.env.API_SERVER_BASEURL,
