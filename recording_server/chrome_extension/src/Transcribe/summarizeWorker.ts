@@ -62,6 +62,15 @@ export async function trySummarizeNext(isFinal: boolean) {
                 })
                 await autoHighlight(parameters.agenda, collect)
             }
+            try {
+                await api.notify(parameters.user_token, {
+                    message: 'RefreshProject',
+                    user_id: parameters.user_id,
+                    payload: { project_id: SESSION.project.id },
+                })
+            } catch (e) {
+                console.error('notify failed')
+            }
         }
     }
     return false
