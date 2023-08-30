@@ -2,7 +2,7 @@ import { sleep } from '../utils'
 import { api, RecognizerWord } from 'spoke_api_js'
 import * as R from 'ramda'
 import { SESSION } from '../record'
-import { Transcriber } from './streaming'
+import { Transcriber } from './Transcriber'
 
 export async function wordPosterWorker() {
     async function routine() {

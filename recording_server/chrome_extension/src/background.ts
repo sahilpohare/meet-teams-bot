@@ -14,8 +14,7 @@ export let SPEAKERS: Speaker[] = []
 export * from './state'
 import * as State from './state'
 import { sleep } from './utils'
-import * as streaming from './Transcribe/streaming'
-import { Transcriber } from './Transcribe/streaming'
+import { Transcriber } from './Transcribe/Transcriber'
 
 export function addDefaultHeader(name: string, value: string) {
     axios.defaults.headers.common[name] = value

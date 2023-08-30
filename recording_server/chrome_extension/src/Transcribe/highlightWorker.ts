@@ -1,4 +1,4 @@
-import { Transcriber } from './streaming'
+import { Transcriber } from './Transcriber'
 import * as R from 'ramda'
 import { parameters } from '../background'
 import { START_RECORD_TIMESTAMP, SESSION } from '../record'

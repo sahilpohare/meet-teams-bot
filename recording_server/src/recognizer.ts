@@ -4,7 +4,9 @@ import { RecognizerResult } from 'spoke_api_js'
 /**
  * A wrapper around Microsoft's speech SDK: emits language and words from audio data.
  *
- * Usage: call `await recognizer.start()`, `recognizer.write(...)`, `await recognizer.stop()` IN THAT ORDER.
+ * No defensive code:
+ * call `await recognizer.start()`, `recognizer.write(...)` and `await recognizer.stop()`
+ * IN THAT ORDER.
  */
 export class Recognizer {
   private recognizer: SpeechSDK.SpeechRecognizer
@@ -146,6 +148,7 @@ export class RecognizerSession {
   }): Promise<void> {
     // Prevents garbage collection, we need those handlers
     this.oldRecognizer = this.recognizer
+    this.oldRecognizer // Suppress `unused` warning
 
     this.recognizer = new Recognizer({
       language,
@@ -154,7 +157,7 @@ export class RecognizerSession {
       sampleRate,
       dictionary: this.dictionary,
       onResult: (json) => this.results.push({ offset, json }),
-      onCancel: () => console.log('TODO'), // TODO stop and retry to start
+      onCancel: () => console.error('TODO CANCEL'), // TODO: stop and retry to start
     })
 
     await this.recognizer.start()

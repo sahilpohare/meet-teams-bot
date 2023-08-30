@@ -1,4 +1,4 @@
-import { api, RecognizerWord, RecognizerResult } from 'spoke_api_js'
+import { api, RecognizerResult } from 'spoke_api_js'
 import * as R from 'ramda'
 import axios from 'axios'
 import { parameters } from '../background'
@@ -73,8 +73,9 @@ class RecognizerClient {
  * Transcribes an audio stream using the recognizer of the underlying Node server.
  */
 export class Transcriber {
-  static TRANSCRIBER: Transcriber | undefined
   static STOPPED = false
+  private static TRANSCRIBER: Transcriber | undefined
+  private static rebootTimer: NodeJS.Timer
 
   private audioStream: MediaStream
   private sampleRate: number
@@ -97,6 +98,7 @@ export class Transcriber {
     Transcriber.TRANSCRIBER.startRecorder()
     await Transcriber.TRANSCRIBER.startRecognizer()
     Transcriber.TRANSCRIBER.pollResults(1_000)
+    Transcriber.rebootTimer = setInterval(() => Transcriber.reboot(), 10_000)
   }
 
   /** Stops and restarts the recorder (to free some memory) and the recognizer (to update its tokens and language). */
@@ -117,6 +119,7 @@ export class Transcriber {
   static async stop(): Promise<void> {
     if (Transcriber.TRANSCRIBER == null) throw 'Transcriber not inited'
 
+    clearInterval(Transcriber.rebootTimer)
     Transcriber.TRANSCRIBER.destroy()
     tryOrLog('Stop audio stream', async () =>
       Transcriber.TRANSCRIBER?.audioStream.getAudioTracks()[0].stop(),
@@ -196,19 +199,19 @@ export class Transcriber {
       )
     }
 
-    // Releases memory?
+    // Release memory (?)
     Transcriber.TRANSCRIBER = undefined
   }
 
   /** Returns a new `Transcriber`. */
   private constructor(audioStream: MediaStream) {
+    this.queue = newSerialQueue()
     this.audioStream = audioStream
     this.sampleRate =
       audioStream.getAudioTracks()[0].getSettings().sampleRate ?? 0
     this.offset = 0
     this.bufferAudioData = true
     this.bufferedAudioData = []
-    this.queue = newSerialQueue()
 
     // Simply not to have undefined properties
     this.wordPosterWorker = new Promise((resolve) => resolve())
@@ -225,6 +228,12 @@ export class Transcriber {
 
   /** Starts the recorder. */
   private startRecorder(): void {
+    // NOTE:
+    // We buffer audio data when not transcribing (i.e. when rebooting)
+    // and flush that back to the next recognizer session
+    // We also use a queue to make sure writes to the recognizer are sequential
+    // (recorder.ondataavailable does not await...)
+
     this.bufferAudioData = true
     this.recorder = new RecordRTC(this.audioStream, {
       type: 'audio',
@@ -250,7 +259,6 @@ export class Transcriber {
             )
           }
         })
-
       },
       disableLogs: true,
     })
@@ -260,8 +268,13 @@ export class Transcriber {
 
   /** Stops the recorder. */
   private async stopRecorder(): Promise<void> {
+    // Make sure (?) we get all data from the recorder
     await new Promise(resolve => { this.recorder?.stopRecording(resolve) })
+
+    // Await writes to the recognizer
+    this.queue.push(async () => { return }) // HACK: for drain to work
     await this.queue.drain()
+
     this.recorder?.destroy()
   }
 
@@ -301,6 +314,7 @@ export class Transcriber {
   /** Gets and handles recognizer results. */
   private static async getResults(): Promise<void> {
     for (const { offset, json } of await RecognizerClient.getResults()) {
+      // Sadly this is not typed
       const result: {
         PrimaryLanguage?: { Language?: string }
         NBest?: {
@@ -327,7 +341,6 @@ export class Transcriber {
 
   /** Handles detected language. */
   private static async handleLanguage(language: string): Promise<void> {
-    console.log('------------>', language)
     if (language === '' || parameters.language === language) return
 
     parameters.language = language
@@ -347,16 +360,16 @@ export class Transcriber {
   ): Promise<void> {
     if (!(SESSION && offset !== 0 && START_RECORD_OFFSET !== 0)) return
 
-    // MS trim punctuation from `Words`, but it's kept in `Display`
+    // NOTE: MS trim punctuation from `Words`, but it's kept in `Display`
     const splitted = (() => {
       const res: string[] = []
       const splitted = text.split(' ')
 
       for (let i = 0; i < splitted.length; i++) {
         if (res.length > 0 && !!splitted[i].match(/^[.,:!?]/)) {
-          res[res.length - 1] = `${res[res.length - 1]}\xa0${
+          res[res.length - 1] = `${res[res.length - 1]} \xa0${
             splitted[i]
-            }`
+            } `
         } else {
           res.push(splitted[i])
         }
@@ -379,7 +392,7 @@ export class Transcriber {
         }
       })()
 
-      // MS returns offsets in ticks:
+      // NOTE: MS returns offsets in ticks:
       // "One tick represents one hundred nanoseconds or one ten-millionth of a second."
       const TEN_MILLION = 10_000_000
 
@@ -391,7 +404,6 @@ export class Transcriber {
       end_ts += (offset - START_RECORD_OFFSET) / 1_000
 
       SESSION.words.push({ type: 'text', value, ts, end_ts, confidence })
-      console.log(`${'='.repeat(200)}--${value}--${ts}--${end_ts}--${'='.repeat(200)}}`)
     }
   }
 }

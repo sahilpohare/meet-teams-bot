@@ -199,22 +199,19 @@ async function findShowEveryOne(page: puppeteer.Page, click: boolean) {
 }
 
 async function findEndMeeting(page: Page): Promise<boolean> {
-    console.log("--------------------------------------------------------- findEndMeeting")
-    return new Promise(res => setTimeout(() => res(true), 5_000))
-
-    // return await page.$$eval('div', (elems) => {
-    //     for (const e of elems) {
-    //         let elem = e as any
-    //         // console.log(elem.innerText)
-    //         if (
-    //             elem.innerText === "You've been removed from the meeting" ||
-    //             elem.innerText === 'The call ended because everyone left'
-    //         ) {
-    //             return true
-    //         }
-    //     }
-    //     return false
-    // })
+    return await page.$$eval('div', (elems) => {
+        for (const e of elems) {
+            let elem = e as any
+            // console.log(elem.innerText)
+            if (
+                elem.innerText === "You've been removed from the meeting" ||
+                elem.innerText === 'The call ended because everyone left'
+            ) {
+                return true
+            }
+        }
+        return false
+    })
 }
 
 export async function waitForEndMeeting(

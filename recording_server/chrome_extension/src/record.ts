@@ -1,6 +1,6 @@
 import * as R from 'ramda'
 import * as asyncLib from 'async'
-import { Transcriber } from './Transcribe/streaming'
+import { Transcriber } from './Transcribe/Transcriber'
 import {
     Agenda,
     Editor,
