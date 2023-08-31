@@ -1,34 +1,33 @@
 import * as R from 'ramda'
 import * as asyncLib from 'async'
-import * as streaming from './Transcribe/streaming'
-
+import { Transcriber } from './Transcribe/Transcriber'
 import {
     Agenda,
     Editor,
-    RevWord,
+    RecognizerWord,
     Transcript,
     UseCredit,
     Video,
     Word,
+    EditorWrapper,
+    Asset,
+    Project,
+    api,
 } from 'spoke_api_js'
-import { Asset, Project, api } from 'spoke_api_js'
-
-import { EditorWrapper } from 'spoke_api_js'
-import { SPEAKERS } from './background'
+import { SPEAKERS, parameters } from './background'
 import { newSerialQueue } from './queue'
-import { parameters } from './background'
 import { sleep } from './utils'
 
-export let VIDEO_SIZE: VideoSize
+const STREAM: MediaStream | null = null
+let RECORDED_CHUNKS: BlobEvent[] = []
 let MEDIA_RECORDER: MediaRecorder // MediaRecorder instance to capture footage
-var RECORDED_CHUNKS: BlobEvent[] = []
-let STREAM: MediaStream | null = null
 let THIS_STREAM: MediaStreamAudioSourceNode
-export var CONTEXT: AudioContext
-export var START_RECORD_OFFSET = 0
-export var START_RECORD_TIMESTAMP = 0
 
-export var SESSION: SpokeSession | null = null
+export let VIDEO_SIZE: VideoSize
+export let CONTEXT: AudioContext
+export let START_RECORD_OFFSET = 0
+export let START_RECORD_TIMESTAMP = 0
+export let SESSION: SpokeSession | null = null
 
 export type SpokeSession = {
     id: number
@@ -39,7 +38,7 @@ export type SpokeSession = {
     cut_times: number[]
     video_size: VideoSize
     asset: Asset
-    words: RevWord[]
+    words: RecognizerWord[]
     next_editor_index_to_summarise: number
     //last word transcribe time
     transcribed_until: number
@@ -73,9 +72,10 @@ type VideoSize = {
 }
 
 export async function initMediaRecorder(): Promise<void> {
-    var width: number = 1280
-    var fps = 30
-    var height = 720
+    const width = 1280
+    const fps = 30
+    const height = 720
+
     return new Promise((resolve, reject) => {
         chrome.tabCapture.capture(
             {
@@ -93,56 +93,46 @@ export async function initMediaRecorder(): Promise<void> {
                 },
             },
             function (stream) {
-                if (stream) {
-                    console.log('stream from chrome', stream)
-                    // Combine tab and microphone audio
-
-                    // Keep playing tab audio
-                    CONTEXT = new AudioContext()
-
-                    THIS_STREAM = CONTEXT.createMediaStreamSource(stream)
-                    THIS_STREAM.connect(CONTEXT.destination)
-
-                    // Set up media recorder & inject content
-
-                    const mediaConstraints = {
-                        mimeType: 'video/webm; codecs=h264,pcm',
-                    } //, videoBitsPerSecond: 2000000 }
-                    VIDEO_SIZE = {
-                        height: stream.getVideoTracks()[0].getSettings().height,
-                        width: stream.getVideoTracks()[0].getSettings().width,
-                    }
-                    console.log('setting media recorder')
-                    try {
-                        MEDIA_RECORDER = new MediaRecorder(
-                            stream,
-                            mediaConstraints,
-                        )
-                    } catch (e) {
-                        console.error('error creating media recorder', e)
-                        reject(e)
-                    }
-                    console.log('setting audio stream')
-                    const audioStream = new MediaStream(stream.getAudioTracks())
-                    streaming
-                        .streamingTranscribe(audioStream, CONTEXT)
-                        .then(() => {
-                            MEDIA_RECORDER.ondataavailable =
-                                handleDataAvailable()
-                            MEDIA_RECORDER.onstop = handleStop
-                            resolve()
-                        })
-                        .catch((e) => {
-                            console.error(
-                                'an error occured in streaming transcribe',
-                                e,
-                            )
-
-                            reject()
-                        })
-                } else {
+                if (stream == null) {
                     reject()
+                    return
                 }
+
+                // Combine tab and microphone audio
+                // Keep playing tab audio
+                CONTEXT = new AudioContext()
+                THIS_STREAM = CONTEXT.createMediaStreamSource(stream)
+                THIS_STREAM.connect(CONTEXT.destination)
+                VIDEO_SIZE = {
+                    height: stream.getVideoTracks()[0].getSettings().height,
+                    width: stream.getVideoTracks()[0].getSettings().width,
+                }
+
+                try {
+                    MEDIA_RECORDER = new MediaRecorder(stream, {
+                        mimeType: 'video/webm; codecs=h264,pcm',
+                    })
+                } catch (e) {
+                    console.error('error creating media recorder', e)
+                    reject(e)
+                    return
+                }
+
+                console.log('Initing')
+                Transcriber.init(new MediaStream(stream.getAudioTracks()))
+                    .then(() => {
+                        console.log('Inited')
+                        MEDIA_RECORDER.ondataavailable = handleDataAvailable()
+                        MEDIA_RECORDER.onstop = handleStop
+                        resolve()
+                    })
+                    .catch((e) => {
+                        console.error(
+                            'an error occured in streaming transcribe',
+                            e,
+                        )
+                        reject()
+                    })
             },
         )
     })
@@ -152,7 +142,6 @@ export async function startRecording(
     projectName: string,
     agenda?: Agenda,
 ): Promise<Project> {
-    console.log('START RECORDING')
     const newSessionId = await api.startRecordingSession()
     console.log(`[startRecording]`, { newSessionId })
 
@@ -213,7 +202,7 @@ export async function startRecording(
     MEDIA_RECORDER.onerror = function (e) {
         console.error('media recorder error', e)
     }
-    START_RECORD_OFFSET = CONTEXT.currentTime
+    START_RECORD_OFFSET = now
     START_RECORD_TIMESTAMP = now
     console.log(`after media recorder start`)
 
@@ -262,7 +251,7 @@ export async function stop() {
     }
 }
 
-export async function waitUntilComplete(kill: boolean = false) {
+export async function waitUntilComplete(kill = false) {
     const spokeSession = SESSION!
 
     if (spokeSession.project) {
@@ -292,7 +281,7 @@ export async function waitUntilComplete(kill: boolean = false) {
     await stopRecordServer(spokeSession)
 }
 
-export async function unsetAllStream() {
+async function unsetAllStream(): Promise<void> {
     STREAM?.getTracks().forEach((track) => track.stop())
     await CONTEXT?.close()
 }

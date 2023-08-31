@@ -6,7 +6,10 @@ import { Logger } from './logger'
 import { PORT } from './instance'
 import * as redis from 'redis'
 import { sleep } from './utils'
+import { RecognizerSession } from './Recognizer'
+import { api, setConfig } from 'spoke_api_js'
 
+export let PROJECT_ID: number | undefined = undefined
 export const LOGGER = new Logger({})
 
 console.log('redis url: ', process.env.REDIS_URL)
@@ -26,9 +29,15 @@ export async function server() {
     const app = express()
 
     const jsonParser = bodyParser.json({ limit: '50mb' })
+    const allowed_origin = ALLOWED_ORIGIN
+
+    setConfig({
+        api_server_internal_url: process.env.API_SERVER_BASEURL,
+        logError: null,
+    })
 
     app.options('*', (_req, res) => {
-        res.header('Access-Control-Allow-Origin', ALLOWED_ORIGIN)
+        res.header('Access-Control-Allow-Origin', allowed_origin)
         res.header('Access-Control-Allow-Credentials', 'true')
         res.header(
             'Access-Control-Allow-Methods',
@@ -42,7 +51,7 @@ export async function server() {
     })
 
     app.use((req, res, next) => {
-        res.header('Access-Control-Allow-Origin', ALLOWED_ORIGIN)
+        res.header('Access-Control-Allow-Origin', allowed_origin)
         res.header('Access-Control-Allow-Credentials', 'true')
         res.header(
             'Access-Control-Allow-Methods',
@@ -59,6 +68,43 @@ export async function server() {
         }
 
         next()
+    })
+
+    const recognizerSession = new RecognizerSession([])
+
+    app.post('/recognizer/start', jsonParser, async (req, res) => {
+        const {
+            language,
+            sampleRate,
+            offset,
+        }: { language: string; sampleRate: number; offset: number } = req.body
+        const [token, region] = await api.requestAuthorizationToken()
+
+        await recognizerSession.start({
+            language,
+            token,
+            region,
+            sampleRate,
+            offset,
+        })
+        res.send('ok')
+    })
+
+    app.post('/recognizer/write', jsonParser, async (req, res) => {
+        const bytes: number[] = req.body.bytes
+        const buffer = new Uint8Array(bytes).buffer
+
+        recognizerSession.write(buffer)
+        res.send('ok')
+    })
+
+    app.post('/recognizer/stop', jsonParser, async (_, res) => {
+        await recognizerSession.stop()
+        res.send('ok')
+    })
+
+    app.get('/recognizer/results', jsonParser, (_, res) => {
+        res.json(recognizerSession.getResults())
     })
 
     app.post('/status', jsonParser, async (req, res) => {

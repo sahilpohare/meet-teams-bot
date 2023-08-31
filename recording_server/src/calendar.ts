@@ -38,11 +38,13 @@ export async function notifyApp(
     if (event != null) {
         try {
             const eventStatus = status === 'EndRecording' ? 'None' : status
-            await patchEvent(data.user_token, {
-                status: eventStatus,
-                id: data.event?.id,
-                ...event,
-            })
+            if (data.event.id != null) {
+                await patchEvent(data.user_token, {
+                    status: eventStatus,
+                    id: data.event?.id,
+                    ...event,
+                })
+            }
         } catch (e) {
             console.error('error patching event: ', e)
         }

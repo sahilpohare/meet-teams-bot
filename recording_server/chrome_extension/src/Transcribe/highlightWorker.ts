@@ -1,4 +1,4 @@
-import { STREAMING_TRANSCRIBE, STOPED } from './streaming'
+import { Transcriber } from './Transcriber'
 import * as R from 'ramda'
 import { parameters } from '../background'
 import { START_RECORD_TIMESTAMP, SESSION } from '../record'
@@ -11,36 +11,31 @@ import {
     Label,
 } from 'spoke_api_js'
 
-const MIN_TO_HIGHLIGHT = 180000
+// in milis seconds
+const MIN_TO_HIGHLIGHT = 180_000
 
 let EMPTY_LABEL: Label | null = null
 
-export async function highlightWorker(workerVersion: number) {
+export async function highlightWorker(): Promise<void> {
     let i = 0
-    while (!STOPED) {
-        if (
-            STREAMING_TRANSCRIBE &&
-            workerVersion !== STREAMING_TRANSCRIBE?.workerVersion
-        ) {
-            console.log('returning from worker highlighter')
-            return
-        }
-        const spokeSession = SESSION
-        if (spokeSession) {
+
+    while (!Transcriber.STOPPED) {
+        if (SESSION) {
             if (i % 100 === 0) {
                 try {
                     await calcHighlights(false)
                 } catch (e) {
-                    console.log(e, 'calcHighlight failed')
+                    console.log(e, 'calcHighlights() failed')
                 }
             }
             i++
         }
-        await sleep(5000)
+
+        await sleep(5_000)
     }
 }
 
-export async function calcHighlights(isFinal: boolean) {
+export async function calcHighlights(isFinal: boolean): Promise<boolean> {
     if (SESSION) {
         const project_id = SESSION.project.id
         const asset_id = SESSION.asset.id

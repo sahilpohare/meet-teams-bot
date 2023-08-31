@@ -9,12 +9,12 @@ type Speaker = {
 }
 
 addListener()
-export var SPEAKERS: Speaker[] = []
+export let SPEAKERS: Speaker[] = []
 
 export * from './state'
 import * as State from './state'
 import { sleep } from './utils'
-import * as streaming from './Transcribe/streaming'
+import { Transcriber } from './Transcribe/Transcriber'
 
 export function addDefaultHeader(name: string, value: string) {
     axios.defaults.headers.common[name] = value
@@ -37,7 +37,7 @@ function setUserAgent(window, userAgent) {
     }
     // Works on Safari
     if (window.navigator.userAgent !== userAgent) {
-        var userAgentProp = {
+        const userAgentProp = {
             get: function () {
                 return userAgent
             },
@@ -138,12 +138,12 @@ export async function startRecording(
 
 export async function stopMediaRecorder() {
     await record.stop()
-    await streaming.stop()
+    await Transcriber.stop()
 }
 
 export async function waitForUpload() {
     await record.waitUntilComplete()
-    await streaming.waitUntilComplete()
+    await Transcriber.waitUntilComplete()
 }
 
 export async function markMoment(
@@ -165,7 +165,7 @@ export async function changeLanguage(data: ChangeLanguage) {
     console.log('[changeLnaugage]', data)
     if (State.parameters.language !== data.language) {
         State.changeLanguage(data)
-        await streaming.changeLanguage()
+        await Transcriber.reboot()
     }
 }
 

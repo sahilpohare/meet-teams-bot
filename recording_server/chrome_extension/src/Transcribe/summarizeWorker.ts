@@ -1,4 +1,4 @@
-import { STREAMING_TRANSCRIBE, STOPED } from './streaming'
+import { Transcriber } from './Transcriber'
 import * as R from 'ramda'
 import { parameters } from '../background'
 import { SESSION } from '../record'
@@ -17,18 +17,11 @@ const MIN_TOKEN_GPT4 = 1000
 const MAX_TOKEN_GPT4 = 2500
 const CONTEXT: AutoHighlightResponse = { clips: [] }
 
-export async function summarizeWorker(workerVersion: number) {
+export async function summarizeWorker(): Promise<void> {
     let i = 0
-    while (!STOPED) {
-        if (
-            STREAMING_TRANSCRIBE &&
-            workerVersion !== STREAMING_TRANSCRIBE?.workerVersion
-        ) {
-            console.log('returning from worker summarizer')
-            return
-        }
-        const spokeSession = SESSION
-        if (spokeSession) {
+
+    while (!Transcriber.STOPPED) {
+        if (SESSION) {
             if (i % 10 === 0) {
                 try {
                     await trySummarizeNext(false)
@@ -38,26 +31,28 @@ export async function summarizeWorker(workerVersion: number) {
             }
             i++
         }
-        await sleep(3000)
+
+        await sleep(3_000)
     }
 }
 
-export async function trySummarizeNext(isFinal: boolean) {
+export async function trySummarizeNext(isFinal: boolean): Promise<boolean> {
     if (SESSION) {
         const labels = parameters.agenda ? extractLabels(parameters.agenda) : []
         const collect = await collectSentenceToAutoHighlight(isFinal, labels)
+
         if (collect != null && collect.length > 0) {
             if (parameters.agenda) {
                 await autoHighlight(parameters.agenda, collect)
             } else {
-                const agenda = await detectTemplate(collect)
-                parameters.agenda = agenda
+                parameters.agenda = await detectTemplate(collect)
 
                 await api.patchProject({
                     id: SESSION.project.id,
-                    template: agenda.json,
-                    original_agenda_id: agenda.id,
+                    template: parameters.agenda.json,
+                    original_agenda_id: parameters.agenda.id,
                 })
+
                 await autoHighlight(parameters.agenda, collect)
             }
             try {
@@ -69,8 +64,13 @@ export async function trySummarizeNext(isFinal: boolean) {
             } catch (e) {
                 console.error('notify failed')
             }
+
+            return true
+        } else {
+            return false
         }
     }
+
     return false
 }
 
