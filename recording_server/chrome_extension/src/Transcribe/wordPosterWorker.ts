@@ -67,7 +67,7 @@ async function pushWords(pushable: RecognizerWord[]) {
             const transcript_id = v.complete_editor?.video.transcripts[0].id!
             const video_id = v.complete_editor?.video.id!
 
-            // console.log({ wordsWithin })
+            console.log('posting words: ', wordsWithin)
             const words = await api.postWord(
                 wordsWithin,
                 transcript_id,

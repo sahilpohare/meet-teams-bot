@@ -1,4 +1,4 @@
-import { ChangeLanguage } from './background'
+import { ChangeAgenda, ChangeLanguage } from './background'
 import { MeetingProvider, Marker, Agenda } from 'spoke_api_js'
 
 export type MeetingParams = {
@@ -82,6 +82,10 @@ export function addMeetingParams(meetingParams: MeetingParams) {
     parameters.vocabulary = meetingParams.vocabulary
     console.log({ meetingParams })
     console.log({ parameters })
+}
+
+export function changeAgenda(agenda: Agenda) {
+    parameters.agenda = agenda
 }
 
 export function changeLanguage(changeLanguage: ChangeLanguage) {

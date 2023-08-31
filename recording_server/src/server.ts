@@ -155,6 +155,16 @@ export async function server() {
         }
     })
 
+    app.post('/change_agenda', jsonParser, async (req, res) => {
+        const data: meeting.ChangeAgendaRequest = req.body
+        try {
+            await meeting.changeAgenda(data)
+            res.send('ok')
+        } catch (e) {
+            res.status(500).send(JSON.stringify(e))
+        }
+    })
+
     app.post('/change_language', jsonParser, async (req, res) => {
         const data: ChangeLanguage = req.body
         try {

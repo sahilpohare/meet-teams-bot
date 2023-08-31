@@ -13,12 +13,11 @@ import {
     Label,
 } from 'spoke_api_js'
 
-const MIN_TOKEN_GPT4 = 1000
-const MAX_TOKEN_GPT4 = 2500
+const MIN_TOKEN_GPT4 = 500
 const CONTEXT: AutoHighlightResponse = { clips: [] }
 
 export async function summarizeWorker(): Promise<void> {
-    let i = 0
+    let i = 1
 
     while (!Transcriber.STOPPED) {
         if (SESSION) {
@@ -43,7 +42,8 @@ export async function trySummarizeNext(isFinal: boolean): Promise<boolean> {
 
         if (collect != null && collect.length > 0) {
             if (parameters.agenda) {
-                await autoHighlight(parameters.agenda, collect)
+                const agenda = await api.getAgendaWithId(parameters.agenda.id)
+                await autoHighlight(agenda, collect)
             } else {
                 parameters.agenda = await detectTemplate(collect)
 
@@ -51,6 +51,11 @@ export async function trySummarizeNext(isFinal: boolean): Promise<boolean> {
                     id: SESSION.project.id,
                     template: parameters.agenda.json,
                     original_agenda_id: parameters.agenda.id,
+                })
+                await api.notifyApp(parameters.user_token, {
+                    message: 'AgendaDetected',
+                    user_id: parameters.user_id,
+                    payload: { agenda_id: parameters.agenda.id },
                 })
 
                 await autoHighlight(parameters.agenda, collect)
@@ -78,9 +83,8 @@ async function collectSentenceToAutoHighlight(
     isFinal: boolean,
     labels: string[],
 ): Promise<Sentence[] | undefined> {
-    const res: SummaryParam & { fullSentence: string } = {
+    const res: SummaryParam = {
         sentences: [],
-        fullSentence: '',
         lang: parameters.language,
     }
     let withNextIsMaxToken = false
@@ -98,31 +102,19 @@ async function collectSentenceToAutoHighlight(
             i++
         ) {
             const video_info = video_infos[i]
-            console.log(
-                '[collectSentenceToSummarize]',
-                SESSION.next_editor_index_to_summarise,
-                i,
-                SESSION.transcribed_until,
-                video_info.tcout,
-            )
+            console.log('[collectSentenceToSummarize]', {
+                next_editor_index_to_summarize:
+                    SESSION.next_editor_index_to_summarise,
+                i: i,
+                transcribed_until: SESSION.transcribed_until,
+                tcout: video_info.tcout,
+                sentences: res.sentences,
+            })
             if (
                 !(SESSION.transcribed_until >= video_info.tcout || isFinal) ||
                 (await autoHighlightCountToken(res.sentences, labels)) >
                     MIN_TOKEN_GPT4
             ) {
-                break
-            }
-            const newFullSentence =
-                res.fullSentence +
-                '\n' +
-                video_info.speaker_name +
-                ':' +
-                video_info.words.map((w) => w.text).join(' ')
-            if (
-                (await autoHighlightCountToken(res.sentences, labels)) >
-                MAX_TOKEN_GPT4
-            ) {
-                withNextIsMaxToken = true
                 break
             }
             if (video_info.words.length > 0) {
@@ -132,18 +124,14 @@ async function collectSentenceToAutoHighlight(
                     start_timestamp: video_info.words[0].start_time,
                     end_timestamp:
                         video_info.words[video_info.words.length - 1].end_time,
-                    // SESSION?.video_informations[
-                    // } else {
                 })
-                res.fullSentence = newFullSentence
             }
             next_index_to_summarise = i + 1
         }
         if (
             (await autoHighlightCountToken(res.sentences, labels)) >
                 MIN_TOKEN_GPT4 ||
-            isFinal ||
-            withNextIsMaxToken
+            isFinal
         ) {
             SESSION.next_editor_index_to_summarise = next_index_to_summarise
             return res.sentences

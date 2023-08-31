@@ -160,7 +160,21 @@ export type ChangeLanguage = {
     use_my_vocabulary: boolean
     language: string
 }
+export type ChangeAgenda = {
+    agenda_id: number
+}
 
+export async function changeAgenda(data: ChangeAgenda) {
+    console.log('[changeLnaugage]', data)
+    if (State.parameters.agenda?.id !== data.agenda_id) {
+        try {
+            const agenda = await api.getAgendaWithId(data.agenda_id)
+            State.changeAgenda(agenda)
+        } catch (e) {
+            console.error('error getting agenda', e)
+        }
+    }
+}
 export async function changeLanguage(data: ChangeLanguage) {
     console.log('[changeLnaugage]', data)
     if (State.parameters.language !== data.language) {
@@ -175,3 +189,4 @@ w.markMoment = markMoment
 w.stopMediaRecorder = stopMediaRecorder
 w.waitForUpload = waitForUpload
 w.changeLanguage = changeLanguage
+w.changeAgenda = changeAgenda

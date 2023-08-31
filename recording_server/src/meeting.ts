@@ -317,6 +317,9 @@ export async function recordMeetingToEnd() {
         await cleanEverything(false)
     }
 }
+export type ChangeAgendaRequest = {
+    agenda_id: number
+}
 
 export type ChangeLanguage = {
     meeting_url: string
@@ -325,6 +328,24 @@ export type ChangeLanguage = {
     user_id: number
 }
 
+export async function changeAgenda(data: ChangeAgendaRequest) {
+    const meeting = getMeetingGlobal()
+    if (meeting != null) {
+        CURRENT_MEETING.logger.info('Changing language', {
+            new_agenda: data.agenda_id,
+        })
+        // CURRENT_MEETING.logger.error('Can\'t change language, the feature is desactivated')
+        let { backgroundPage } = meeting
+        await backgroundPage.evaluate(async (data) => {
+            const w = window as any
+            await w.changeAgenda(data)
+        }, data)
+    } else {
+        CURRENT_MEETING.logger.error(
+            "Can't change language, the meeting has ended",
+        )
+    }
+}
 export async function changeLanguage(data: ChangeLanguage) {
     const meeting = getMeetingGlobal()
     if (meeting != null) {
