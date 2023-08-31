@@ -16,6 +16,7 @@ export type MeetingParams = {
     session_id: string
     rev_api_key: string
     agenda?: Agenda
+    vocabulary: string[]
 }
 
 export type State = {
@@ -34,6 +35,7 @@ export type State = {
     rev_api_key: string
     user_id: number
     agenda?: Agenda
+    vocabulary: string[]
 }
 
 export type Preferences = {
@@ -60,6 +62,7 @@ export const parameters: State = {
     rev_api_key: '',
     user_id: 0,
     agenda: undefined,
+    vocabulary: [],
 }
 
 export function addMeetingParams(meetingParams: MeetingParams) {
@@ -76,6 +79,7 @@ export function addMeetingParams(meetingParams: MeetingParams) {
     parameters.rev_api_key = meetingParams.rev_api_key
     parameters.user_id = meetingParams.user_id
     parameters.agenda = meetingParams.agenda
+    parameters.vocabulary = meetingParams.vocabulary
     console.log({ meetingParams })
     console.log({ parameters })
 }

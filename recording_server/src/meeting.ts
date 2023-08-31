@@ -129,6 +129,7 @@ export type MeetingParams = {
     bot_branding: boolean
     has_installed_extension: boolean
     custom_branding_bot_path: string
+    vocabulary: string[]
 }
 
 export type MarkMomentParams = {
@@ -238,6 +239,7 @@ export async function startRecordMeeting(meetingParams: MeetingParams) {
             CURRENT_MEETING.meeting.browser,
             meetingLink,
         )
+        CURRENT_MEETING.logger.info('meeting page opened')
 
         CURRENT_MEETING.meeting.meetingTimeoutInterval = setTimeout(
             () => stopRecording('timeout'),
@@ -248,6 +250,7 @@ export async function startRecordMeeting(meetingParams: MeetingParams) {
             CURRENT_MEETING.meeting.page,
             meetingParams,
         )
+        CURRENT_MEETING.logger.info('meeting page joined')
         listenPage(CURRENT_MEETING.meeting.backgroundPage)
 
         meetingParams.api_server_baseurl = process.env.API_SERVER_BASEURL
@@ -261,6 +264,7 @@ export async function startRecordMeeting(meetingParams: MeetingParams) {
             },
             meetingParams,
         )
+        CURRENT_MEETING.logger.info('startRecording called')
 
         if (project == null) {
             throw 'failed creating project'
@@ -269,6 +273,7 @@ export async function startRecordMeeting(meetingParams: MeetingParams) {
         CURRENT_MEETING.project = project
         return project
     } catch (e) {
+        console.error('an error occured while starting recording', e)
         console.error('setting current_meeting error')
         CURRENT_MEETING.error = e
         console.error('after set current meeting error')

@@ -77,7 +77,13 @@ export async function server() {
             language,
             sampleRate,
             offset,
-        }: { language: string; sampleRate: number; offset: number } = req.body
+            vocabulary,
+        }: {
+            language: string
+            sampleRate: number
+            offset: number
+            vocabulary: string[]
+        } = req.body
         const [token, region] = await api.requestAuthorizationToken()
 
         await recognizerSession.start({
@@ -86,6 +92,7 @@ export async function server() {
             region,
             sampleRate,
             offset,
+            vocabulary,
         })
         res.send('ok')
     })

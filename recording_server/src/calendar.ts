@@ -38,7 +38,7 @@ export async function notifyApp(
     if (event != null) {
         try {
             const eventStatus = status === 'EndRecording' ? 'None' : status
-            if (data.event.id != null) {
+            if (data.event?.id != null) {
                 await patchEvent(data.user_token, {
                     status: eventStatus,
                     id: data.event?.id,

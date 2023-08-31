@@ -19,14 +19,14 @@ export class Recognizer {
         region,
         sampleRate,
         language,
-        dictionary,
+        vocabulary,
         onResult,
         onCancel,
     }: {
         token: string
         region: string
         sampleRate: number
-        dictionary: string[]
+        vocabulary: string[]
         language: string
         onResult: (json: string) => void
         onCancel: () => void
@@ -74,10 +74,10 @@ export class Recognizer {
         this.recognizer.canceled = () => onCancel()
 
         // API cancels recognizer if dictionary is empty
-        if (dictionary.length > 0) {
+        if (vocabulary.length > 0) {
             SpeechSDK.PhraseListGrammar.fromRecognizer(
                 this.recognizer,
-            ).addPhrases(dictionary)
+            ).addPhrases(vocabulary)
         }
     }
 
@@ -124,13 +124,11 @@ export class RecognizerSession {
     private recognizer: Recognizer | null
     private oldRecognizer: Recognizer | null
     private results: RecognizerResult[]
-    private dictionary: string[]
 
     /** Returns a new `RecognizerSession`. */
-    constructor(dictionary: string[]) {
+    constructor() {
         this.recognizer = null
         this.results = []
-        this.dictionary = dictionary
     }
 
     /** Starts the recognizer. */
@@ -140,12 +138,14 @@ export class RecognizerSession {
         language,
         sampleRate,
         offset,
+        vocabulary,
     }: {
         token: string
         region: string
         sampleRate: number
         language: string
         offset: number
+        vocabulary: string[]
     }): Promise<void> {
         // Prevents garbage collection, we need those handlers
         this.oldRecognizer = this.recognizer
@@ -156,7 +156,7 @@ export class RecognizerSession {
             token,
             region,
             sampleRate,
-            dictionary: this.dictionary,
+            vocabulary,
             onResult: (json) => this.results.push({ offset, json }),
             onCancel: () => console.error('TODO CANCEL'), // TODO: stop and retry to start
         })

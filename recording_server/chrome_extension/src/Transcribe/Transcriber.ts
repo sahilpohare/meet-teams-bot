@@ -37,7 +37,12 @@ class RecognizerClient {
         await axios({
             method: 'post',
             url: 'http://127.0.0.1:8080/recognizer/start',
-            data: { language, sampleRate, offset },
+            data: {
+                language,
+                sampleRate,
+                offset,
+                vocabulary: parameters.vocabulary,
+            },
         })
     }
 
