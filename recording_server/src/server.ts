@@ -6,7 +6,7 @@ import { Logger } from './logger'
 import { PORT } from './instance'
 import * as redis from 'redis'
 import { sleep } from './utils'
-import { RecognizerSession } from './Recognizer'
+import { RecognizerSession } from './recognizer'
 import { api, setConfig } from 'spoke_api_js'
 
 export let PROJECT_ID: number | undefined = undefined
@@ -70,7 +70,7 @@ export async function server() {
         next()
     })
 
-    const recognizerSession = new RecognizerSession([])
+    const recognizerSession = new RecognizerSession()
 
     app.post('/recognizer/start', jsonParser, async (req, res) => {
         const {
