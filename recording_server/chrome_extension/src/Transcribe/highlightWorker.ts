@@ -11,8 +11,6 @@ import {
     Label,
 } from 'spoke_api_js'
 
-const MAX_TOKEN = 3450
-// in milis seconds
 const MIN_TO_HIGHLIGHT = 180000
 
 let EMPTY_LABEL: Label | null = null

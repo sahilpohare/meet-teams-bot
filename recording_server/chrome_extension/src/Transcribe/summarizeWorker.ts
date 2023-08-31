@@ -38,7 +38,7 @@ export async function summarizeWorker(workerVersion: number) {
             }
             i++
         }
-        await sleep(3)
+        await sleep(3000)
     }
 }
 
