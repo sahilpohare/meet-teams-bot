@@ -162,6 +162,7 @@ export async function server() {
             await meeting.changeAgenda(data)
             res.send('ok')
         } catch (e) {
+            LOGGER.error(`changing agenda error ${e}`)
             res.status(500).send(JSON.stringify(e))
         }
     })
