@@ -157,6 +157,7 @@ export async function server() {
 
     app.post('/change_agenda', jsonParser, async (req, res) => {
         const data: meeting.ChangeAgendaRequest = req.body
+        console.log('change agenda request', data)
         try {
             await meeting.changeAgenda(data)
             res.send('ok')
