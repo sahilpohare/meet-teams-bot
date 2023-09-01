@@ -328,16 +328,32 @@ export type ChangeLanguage = {
     user_id: number
 }
 
+export async function getAgenda(): Promise<Agenda | undefined> {
+    const meeting = getMeetingGlobal()
+    if (meeting != null) {
+        const agenda = await CURRENT_MEETING.meeting.backgroundPage.evaluate(
+            async () => {
+                const w = window as any
+                console.log('window ', w)
+                return await w.getAgenda()
+            },
+        )
+        return agenda
+    } else {
+        CURRENT_MEETING.logger.error("Can't get agenda")
+        return undefined
+    }
+}
+
 export async function changeAgenda(data: ChangeAgendaRequest) {
     const meeting = getMeetingGlobal()
     if (meeting != null) {
-        CURRENT_MEETING.logger.info('Changing language', {
+        CURRENT_MEETING.logger.info('Changing agenda', {
             new_agenda: data.agenda_id,
         })
-        // CURRENT_MEETING.logger.error('Can\'t change language, the feature is desactivated')
-        let { backgroundPage } = meeting
-        await backgroundPage.evaluate(async (data) => {
+        await CURRENT_MEETING.meeting.backgroundPage.evaluate(async (data) => {
             const w = window as any
+            console.log('window ', w)
             await w.changeAgenda(data)
         }, data)
     } else {

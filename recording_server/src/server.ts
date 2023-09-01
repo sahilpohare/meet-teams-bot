@@ -18,10 +18,8 @@ export const clientRedis = redis.createClient({
 })
 clientRedis.on('error', (err) => {
     console.error('Redis error:', err)
-    // Handle the error appropriately here.
 })
 
-// Constants
 const HOST = '0.0.0.0'
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN
 
@@ -141,7 +139,18 @@ export async function server() {
                         return
                     } else if (meeting.CURRENT_MEETING.project != null) {
                         logger.info('status ready, returning project')
-                        res.json(meeting.CURRENT_MEETING.project)
+                        let agenda = null
+                        try {
+                            agenda = await meeting.getAgenda()
+                        } catch (e) {
+                            logger.error(
+                                'failed to get agenda in status request',
+                            )
+                        }
+                        res.json({
+                            project: meeting.CURRENT_MEETING.project,
+                            agenda: agenda,
+                        })
                         return
                     }
                 }

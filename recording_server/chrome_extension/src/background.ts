@@ -111,7 +111,7 @@ export async function startRecording(
     try {
         State.addMeetingParams(meetingParams)
 
-        console.log('TOKEN', State.parameters.user_token)
+        console.log('new version', '1.1')
 
         addDefaultHeader('Authorization', State.parameters.user_token)
         setConfig({
@@ -164,8 +164,15 @@ export type ChangeAgenda = {
     agenda_id: number
 }
 
+export async function getAgenda() {
+    if (State.parameters.agenda != null) {
+        return State.parameters.agenda
+    } else {
+        return undefined
+    }
+}
 export async function changeAgenda(data: ChangeAgenda) {
-    console.log('[changeLnaugage]', data)
+    console.log('[changeagenda]', data)
     if (State.parameters.agenda?.id !== data.agenda_id) {
         try {
             const agenda = await api.getAgendaWithId(data.agenda_id)
@@ -190,3 +197,4 @@ w.stopMediaRecorder = stopMediaRecorder
 w.waitForUpload = waitForUpload
 w.changeLanguage = changeLanguage
 w.changeAgenda = changeAgenda
+w.getAgenda = getAgenda
