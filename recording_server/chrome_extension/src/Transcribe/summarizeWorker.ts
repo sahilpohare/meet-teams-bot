@@ -47,11 +47,15 @@ export async function trySummarizeNext(isFinal: boolean): Promise<boolean> {
             } else {
                 parameters.agenda = await detectTemplate(collect)
 
-                await api.patchProject({
-                    id: SESSION.project.id,
-                    template: parameters.agenda.json,
-                    original_agenda_id: parameters.agenda.id,
-                })
+                try {
+                    await api.patchProject({
+                        id: SESSION.project.id,
+                        template: parameters.agenda.json,
+                        original_agenda_id: parameters.agenda.id,
+                    })
+                } catch (e) {
+                    console.error('failed to patch project')
+                }
                 await api.notifyApp(parameters.user_token, {
                     message: 'AgendaDetected',
                     user_id: parameters.user_id,
@@ -219,7 +223,7 @@ export function findLabel(agenda: Agenda, label: string): Label | undefined {
                 b.data.name === label,
             agenda.json.blocks,
         )?.data as any
-    ).label
+    )?.label
 }
 export function extractLabels(agenda: Agenda): string[] {
     return agenda.json.blocks
