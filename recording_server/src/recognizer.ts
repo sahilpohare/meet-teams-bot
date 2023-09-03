@@ -74,7 +74,7 @@ export class Recognizer {
         this.recognizer.canceled = () => onCancel()
 
         // API cancels recognizer if dictionary is empty
-        if (vocabulary.length > 0) {
+        if (vocabulary?.length > 0) {
             SpeechSDK.PhraseListGrammar.fromRecognizer(
                 this.recognizer,
             ).addPhrases(vocabulary)
