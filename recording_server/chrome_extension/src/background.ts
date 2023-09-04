@@ -20,8 +20,6 @@ export function addDefaultHeader(name: string, value: string) {
     axios.defaults.headers.common[name] = value
 }
 
-console.log('USER AGENT BEFORE', navigator.userAgent)
-
 function setUserAgent(window, userAgent) {
     // Works on Firefox, Chrome, Opera and IE9+
     if ((navigator as any).__defineGetter__) {
@@ -55,8 +53,6 @@ setUserAgent(
     window,
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36',
 )
-
-console.log('USER AGENT AFTER', navigator.userAgent)
 
 function addListener() {
     chrome.runtime.onMessage.addListener(function (

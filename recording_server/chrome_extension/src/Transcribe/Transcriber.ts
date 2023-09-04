@@ -10,8 +10,6 @@ import { trySummarizeNext, summarizeWorker } from './summarizeWorker'
 import { calcHighlights, highlightWorker } from './highlightWorker'
 import RecordRTC, { StereoAudioRecorder } from 'recordrtc'
 
-const OFFSET_MICROSOFT_BUG = 0.00202882151
-
 const tryOrLog = async <T>(message: string, fn: () => Promise<T>) => {
     try {
         await fn()
