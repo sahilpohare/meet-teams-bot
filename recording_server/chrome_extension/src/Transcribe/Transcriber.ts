@@ -114,12 +114,29 @@ export class Transcriber {
 
         // We reboot the recorder as well to (hopefully) reduce memory usage
         // We restart instantly to (hopefully) resume where we just left off
-        await Transcriber.TRANSCRIBER.stopRecorder()
-        Transcriber.TRANSCRIBER.startRecorder()
+        console.log('[reboot]', 'before stop recorder')
+        try {
+            await Transcriber.TRANSCRIBER.stopRecorder()
+        } catch (e) {
+            console.log('[reboot]', 'error stopping recorder', e)
+        }
+        try {
+            Transcriber.TRANSCRIBER.startRecorder()
+        } catch (e) {
+            console.log('[reboot]', 'error restarting recorder', e)
+        }
 
         // Reboot the recognizer (audio data is buffered in the meantime)
-        await Transcriber.TRANSCRIBER.stopRecognizer()
-        await Transcriber.TRANSCRIBER.startRecognizer()
+        try {
+            await Transcriber.TRANSCRIBER.stopRecognizer()
+        } catch (e) {
+            console.log('[reboot]', 'error stoping recognizer', e)
+        }
+        try {
+            await Transcriber.TRANSCRIBER.startRecognizer()
+        } catch (e) {
+            console.log('[reboot]', 'error starting recognizer', e)
+        }
     }
 
     /**  Ends the transcribing, and destroys resources. */
@@ -283,14 +300,17 @@ export class Transcriber {
         await new Promise((resolve) => {
             this.recorder?.stopRecording(resolve)
         })
+        console.log('[reboot]', 'this.recorder.stopped')
 
         // Await writes to the recognizer
         this.queue.push(async () => {
             return
         }) // HACK: for drain to work
         await this.queue.drain()
+        console.log('[reboot]', 'this.queue.drained')
 
         this.recorder?.destroy()
+        console.log('[reboot]', 'this.recorder.destroy')
     }
 
     /** Starts the recognizer. */
@@ -357,6 +377,7 @@ export class Transcriber {
     /** Handles detected language. */
     private static async handleLanguage(language: string): Promise<void> {
         if (language === '' || parameters.language === language) return
+        console.log('[handleLanguage]', new Date(), language)
 
         parameters.language = language
         await api.notifyApp(parameters.user_token, {
@@ -418,5 +439,6 @@ export class Transcriber {
 
             SESSION.words.push({ type: 'text', value, ts, end_ts, confidence })
         }
+        console.log('[handleResult]', new Date(), words.length)
     }
 }
