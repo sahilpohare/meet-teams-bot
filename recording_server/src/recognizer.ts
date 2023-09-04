@@ -29,7 +29,7 @@ export class Recognizer {
         vocabulary: string[]
         language: string
         onResult: (json: string) => void
-        onCancel: () => void
+        onCancel: (e: any) => void
     }) {
         this.pushStream = SpeechSDK.AudioInputStream.createPushStream(
             SpeechSDK.AudioStreamFormat.getWaveFormat(
@@ -71,7 +71,7 @@ export class Recognizer {
             SpeechSDK.AudioConfig.fromStreamInput(this.pushStream),
         )
         this.recognizer.recognized = (_, event) => onResult(event.result.json)
-        this.recognizer.canceled = () => onCancel()
+        this.recognizer.canceled = (e) => onCancel(e)
 
         // API cancels recognizer if dictionary is empty
         if (vocabulary?.length > 0) {
@@ -158,7 +158,7 @@ export class RecognizerSession {
             sampleRate,
             vocabulary,
             onResult: (json) => this.results.push({ offset, json }),
-            onCancel: () => console.error('TODO CANCEL'), // TODO: stop and retry to start
+            onCancel: (e) => console.error('transcription cancelled', e),
         })
 
         await this.recognizer.start()
