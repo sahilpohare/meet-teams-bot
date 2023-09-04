@@ -106,7 +106,7 @@ export class Transcriber {
         Transcriber.rebootTimer = setInterval(
             () => Transcriber.reboot(),
             // restart transcription every 9 minutes as microsoft token expriration
-            60_000 * 10,
+            60_000 * 9,
         )
     }
 
@@ -415,8 +415,6 @@ export class Transcriber {
 
             let ts = word.Offset / TEN_MILLION
             let end_ts = word.Offset / TEN_MILLION + word.Duration / TEN_MILLION
-            ts -= OFFSET_MICROSOFT_BUG * ts
-            end_ts -= OFFSET_MICROSOFT_BUG * end_ts
             ts += (offset - START_RECORD_OFFSET) / 1_000
             end_ts += (offset - START_RECORD_OFFSET) / 1_000
 
