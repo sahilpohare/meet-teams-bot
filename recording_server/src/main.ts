@@ -17,6 +17,10 @@ import {
 import { sleep } from './utils'
 import { notifyApp } from './calendar'
 import { exit } from 'process'
+
+
+console.log('version 1.0')
+
 ;(async () => {
     if (process.argv[2]?.includes('get_extension_id')) {
         getExtensionId().then((x) => console.log(x))
