@@ -19,78 +19,18 @@ const tryOrLog = async <T>(message: string, fn: () => Promise<T>) => {
 }
 
 /**
- * A client to call the `/recognizer/*` routes on the underlying NodeJS server.
- */
-class RecognizerClient {
-    /** Calls POST `/recognizer/start`. */
-    static async start({
-        language,
-        sampleRate,
-        offset,
-    }: {
-        language: string
-        sampleRate: number
-        offset: number
-    }): Promise<void> {
-        await axios({
-            method: 'post',
-            url: 'http://127.0.0.1:8080/recognizer/start',
-            data: {
-                language,
-                sampleRate,
-                offset,
-                vocabulary: parameters.vocabulary,
-            },
-        })
-    }
-
-    /** Calls POST `/recognizer/write`. */
-    static async write(bytes: number[]): Promise<void> {
-        await axios({
-            method: 'post',
-            url: 'http://127.0.0.1:8080/recognizer/write',
-            data: { bytes },
-        })
-    }
-
-    /** Calls POST `/recognizer/stop`. */
-    static async stop(): Promise<void> {
-        await axios({
-            method: 'post',
-            url: 'http://127.0.0.1:8080/recognizer/stop',
-        })
-    }
-
-    /** Calls GET `/recognizer/results`. */
-    static async getResults(): Promise<RecognizerResult[]> {
-        return (
-            await axios({
-                method: 'get',
-                url: 'http://127.0.0.1:8080/recognizer/results',
-            })
-        ).data
-    }
-}
-
-/**
  * Transcribes an audio stream using the recognizer of the underlying Node server.
  */
 export class Transcriber {
     static STOPPED = false
     private static TRANSCRIBER: Transcriber | undefined
+    private static TRANSCRIBER_SESSION: TranscriberSession | undefined
     private static rebootTimer: NodeJS.Timer
-
     private audioStream: MediaStream
-    private sampleRate: number
-    private recorder: RecordRTC | undefined
-    private offset: number
-    private bufferAudioData: boolean
-    private bufferedAudioData: ArrayBuffer[]
     private wordPosterWorker: Promise<void>
     private summarizeWorker: Promise<void>
     private highlightWorker: Promise<void>
     private pollTimer: NodeJS.Timer | undefined
-    private queue: asyncLib.AsyncQueue<() => Promise<void>>
 
     /** Inits the transcriber. */
     static async init(audioStream: MediaStream): Promise<void> {
@@ -98,8 +38,9 @@ export class Transcriber {
 
         Transcriber.TRANSCRIBER = new Transcriber(audioStream)
         Transcriber.TRANSCRIBER.launchWorkers()
-        Transcriber.TRANSCRIBER.startRecorder()
-        await Transcriber.TRANSCRIBER.startRecognizer()
+        Transcriber.TRANSCRIBER_SESSION = new TranscriberSession(audioStream)
+        Transcriber.TRANSCRIBER_SESSION.startRecorder()
+        await Transcriber.TRANSCRIBER_SESSION.startRecognizer()
         Transcriber.TRANSCRIBER.pollResults(1_000)
         Transcriber.rebootTimer = setInterval(
             () => Transcriber.reboot(),
@@ -114,32 +55,49 @@ export class Transcriber {
 
         // We reboot the recorder as well to (hopefully) reduce memory usage
         // We restart instantly to (hopefully) resume where we just left off
+        let newTranscriber
         try {
-            await Transcriber.TRANSCRIBER.stopRecorder()
-            console.log('[reboot]', 'after Transcriber.TRANSCRIBER.stopRecorder')
+            newTranscriber = new TranscriberSession(
+                Transcriber.TRANSCRIBER.audioStream,
+            )
+            newTranscriber.startRecorder()
+            console.log(
+                '[reboot]',
+                'after Transcriber.TRANSCRIBER.stopRecorder',
+            )
         } catch (e) {
             console.error('[reboot]', 'error stopping recorder', e)
         }
         try {
-            Transcriber.TRANSCRIBER.startRecorder()
-            console.log('[reboot]', 'after Transcriber.TRANSCRIBER.startRecorder')
+            await Transcriber.TRANSCRIBER_SESSION?.stopRecorder()
+            console.log(
+                '[reboot]',
+                'after Transcriber.TRANSCRIBER.stopRecorder',
+            )
         } catch (e) {
-            console.error('[reboot]', 'error restarting recorder', e)
+            console.error('[reboot]', 'error stopping recorder', e)
         }
 
         // Reboot the recognizer (audio data is buffered in the meantime)
         try {
-            await Transcriber.TRANSCRIBER.stopRecognizer()
-            console.log('[reboot]', 'after Transcriber.TRANSCRIBER.stopRecognizer')
+            await Transcriber.TRANSCRIBER_SESSION?.stopRecognizer()
+            console.log(
+                '[reboot]',
+                'after Transcriber.TRANSCRIBER.stopRecognizer',
+            )
         } catch (e) {
             console.error('[reboot]', 'error stoping recognizer', e)
         }
         try {
-            await Transcriber.TRANSCRIBER.startRecognizer()
-            console.log('[reboot]', 'after Transcriber.TRANSCRIBER.startRecognizer')
+            await newTranscriber.startRecognizer()
+            console.log(
+                '[reboot]',
+                'after Transcriber.TRANSCRIBER.startRecognizer',
+            )
         } catch (e) {
             console.error('[reboot]', 'error starting recognizer', e)
         }
+        this.TRANSCRIBER_SESSION = newTranscriber
     }
 
     /**  Ends the transcribing, and destroys resources. */
@@ -147,13 +105,17 @@ export class Transcriber {
         if (Transcriber.TRANSCRIBER == null) throw 'Transcriber not inited'
 
         clearInterval(Transcriber.rebootTimer)
-        Transcriber.TRANSCRIBER.destroy()
-        tryOrLog('Stop audio stream', async () =>
-            Transcriber.TRANSCRIBER?.audioStream.getAudioTracks()[0].stop(),
+        //Transcriber.TRANSCRIBER.destroy()
+        //tryOrLog('Stop audio stream', async () =>
+        //    Transcriber.TRANSCRIBER?.audioStream.getAudioTracks()[0].stop(),
+        //)
+        tryOrLog(
+            'Stop transcription',
+            async () => await Transcriber.TRANSCRIBER_SESSION?.stopRecorder(),
         )
         tryOrLog(
             'Stop transcription',
-            async () => await Transcriber.TRANSCRIBER?.stopRecognizer(),
+            async () => await Transcriber.TRANSCRIBER_SESSION?.stopRecognizer(),
         )
 
         // Retreive last results that weren't polled
@@ -232,13 +194,9 @@ export class Transcriber {
 
     /** Returns a new `Transcriber`. */
     private constructor(audioStream: MediaStream) {
-        this.queue = newSerialQueue()
         this.audioStream = audioStream
         this.sampleRate =
             audioStream.getAudioTracks()[0].getSettings().sampleRate ?? 0
-        this.offset = 0
-        this.bufferAudioData = true
-        this.bufferedAudioData = []
 
         // Simply not to have undefined properties
         this.wordPosterWorker = new Promise((resolve) => resolve())
@@ -252,100 +210,11 @@ export class Transcriber {
         this.summarizeWorker = summarizeWorker()
         this.highlightWorker = highlightWorker()
     }
-
-    /** Starts the recorder. */
-    private startRecorder(): void {
-        // NOTE:
-        // We buffer audio data when not transcribing (i.e. when rebooting)
-        // and flush that back to the next recognizer session
-        // We also use a queue to make sure writes to the recognizer are sequential
-        // (recorder.ondataavailable does not await...)
-
-        this.bufferAudioData = true
-        this.recorder = new RecordRTC(this.audioStream, {
-            type: 'audio',
-            mimeType: 'audio/webm;codecs=pcm', // endpoint requires 16bit PCM audio
-            recorderType: StereoAudioRecorder,
-            timeSlice: 250, // set 250 ms intervals of data that sends to AAI
-            desiredSampRate: this.sampleRate,
-            numberOfAudioChannels: 1, // real-time requires only one channel
-            bufferSize: 4096,
-            audioBitsPerSecond: this.sampleRate * 16,
-            ondataavailable: async (blob: Blob) => {
-	        console.log('ondataavailable')
-                this.queue.push(async () => {
-                    if (this.bufferAudioData) {
-                        this.bufferedAudioData.push(await blob.arrayBuffer())
-                    } else {
-                        // Flush buffered data
-                        for (const buffer of this.bufferedAudioData.splice(0)) {
-                            await RecognizerClient.write(
-                                Array.from(new Uint8Array(buffer)),
-                            )
-                        }
-
-                        await RecognizerClient.write(
-                            Array.from(
-                                new Uint8Array(await blob.arrayBuffer()),
-                            ),
-                        )
-                    }
-                })
-            },
-            disableLogs: true,
-        })
-    
-
-        this.recorder?.startRecording()
-        this.offset = new Date().getTime()
-    }
-
-    /** Stops the recorder. */
-    private async stopRecorder(): Promise<void> {
-        // Make sure (?) we get all data from the recorder
-        await new Promise((resolve) => {
-            this.recorder?.stopRecording(resolve)
-        })
-        console.log('[reboot]', 'this.recorder.stopped')
-
-	//await drainQueue(this.queue)
-        console.log('[reboot]', 'this.queue.drained')
-
-        this.recorder?.destroy()
-        console.log('[reboot]', 'this.recorder.destroy')
-    }
-
-    /** Starts the recognizer. */
-    private async startRecognizer(): Promise<void> {
-        await RecognizerClient.start({
-            language: parameters.language,
-            sampleRate: this.sampleRate,
-            offset: this.offset,
-        })
-
-        this.bufferAudioData = false
-    }
-
-    /** Stops the recognizer. */
-    private async stopRecognizer(): Promise<void> {
-        await RecognizerClient.stop()
-    }
-
     /** Gets and handles recognizer results every `interval` ms. */
     private pollResults(interval: number): void {
         if (this.pollTimer != null) throw 'Already polling'
 
         this.pollTimer = setInterval(Transcriber.getResults, interval)
-    }
-
-    /** Destroys resources and stops polling. */
-    private destroy(): void {
-        this.recorder?.destroy()
-
-        if (this.pollTimer != null) {
-            clearInterval(this.pollTimer)
-            this.pollTimer = undefined
-        }
     }
 
     /** Gets and handles recognizer results. */
@@ -416,7 +285,10 @@ export class Transcriber {
             return res
         })()
 
-        console.log('[handleResult] offset from start of video: ', (offset - START_RECORD_OFFSET) / 1_000)
+        console.log(
+            '[handleResult] offset from start of video: ',
+            (offset - START_RECORD_OFFSET) / 1_000,
+        )
         for (let [i, word] of words.entries()) {
             const value = (() => {
                 if (
@@ -431,7 +303,6 @@ export class Transcriber {
                 }
             })()
 
-	    
             // NOTE: MS returns offsets in ticks:
             // "One tick represents one hundred nanoseconds or one ten-millionth of a second."
             const TEN_MILLION = 10_000_000
@@ -445,5 +316,164 @@ export class Transcriber {
             SESSION.words.push({ type: 'text', value, ts, end_ts, confidence })
         }
         console.log('[handleResult]', new Date(), words.length)
+    }
+}
+
+export class TranscriberSession {
+    private recorder: RecordRTC | undefined
+    private offset: number
+    private bufferAudioData: boolean
+    private bufferedAudioData: ArrayBuffer[]
+    private queue: asyncLib.AsyncQueue<() => Promise<void>>
+    private audioStream: MediaStream
+    private sampleRate: number
+
+    constructor(audioStream: MediaStream) {
+        this.queue = newSerialQueue()
+        this.audioStream = audioStream
+        this.sampleRate =
+            audioStream.getAudioTracks()[0].getSettings().sampleRate ?? 0
+        this.offset = 0
+        this.bufferAudioData = true
+        this.bufferedAudioData = []
+    }
+    /** Starts the recorder. */
+    startRecorder(): void {
+        // NOTE:
+        // We buffer audio data when not transcribing (i.e. when rebooting)
+        // and flush that back to the next recognizer session
+        // We also use a queue to make sure writes to the recognizer are sequential
+        // (recorder.ondataavailable does not await...)
+
+        this.bufferAudioData = true
+        this.recorder = new RecordRTC(this.audioStream, {
+            type: 'audio',
+            mimeType: 'audio/webm;codecs=pcm', // endpoint requires 16bit PCM audio
+            recorderType: StereoAudioRecorder,
+            timeSlice: 250, // set 250 ms intervals of data that sends to AAI
+            desiredSampRate: this.sampleRate,
+            numberOfAudioChannels: 1, // real-time requires only one channel
+            bufferSize: 4096,
+            audioBitsPerSecond: this.sampleRate * 16,
+            ondataavailable: async (blob: Blob) => {
+                console.log('ondataavailable')
+                this.queue.push(async () => {
+                    if (this.bufferAudioData) {
+                        this.bufferedAudioData.push(await blob.arrayBuffer())
+                    } else {
+                        // Flush buffered data
+                        for (const buffer of this.bufferedAudioData.splice(0)) {
+                            await RecognizerClient.write(
+                                Array.from(new Uint8Array(buffer)),
+                            )
+                        }
+
+                        await RecognizerClient.write(
+                            Array.from(
+                                new Uint8Array(await blob.arrayBuffer()),
+                            ),
+                        )
+                    }
+                })
+            },
+            disableLogs: true,
+        })
+
+        this.recorder?.startRecording()
+        this.offset = new Date().getTime()
+    }
+
+    /** Stops the recorder. */
+    async stopRecorder(): Promise<void> {
+        // Make sure (?) we get all data from the recorder
+        await new Promise((resolve: any) => {
+            this.recorder?.stopRecording(resolve)
+        })
+        console.log('[reboot]', 'this.recorder.stopped')
+
+        //await drainQueue(this.queue)
+        console.log('[reboot]', 'this.queue.drained')
+
+        this.recorder?.destroy()
+        console.log('[reboot]', 'this.recorder.destroy')
+    }
+
+    /** Starts the recognizer. */
+    async startRecognizer(): Promise<void> {
+        await RecognizerClient.start({
+            language: parameters.language,
+            sampleRate: this.sampleRate,
+            offset: this.offset,
+        })
+
+        this.bufferAudioData = false
+    }
+
+    /** Stops the recognizer. */
+    async stopRecognizer(): Promise<void> {
+        await RecognizerClient.stop()
+    }
+
+    /** Destroys resources and stops polling. */
+    private destroy(): void {
+        this.recorder?.destroy()
+
+        //if (this.pollTimer != null) {
+        //    clearInterval(this.pollTimer)
+        //    this.pollTimer = undefined
+        //}
+    }
+}
+/**
+ * A client to call the `/recognizer/*` routes on the underlying NodeJS server.
+ */
+class RecognizerClient {
+    /** Calls POST `/recognizer/start`. */
+    static async start({
+        language,
+        sampleRate,
+        offset,
+    }: {
+        language: string
+        sampleRate: number
+        offset: number
+    }): Promise<void> {
+        await axios({
+            method: 'post',
+            url: 'http://127.0.0.1:8080/recognizer/start',
+            data: {
+                language,
+                sampleRate,
+                offset,
+                vocabulary: parameters.vocabulary,
+            },
+        })
+    }
+
+    /** Calls POST `/recognizer/write`. */
+    static async write(bytes: number[]): Promise<void> {
+        await axios({
+            method: 'post',
+            url: 'http://127.0.0.1:8080/recognizer/write',
+            data: { bytes },
+        })
+    }
+
+    /** Calls POST `/recognizer/stop`. */
+    static async stop(): Promise<void> {
+        await axios({
+            method: 'post',
+            url: 'http://127.0.0.1:8080/recognizer/stop',
+        })
+    }
+
+    /** Calls GET `/recognizer/results`. */
+    static async getResults(): Promise<RecognizerResult[]> {
+        return (
+            await axios({
+                method: 'get',
+                url: 'http://127.0.0.1:8080/recognizer/results',
+            })
+        ).data
     }
 }
