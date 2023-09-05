@@ -75,12 +75,12 @@ export class Recognizer {
         this.recognizer.canceled = (e) => onCancel(e)
         const sessionStoppedPromise = new Promise((resolve, reject) => {
             this.recognizer.sessionStopped = (s, e) => {
-                console.log("\n    Session stopped event.");
-                resolve("Session stopped");
-            };
+                console.log('\n    Session stopped event.')
+                resolve('Session stopped')
+            }
         })
 
-	this.waitForSessionStoped = sessionStoppedPromise
+        this.waitForSessionStoped = sessionStoppedPromise
 
         // API cancels recognizer if dictionary is empty
         if (vocabulary?.length > 0) {
@@ -96,7 +96,7 @@ export class Recognizer {
         return await new Promise((resolve, reject) => {
             this.recognizer.startContinuousRecognitionAsync(
                 async () => {
-		    console.log('a new recognizer has started')
+                    console.log('a new recognizer has started')
                     resolve()
                 },
                 (error) => {
@@ -115,10 +115,10 @@ export class Recognizer {
     /** Stops the recognition and returns the session id. */
     async stop(): Promise<void> {
         await new Promise((resolve, reject) => {
-	    console.log('stopping recognizer')
+            console.log('stopping recognizer')
             this.recognizer.stopContinuousRecognitionAsync(
                 async () => {
-	            console.log('recognizer has stopped')
+                    console.log('recognizer has stopped')
                     resolve()
                 },
                 (error) => {

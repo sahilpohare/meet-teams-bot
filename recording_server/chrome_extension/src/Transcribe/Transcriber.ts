@@ -45,7 +45,7 @@ export class Transcriber {
         Transcriber.rebootTimer = setInterval(
             () => Transcriber.reboot(),
             // restart transcription every 9 minutes as microsoft token expriration
-            10_000 * 2,
+            60_000 * 8,
         )
     }
 
@@ -61,10 +61,7 @@ export class Transcriber {
                 Transcriber.TRANSCRIBER.audioStream.clone(),
             )
             newTranscriber.startRecorder()
-            console.log(
-                '[reboot]',
-                'newTranscriber = new TranscriberSession',
-            )
+            console.log('[reboot]', 'newTranscriber = new TranscriberSession')
         } catch (e) {
             console.error('[reboot]', 'error stopping recorder', e)
         }
@@ -366,23 +363,21 @@ export class TranscriberSession {
             bufferSize: 4096,
             audioBitsPerSecond: this.sampleRate * 16,
             ondataavailable: async (blob: Blob) => {
-	    console.log('ondataavailable')
-               if (this.bufferAudioData) {
-                   this.bufferedAudioData.push(await blob.arrayBuffer())
-               } else {
-                   // Flush buffered data
-                   for (const buffer of this.bufferedAudioData.splice(0)) {
-                       await RecognizerClient.write(
-                           Array.from(new Uint8Array(buffer)),
-                       )
-                   }
+                console.log('ondataavailable')
+                if (this.bufferAudioData) {
+                    this.bufferedAudioData.push(await blob.arrayBuffer())
+                } else {
+                    // Flush buffered data
+                    for (const buffer of this.bufferedAudioData.splice(0)) {
+                        await RecognizerClient.write(
+                            Array.from(new Uint8Array(buffer)),
+                        )
+                    }
 
-                   await RecognizerClient.write(
-                       Array.from(
-                           new Uint8Array(await blob.arrayBuffer()),
-                       ),
-                   )
-               }
+                    await RecognizerClient.write(
+                        Array.from(new Uint8Array(await blob.arrayBuffer())),
+                    )
+                }
             },
             disableLogs: true,
         })
@@ -398,7 +393,6 @@ export class TranscriberSession {
             this.recorder?.stopRecording(resolve)
         })
         console.log('[reboot]', 'this.recorder.stopped')
-
 
         //this.recorder?.destroy()
         console.log('[reboot]', 'this.recorder.destroy')
