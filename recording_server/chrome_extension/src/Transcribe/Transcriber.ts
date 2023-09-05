@@ -45,7 +45,7 @@ export class Transcriber {
         Transcriber.rebootTimer = setInterval(
             () => Transcriber.reboot(),
             // restart transcription every 9 minutes as microsoft token expriration
-            60_000 * 1,
+            10_000 * 2,
         )
     }
 
@@ -58,17 +58,21 @@ export class Transcriber {
         let newTranscriber
         try {
             newTranscriber = new TranscriberSession(
-                Transcriber.TRANSCRIBER.audioStream,
+                Transcriber.TRANSCRIBER.audioStream.clone(),
             )
             newTranscriber.startRecorder()
             console.log(
                 '[reboot]',
-                'after Transcriber.TRANSCRIBER.stopRecorder',
+                'newTranscriber = new TranscriberSession',
             )
         } catch (e) {
             console.error('[reboot]', 'error stopping recorder', e)
         }
         try {
+            console.log(
+                '[reboot]',
+                'before Transcriber.TRANSCRIBER.stopRecorder',
+            )
             await Transcriber.TRANSCRIBER_SESSION?.stopRecorder()
             console.log(
                 '[reboot]',
@@ -80,6 +84,10 @@ export class Transcriber {
 
         // Reboot the recognizer (audio data is buffered in the meantime)
         try {
+            console.log(
+                '[reboot]',
+                'before Transcriber.TRANSCRIBER.stopRecognizer',
+            )
             await Transcriber.TRANSCRIBER_SESSION?.stopRecognizer()
             console.log(
                 '[reboot]',
@@ -89,10 +97,14 @@ export class Transcriber {
             console.error('[reboot]', 'error stoping recognizer', e)
         }
         try {
+            console.log(
+                '[reboot] before newTranscriber.startRecognizer',
+                'before ',
+            )
             await newTranscriber.startRecognizer()
             console.log(
                 '[reboot]',
-                'after Transcriber.TRANSCRIBER.startRecognizer',
+                'after Transcriber.newTranscriber.startRecognizer',
             )
         } catch (e) {
             console.error('[reboot]', 'error starting recognizer', e)
@@ -195,8 +207,6 @@ export class Transcriber {
     /** Returns a new `Transcriber`. */
     private constructor(audioStream: MediaStream) {
         this.audioStream = audioStream
-        this.sampleRate =
-            audioStream.getAudioTracks()[0].getSettings().sampleRate ?? 0
 
         // Simply not to have undefined properties
         this.wordPosterWorker = new Promise((resolve) => resolve())
@@ -356,25 +366,23 @@ export class TranscriberSession {
             bufferSize: 4096,
             audioBitsPerSecond: this.sampleRate * 16,
             ondataavailable: async (blob: Blob) => {
-                console.log('ondataavailable')
-                this.queue.push(async () => {
-                    if (this.bufferAudioData) {
-                        this.bufferedAudioData.push(await blob.arrayBuffer())
-                    } else {
-                        // Flush buffered data
-                        for (const buffer of this.bufferedAudioData.splice(0)) {
-                            await RecognizerClient.write(
-                                Array.from(new Uint8Array(buffer)),
-                            )
-                        }
+	    console.log('ondataavailable')
+               if (this.bufferAudioData) {
+                   this.bufferedAudioData.push(await blob.arrayBuffer())
+               } else {
+                   // Flush buffered data
+                   for (const buffer of this.bufferedAudioData.splice(0)) {
+                       await RecognizerClient.write(
+                           Array.from(new Uint8Array(buffer)),
+                       )
+                   }
 
-                        await RecognizerClient.write(
-                            Array.from(
-                                new Uint8Array(await blob.arrayBuffer()),
-                            ),
-                        )
-                    }
-                })
+                   await RecognizerClient.write(
+                       Array.from(
+                           new Uint8Array(await blob.arrayBuffer()),
+                       ),
+                   )
+               }
             },
             disableLogs: true,
         })
@@ -391,10 +399,8 @@ export class TranscriberSession {
         })
         console.log('[reboot]', 'this.recorder.stopped')
 
-        //await drainQueue(this.queue)
-        console.log('[reboot]', 'this.queue.drained')
 
-        this.recorder?.destroy()
+        //this.recorder?.destroy()
         console.log('[reboot]', 'this.recorder.destroy')
     }
 
