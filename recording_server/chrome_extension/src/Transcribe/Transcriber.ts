@@ -10,6 +10,8 @@ import { trySummarizeNext, summarizeWorker } from './summarizeWorker'
 import { calcHighlights, highlightWorker } from './highlightWorker'
 import RecordRTC, { StereoAudioRecorder } from 'recordrtc'
 
+const OFFSET_MICROSOFT_BUG = 0.00202882151
+
 const tryOrLog = async <T>(message: string, fn: () => Promise<T>) => {
     try {
         await fn()
@@ -318,7 +320,8 @@ export class Transcriber {
             let end_ts = word.Offset / TEN_MILLION + word.Duration / TEN_MILLION
             ts += (offset - START_RECORD_OFFSET) / 1_000
             end_ts += (offset - START_RECORD_OFFSET) / 1_000
-
+            ts -= OFFSET_MICROSOFT_BUG * ts
+            end_ts -= OFFSET_MICROSOFT_BUG * end_ts
             console.log('[handleResult]', word)
             SESSION.words.push({ type: 'text', value, ts, end_ts, confidence })
         }
