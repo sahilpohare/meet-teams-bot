@@ -2,7 +2,7 @@ import { api, RecognizerResult } from 'spoke_api_js'
 import * as R from 'ramda'
 import axios from 'axios'
 import { parameters } from '../background'
-import { newSerialQueue } from '../queue'
+import { newSerialQueue, drainQueue } from '../queue'
 import * as asyncLib from 'async'
 import { START_RECORD_OFFSET, SESSION } from '../record'
 import { wordPosterWorker } from './wordPosterWorker'
@@ -104,7 +104,7 @@ export class Transcriber {
         Transcriber.rebootTimer = setInterval(
             () => Transcriber.reboot(),
             // restart transcription every 9 minutes as microsoft token expriration
-            60_000 * 9,
+            60_000 * 1,
         )
     }
 
@@ -114,28 +114,31 @@ export class Transcriber {
 
         // We reboot the recorder as well to (hopefully) reduce memory usage
         // We restart instantly to (hopefully) resume where we just left off
-        console.log('[reboot]', 'before stop recorder')
         try {
             await Transcriber.TRANSCRIBER.stopRecorder()
+            console.log('[reboot]', 'after Transcriber.TRANSCRIBER.stopRecorder')
         } catch (e) {
-            console.log('[reboot]', 'error stopping recorder', e)
+            console.error('[reboot]', 'error stopping recorder', e)
         }
         try {
             Transcriber.TRANSCRIBER.startRecorder()
+            console.log('[reboot]', 'after Transcriber.TRANSCRIBER.startRecorder')
         } catch (e) {
-            console.log('[reboot]', 'error restarting recorder', e)
+            console.error('[reboot]', 'error restarting recorder', e)
         }
 
         // Reboot the recognizer (audio data is buffered in the meantime)
         try {
             await Transcriber.TRANSCRIBER.stopRecognizer()
+            console.log('[reboot]', 'after Transcriber.TRANSCRIBER.stopRecognizer')
         } catch (e) {
-            console.log('[reboot]', 'error stoping recognizer', e)
+            console.error('[reboot]', 'error stoping recognizer', e)
         }
         try {
             await Transcriber.TRANSCRIBER.startRecognizer()
+            console.log('[reboot]', 'after Transcriber.TRANSCRIBER.startRecognizer')
         } catch (e) {
-            console.log('[reboot]', 'error starting recognizer', e)
+            console.error('[reboot]', 'error starting recognizer', e)
         }
     }
 
@@ -269,6 +272,7 @@ export class Transcriber {
             bufferSize: 4096,
             audioBitsPerSecond: this.sampleRate * 16,
             ondataavailable: async (blob: Blob) => {
+	        console.log('ondataavailable')
                 this.queue.push(async () => {
                     if (this.bufferAudioData) {
                         this.bufferedAudioData.push(await blob.arrayBuffer())
@@ -290,7 +294,9 @@ export class Transcriber {
             },
             disableLogs: true,
         })
-        this.recorder.startRecording()
+    
+
+        this.recorder?.startRecording()
         this.offset = new Date().getTime()
     }
 
@@ -302,11 +308,7 @@ export class Transcriber {
         })
         console.log('[reboot]', 'this.recorder.stopped')
 
-        // Await writes to the recognizer
-        this.queue.push(async () => {
-            return
-        }) // HACK: for drain to work
-        await this.queue.drain()
+	//await drainQueue(this.queue)
         console.log('[reboot]', 'this.queue.drained')
 
         this.recorder?.destroy()
@@ -414,6 +416,7 @@ export class Transcriber {
             return res
         })()
 
+        console.log('[handleResult] offset from start of video: ', (offset - START_RECORD_OFFSET) / 1_000)
         for (let [i, word] of words.entries()) {
             const value = (() => {
                 if (
@@ -428,6 +431,7 @@ export class Transcriber {
                 }
             })()
 
+	    
             // NOTE: MS returns offsets in ticks:
             // "One tick represents one hundred nanoseconds or one ten-millionth of a second."
             const TEN_MILLION = 10_000_000
@@ -437,6 +441,7 @@ export class Transcriber {
             ts += (offset - START_RECORD_OFFSET) / 1_000
             end_ts += (offset - START_RECORD_OFFSET) / 1_000
 
+            console.log('[handleResult]', word)
             SESSION.words.push({ type: 'text', value, ts, end_ts, confidence })
         }
         console.log('[handleResult]', new Date(), words.length)

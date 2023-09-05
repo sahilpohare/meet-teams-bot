@@ -293,7 +293,7 @@ function handleDataAvailable() {
         const spokeSession = SESSION!
         const first = spokeSession.cut_times[spokeSession.cut_times.length - 1]
         const last = new Date().getTime()
-        console.log('RECORDING TIMESTAMP', e.timecode)
+//        console.log('RECORDING TIMESTAMP', e.timecode)
 
         RECORDED_CHUNKS.push(e)
         const lastSpeaker = SPEAKERS[SPEAKERS.length - 1]

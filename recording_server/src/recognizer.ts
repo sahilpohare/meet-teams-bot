@@ -12,6 +12,7 @@ import { RecognizerResult } from 'spoke_api_js'
 export class Recognizer {
     private recognizer: SpeechSDK.SpeechRecognizer
     private pushStream: SpeechSDK.PushAudioInputStream
+    private waitForSessionStoped: Promise<void>
 
     /** Returns a new `Recognizer`. */
     constructor({
@@ -72,6 +73,14 @@ export class Recognizer {
         )
         this.recognizer.recognized = (_, event) => onResult(event.result.json)
         this.recognizer.canceled = (e) => onCancel(e)
+        const sessionStoppedPromise = new Promise((resolve, reject) => {
+            this.recognizer.sessionStopped = (s, e) => {
+                console.log("\n    Session stopped event.");
+                resolve("Session stopped");
+            };
+        })
+
+	this.waitForSessionStoped = sessionStoppedPromise
 
         // API cancels recognizer if dictionary is empty
         if (vocabulary?.length > 0) {
@@ -83,9 +92,11 @@ export class Recognizer {
 
     /** Starts the recognition and returns the session id. */
     async start(): Promise<void> {
+        console.log('starting a new recognizer')
         return await new Promise((resolve, reject) => {
             this.recognizer.startContinuousRecognitionAsync(
                 async () => {
+		    console.log('a new recognizer has started')
                     resolve()
                 },
                 (error) => {
@@ -103,9 +114,11 @@ export class Recognizer {
 
     /** Stops the recognition and returns the session id. */
     async stop(): Promise<void> {
-        return await new Promise((resolve, reject) => {
+        await new Promise((resolve, reject) => {
+	    console.log('stopping recognizer')
             this.recognizer.stopContinuousRecognitionAsync(
                 async () => {
+	            console.log('recognizer has stopped')
                     resolve()
                 },
                 (error) => {
@@ -114,6 +127,8 @@ export class Recognizer {
                 },
             )
         })
+        await this.waitForSessionStoped
+        console.log('after this.waitForSessionStoped')
     }
 }
 

@@ -334,7 +334,6 @@ export async function getAgenda(): Promise<Agenda | undefined> {
         const agenda = await CURRENT_MEETING.meeting.backgroundPage.evaluate(
             async () => {
                 const w = window as any
-                console.log('window ', w)
                 return await w.getAgenda()
             },
         )
@@ -353,7 +352,6 @@ export async function changeAgenda(data: ChangeAgendaRequest) {
         })
         await CURRENT_MEETING.meeting.backgroundPage.evaluate(async (data) => {
             const w = window as any
-            console.log('window ', w)
             await w.changeAgenda(data)
         }, data)
     } else {

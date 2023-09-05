@@ -13,3 +13,13 @@ export function newTranscribeQueue() {
         done()
     }, 10)
 }
+
+export const drainQueue = (queue: any) => {
+    return new Promise((resolve, reject) => {
+        queue.drain(() => {
+            resolve();
+        });
+    });
+}
+
+

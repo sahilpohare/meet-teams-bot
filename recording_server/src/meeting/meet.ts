@@ -93,8 +93,10 @@ export async function joinMeeting(
         console.log('Use without an account:', { useWithoutAccountClicked })
         i += 1
     }
+    await screenshot(page, `before_typing_bot_name`)
     await page.focus('input[type=text]')
     await page.keyboard.type(meetingParams.bot_name)
+    await screenshot(page, `after_typing_bot_name`)
 
     console.log('after click dismiss:')
     let askToJoinClicked = false
@@ -224,7 +226,7 @@ export async function waitForEndMeeting(
             if (await findEndMeeting(page)) {
                 break
             }
-            CURRENT_MEETING.logger.info('[findendmeeting]  false')
+            //CURRENT_MEETING.logger.info('[findendmeeting]  false')
         } catch (e) {
             CURRENT_MEETING.logger.info('[findendmeeting]  error', e)
         }
