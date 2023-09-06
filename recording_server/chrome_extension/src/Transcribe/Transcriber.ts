@@ -367,20 +367,24 @@ export class TranscriberSession {
             audioBitsPerSecond: this.sampleRate * 16,
             ondataavailable: async (blob: Blob) => {
                 console.log('ondataavailable')
-                if (this.bufferAudioData) {
-                    this.bufferedAudioData.push(await blob.arrayBuffer())
-                } else {
-                    // Flush buffered data
-                    for (const buffer of this.bufferedAudioData.splice(0)) {
+                this.queue.push(async () => {
+                    if (this.bufferAudioData) {
+                        this.bufferedAudioData.push(await blob.arrayBuffer())
+                    } else {
+                        // Flush buffered data
+                        for (const buffer of this.bufferedAudioData.splice(0)) {
+                            await RecognizerClient.write(
+                                Array.from(new Uint8Array(buffer)),
+                            )
+                        }
+
                         await RecognizerClient.write(
-                            Array.from(new Uint8Array(buffer)),
+                            Array.from(
+                                new Uint8Array(await blob.arrayBuffer()),
+                            ),
                         )
                     }
-
-                    await RecognizerClient.write(
-                        Array.from(new Uint8Array(await blob.arrayBuffer())),
-                    )
-                }
+                })
             },
             disableLogs: true,
         })
