@@ -44,11 +44,11 @@ export class Transcriber {
         Transcriber.TRANSCRIBER_SESSION.startRecorder()
         await Transcriber.TRANSCRIBER_SESSION.startRecognizer()
         Transcriber.TRANSCRIBER.pollResults(1_000)
-        Transcriber.rebootTimer = setInterval(
-            () => Transcriber.reboot(),
-            // restart transcription every 9 minutes as microsoft token expriration
-            60_000 * 1,
-        )
+        //Transcriber.rebootTimer = setInterval(
+        //    () => Transcriber.reboot(),
+        //    // restart transcription every 9 minutes as microsoft token expriration
+        //    60_000 * 3,
+        //)
     }
 
     /** Stops and restarts the recorder (to free some memory) and the recognizer (to update its tokens and language). */
@@ -318,8 +318,8 @@ export class Transcriber {
 
             let ts = word.Offset / TEN_MILLION
             let end_ts = word.Offset / TEN_MILLION + word.Duration / TEN_MILLION
-            ts += (offset - START_RECORD_OFFSET) / 1_000
-            end_ts += (offset - START_RECORD_OFFSET) / 1_000
+            ts += offset - START_RECORD_OFFSET 
+            end_ts += offset - START_RECORD_OFFSET
             ts -= OFFSET_MICROSOFT_BUG * ts
             end_ts -= OFFSET_MICROSOFT_BUG * end_ts
             console.log('[handleResult]', word)
