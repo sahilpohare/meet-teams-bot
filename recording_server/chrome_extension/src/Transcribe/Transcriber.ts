@@ -44,71 +44,76 @@ export class Transcriber {
         Transcriber.TRANSCRIBER_SESSION.startRecorder()
         await Transcriber.TRANSCRIBER_SESSION.startRecognizer()
         Transcriber.TRANSCRIBER.pollResults(1_000)
-        //Transcriber.rebootTimer = setInterval(
-        //    () => Transcriber.reboot(),
-        //    // restart transcription every 9 minutes as microsoft token expriration
-        //    60_000 * 3,
-        //)
+        Transcriber.rebootTimer = setInterval(
+            () => Transcriber.reboot(),
+            // restart transcription every 9 minutes as microsoft token expriration
+            60_000 * 1,
+        )
     }
 
     /** Stops and restarts the recorder (to free some memory) and the recognizer (to update its tokens and language). */
     static async reboot(): Promise<void> {
         if (Transcriber.TRANSCRIBER == null) throw 'Transcriber not inited'
 
-        // We reboot the recorder as well to (hopefully) reduce memory usage
-        // We restart instantly to (hopefully) resume where we just left off
-        let newTranscriber
+        console.log('call refresh token')
         try {
-            newTranscriber = new TranscriberSession(
-                Transcriber.TRANSCRIBER.audioStream.clone(),
-            )
-            newTranscriber.startRecorder()
-            console.log('[reboot]', 'newTranscriber = new TranscriberSession')
+            await RecognizerClient.refresh_token()
         } catch (e) {
-            console.error('[reboot]', 'error stopping recorder', e)
+            console.error('error calling refresh token', e)
         }
-        try {
-            console.log(
-                '[reboot]',
-                'before Transcriber.TRANSCRIBER.stopRecorder',
-            )
-            await Transcriber.TRANSCRIBER_SESSION?.stopRecorder()
-            console.log(
-                '[reboot]',
-                'after Transcriber.TRANSCRIBER.stopRecorder',
-            )
-        } catch (e) {
-            console.error('[reboot]', 'error stopping recorder', e)
-        }
-
-        // Reboot the recognizer (audio data is buffered in the meantime)
-        try {
-            console.log(
-                '[reboot]',
-                'before Transcriber.TRANSCRIBER.stopRecognizer',
-            )
-            await Transcriber.TRANSCRIBER_SESSION?.stopRecognizer()
-            console.log(
-                '[reboot]',
-                'after Transcriber.TRANSCRIBER.stopRecognizer',
-            )
-        } catch (e) {
-            console.error('[reboot]', 'error stoping recognizer', e)
-        }
-        try {
-            console.log(
-                '[reboot] before newTranscriber.startRecognizer',
-                'before ',
-            )
-            await newTranscriber.startRecognizer()
-            console.log(
-                '[reboot]',
-                'after Transcriber.newTranscriber.startRecognizer',
-            )
-        } catch (e) {
-            console.error('[reboot]', 'error starting recognizer', e)
-        }
-        this.TRANSCRIBER_SESSION = newTranscriber
+        //// We reboot the recorder as well to (hopefully) reduce memory usage
+        //// We restart instantly to (hopefully) resume where we just left off
+        //let newTranscriber
+        //try {
+        //    newTranscriber = new TranscriberSession(
+        //        Transcriber.TRANSCRIBER.audioStream.clone(),
+        //    )
+        //    newTranscriber.startRecorder()
+        //    console.log('[reboot]', 'newTranscriber = new TranscriberSession')
+        //} catch (e) {
+        //    console.error('[reboot]', 'error stopping recorder', e)
+        //}
+        //try {
+        //    console.log(
+        //        '[reboot]',
+        //        'before Transcriber.TRANSCRIBER.stopRecorder',
+        //    )
+        //    await Transcriber.TRANSCRIBER_SESSION?.stopRecorder()
+        //    console.log(
+        //        '[reboot]',
+        //        'after Transcriber.TRANSCRIBER.stopRecorder',
+        //    )
+        //} catch (e) {
+        //    console.error('[reboot]', 'error stopping recorder', e)
+        //}
+        //// Reboot the recognizer (audio data is buffered in the meantime)
+        //try {
+        //    console.log(
+        //        '[reboot]',
+        //        'before Transcriber.TRANSCRIBER.stopRecognizer',
+        //    )
+        //    await Transcriber.TRANSCRIBER_SESSION?.stopRecognizer()
+        //    console.log(
+        //        '[reboot]',
+        //        'after Transcriber.TRANSCRIBER.stopRecognizer',
+        //    )
+        //} catch (e) {
+        //    console.error('[reboot]', 'error stoping recognizer', e)
+        //}
+        //try {
+        //    console.log(
+        //        '[reboot] before newTranscriber.startRecognizer',
+        //        'before ',
+        //    )
+        //    await newTranscriber.startRecognizer()
+        //    console.log(
+        //        '[reboot]',
+        //        'after Transcriber.newTranscriber.startRecognizer',
+        //    )
+        //} catch (e) {
+        //    console.error('[reboot]', 'error starting recognizer', e)
+        //}
+        //this.TRANSCRIBER_SESSION = newTranscriber
     }
 
     /**  Ends the transcribing, and destroys resources. */
@@ -318,7 +323,7 @@ export class Transcriber {
 
             let ts = word.Offset / TEN_MILLION
             let end_ts = word.Offset / TEN_MILLION + word.Duration / TEN_MILLION
-            ts += offset - START_RECORD_OFFSET 
+            ts += offset - START_RECORD_OFFSET
             end_ts += offset - START_RECORD_OFFSET
             ts -= OFFSET_MICROSOFT_BUG * ts
             end_ts -= OFFSET_MICROSOFT_BUG * end_ts
@@ -457,6 +462,12 @@ class RecognizerClient {
         })
     }
 
+    static async refresh_token(): Promise<void> {
+        await axios({
+            method: 'post',
+            url: 'http://127.0.0.1:8080/recognizer/refresh_token',
+        })
+    }
     /** Calls POST `/recognizer/write`. */
     static async write(bytes: number[]): Promise<void> {
         await axios({

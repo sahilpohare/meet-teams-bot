@@ -103,6 +103,10 @@ export async function server() {
         res.send('ok')
     })
 
+    app.post('/recognizer/refresh_token', jsonParser, async (_, res) => {
+        await recognizerSession.refresh_token()
+        res.send('ok')
+    })
     app.post('/recognizer/stop', jsonParser, async (_, res) => {
         await recognizerSession.stop()
         res.send('ok')

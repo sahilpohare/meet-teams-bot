@@ -1,5 +1,5 @@
 import * as SpeechSDK from 'microsoft-cognitiveservices-speech-sdk'
-import { RecognizerResult } from 'spoke_api_js'
+import { RecognizerResult, api } from 'spoke_api_js'
 
 /**
  * A wrapper around Microsoft's speech SDK: emits language and words from audio data.
@@ -90,6 +90,10 @@ export class Recognizer {
         }
     }
 
+    async refresh_token() {
+        const [token, region] = await api.requestAuthorizationToken()
+        this.recognizer.authorizationToken = token
+    }
     /** Starts the recognition and returns the session id. */
     async start(): Promise<void> {
         console.log('starting a new recognizer')
@@ -178,7 +182,9 @@ export class RecognizerSession {
 
         await this.recognizer.start()
     }
-
+    async refresh_token() {
+        this.recognizer.refresh_token()
+    }
     /** Writes `data` to the recognizer. */
     write(data: ArrayBuffer): void {
         this.recognizer.write(data)
