@@ -202,7 +202,7 @@ export async function startRecording(
     MEDIA_RECORDER.onerror = function (e) {
         console.error('media recorder error', e)
     }
-    START_RECORD_OFFSET = now
+    START_RECORD_OFFSET = CONTEXT.currentTime
     START_RECORD_TIMESTAMP = now
     console.log(`after media recorder start`)
 
@@ -293,7 +293,7 @@ function handleDataAvailable() {
         const spokeSession = SESSION!
         const first = spokeSession.cut_times[spokeSession.cut_times.length - 1]
         const last = new Date().getTime()
-//        console.log('RECORDING TIMESTAMP', e.timecode)
+        //        console.log('RECORDING TIMESTAMP', e.timecode)
 
         RECORDED_CHUNKS.push(e)
         const lastSpeaker = SPEAKERS[SPEAKERS.length - 1]

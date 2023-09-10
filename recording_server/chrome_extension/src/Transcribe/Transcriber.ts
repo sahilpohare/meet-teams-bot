@@ -4,7 +4,7 @@ import axios from 'axios'
 import { parameters } from '../background'
 import { newSerialQueue, drainQueue } from '../queue'
 import * as asyncLib from 'async'
-import { START_RECORD_OFFSET, SESSION } from '../record'
+import { START_RECORD_OFFSET, SESSION, CONTEXT } from '../record'
 import { wordPosterWorker } from './wordPosterWorker'
 import { trySummarizeNext, summarizeWorker } from './summarizeWorker'
 import { calcHighlights, highlightWorker } from './highlightWorker'
@@ -47,7 +47,7 @@ export class Transcriber {
         Transcriber.rebootTimer = setInterval(
             () => Transcriber.reboot(),
             // restart transcription every 9 minutes as microsoft token expriration
-            60_000 * 8,
+            60_000 * 1,
         )
     }
 
@@ -390,7 +390,7 @@ export class TranscriberSession {
         })
 
         this.recorder?.startRecording()
-        this.offset = new Date().getTime()
+        this.offset = CONTEXT.currentTime
     }
 
     /** Stops the recorder. */
