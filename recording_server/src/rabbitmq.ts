@@ -25,7 +25,6 @@ export class Consumer {
 
         console.log('connected to rabbitmq: ', process.env.AMQP_ADDRESS)
         const channel = await connection.createChannel()
-        await channel.assertQueue(Consumer.QUEUE_NAME, { durable: true })
 
         console.log('declaring queue: ', Consumer.QUEUE_NAME)
         channel.prefetch(Consumer.PREFETCH_COUNT)
