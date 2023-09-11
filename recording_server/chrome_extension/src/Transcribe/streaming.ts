@@ -188,16 +188,6 @@ export async function waitUntilComplete() {
         console.log(e, 'calcHighlight failed')
     }
 
-    //if let Some(project_id) = project_id {
-    //    if let Err(e) = post_api_server_request(
-    //        "worker/send_message",
-    //        serde_json::to_string(&WorkerMessage::NewSpoke { project_id, user }).unwrap(),
-    //    )
-    //    .await
-    //    {
-    //        slog::error!(&logger, "error notifying project"; "message" => format!("{}", e));
-    //    }
-    //}
     if (SESSION) {
         await api.patchAsset({ id: SESSION.asset.id, uploading: false })
         let message = {
