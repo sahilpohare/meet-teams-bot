@@ -6,8 +6,7 @@ import { Logger } from './logger'
 import { PORT } from './instance'
 import * as redis from 'redis'
 import { sleep } from './utils'
-import { RecognizerSession } from './recognizer'
-import { api, setConfig } from 'spoke_api_js'
+import { setConfig } from 'spoke_api_js'
 
 export let PROJECT_ID: number | undefined = undefined
 export const LOGGER = new Logger({})
@@ -66,54 +65,6 @@ export async function server() {
         }
 
         next()
-    })
-
-    const recognizerSession = new RecognizerSession()
-
-    app.post('/recognizer/start', jsonParser, async (req, res) => {
-        const {
-            language,
-            sampleRate,
-            offset,
-            vocabulary,
-        }: {
-            language: string
-            sampleRate: number
-            offset: number
-            vocabulary: string[]
-        } = req.body
-        const [token, region] = await api.requestAuthorizationToken()
-
-        await recognizerSession.start({
-            language,
-            token,
-            region,
-            sampleRate,
-            offset,
-            vocabulary,
-        })
-        res.send('ok')
-    })
-
-    app.post('/recognizer/write', jsonParser, async (req, res) => {
-        const bytes: number[] = req.body.bytes
-        const buffer = new Uint8Array(bytes).buffer
-
-        recognizerSession.write(buffer)
-        res.send('ok')
-    })
-
-    app.post('/recognizer/refresh_token', jsonParser, async (_, res) => {
-        await recognizerSession.refresh_token()
-        res.send('ok')
-    })
-    app.post('/recognizer/stop', jsonParser, async (_, res) => {
-        await recognizerSession.stop()
-        res.send('ok')
-    })
-
-    app.get('/recognizer/results', jsonParser, (_, res) => {
-        res.json(recognizerSession.getResults())
     })
 
     app.post('/status', jsonParser, async (req, res) => {

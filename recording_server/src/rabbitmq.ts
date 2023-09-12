@@ -2,7 +2,7 @@ import { connect, Channel } from 'amqplib'
 import { MeetingParams, startRecordMeeting, setInitalParams } from './meeting'
 import { LOGGER } from './server'
 import { LOCK_INSTANCE_AT_STARTUP, setProtection } from './instance'
-import { notify, notifyApp, patchEvent } from './calendar'
+import { notify, notifyApp } from './calendar'
 import { setLoggerProjectId } from './logger'
 
 const POD_NAME = process.env.POD_NAME
