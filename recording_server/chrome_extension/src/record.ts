@@ -6,7 +6,6 @@ import {
     Editor,
     RecognizerWord,
     Transcript,
-    UseCredit,
     Video,
     Word,
     EditorWrapper,
@@ -49,7 +48,6 @@ export type SpokeSession = {
 export type VideoInformation = {
     video_size: VideoSize
     words: Word[]
-    credit?: UseCredit
     s3_path?: string
     thumbnail_path?: string
     video_duration: number
@@ -557,7 +555,6 @@ function createVideo(
     asset: Asset,
 ): Partial<Video> {
     return {
-        no_credit: false,
         s3_path: videoInfo.s3_path,
         transcripts: createTranscripts(videoInfo) as Transcript[],
         thumbnail_path: videoInfo.thumbnail_path,
