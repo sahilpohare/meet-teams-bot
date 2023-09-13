@@ -71,8 +71,6 @@ function addListener() {
             }
             case 'RECORD': {
                 State.parameters.language = 'en'
-                State.parameters.rev_api_key =
-                    '0240x0Bj4Wv4pBaSe7xYjIfrkOFAaH1x76u4w1mpZ4zY1bt9Ov8njsjJOWhYLmqtlwMxQAU5Lxg9ULKdDgtV3sve-wwM8'
                 record.initMediaRecorder()
                 break
             }

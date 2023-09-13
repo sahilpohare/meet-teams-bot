@@ -14,7 +14,6 @@ export type MeetingParams = {
     api_server_baseurl: string
     api_download_baseurl: string
     session_id: string
-    rev_api_key: string
     agenda?: Agenda
     vocabulary: string[]
 }
@@ -32,7 +31,6 @@ export type State = {
     api_server_baseurl: string
     api_download_baseurl: string
     session_id: string
-    rev_api_key: string
     user_id: number
     agenda?: Agenda
     vocabulary: string[]
@@ -59,7 +57,6 @@ export const parameters: State = {
     meeting_url: '',
     meeting_provider: 'Zoom',
     session_id: '',
-    rev_api_key: '',
     user_id: 0,
     agenda: undefined,
     vocabulary: [],
@@ -76,7 +73,6 @@ export function addMeetingParams(meetingParams: MeetingParams) {
     parameters.api_server_baseurl = meetingParams.api_server_baseurl
     parameters.api_download_baseurl = meetingParams.api_download_baseurl
     parameters.session_id = meetingParams.session_id
-    parameters.rev_api_key = meetingParams.rev_api_key
     parameters.user_id = meetingParams.user_id
     parameters.agenda = meetingParams.agenda
     parameters.vocabulary = meetingParams.vocabulary

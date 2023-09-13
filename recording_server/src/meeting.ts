@@ -124,7 +124,6 @@ export type MeetingParams = {
     api_server_baseurl?: string
     api_download_baseurl?: string
     event?: { id: number }
-    rev_api_key: string
     agenda?: Agenda
     bot_branding: boolean
     has_installed_extension: boolean
@@ -255,7 +254,6 @@ export async function startRecordMeeting(meetingParams: MeetingParams) {
 
         meetingParams.api_server_baseurl = process.env.API_SERVER_BASEURL
         meetingParams.api_download_baseurl = process.env.API_DOWNLOAD_BASEURL
-        meetingParams.rev_api_key = process.env.REV_API_KEY
 
         const project = await CURRENT_MEETING.meeting.backgroundPage.evaluate(
             async (meetingParams) => {
