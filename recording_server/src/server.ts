@@ -96,7 +96,11 @@ export async function server() {
                         logger.info('status ready, returning project')
                         let agenda = null
                         try {
-                            agenda = await meeting.getAgenda()
+                            if (
+                                meeting.CURRENT_MEETING.status === 'Recording'
+                            ) {
+                                agenda = await meeting.getAgenda()
+                            }
                         } catch (e) {
                             logger.error(
                                 'failed to get agenda in status request',
@@ -105,6 +109,7 @@ export async function server() {
                         res.json({
                             project: meeting.CURRENT_MEETING.project,
                             agenda: agenda,
+                            status: meeting.CURRENT_MEETING.status,
                         })
                         return
                     }
