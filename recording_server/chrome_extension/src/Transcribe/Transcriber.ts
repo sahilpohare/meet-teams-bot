@@ -1,4 +1,4 @@
-import { api, GladiaResult } from 'spoke_api_js'
+import { api, GladiaResult, gladiaToGoogleLang } from 'spoke_api_js'
 import * as R from 'ramda'
 import { parameters } from '../background'
 import { newSerialQueue, newTranscribeQueue } from '../queue'
@@ -225,9 +225,9 @@ export class Transcriber {
     /** Handles detected language. */
     private static async handleLanguage(language: string): Promise<void> {
         if (language === '' || parameters.language === language) return
-        console.log('[handleLanguage]', new Date(), language)
+        const googleLang = gladiaToGoogleLang(language) ?? 'en-US'
 
-        parameters.language = language
+        parameters.language = googleLang
         //await api.notifyApp(parameters.user_token, {
         //    message: 'LangDetected',
         //    user_id: parameters.user_id,
