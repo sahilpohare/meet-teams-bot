@@ -95,7 +95,7 @@ export class Consumer {
                 user_id: data.user_id,
                 payload: {
                     agenda: data.agenda,
-                    session: data.session_id,
+                    session_id: data.session_id,
                     meeting_url: data.meeting_url,
                     project,
                 },
