@@ -257,13 +257,15 @@ export class Transcriber {
             ts += offset - START_RECORD_OFFSET
             end_ts += offset - START_RECORD_OFFSET
             console.log('[handleResult]', word)
-            SESSION.words.push({
-                type: 'text',
-                value: word.word,
-                ts,
-                end_ts,
-                confidence: 1.0,
-            })
+            if (word.word !== '') {
+                SESSION.words.push({
+                    type: 'text',
+                    value: word.word,
+                    ts,
+                    end_ts,
+                    confidence: 1.0,
+                })
+            }
         }
         console.log('[handleResult]', new Date(), words.length)
     }
