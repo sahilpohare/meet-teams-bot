@@ -32,11 +32,6 @@ export class Consumer {
                     durable: false,
                 })
             } catch (e) {}
-            try {
-                await channel.assertQueue(Consumer.QUEUE_NAME, {
-                    autoDelete: true,
-                })
-            } catch (e) {}
         }
 
         console.log('declaring queue: ', Consumer.QUEUE_NAME)
