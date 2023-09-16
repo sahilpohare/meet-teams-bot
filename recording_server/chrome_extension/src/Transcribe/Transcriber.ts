@@ -46,7 +46,7 @@ export class Transcriber {
         Transcriber.rebootTimer = setInterval(
             () => Transcriber.reboot(),
             // restart transcription every 9 minutes as microsoft token expriration
-            60_000,
+            60_000 * 3,
         )
     }
 
