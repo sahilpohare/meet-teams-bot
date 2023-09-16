@@ -12,7 +12,7 @@ import {
 } from 'spoke_api_js'
 
 // in milis seconds
-const MIN_TO_HIGHLIGHT = 180_000
+const MIN_TO_HIGHLIGHT = 180_000 * 3
 
 let EMPTY_LABEL: Label | null = null
 
