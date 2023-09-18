@@ -83,8 +83,8 @@ export async function openMeetingPage(
     const url = url_parse(link, true)
     console.log({ url })
     const context = browser.defaultBrowserContext()
-    context.clearPermissionOverrides()
-    context.overridePermissions(url.origin, ['camera'])
+    await context.clearPermissionOverrides()
+    await context.overridePermissions(url.origin, ['camera'])
     const page = await browser.newPage()
     await page.goto(link, { waitUntil: 'networkidle2' })
     return page
@@ -417,7 +417,9 @@ async function continueModal(page: Page, functionName: string) {
                 { timeout: 500 },
             )
             if (element) {
-                CURRENT_MEETING.logger.info(`[${functionName}] legacy button found`)
+                CURRENT_MEETING.logger.info(
+                    `[${functionName}] legacy button found`,
+                )
                 await element.click()
                 return true
             }

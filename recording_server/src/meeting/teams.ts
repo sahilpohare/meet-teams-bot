@@ -49,8 +49,8 @@ export async function openMeetingPage(
     console.log({ url })
 
     const context = browser.defaultBrowserContext()
-    context.clearPermissionOverrides()
-    context.overridePermissions(url.origin, ['camera'])
+    await context.clearPermissionOverrides()
+    await context.overridePermissions(url.origin, ['camera'])
 
     const page = await browser.newPage()
     await page.goto(link, { waitUntil: 'networkidle2' })
