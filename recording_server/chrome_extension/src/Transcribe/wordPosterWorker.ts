@@ -21,6 +21,14 @@ export async function wordPosterWorker() {
             }, session.words)
 
             session.words = nonPushable
+            console.log(
+                '[wordPosterWorker] routine pushable length',
+                pushable.length,
+            )
+            console.log(
+                '[wordPosterWorker] routine nonpushable length',
+                pushable.length,
+            )
             const pushableClone = [...pushable]
             await pushWords(pushableClone)
 
@@ -48,8 +56,10 @@ export async function wordPosterWorker() {
     while (!Transcriber.STOPPED) {
         await routine()
         await sleep(5_000)
+        console.log('[wordPosterWorker] end while loop')
     }
 
+    console.log('[wordPosterWorker] execute last routine')
     await routine()
 }
 
