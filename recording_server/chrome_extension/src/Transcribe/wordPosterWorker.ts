@@ -21,14 +21,6 @@ export async function wordPosterWorker() {
             }, session.words)
 
             session.words = nonPushable
-            console.log(
-                '[wordPosterWorker] routine pushable length',
-                pushable.length,
-            )
-            console.log(
-                '[wordPosterWorker] routine nonpushable length',
-                pushable.length,
-            )
             const pushableClone = [...pushable]
             await pushWords(pushableClone)
 

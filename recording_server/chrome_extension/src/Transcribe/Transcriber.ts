@@ -255,7 +255,7 @@ export class Transcriber {
             let end_ts = word.time_end
             ts += offset - START_RECORD_OFFSET
             end_ts += offset - START_RECORD_OFFSET
-            console.log('[handleResult]', word)
+            //console.log('[handleResult]', word)
             if (word.word !== '') {
                 SESSION.words.push({
                     type: 'text',
