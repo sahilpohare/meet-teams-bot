@@ -60,7 +60,7 @@ export class Transcriber {
         try {
             newTranscriber = new TranscriberSession(
                 Transcriber.TRANSCRIBER.audioStream.clone(),
-                this.onResult,
+                Transcriber.onResult,
             )
             newTranscriber.startRecorder()
             console.log('[reboot]', 'newTranscriber = new TranscriberSession')
@@ -204,10 +204,7 @@ export class Transcriber {
     /** Gets and handles recognizer results every `interval` ms. */
 
     /** Gets and handles recognizer results. */
-    private static async onResult(
-        json: GladiaResult,
-        offset: number,
-    ): Promise<void> {
+    private static onResult(json: GladiaResult, offset: number): void {
         for (const prediction of json.prediction) {
             const language = prediction.language
             const words = prediction.words
@@ -223,7 +220,7 @@ export class Transcriber {
     }
 
     /** Handles detected language. */
-    private static async handleLanguage(language: string): Promise<void> {
+    private static handleLanguage(language: string): void {
         if (language === '' || parameters.language === language) return
         const googleLang = gladiaToGoogleLang(language) ?? 'en-US'
 
@@ -236,14 +233,14 @@ export class Transcriber {
     }
 
     /** Handles detected language. */
-    private static async handleResult(
+    private static handleResult(
         words: {
             time_begin: number
             time_end: number
             word: string
         }[],
         offset: number,
-    ): Promise<void> {
+    ): void {
         if (!(SESSION && offset !== 0 && START_RECORD_OFFSET !== 0)) return
 
         console.log('[handleResult] offset from start of video: ', words)
