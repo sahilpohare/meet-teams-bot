@@ -30,7 +30,7 @@ export class Transcriber {
     private summarizeWorker: Promise<void>
     private highlightWorker: Promise<void>
     private pollTimer: NodeJS.Timer | undefined
-    private transcribeQueue: asyncLib.QueueObject<() => void>
+    private transcribeQueue: Promise<void>[]
     /** Inits the transcriber. */
     static async init(audioStream: MediaStream): Promise<void> {
         if (Transcriber.TRANSCRIBER != null) throw 'Transcriber already inited'
@@ -68,21 +68,23 @@ export class Transcriber {
             console.error('[reboot]', 'error stopping recorder', e)
         }
         const transcriberSession = Transcriber.TRANSCRIBER_SESSION
-        Transcriber.TRANSCRIBER.transcribeQueue.push(async () => {
-            try {
-                console.log(
-                    '[reboot]',
-                    'before Transcriber.TRANSCRIBER.stopRecorder',
-                )
-                await transcriberSession?.stopRecorder()
-                console.log(
-                    '[reboot]',
-                    'after Transcriber.TRANSCRIBER.stopRecorder',
-                )
-            } catch (e) {
-                console.error('[reboot]', 'error stopping recorder', e)
-            }
-        })
+        Transcriber.TRANSCRIBER.transcribeQueue.push(
+            (async () => {
+                try {
+                    console.log(
+                        '[reboot]',
+                        'before Transcriber.TRANSCRIBER.stopRecorder',
+                    )
+                    await transcriberSession?.stopRecorder()
+                    console.log(
+                        '[reboot]',
+                        'after Transcriber.TRANSCRIBER.stopRecorder',
+                    )
+                } catch (e) {
+                    console.error('[reboot]', 'error stopping recorder', e)
+                }
+            })(),
+        )
         // Reboot the recognizer (audio data is buffered in the meantime)
         this.TRANSCRIBER_SESSION = newTranscriber
     }
@@ -97,15 +99,11 @@ export class Transcriber {
             async () => await Transcriber.TRANSCRIBER_SESSION?.stopRecorder(),
         )
 
-        Transcriber.TRANSCRIBER.transcribeQueue.push(async () => {
-            return
-        })
-
         console.log(
             '[stop]',
             'before Transcriber.TRANSCRIBER.transcribeQueue drain',
         )
-        await Transcriber.TRANSCRIBER.transcribeQueue.drain()
+        await Promise.all(Transcriber.TRANSCRIBER.transcribeQueue)
         console.log(
             '[stop]',
             'after Transcriber.TRANSCRIBER.transcribeQueue drain',
@@ -188,7 +186,7 @@ export class Transcriber {
     private constructor(audioStream: MediaStream) {
         this.audioStream = audioStream
 
-        this.transcribeQueue = newTranscribeQueue()
+        this.transcribeQueue = []
         // Simply not to have undefined properties
         this.wordPosterWorker = new Promise((resolve) => resolve())
         this.summarizeWorker = new Promise((resolve) => resolve())
@@ -271,32 +269,23 @@ export class Transcriber {
 export class TranscriberSession {
     private recorder: RecordRTC | undefined
     private offset: number
-    private bufferAudioData: boolean
-    private bufferedAudioData: ArrayBuffer[]
-    private queue: asyncLib.AsyncQueue<() => Promise<void>>
     private audioStream: MediaStream
     private sampleRate: number
     private onResult: any
 
     constructor(audioStream: MediaStream, onResult: any) {
-        this.queue = newSerialQueue()
         this.audioStream = audioStream
         this.sampleRate =
             audioStream.getAudioTracks()[0].getSettings().sampleRate ?? 0
         this.offset = 0
-        this.bufferAudioData = true
-        this.bufferedAudioData = []
         this.onResult = onResult
     }
     /** Starts the recorder. */
     startRecorder(): void {
         // NOTE:
-        // We buffer audio data when not transcribing (i.e. when rebooting)
-        // and flush that back to the next recognizer session
         // We also use a queue to make sure writes to the recognizer are sequential
         // (recorder.ondataavailable does not await...)
 
-        this.bufferAudioData = true
         this.recorder = new RecordRTC(this.audioStream, {
             type: 'audio',
             mimeType: 'audio/webm;codecs=pcm', // endpoint requires 16bit PCM audio
