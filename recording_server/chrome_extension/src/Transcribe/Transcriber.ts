@@ -9,14 +9,6 @@ import { trySummarizeNext, summarizeWorker } from './summarizeWorker'
 import { calcHighlights, highlightWorker } from './highlightWorker'
 import RecordRTC, { StereoAudioRecorder } from 'recordrtc'
 
-const tryOrLog = async <T>(message: string, fn: () => Promise<T>) => {
-    try {
-        await fn()
-    } catch (e) {
-        console.error(message, e)
-    }
-}
-
 /**
  * Transcribes an audio stream using the recognizer of the underlying Node server.
  */
@@ -94,10 +86,11 @@ export class Transcriber {
         if (Transcriber.TRANSCRIBER == null) throw 'Transcriber not inited'
 
         clearInterval(Transcriber.rebootTimer)
-        tryOrLog(
-            'Stop transcription',
-            async () => await Transcriber.TRANSCRIBER_SESSION?.stopRecorder(),
-        )
+        try {
+            await Transcriber.TRANSCRIBER_SESSION?.stopRecorder()
+        } catch (e) {
+            console.error('[stop]', 'error stopping recorder', e)
+        }
 
         console.log(
             '[stop]',
@@ -124,17 +117,17 @@ export class Transcriber {
             SESSION?.project.id &&
             R.all((v) => v.words.length === 0, SESSION.video_informations)
         ) {
-            tryOrLog(
-                'Patching project',
-                async () =>
-                    await api.patchProject({
-                        id: SESSION?.project.id,
-                        no_transcript: true,
-                    }),
-            )
+            try {
+                await api.patchProject({
+                    id: SESSION?.project.id,
+                    no_transcript: true,
+                })
+            } catch (e) {
+                console.error('[waitUntilComplete]', 'error patching project')
+            }
         }
 
-        tryOrLog('Set transcription as complete', async () => {
+        try {
             if (!SESSION) return
 
             for (const infos of SESSION.video_informations) {
@@ -148,34 +141,43 @@ export class Transcriber {
                     video.transcription_completed = true
                 }
             }
-        })
+        } catch (e) {
+            console.error('[waitUntilComplete]', 'error patching video')
+        }
 
         await Transcriber.TRANSCRIBER.summarizeWorker
         await Transcriber.TRANSCRIBER.highlightWorker
 
         while (await trySummarizeNext(true)) {}
 
-        tryOrLog('Calculate highlights', async () => await calcHighlights(true))
+        try {
+            await calcHighlights(true)
+        } catch (e) {
+            console.error('[waitUntilComplete]', 'error calcHighlights')
+        }
 
         if (SESSION) {
-            tryOrLog(
-                'Patch asset',
-                async () =>
-                    await api.patchAsset({
-                        id: SESSION?.asset.id,
-                        uploading: false,
-                    }),
-            )
-            tryOrLog(
-                'Send worker message (new spoke)',
-                async () =>
-                    await api.workerSendMessage({
-                        NewSpoke: {
-                            project_id: SESSION?.project.id,
-                            user: { id: parameters.user_id },
-                        },
-                    }),
-            )
+            try {
+                await api.patchAsset({
+                    id: SESSION?.asset.id,
+                    uploading: false,
+                })
+            } catch (e) {
+                console.error('[waitUntilComplete]', 'error patching asset')
+            }
+            try {
+                await api.workerSendMessage({
+                    NewSpoke: {
+                        project_id: SESSION?.project.id,
+                        user: { id: parameters.user_id },
+                    },
+                })
+            } catch (e) {
+                console.error(
+                    '[waitUntilComplete]',
+                    'error worker send message',
+                )
+            }
         }
 
         // Release memory (?)
