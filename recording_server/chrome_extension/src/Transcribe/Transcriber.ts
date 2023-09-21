@@ -31,7 +31,7 @@ export class Transcriber {
         Transcriber.TRANSCRIBER.launchWorkers()
         Transcriber.TRANSCRIBER_SESSION = new TranscriberSession(
             audioStream,
-            this.onResult,
+            Transcriber.onResult,
         )
 
         Transcriber.TRANSCRIBER_SESSION.startRecorder()
