@@ -19,7 +19,7 @@ const CONTEXT: AutoHighlightResponse = { clips: [] }
 export async function summarizeWorker(): Promise<void> {
     let i = 1
 
-    while (!Transcriber.STOPPED) {
+    while (!Transcriber.TRANSCRIBER?.stopped) {
         if (SESSION) {
             if (i % 10 === 0) {
                 try {

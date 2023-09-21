@@ -19,7 +19,7 @@ let EMPTY_LABEL: Label | null = null
 export async function highlightWorker(): Promise<void> {
     let i = 0
 
-    while (!Transcriber.STOPPED) {
+    while (!Transcriber.TRANSCRIBER?.stopped) {
         if (SESSION) {
             if (i % 100 === 0) {
                 try {

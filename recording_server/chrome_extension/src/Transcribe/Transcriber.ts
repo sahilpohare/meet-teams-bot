@@ -12,11 +12,12 @@ import RecordRTC, { StereoAudioRecorder } from 'recordrtc'
 /**
  * Transcribes an audio stream using the recognizer of the underlying Node server.
  */
+
 export class Transcriber {
-    static STOPPED = false
-    private static TRANSCRIBER: Transcriber | undefined
-    private static TRANSCRIBER_SESSION: TranscriberSession | undefined
-    private static rebootTimer: NodeJS.Timer
+    static TRANSCRIBER: Transcriber | undefined
+    public stopped = false
+    private transcriber_session: TranscriberSession | undefined
+    private rebootTimer: NodeJS.Timer
     private audioStream: MediaStream
     private wordPosterWorker: Promise<void>
     private summarizeWorker: Promise<void>
@@ -25,42 +26,35 @@ export class Transcriber {
     private transcribeQueue: asyncLib.QueueObject<() => void>
     /** Inits the transcriber. */
     static async init(audioStream: MediaStream): Promise<void> {
-        if (Transcriber.TRANSCRIBER != null) throw 'Transcriber already inited'
-
         Transcriber.TRANSCRIBER = new Transcriber(audioStream)
-        Transcriber.TRANSCRIBER.launchWorkers()
-        Transcriber.TRANSCRIBER_SESSION = new TranscriberSession(
-            audioStream,
-            Transcriber.onResult,
-        )
+        await Transcriber.TRANSCRIBER.start(audioStream)
+    }
+    async start(audioStream: MediaStream): Promise<void> {
+        this.launchWorkers()
+        this.transcriber_session = new TranscriberSession(audioStream)
 
-        Transcriber.TRANSCRIBER_SESSION.startRecorder()
-        Transcriber.rebootTimer = setInterval(
-            () => Transcriber.reboot(),
+        this.transcriber_session.startRecorder()
+        this.rebootTimer = setInterval(
+            () => this.reboot(),
             // restart transcription every 9 minutes as microsoft token expriration
             60_000 * 3,
         )
     }
 
     /** Stops and restarts the recorder (to free some memory) and the recognizer (to update its tokens and language). */
-    static async reboot(): Promise<void> {
-        if (Transcriber.TRANSCRIBER == null) throw 'Transcriber not inited'
-
+    async reboot(): Promise<void> {
         // We reboot the recorder as well to (hopefully) reduce memory usage
         // We restart instantly to (hopefully) resume where we just left off
         let newTranscriber
         try {
-            newTranscriber = new TranscriberSession(
-                Transcriber.TRANSCRIBER.audioStream.clone(),
-                Transcriber.onResult,
-            )
+            newTranscriber = new TranscriberSession(this.audioStream.clone())
             newTranscriber.startRecorder()
             console.log('[reboot]', 'newTranscriber = new TranscriberSession')
         } catch (e) {
             console.error('[reboot]', 'error stopping recorder', e)
         }
-        const transcriberSession = Transcriber.TRANSCRIBER_SESSION
-        Transcriber.TRANSCRIBER.transcribeQueue.push(async () => {
+        const transcriberSession = this.transcriber_session
+        this.transcribeQueue.push(async () => {
             try {
                 console.log(
                     '[reboot]',
@@ -76,44 +70,32 @@ export class Transcriber {
             }
         })
         // Reboot the recognizer (audio data is buffered in the meantime)
-        this.TRANSCRIBER_SESSION = newTranscriber
+        this.transcriber_session = newTranscriber
     }
 
     /**  Ends the transcribing, and destroys resources. */
-    static async stop(): Promise<void> {
-        if (Transcriber.TRANSCRIBER == null) throw 'Transcriber not inited'
-
-        clearInterval(Transcriber.rebootTimer)
+    async stop(): Promise<void> {
+        clearInterval(this.rebootTimer)
         try {
-            await Transcriber.TRANSCRIBER_SESSION?.stopRecorder()
+            await this.transcriber_session?.stopRecorder()
         } catch (e) {
             console.error('[stop]', 'error stopping recorder', e)
         }
 
-        Transcriber.TRANSCRIBER.transcribeQueue.push(async () => {
+        this.transcribeQueue.push(async () => {
             return
         })
 
-        console.log(
-            '[stop]',
-            'before Transcriber.TRANSCRIBER.transcribeQueue drain',
-        )
-        await Transcriber.TRANSCRIBER.transcribeQueue.drain()
-        console.log(
-            '[stop]',
-            'after Transcriber.TRANSCRIBER.transcribeQueue drain',
-        )
+        await this.transcribeQueue.drain()
 
         // Retreive last results that weren't polled
     }
 
     /** Waits for the workers to finish, and destroys the transcbriber. */
-    static async waitUntilComplete(): Promise<void> {
-        if (Transcriber.TRANSCRIBER == null) throw 'Transcriber not inited'
+    async waitUntilComplete(): Promise<void> {
+        this.stopped = true
 
-        Transcriber.STOPPED = true
-
-        await Transcriber.TRANSCRIBER.wordPosterWorker
+        await this.wordPosterWorker
 
         if (
             SESSION?.project.id &&
@@ -147,8 +129,8 @@ export class Transcriber {
             console.error('[waitUntilComplete]', 'error patching video')
         }
 
-        await Transcriber.TRANSCRIBER.summarizeWorker
-        await Transcriber.TRANSCRIBER.highlightWorker
+        await this.summarizeWorker
+        await this.highlightWorker
 
         while (await trySummarizeNext(true)) {}
 
@@ -181,14 +163,12 @@ export class Transcriber {
                 )
             }
         }
-
-        // Release memory (?)
-        Transcriber.TRANSCRIBER = undefined
     }
 
     /** Returns a new `Transcriber`. */
     private constructor(audioStream: MediaStream) {
         this.audioStream = audioStream
+        this.rebootTimer = setTimeout(() => {}, 0)
 
         this.transcribeQueue = newTranscribeQueue()
         // Simply not to have undefined properties
@@ -204,7 +184,72 @@ export class Transcriber {
         this.highlightWorker = highlightWorker()
     }
     /** Gets and handles recognizer results every `interval` ms. */
+}
 
+export class TranscriberSession {
+    private recorder: RecordRTC | undefined
+    private offset: number
+    private audioStream: MediaStream
+    private sampleRate: number
+
+    constructor(audioStream: MediaStream) {
+        this.audioStream = audioStream
+        this.sampleRate =
+            audioStream.getAudioTracks()[0].getSettings().sampleRate ?? 0
+        this.offset = 0
+    }
+    /** Starts the recorder. */
+    startRecorder(): void {
+        // NOTE:
+        // We buffer audio data when not transcribing (i.e. when rebooting)
+        // and flush that back to the next recognizer session
+        // We also use a queue to make sure writes to the recognizer are sequential
+        // (recorder.ondataavailable does not await...)
+
+        this.recorder = new RecordRTC(this.audioStream, {
+            type: 'audio',
+            mimeType: 'audio/webm;codecs=pcm', // endpoint requires 16bit PCM audio
+            recorderType: StereoAudioRecorder,
+            timeSlice: 250, // set 250 ms intervals of data that sends to AAI
+            desiredSampRate: this.sampleRate,
+            numberOfAudioChannels: 1, // real-time requires only one channel
+            bufferSize: 4096,
+            audioBitsPerSecond: this.sampleRate * 16,
+            ondataavailable: (data: any) => {
+                //console.log('[ondataavailable]', data)
+            },
+        })
+
+        this.recorder?.startRecording()
+        this.offset = CONTEXT.currentTime
+    }
+
+    /** Stops the recorder. */
+    async stopRecorder(): Promise<void> {
+        // Make sure (?) we get all data from the recorder
+        await new Promise((resolve: any) => {
+            this.recorder?.stopRecording(async () => {
+                const blob = this.recorder?.getBlob()
+                const array = await blob?.arrayBuffer()
+                console.log('[stopRecorder]', 'array', array)
+                console.log('blob', blob)
+                if (blob != null) {
+                    console.log('blob ready requesting gladia')
+                    try {
+                        let res = await api.transcribeWithGladia(
+                            blob,
+                            parameters.vocabulary,
+                        )
+                        console.log('[stopRecorder]', res)
+                        TranscriberSession.onResult(res, this.offset)
+                    } catch (e) {
+                        console.error('an error occured calling gladia, ', e)
+                    }
+                }
+                resolve()
+            })
+        })
+    }
     /** Gets and handles recognizer results. */
     private static onResult(json: GladiaResult, offset: number): void {
         for (const prediction of json.prediction) {
@@ -212,11 +257,11 @@ export class Transcriber {
             const words = prediction.words
 
             if (language) {
-                Transcriber.handleLanguage(language)
+                TranscriberSession.handleLanguage(language)
             }
 
             if (words) {
-                Transcriber.handleResult(words, offset)
+                TranscriberSession.handleResult(words, offset)
             }
         }
     }
@@ -267,81 +312,5 @@ export class Transcriber {
             }
         }
         console.log('[handleResult]', new Date(), words.length)
-    }
-}
-
-export class TranscriberSession {
-    private recorder: RecordRTC | undefined
-    private offset: number
-    private bufferAudioData: boolean
-    private bufferedAudioData: ArrayBuffer[]
-    private queue: asyncLib.AsyncQueue<() => Promise<void>>
-    private audioStream: MediaStream
-    private sampleRate: number
-    private onResult: any
-
-    constructor(audioStream: MediaStream, onResult: any) {
-        this.queue = newSerialQueue()
-        this.audioStream = audioStream
-        this.sampleRate =
-            audioStream.getAudioTracks()[0].getSettings().sampleRate ?? 0
-        this.offset = 0
-        this.bufferAudioData = true
-        this.bufferedAudioData = []
-        this.onResult = onResult
-    }
-    /** Starts the recorder. */
-    startRecorder(): void {
-        // NOTE:
-        // We buffer audio data when not transcribing (i.e. when rebooting)
-        // and flush that back to the next recognizer session
-        // We also use a queue to make sure writes to the recognizer are sequential
-        // (recorder.ondataavailable does not await...)
-
-        this.bufferAudioData = true
-        this.recorder = new RecordRTC(this.audioStream, {
-            type: 'audio',
-            mimeType: 'audio/webm;codecs=pcm', // endpoint requires 16bit PCM audio
-            recorderType: StereoAudioRecorder,
-            timeSlice: 250, // set 250 ms intervals of data that sends to AAI
-            desiredSampRate: this.sampleRate,
-            numberOfAudioChannels: 1, // real-time requires only one channel
-            bufferSize: 4096,
-            audioBitsPerSecond: this.sampleRate * 16,
-            ondataavailable: (data: any) => {
-                //console.log('[ondataavailable]', data)
-            },
-        })
-
-        this.recorder?.startRecording()
-        this.offset = CONTEXT.currentTime
-    }
-
-    /** Stops the recorder. */
-    async stopRecorder(): Promise<void> {
-        // Make sure (?) we get all data from the recorder
-        await new Promise((resolve: any) => {
-            this.recorder?.stopRecording(async () => {
-                const blob = this.recorder?.getBlob()
-                const array = await blob?.arrayBuffer()
-                console.log('[stopRecorder]', 'array', array)
-                console.log('blob', blob)
-                if (blob != null) {
-                    console.log('blob ready requesting gladia')
-                    try {
-                        let res = await api.transcribeWithGladia(
-                            blob,
-                            parameters.vocabulary,
-                        )
-                        console.log('[stopRecorder]', res)
-                        console.log('[stopRecorder]', this.onResult)
-                        this.onResult(res, this.offset)
-                    } catch (e) {
-                        console.error('an error occured calling gladia, ', e)
-                    }
-                }
-                resolve()
-            })
-        })
     }
 }

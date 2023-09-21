@@ -45,7 +45,7 @@ export async function wordPosterWorker() {
         }
     }
 
-    while (!Transcriber.STOPPED) {
+    while (!Transcriber.TRANSCRIBER?.stopped) {
         await routine()
         await sleep(5_000)
         console.log('[wordPosterWorker] end while loop')
