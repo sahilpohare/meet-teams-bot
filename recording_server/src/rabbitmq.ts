@@ -32,8 +32,18 @@ export class Consumer {
         return new Consumer(channel)
     }
 
+    async deleteQueue() {
+        if (LOCK_INSTANCE_AT_STARTUP && Consumer.QUEUE_NAME === POD_NAME) {
+            try {
+                await this.channel.deleteQueue(Consumer.QUEUE_NAME)
+            } catch (e) {
+                console.error('fail to delete queue', e)
+            }
+        }
+    }
+
     async consume(
-        handler: (data: MeetingParams) => void,
+        handler: (data: MeetingParams) => Promise<void>,
     ): Promise<StartRecordingResult> {
         return new Promise((resolve, reject) => {
             this.channel
