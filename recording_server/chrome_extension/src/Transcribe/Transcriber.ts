@@ -240,8 +240,9 @@ export class TranscriberSession {
                             blob,
                             parameters.vocabulary,
                         )
-                        console.log('[stopRecorder]', res)
-                        TranscriberSession.onResult(res, this.offset)
+                        console.log('[stopRecorder]', res.prediction.length)
+                        console.log('[stopRecorder]', onResult)
+                        onResult(res, this.offset)
                     } catch (e) {
                         console.error('an error occured calling gladia, ', e)
                     }
@@ -250,58 +251,57 @@ export class TranscriberSession {
             })
         })
     }
-    /** Gets and handles recognizer results. */
-    private static onResult(json: GladiaResult, offset: number): void {
-        for (const prediction of json.prediction) {
-            const language = prediction.language
-            const words = prediction.words
+}
 
-            if (language) {
-                TranscriberSession.handleLanguage(language)
-            }
+/** Gets and handles recognizer results. */
+function onResult(json: GladiaResult, offset: number): void {
+    console.log('[onResult] ')
+    for (const prediction of json.prediction) {
+        const language = prediction.language
+        const words = prediction.words
 
-            if (words) {
-                TranscriberSession.handleResult(words, offset)
-            }
+        if (language) {
+            handleLanguage(language)
+        }
+
+        if (words != null && words.length > 0) {
+            handleResult(words, offset)
+        } else {
+            console.log('[onResult] ', 'no words')
         }
     }
+}
 
-    /** Handles detected language. */
-    private static handleLanguage(language: string): void {
-        if (language === '' || parameters.language === language) return
-        const googleLang = gladiaToGoogleLang(language) ?? 'en-US'
+/** Handles detected language. */
+function handleLanguage(language: string): void {
+    if (language === '' || parameters.language === language) return
+    const googleLang = gladiaToGoogleLang(language) ?? 'en-US'
 
-        parameters.language = googleLang
-        //await api.notifyApp(parameters.user_token, {
-        //    message: 'LangDetected',
-        //    user_id: parameters.user_id,
-        //    payload: { language },
-        //})
-    }
+    parameters.language = googleLang
+}
 
-    /** Handles detected language. */
-    private static handleResult(
-        words: {
-            time_begin: number
-            time_end: number
-            word: string
-        }[],
-        offset: number,
-    ): void {
-        if (!(SESSION && offset !== 0 && START_RECORD_OFFSET !== 0)) return
-
-        console.log('[handleResult] offset from start of video: ', words)
-        console.log(
-            '[handleResult] offset from start of video: ',
-            (offset - START_RECORD_OFFSET) / 1_000,
-        )
-        for (let [i, word] of words.entries()) {
-            let ts = word.time_begin
-            let end_ts = word.time_end
-            ts += offset - START_RECORD_OFFSET
-            end_ts += offset - START_RECORD_OFFSET
-            //console.log('[handleResult]', word)
-            if (word.word !== '') {
+/** Handles detected language. */
+function handleResult(
+    words: {
+        time_begin: number
+        time_end: number
+        word: string
+    }[],
+    offset: number,
+): void {
+    console.log('[handleResult] offset from start of video: ', words)
+    console.log(
+        '[handleResult] offset from start of video: ',
+        (offset - START_RECORD_OFFSET) / 1_000,
+    )
+    for (let [i, word] of words.entries()) {
+        let ts = word.time_begin
+        let end_ts = word.time_end
+        ts += offset - START_RECORD_OFFSET
+        end_ts += offset - START_RECORD_OFFSET
+        //console.log('[handleResult]', word)
+        if (word.word !== '') {
+            if (SESSION != null) {
                 SESSION.words.push({
                     type: 'text',
                     value: word.word,
@@ -309,8 +309,10 @@ export class TranscriberSession {
                     end_ts,
                     confidence: 1.0,
                 })
+            } else {
+                console.error('[handleResult]', 'SESSION is null')
             }
         }
-        console.log('[handleResult]', new Date(), words.length)
     }
+    console.log('[handleResult]', new Date(), words.length)
 }
