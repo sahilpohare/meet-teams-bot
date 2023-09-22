@@ -9,22 +9,15 @@ import { trySummarizeNext, summarizeWorker } from './summarizeWorker'
 import { calcHighlights, highlightWorker } from './highlightWorker'
 import RecordRTC, { StereoAudioRecorder } from 'recordrtc'
 
-const tryOrLog = async <T>(message: string, fn: () => Promise<T>) => {
-    try {
-        await fn()
-    } catch (e) {
-        console.error(message, e)
-    }
-}
-
 /**
  * Transcribes an audio stream using the recognizer of the underlying Node server.
  */
+
 export class Transcriber {
-    static STOPPED = false
-    private static TRANSCRIBER: Transcriber | undefined
-    private static TRANSCRIBER_SESSION: TranscriberSession | undefined
-    private static rebootTimer: NodeJS.Timer
+    static TRANSCRIBER: Transcriber | undefined
+    public stopped = false
+    private transcriber_session: TranscriberSession | undefined
+    private rebootTimer: NodeJS.Timer
     private audioStream: MediaStream
     private wordPosterWorker: Promise<void>
     private summarizeWorker: Promise<void>
@@ -33,42 +26,35 @@ export class Transcriber {
     private transcribeQueue: asyncLib.QueueObject<() => void>
     /** Inits the transcriber. */
     static async init(audioStream: MediaStream): Promise<void> {
-        if (Transcriber.TRANSCRIBER != null) throw 'Transcriber already inited'
-
         Transcriber.TRANSCRIBER = new Transcriber(audioStream)
-        Transcriber.TRANSCRIBER.launchWorkers()
-        Transcriber.TRANSCRIBER_SESSION = new TranscriberSession(
-            audioStream,
-            this.onResult,
-        )
+        await Transcriber.TRANSCRIBER.start(audioStream)
+    }
+    async start(audioStream: MediaStream): Promise<void> {
+        this.launchWorkers()
+        this.transcriber_session = new TranscriberSession(audioStream)
 
-        Transcriber.TRANSCRIBER_SESSION.startRecorder()
-        Transcriber.rebootTimer = setInterval(
-            () => Transcriber.reboot(),
+        this.transcriber_session.startRecorder()
+        this.rebootTimer = setInterval(
+            () => this.reboot(),
             // restart transcription every 9 minutes as microsoft token expriration
             60_000 * 3,
         )
     }
 
     /** Stops and restarts the recorder (to free some memory) and the recognizer (to update its tokens and language). */
-    static async reboot(): Promise<void> {
-        if (Transcriber.TRANSCRIBER == null) throw 'Transcriber not inited'
-
+    async reboot(): Promise<void> {
         // We reboot the recorder as well to (hopefully) reduce memory usage
         // We restart instantly to (hopefully) resume where we just left off
         let newTranscriber
         try {
-            newTranscriber = new TranscriberSession(
-                Transcriber.TRANSCRIBER.audioStream.clone(),
-                this.onResult,
-            )
+            newTranscriber = new TranscriberSession(this.audioStream.clone())
             newTranscriber.startRecorder()
             console.log('[reboot]', 'newTranscriber = new TranscriberSession')
         } catch (e) {
             console.error('[reboot]', 'error stopping recorder', e)
         }
-        const transcriberSession = Transcriber.TRANSCRIBER_SESSION
-        Transcriber.TRANSCRIBER.transcribeQueue.push(async () => {
+        const transcriberSession = this.transcriber_session
+        this.transcribeQueue.push(async () => {
             try {
                 console.log(
                     '[reboot]',
@@ -84,59 +70,48 @@ export class Transcriber {
             }
         })
         // Reboot the recognizer (audio data is buffered in the meantime)
-        this.TRANSCRIBER_SESSION = newTranscriber
+        this.transcriber_session = newTranscriber
     }
 
     /**  Ends the transcribing, and destroys resources. */
-    static async stop(): Promise<void> {
-        if (Transcriber.TRANSCRIBER == null) throw 'Transcriber not inited'
+    async stop(): Promise<void> {
+        clearInterval(this.rebootTimer)
+        try {
+            await this.transcriber_session?.stopRecorder()
+        } catch (e) {
+            console.error('[stop]', 'error stopping recorder', e)
+        }
 
-        clearInterval(Transcriber.rebootTimer)
-        tryOrLog(
-            'Stop transcription',
-            async () => await Transcriber.TRANSCRIBER_SESSION?.stopRecorder(),
-        )
-
-        Transcriber.TRANSCRIBER.transcribeQueue.push(async () => {
+        this.transcribeQueue.push(async () => {
             return
         })
 
-        console.log(
-            '[stop]',
-            'before Transcriber.TRANSCRIBER.transcribeQueue drain',
-        )
-        await Transcriber.TRANSCRIBER.transcribeQueue.drain()
-        console.log(
-            '[stop]',
-            'after Transcriber.TRANSCRIBER.transcribeQueue drain',
-        )
+        await this.transcribeQueue.drain()
 
         // Retreive last results that weren't polled
     }
 
     /** Waits for the workers to finish, and destroys the transcbriber. */
-    static async waitUntilComplete(): Promise<void> {
-        if (Transcriber.TRANSCRIBER == null) throw 'Transcriber not inited'
+    async waitUntilComplete(): Promise<void> {
+        this.stopped = true
 
-        Transcriber.STOPPED = true
-
-        await Transcriber.TRANSCRIBER.wordPosterWorker
+        await this.wordPosterWorker
 
         if (
             SESSION?.project.id &&
             R.all((v) => v.words.length === 0, SESSION.video_informations)
         ) {
-            tryOrLog(
-                'Patching project',
-                async () =>
-                    await api.patchProject({
-                        id: SESSION?.project.id,
-                        no_transcript: true,
-                    }),
-            )
+            try {
+                await api.patchProject({
+                    id: SESSION?.project.id,
+                    no_transcript: true,
+                })
+            } catch (e) {
+                console.error('[waitUntilComplete]', 'error patching project')
+            }
         }
 
-        tryOrLog('Set transcription as complete', async () => {
+        try {
             if (!SESSION) return
 
             for (const infos of SESSION.video_informations) {
@@ -150,43 +125,50 @@ export class Transcriber {
                     video.transcription_completed = true
                 }
             }
-        })
+        } catch (e) {
+            console.error('[waitUntilComplete]', 'error patching video')
+        }
 
-        await Transcriber.TRANSCRIBER.summarizeWorker
-        await Transcriber.TRANSCRIBER.highlightWorker
+        await this.summarizeWorker
+        await this.highlightWorker
 
         while (await trySummarizeNext(true)) {}
 
-        tryOrLog('Calculate highlights', async () => await calcHighlights(true))
-
-        if (SESSION) {
-            tryOrLog(
-                'Patch asset',
-                async () =>
-                    await api.patchAsset({
-                        id: SESSION?.asset.id,
-                        uploading: false,
-                    }),
-            )
-            tryOrLog(
-                'Send worker message (new spoke)',
-                async () =>
-                    await api.workerSendMessage({
-                        NewSpoke: {
-                            project_id: SESSION?.project.id,
-                            user: { id: parameters.user_id },
-                        },
-                    }),
-            )
+        try {
+            await calcHighlights(true)
+        } catch (e) {
+            console.error('[waitUntilComplete]', 'error calcHighlights')
         }
 
-        // Release memory (?)
-        Transcriber.TRANSCRIBER = undefined
+        if (SESSION) {
+            try {
+                await api.patchAsset({
+                    id: SESSION?.asset.id,
+                    uploading: false,
+                })
+            } catch (e) {
+                console.error('[waitUntilComplete]', 'error patching asset')
+            }
+            try {
+                await api.workerSendMessage({
+                    NewSpoke: {
+                        project_id: SESSION?.project.id,
+                        user: { id: parameters.user_id },
+                    },
+                })
+            } catch (e) {
+                console.error(
+                    '[waitUntilComplete]',
+                    'error worker send message',
+                )
+            }
+        }
     }
 
     /** Returns a new `Transcriber`. */
     private constructor(audioStream: MediaStream) {
         this.audioStream = audioStream
+        this.rebootTimer = setTimeout(() => {}, 0)
 
         this.transcribeQueue = newTranscribeQueue()
         // Simply not to have undefined properties
@@ -202,94 +184,19 @@ export class Transcriber {
         this.highlightWorker = highlightWorker()
     }
     /** Gets and handles recognizer results every `interval` ms. */
-
-    /** Gets and handles recognizer results. */
-    private static async onResult(
-        json: GladiaResult,
-        offset: number,
-    ): Promise<void> {
-        for (const prediction of json.prediction) {
-            const language = prediction.language
-            const words = prediction.words
-
-            if (language) {
-                Transcriber.handleLanguage(language)
-            }
-
-            if (words) {
-                Transcriber.handleResult(words, offset)
-            }
-        }
-    }
-
-    /** Handles detected language. */
-    private static async handleLanguage(language: string): Promise<void> {
-        if (language === '' || parameters.language === language) return
-        const googleLang = gladiaToGoogleLang(language) ?? 'en-US'
-
-        parameters.language = googleLang
-        //await api.notifyApp(parameters.user_token, {
-        //    message: 'LangDetected',
-        //    user_id: parameters.user_id,
-        //    payload: { language },
-        //})
-    }
-
-    /** Handles detected language. */
-    private static async handleResult(
-        words: {
-            time_begin: number
-            time_end: number
-            word: string
-        }[],
-        offset: number,
-    ): Promise<void> {
-        if (!(SESSION && offset !== 0 && START_RECORD_OFFSET !== 0)) return
-
-        console.log('[handleResult] offset from start of video: ', words)
-        console.log(
-            '[handleResult] offset from start of video: ',
-            (offset - START_RECORD_OFFSET) / 1_000,
-        )
-        for (let [i, word] of words.entries()) {
-            let ts = word.time_begin
-            let end_ts = word.time_end
-            ts += offset - START_RECORD_OFFSET
-            end_ts += offset - START_RECORD_OFFSET
-            console.log('[handleResult]', word)
-            if (word.word !== '') {
-                SESSION.words.push({
-                    type: 'text',
-                    value: word.word,
-                    ts,
-                    end_ts,
-                    confidence: 1.0,
-                })
-            }
-        }
-        console.log('[handleResult]', new Date(), words.length)
-    }
 }
 
 export class TranscriberSession {
     private recorder: RecordRTC | undefined
     private offset: number
-    private bufferAudioData: boolean
-    private bufferedAudioData: ArrayBuffer[]
-    private queue: asyncLib.AsyncQueue<() => Promise<void>>
     private audioStream: MediaStream
     private sampleRate: number
-    private onResult: any
 
-    constructor(audioStream: MediaStream, onResult: any) {
-        this.queue = newSerialQueue()
+    constructor(audioStream: MediaStream) {
         this.audioStream = audioStream
         this.sampleRate =
             audioStream.getAudioTracks()[0].getSettings().sampleRate ?? 0
         this.offset = 0
-        this.bufferAudioData = true
-        this.bufferedAudioData = []
-        this.onResult = onResult
     }
     /** Starts the recorder. */
     startRecorder(): void {
@@ -299,7 +206,6 @@ export class TranscriberSession {
         // We also use a queue to make sure writes to the recognizer are sequential
         // (recorder.ondataavailable does not await...)
 
-        this.bufferAudioData = true
         this.recorder = new RecordRTC(this.audioStream, {
             type: 'audio',
             mimeType: 'audio/webm;codecs=pcm', // endpoint requires 16bit PCM audio
@@ -335,8 +241,7 @@ export class TranscriberSession {
                             parameters.vocabulary,
                         )
                         console.log('[stopRecorder]', res)
-                        console.log('[stopRecorder]', this.onResult)
-                        this.onResult(res, this.offset)
+                        TranscriberSession.onResult(res, this.offset)
                     } catch (e) {
                         console.error('an error occured calling gladia, ', e)
                     }
@@ -344,5 +249,68 @@ export class TranscriberSession {
                 resolve()
             })
         })
+    }
+    /** Gets and handles recognizer results. */
+    private static onResult(json: GladiaResult, offset: number): void {
+        for (const prediction of json.prediction) {
+            const language = prediction.language
+            const words = prediction.words
+
+            if (language) {
+                TranscriberSession.handleLanguage(language)
+            }
+
+            if (words) {
+                TranscriberSession.handleResult(words, offset)
+            }
+        }
+    }
+
+    /** Handles detected language. */
+    private static handleLanguage(language: string): void {
+        if (language === '' || parameters.language === language) return
+        const googleLang = gladiaToGoogleLang(language) ?? 'en-US'
+
+        parameters.language = googleLang
+        //await api.notifyApp(parameters.user_token, {
+        //    message: 'LangDetected',
+        //    user_id: parameters.user_id,
+        //    payload: { language },
+        //})
+    }
+
+    /** Handles detected language. */
+    private static handleResult(
+        words: {
+            time_begin: number
+            time_end: number
+            word: string
+        }[],
+        offset: number,
+    ): void {
+        if (!(SESSION && offset !== 0 && START_RECORD_OFFSET !== 0)) return
+
+        console.log('[handleResult] offset from start of video: ', words)
+        console.log(
+            '[handleResult] offset from start of video: ',
+            (offset - START_RECORD_OFFSET) / 1_000,
+        )
+        for (let [i, word] of words.entries()) {
+            let ts = word.time_begin
+            let end_ts = word.time_end
+            ts += offset - START_RECORD_OFFSET
+            end_ts += offset - START_RECORD_OFFSET
+            //console.log('[handleResult]', word)
+            if (word.word !== '') {
+                SESSION.words.push({
+                    type: 'text',
+                    value: word.word,
+                    ts,
+                    end_ts,
+                    confidence: 1.0,
+                })
+            }
+        }
+        console.log('[handleResult]', new Date(), words.length)
     }
 }

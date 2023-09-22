@@ -18,9 +18,7 @@ import { sleep } from './utils'
 import { notifyApp } from './calendar'
 import { exit } from 'process'
 
-
 console.log('version 1.0')
-
 ;(async () => {
     if (process.argv[2]?.includes('get_extension_id')) {
         getExtensionId().then((x) => console.log(x))
@@ -81,6 +79,11 @@ console.log('version 1.0')
             console.error('fail delete session in redis: ', e)
         }
         if (LOCK_INSTANCE_AT_STARTUP) {
+            try {
+                await consumer.deleteQueue()
+            } catch (e) {
+                console.error('fail to delete queue', e)
+            }
             await terminateInstance()
         }
         console.log('exiting instance')

@@ -132,12 +132,12 @@ export async function startRecording(
 
 export async function stopMediaRecorder() {
     await record.stop()
-    await Transcriber.stop()
+    await Transcriber.TRANSCRIBER?.stop()
 }
 
 export async function waitForUpload() {
     await record.waitUntilComplete()
-    await Transcriber.waitUntilComplete()
+    await Transcriber.TRANSCRIBER?.waitUntilComplete()
 }
 
 export async function markMoment(
@@ -176,19 +176,10 @@ export async function changeAgenda(data: ChangeAgenda) {
         }
     }
 }
-export async function changeLanguage(data: ChangeLanguage) {
-    console.log('[changeLnaugage]', data)
-    if (State.parameters.language !== data.language) {
-        State.changeLanguage(data)
-        await Transcriber.reboot()
-    }
-}
-
 const w = window as any
 w.startRecording = startRecording
 w.markMoment = markMoment
 w.stopMediaRecorder = stopMediaRecorder
 w.waitForUpload = waitForUpload
-w.changeLanguage = changeLanguage
 w.changeAgenda = changeAgenda
 w.getAgenda = getAgenda

@@ -19,7 +19,7 @@ let EMPTY_LABEL: Label | null = null
 export async function highlightWorker(): Promise<void> {
     let i = 0
 
-    while (!Transcriber.STOPPED) {
+    while (!Transcriber.TRANSCRIBER?.stopped) {
         if (SESSION) {
             if (i % 100 === 0) {
                 try {
@@ -168,10 +168,13 @@ function collectSentenceToHighlight(
             next_index_to_highlight = i + 1
         }
         // console.log('[collectSentenceToHighlight]', res.length, endTime, endTime - startTime, isFinal)
+        // for chrome extension
+        const min_to_highlight =
+            parameters.meeting_provider === 'Meet' ? 180_000 : MIN_TO_HIGHLIGHT
         if (
             res.length !== 0 &&
             endTime !== -1 &&
-            (endTime - startTime > MIN_TO_HIGHLIGHT || isFinal)
+            (endTime - startTime > min_to_highlight || isFinal)
         ) {
             SESSION.next_editor_index_to_highlight = next_index_to_highlight
             return [res, startTime, endTime]
