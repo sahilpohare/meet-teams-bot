@@ -210,7 +210,9 @@ export async function joinMeeting(
     await clickWithInnerText(page, 'button', 'View', 1)
     await sleep(1000)
 
-    await clickWithInnerText(page, 'button', 'Speaker', 300)
+    if (!(await clickWithInnerText(page, 'button', 'Speaker', 300))) {
+        throw 'timeout accepting the bot'
+    }
 }
 
 export async function waitForEndMeeting(
