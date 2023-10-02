@@ -119,11 +119,12 @@ export async function clickWithInnerText(
     innerText: string,
     iterations?: number,
     click: boolean = true,
-) {
+): Promise<boolean> {
     let i = 0
     iterations = iterations ?? 10
     let continueButton = false
     while (!continueButton && i < iterations) {
+        console.log(i)
         try {
             continueButton = await page.evaluate(
                 (innerText, htmlType, i, click) => {
@@ -203,7 +204,7 @@ export async function joinMeeting(
 
     // wait for the view button
     if (!(await clickWithInnerText(page, 'button', 'View', 900, false))) {
-        return
+        throw 'timeout accepting the bot'
     }
     await sleep(2000)
     // once the view button is found reclick on it
