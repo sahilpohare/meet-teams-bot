@@ -122,7 +122,7 @@ export type MeetingParams = {
     email: string
     meetingProvider: MeetingProvider
     api_server_baseurl?: string
-    api_download_baseurl?: string
+    api_bot_baseurl?: string
     event?: { id: number }
     agenda?: Agenda
     bot_branding: boolean
@@ -253,7 +253,7 @@ export async function startRecordMeeting(meetingParams: MeetingParams) {
         listenPage(CURRENT_MEETING.meeting.backgroundPage)
 
         meetingParams.api_server_baseurl = process.env.API_SERVER_BASEURL
-        meetingParams.api_download_baseurl = process.env.API_DOWNLOAD_BASEURL
+        meetingParams.api_bot_baseurl = process.env.API_BOT_BASEURL
 
         const project = await CURRENT_MEETING.meeting.backgroundPage.evaluate(
             async (meetingParams) => {

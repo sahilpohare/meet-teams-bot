@@ -12,7 +12,7 @@ export type MeetingParams = {
     meeting_url: string
     meetingProvider: MeetingProvider
     api_server_baseurl: string
-    api_download_baseurl: string
+    api_bot_baseurl: string
     session_id: string
     agenda?: Agenda
     vocabulary: string[]
@@ -29,7 +29,7 @@ export type State = {
     meeting_url: string
     meeting_provider: MeetingProvider
     api_server_baseurl: string
-    api_download_baseurl: string
+    api_bot_baseurl: string
     session_id: string
     user_id: number
     agenda?: Agenda
@@ -48,7 +48,7 @@ export const parameters: State = {
     },
     rev_vocabulary_id: undefined,
     api_server_baseurl: '',
-    api_download_baseurl: '',
+    api_bot_baseurl: '',
     bot_name: 'spoke',
     language: 'en-US',
     markers: [],
@@ -71,7 +71,7 @@ export function addMeetingParams(meetingParams: MeetingParams) {
     parameters.meeting_url = meetingParams.meeting_url
     parameters.meeting_provider = meetingParams.meetingProvider
     parameters.api_server_baseurl = meetingParams.api_server_baseurl
-    parameters.api_download_baseurl = meetingParams.api_download_baseurl
+    parameters.api_bot_baseurl = meetingParams.api_bot_baseurl
     parameters.session_id = meetingParams.session_id
     parameters.user_id = meetingParams.user_id
     parameters.agenda = meetingParams.agenda
