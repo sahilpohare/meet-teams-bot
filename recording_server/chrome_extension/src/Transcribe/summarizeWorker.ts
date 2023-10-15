@@ -13,7 +13,7 @@ import {
     Label,
 } from 'spoke_api_js'
 
-const MIN_TOKEN_GPT4 = 500
+const MIN_TOKEN_GPT4 = 1500
 const CONTEXT: AutoHighlightResponse = { clips: [] }
 
 export async function summarizeWorker(): Promise<void> {
