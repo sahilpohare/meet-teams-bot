@@ -394,7 +394,8 @@ export async function sendDataChunks(
             } catch (e) {
                 await setUploadError(
                     spokeSession.asset.id,
-                    (e as any)?.response?.data ?? e,
+                    (e as any)?.response?.data ??
+                        'An error occured while uploading the video',
                 )
                 console.log('Error in upload chunk killing')
                 spokeSession.upload_queue.kill()
