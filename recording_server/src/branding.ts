@@ -19,7 +19,6 @@ export function generateBranding(botname: string, custom_branding_path?: string)
                 command.kill()
             }
         }
-        // }))
     } catch (e) {
         console.error('fail to generate branding ', e)
         return null
@@ -28,10 +27,9 @@ export function generateBranding(botname: string, custom_branding_path?: string)
 
 export function playBranding(): BrandingHandle {
     try {
-        // await (new Promise<void>((res, _rej) => {
+        // TODO 1280 rg 1240
+        const command = spawn('ffmpeg', ["-stream_loop", "-1", "-re", "-i", "../banding_with_botname.mp4", "-f", "v4l2", "-vcodec", "rawvideo", "-s", "1240x720", "/dev/video10"])
 
-        const command = spawn('ffmpeg', ["-stream_loop", "-1", "-re", "-i", "../branding_with_botname.mp4", "-f", "v4l2", "-vcodec", "rawvideo", "-s", "1240x720", "/dev/video10"])
-        // command.stderr.addListener("data", data => { console.log(data.toString()); });
         return {
             wait: new Promise<void>((res, _rej) => {
                 command.on('close', () => {
@@ -43,7 +41,6 @@ export function playBranding(): BrandingHandle {
                 command.kill("SIGKILL")
             }
         }
-        // }))
     } catch (e) {
         console.error('fail to generate branding ', e)
         return null
