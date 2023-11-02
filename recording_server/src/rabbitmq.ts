@@ -60,7 +60,7 @@ export class Consumer {
                         } catch (e) {
                             error = e
                         }
-                        //TODO: retry in rabbitmq
+                        // TODO: retry in rabbitmq
                         this.channel.ack(message)
                         resolve({ params: meetingParams, error: error })
                     } else {

@@ -110,12 +110,13 @@ export type StatusParams = {
     user_id: number
 }
 
+export type BotBrandingType = 'none' | 'default' | 'custom' | 'favicon'
+
 export type MeetingParams = {
     use_my_vocabulary: boolean
     language: string
     meeting_url: string
     user_token: string
-    bot_name: string
     project_name: string
     user_id: number
     session_id: string
@@ -125,10 +126,12 @@ export type MeetingParams = {
     api_bot_baseurl?: string
     event?: { id: number }
     agenda?: Agenda
-    bot_branding: boolean
     has_installed_extension: boolean
-    custom_branding_bot_path: string
     vocabulary: string[]
+    bot_branding_name: string
+    bot_branding_type: BotBrandingType
+    bot_branding_custom?: string
+    bot_branding_favicon?: string
 }
 
 export type MarkMomentParams = {
@@ -200,13 +203,19 @@ export async function startRecordMeeting(meetingParams: MeetingParams) {
     CURRENT_MEETING.param = meetingParams
 
     try {
-        if (
-            meetingParams.bot_branding ||
-            meetingParams.custom_branding_bot_path
-        ) {
+        if (meetingParams.bot_branding_type != 'none') {
             CURRENT_MEETING.brandingGenerateProcess = generateBranding(
-                meetingParams.bot_name,
-                meetingParams.custom_branding_bot_path,
+                meetingParams.bot_branding_name,
+                (() => {
+                    switch (meetingParams.bot_branding_type) {
+                        case 'default':
+                            return undefined
+                        case 'custom':
+                            return meetingParams.bot_branding_custom
+                        case 'favicon':
+                            return meetingParams.bot_branding_favicon
+                    }
+                })()
             )
             await CURRENT_MEETING.brandingGenerateProcess.wait
             CURRENT_MEETING.brandingPlayProcess = playBranding()
@@ -230,7 +239,7 @@ export async function startRecordMeeting(meetingParams: MeetingParams) {
             meetingId,
             password,
             0,
-            meetingParams.bot_name,
+            meetingParams.bot_branding_name,
         )
         CURRENT_MEETING.logger.info('Meeting link found', { meetingLink })
 
