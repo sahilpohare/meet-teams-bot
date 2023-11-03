@@ -128,10 +128,9 @@ export type MeetingParams = {
     agenda?: Agenda
     has_installed_extension: boolean
     vocabulary: string[]
-    bot_branding_name: string
-    bot_branding_type: BotBrandingType
-    bot_branding_custom?: string
-    bot_branding_favicon?: string
+    bot_name: string
+    bot_branding: boolean
+    custom_branding_bot_path?: string
 }
 
 export type MarkMomentParams = {
@@ -203,19 +202,10 @@ export async function startRecordMeeting(meetingParams: MeetingParams) {
     CURRENT_MEETING.param = meetingParams
 
     try {
-        if (meetingParams.bot_branding_type != 'none') {
+        if (meetingParams.bot_branding) {
             CURRENT_MEETING.brandingGenerateProcess = generateBranding(
-                meetingParams.bot_branding_name,
-                (() => {
-                    switch (meetingParams.bot_branding_type) {
-                        case 'default':
-                            return undefined
-                        case 'custom':
-                            return meetingParams.bot_branding_custom
-                        case 'favicon':
-                            return meetingParams.bot_branding_favicon
-                    }
-                })()
+                meetingParams.bot_name,
+                meetingParams.custom_branding_bot_path,
             )
             await CURRENT_MEETING.brandingGenerateProcess.wait
             CURRENT_MEETING.brandingPlayProcess = playBranding()
@@ -239,7 +229,7 @@ export async function startRecordMeeting(meetingParams: MeetingParams) {
             meetingId,
             password,
             0,
-            meetingParams.bot_branding_name,
+            meetingParams.bot_name,
         )
         CURRENT_MEETING.logger.info('Meeting link found', { meetingLink })
 
