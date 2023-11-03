@@ -110,13 +110,12 @@ export type StatusParams = {
     user_id: number
 }
 
-export type BotBrandingType = 'none' | 'default' | 'custom' | 'favicon'
-
 export type MeetingParams = {
     use_my_vocabulary: boolean
     language: string
     meeting_url: string
     user_token: string
+    bot_name: string
     project_name: string
     user_id: number
     session_id: string
@@ -126,11 +125,10 @@ export type MeetingParams = {
     api_bot_baseurl?: string
     event?: { id: number }
     agenda?: Agenda
-    has_installed_extension: boolean
-    vocabulary: string[]
-    bot_name: string
     bot_branding: boolean
+    has_installed_extension: boolean
     custom_branding_bot_path?: string
+    vocabulary: string[]
 }
 
 export type MarkMomentParams = {
