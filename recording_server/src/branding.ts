@@ -27,7 +27,8 @@ export function generateBranding(botname: string, custom_branding_path?: string)
 
 export function playBranding(): BrandingHandle {
     try {
-        const command = spawn('ffmpeg', ["-stream_loop", "-1", "-re", "-i", "../banding_with_botname.mp4", "-f", "v4l2", "-vcodec", "rawvideo", "-s", "1280x720", "/dev/video10"])
+        const command = spawn('ffmpeg', ["-stream_loop", "-1", "-re", "-i", "../branding.mp4", "-f", "v4l2", "-vcodec", "rawvideo", "-s", "1280x720", "/dev/video10"])
+        command.stderr.addListener("data", data => { console.log(data.toString()); });
 
         return {
             wait: new Promise<void>((res, _rej) => {
