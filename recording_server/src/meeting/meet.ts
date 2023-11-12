@@ -200,7 +200,17 @@ async function findShowEveryOne(page: puppeteer.Page, click: boolean) {
     }
 }
 
-async function findEndMeeting(page: Page): Promise<boolean> {
+async function countParticipants(page: Page): Promise<number> {
+    const count = await page.evaluate(() => {
+        const images = Array.from(document.querySelectorAll('img'))
+        return images.filter(
+            (img) => img.clientWidth === 32 && img.clientHeight === 32,
+        ).length
+    })
+    return count
+}
+
+async function removedFromMeeting(page: Page): Promise<boolean> {
     return await page.$$eval('div', (elems) => {
         for (const e of elems) {
             let elem = e as any
@@ -214,6 +224,26 @@ async function findEndMeeting(page: Page): Promise<boolean> {
         }
         return false
     })
+}
+
+async function findEndMeeting(page: Page): Promise<boolean> {
+    try {
+        if (await removedFromMeeting(page)) {
+            return true
+        }
+    } catch (e) {
+        console.error(e)
+    }
+    try {
+        const numberParticipants = await countParticipants(page)
+        //const numberOfBot = await numberOfBotInMeeting()
+        if (numberParticipants === 1) {
+            return true
+        }
+    } catch (e) {
+        console.error(e)
+    }
+    return false
 }
 
 export async function waitForEndMeeting(
