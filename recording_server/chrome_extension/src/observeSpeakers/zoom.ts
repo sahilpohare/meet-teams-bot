@@ -1,3 +1,5 @@
+import { Speaker } from '../observeSpeakers'
+
 export const MIN_SPEAKER_DURATION = 1000
 export const SPEAKER_LATENCY = 500
 
@@ -62,7 +64,10 @@ export async function getSpeakerRootToObserve(
     })
 }
 
-export function getSpeakerFromDocument(mutation): string[] {
+export function getSpeakerFromDocument(
+    currentSpeaker: string | null,
+    mutation,
+): Speaker[] {
     const speaker =
         getAvatarAndSpeaker(
             document.getElementsByClassName(
@@ -85,7 +90,7 @@ export function getSpeakerFromDocument(mutation): string[] {
             ),
         )
     if (speaker) {
-        return [speaker]
+        return [{ name: speaker, timestamp: Date.now() }]
     } else {
         return []
     }

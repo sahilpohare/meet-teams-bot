@@ -1,3 +1,4 @@
+import { Speaker } from '../observeSpeakers'
 import { sleep } from '../utils'
 
 export const MIN_SPEAKER_DURATION = 0
@@ -43,8 +44,9 @@ const config = {
 }
 
 export function getSpeakerFromDocument(
-    mutation: MutationRecord | null,
-): string[] {
+    currentSpeaker: string | null,
+    mutation,
+): Speaker[] {
     if (
         mutation != null &&
         mutation.type === 'attributes' &&
@@ -77,7 +79,9 @@ export function getSpeakerFromDocument(
                         .filter(([, value]) => value === true)
                         .map(([key]) => key)
 
-                    return currentSpeakers
+                    if (currentSpeaker != null) {
+                        return [{ name: currentSpeaker, timestamp: Date.now() }]
+                    }
                 }
             } else if (currentBorderColor.trim() !== 'rgb(127, 133, 245)') {
                 if (span != null && speaker != null && speaker.trim() !== '') {
@@ -88,7 +92,9 @@ export function getSpeakerFromDocument(
                         .filter(([, value]) => value === true)
                         .map(([key]) => key)
 
-                    return currentSpeakers
+                    if (currentSpeaker != null) {
+                        return [{ name: currentSpeaker, timestamp: Date.now() }]
+                    }
                 }
             }
         }

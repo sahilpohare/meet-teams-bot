@@ -1,5 +1,5 @@
 import * as R from 'ramda'
-type Speaker = {
+export type Speaker = {
     name: string
     timestamp: number
 }
@@ -97,24 +97,31 @@ async function observeSpeakers() {
             //     console.log('an exception occured in remove shity html', e)
             // }
             try {
-                const speakers = PROVIDER.getSpeakerFromDocument(mutation)
+                const speakers = PROVIDER.getSpeakerFromDocument(
+                    SPEAKERS.length > 0
+                        ? SPEAKERS[SPEAKERS.length - 1].name
+                        : null,
+                    mutation,
+                )
 
                 // const speakerName = getSpakerNameFromMutation(mutation)
                 // console.log(speakerName)
                 if (speakers.length > 0) {
                     const previousSpeaker = SPEAKERS[SPEAKERS.length - 1]
                     const speakersFiltered = R.filter(
-                        (u) => u !== BOT_NAME && u !== previousSpeaker.name,
+                        (u) =>
+                            u.name !== BOT_NAME &&
+                            u.name !== previousSpeaker.name,
                         speakers,
                     )
-                    const speakerName = speakersFiltered[0]
+                    const speaker = speakersFiltered[0]
                     const newSpeaker = {
-                        name: speakerName,
-                        timestamp: Date.now() - PROVIDER.SPEAKER_LATENCY,
+                        name: speaker.name,
+                        timestamp: speaker.timestamp - PROVIDER.SPEAKER_LATENCY,
                     }
 
-                    if (speakerName) {
-                        console.log({ speakerName })
+                    if (speaker) {
+                        console.log({ speaker })
                         const speakerDuration =
                             newSpeaker.timestamp - previousSpeaker.timestamp
                         if (speakerDuration < PROVIDER.MIN_SPEAKER_DURATION) {
@@ -131,10 +138,7 @@ async function observeSpeakers() {
                                 PROVIDER.MIN_SPEAKER_DURATION + 500,
                             )
                         } else {
-                            if (
-                                MEETING_PROVIDER === 'Zoom' ||
-                                MEETING_PROVIDER === 'Meet'
-                            ) {
+                            if (MEETING_PROVIDER === 'Zoom') {
                                 chrome.runtime.sendMessage({
                                     type: 'REFRESH_SPEAKERS',
                                     payload: SPEAKERS,
@@ -152,7 +156,7 @@ async function observeSpeakers() {
                                     payload: SPEAKERS,
                                 })
                             }
-                            console.log('speaker changed to: ', speakerName)
+                            console.log('speaker changed to: ', speaker)
                         }
                     } else {
                         console.log('no speaker change')
@@ -170,13 +174,13 @@ async function observeSpeakers() {
         // speaker-bar-container__video-frame speaker-bar-container__video-frame--active
         // Starts listening for changes in the root HTML element of the page.
         const speakers = R.filter(
-            (u) => u !== BOT_NAME,
-            PROVIDER.getSpeakerFromDocument(null),
+            (u) => u.name !== BOT_NAME,
+            PROVIDER.getSpeakerFromDocument(null, null),
         )
 
-        const speakerName = speakers[0]
-        if (speakerName) {
-            SPEAKERS.push({ timestamp: Date.now(), name: speakerName })
+        const speaker = speakers[0]
+        if (speaker) {
+            SPEAKERS.push(speaker)
             console.log(
                 '[ObserveSpeaker] inital speakers',
                 SPEAKERS[SPEAKERS.length - 1],

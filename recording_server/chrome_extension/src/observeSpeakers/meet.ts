@@ -1,5 +1,6 @@
+import { Speaker } from '../observeSpeakers'
 import { sleep } from '../utils'
-export const MIN_SPEAKER_DURATION = 3000
+export const MIN_SPEAKER_DURATION = 400
 export const SPEAKER_LATENCY = 500
 
 export async function getSpeakerRootToObserve(
@@ -112,6 +113,8 @@ export async function getSpeakerRootToObserve(
                 subtree: true,
                 attributeFilter: ['class'],
             })
+            // Set interval to log and reset speaker counts every 100 ms
+            setInterval(calcSpeaker, 100)
         } else {
             console.error('could not find root speaker to observe')
         }
@@ -119,7 +122,90 @@ export async function getSpeakerRootToObserve(
     }
 }
 
-export function getSpeakerFromDocument(mutation): string[] {
+// Function to reset speaker counts
+function resetSpeakerCounts() {
+    speakerCounts = new Map()
+}
+
+// Function to log speaker counts
+function calcSpeaker() {
+    console.log(speakerCounts)
+    let maxCount = 0
+    let maxSpeaker = ''
+
+    // Find the speaker with the maximum occurrences
+    speakerCounts.forEach((count, speaker) => {
+        if (count > maxCount) {
+            maxSpeaker = speaker
+            maxCount = count
+        }
+    })
+
+    // Only add to array if a speaker was found
+    if (maxSpeaker) {
+        const currentDate = Date.now()
+        maxOccurrences.push({
+            speaker: maxSpeaker,
+            timestamp: currentDate,
+            count: maxCount,
+        })
+    }
+    resetSpeakerCounts()
+}
+
+let maxOccurrences: { speaker: string; timestamp: number; count: number }[] = []
+
+let speakerCounts = new Map()
+
+export function getSpeakerFromDocument(
+    currentSpeaker: string | null,
+    mutation,
+): Speaker[] {
+    const speakers = getSpeakerFromMutation(mutation)
+    speakers.forEach((speaker) => {
+        speakerCounts.set(speaker, (speakerCounts.get(speaker) || 0) + 1)
+    })
+
+    console.log({ maxOccurrences })
+    // Check for more than 5 adjacent occurrences of a different speaker
+    for (let i = 0; i < maxOccurrences.length; i++) {
+        if (maxOccurrences[i].speaker !== currentSpeaker) {
+            let differentSpeaker = maxOccurrences[i]
+            let differentSpeakerCount = 0
+            for (let j = i; j < maxOccurrences.length; j++) {
+                if (maxOccurrences[j].speaker === differentSpeaker.speaker) {
+                    if (differentSpeakerCount > 5) {
+                        console.log(
+                            'different speaker count > 5',
+                            differentSpeakerCount,
+                            maxOccurrences,
+                        )
+                        // Return the speaker and timestamp, then crop the array
+                        console.log(
+                            `Speaker Changed: ${maxOccurrences[j].speaker} at ${maxOccurrences[j].timestamp}`,
+                        )
+                        maxOccurrences = maxOccurrences.slice(j)
+                        return [
+                            {
+                                name: differentSpeaker.speaker,
+                                timestamp: differentSpeaker.timestamp,
+                            },
+                        ]
+                    }
+                    differentSpeakerCount++
+                } else {
+                    break
+                }
+            }
+        }
+    }
+    if (maxOccurrences.length > 0) {
+        maxOccurrences = maxOccurrences.slice(-1)
+    }
+    return []
+}
+
+export function getSpeakerFromMutation(mutation): string[] {
     if (mutation == null) {
         return []
     }
@@ -178,7 +264,6 @@ export function getSpeakerFromDocument(mutation): string[] {
         return []
     }
 }
-
 function findSpeakerName(divSpeaker: any) {
     // Array.from(divSpeaker.querySelectorAll('span')).forEach(s => console.log(s.innerText))
     // console.log({ mutation })
