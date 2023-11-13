@@ -1,6 +1,6 @@
 import { Speaker } from '../observeSpeakers'
 import { sleep } from '../utils'
-export const MIN_SPEAKER_DURATION = 400
+export const MIN_SPEAKER_DURATION = 200
 export const SPEAKER_LATENCY = 500
 
 export async function getSpeakerRootToObserve(
@@ -129,7 +129,6 @@ function resetSpeakerCounts() {
 
 // Function to log speaker counts
 function calcSpeaker() {
-    console.log(speakerCounts)
     let maxCount = 0
     let maxSpeaker = ''
 
@@ -153,8 +152,10 @@ function calcSpeaker() {
     resetSpeakerCounts()
 }
 
+// Array to store the maximum occurrences of a speaker in a 100 ms interval
 let maxOccurrences: { speaker: string; timestamp: number; count: number }[] = []
 
+// Array to store current speaker count in this 100 ms interval
 let speakerCounts = new Map()
 
 export function getSpeakerFromDocument(
@@ -174,9 +175,9 @@ export function getSpeakerFromDocument(
             let differentSpeakerCount = 0
             for (let j = i; j < maxOccurrences.length; j++) {
                 if (maxOccurrences[j].speaker === differentSpeaker.speaker) {
-                    if (differentSpeakerCount > 5) {
+                    if (differentSpeakerCount >= 3) {
                         console.log(
-                            'different speaker count > 5',
+                            'different speaker count > 3',
                             differentSpeakerCount,
                             maxOccurrences,
                         )
@@ -200,7 +201,11 @@ export function getSpeakerFromDocument(
         }
     }
     if (maxOccurrences.length > 0) {
-        maxOccurrences = maxOccurrences.slice(-1)
+        if (
+            maxOccurrences[maxOccurrences.length - 1].speaker === currentSpeaker
+        ) {
+            maxOccurrences = maxOccurrences.slice(-1)
+        }
     }
     return []
 }
@@ -258,7 +263,6 @@ export function getSpeakerFromMutation(mutation): string[] {
             }
         }
         // })
-        console.log('SPEAKERS FOUND: ', speakers)
         return speakers
     } catch (e) {
         return []

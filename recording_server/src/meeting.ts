@@ -416,6 +416,12 @@ async function stopRecordingInternal(param: Session) {
             await w.stopMediaRecorder()
         })
         try {
+            await page.goto('about:blank')
+        } catch (e) {
+            console.error(e)
+        }
+
+        try {
             clearTimeout(meetingTimeoutInterval)
         } catch (e) {
             console.error(e)
