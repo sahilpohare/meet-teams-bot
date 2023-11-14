@@ -167,7 +167,6 @@ export function getSpeakerFromDocument(
         speakerCounts.set(speaker, (speakerCounts.get(speaker) || 0) + 1)
     })
 
-    console.log({ maxOccurrences })
     // Check for more than 5 adjacent occurrences of a different speaker
     for (let i = 0; i < maxOccurrences.length; i++) {
         if (maxOccurrences[i].speaker !== currentSpeaker) {
@@ -176,15 +175,6 @@ export function getSpeakerFromDocument(
             for (let j = i; j < maxOccurrences.length; j++) {
                 if (maxOccurrences[j].speaker === differentSpeaker.speaker) {
                     if (differentSpeakerCount >= 3) {
-                        console.log(
-                            'different speaker count > 3',
-                            differentSpeakerCount,
-                            maxOccurrences,
-                        )
-                        // Return the speaker and timestamp, then crop the array
-                        console.log(
-                            `Speaker Changed: ${maxOccurrences[j].speaker} at ${maxOccurrences[j].timestamp}`,
-                        )
                         maxOccurrences = maxOccurrences.slice(j)
                         return [
                             {
