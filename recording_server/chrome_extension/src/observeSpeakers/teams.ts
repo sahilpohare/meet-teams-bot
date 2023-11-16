@@ -132,3 +132,7 @@ export function removeShityHtml() {
         console.error('error in remove shitty html', e)
     }
 }
+
+export function findAllAttendees(): string[] {
+    return []
+}

@@ -10,6 +10,7 @@ type Speaker = {
 
 addListener()
 export let SPEAKERS: Speaker[] = []
+export let ATTENDEES: string[] = []
 
 export * from './state'
 import * as State from './state'
@@ -61,6 +62,10 @@ function addListener() {
         _sendResponse,
     ) {
         switch (request.type) {
+            case 'REFRESH_ATTENDEES': {
+                ATTENDEES = request.payload
+                break
+            }
             case 'REFRESH_SPEAKERS': {
                 SPEAKERS = request.payload
                 break
