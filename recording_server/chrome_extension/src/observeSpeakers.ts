@@ -91,11 +91,6 @@ async function observeSpeakers() {
             if (parameters.meeting_provider === 'Teams') {
                 PROVIDER.removeShityHtml()
             }
-            // try {
-            //     PROVIDER.removeShityHtml()
-            // } catch (e) {
-            //     console.log('an exception occured in remove shity html', e)
-            // }
             try {
                 const speakers = PROVIDER.getSpeakerFromDocument(
                     SPEAKERS.length > 0
@@ -104,8 +99,6 @@ async function observeSpeakers() {
                     mutation,
                 )
 
-                // const speakerName = getSpakerNameFromMutation(mutation)
-                // console.log(speakerName)
                 if (speakers.length > 0) {
                     const previousSpeaker = SPEAKERS[SPEAKERS.length - 1]
                     const speakersFiltered = R.filter(
@@ -121,10 +114,12 @@ async function observeSpeakers() {
                     }
 
                     if (speaker) {
-                        console.log({ speaker })
                         const speakerDuration =
                             newSpeaker.timestamp - previousSpeaker.timestamp
-                        if (speakerDuration < PROVIDER.MIN_SPEAKER_DURATION) {
+                        if (
+                            MEETING_PROVIDER !== 'Meet' &&
+                            speakerDuration < PROVIDER.MIN_SPEAKER_DURATION
+                        ) {
                             SPEAKERS[SPEAKERS.length - 1] = newSpeaker
                             if (
                                 SPEAKERS.length > 2 &&
