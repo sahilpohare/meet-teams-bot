@@ -1,4 +1,9 @@
-import { api, GladiaResult, gladiaToGoogleLang } from 'spoke_api_js'
+import {
+    api,
+    GladiaResult,
+    googleToGladia,
+    gladiaToGoogleLang,
+} from 'spoke_api_js'
 import * as R from 'ramda'
 import { parameters } from '../background'
 import { newSerialQueue, newTranscribeQueue } from '../queue'
@@ -239,6 +244,9 @@ export class TranscriberSession {
                         let res = await api.transcribeWithGladia(
                             blob,
                             parameters.vocabulary,
+                            parameters.force_lang === true
+                                ? googleToGladia(parameters.language)
+                                : undefined,
                         )
                         console.log('[stopRecorder]', res.prediction.length)
                         console.log('[stopRecorder]', onResult)

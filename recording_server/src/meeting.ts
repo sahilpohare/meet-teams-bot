@@ -129,6 +129,7 @@ export type MeetingParams = {
     has_installed_extension: boolean
     custom_branding_bot_path?: string
     vocabulary: string[]
+    force_lang: boolean
 }
 
 export type MarkMomentParams = {

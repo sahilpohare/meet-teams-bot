@@ -16,6 +16,7 @@ export type MeetingParams = {
     session_id: string
     agenda?: Agenda
     vocabulary: string[]
+    force_lang: boolean
 }
 
 export type State = {
@@ -34,6 +35,7 @@ export type State = {
     user_id: number
     agenda?: Agenda
     vocabulary: string[]
+    force_lang: boolean
 }
 
 export type Preferences = {
@@ -60,6 +62,7 @@ export const parameters: State = {
     user_id: 0,
     agenda: undefined,
     vocabulary: [],
+    force_lang: false,
 }
 
 export function addMeetingParams(meetingParams: MeetingParams) {
@@ -76,6 +79,7 @@ export function addMeetingParams(meetingParams: MeetingParams) {
     parameters.user_id = meetingParams.user_id
     parameters.agenda = meetingParams.agenda
     parameters.vocabulary = meetingParams.vocabulary
+    parameters.force_lang = meetingParams.force_lang
     console.log({ meetingParams })
     console.log({ parameters })
 }
