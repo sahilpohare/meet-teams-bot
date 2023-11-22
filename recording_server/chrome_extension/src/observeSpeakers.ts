@@ -108,12 +108,13 @@ async function observeSpeakers() {
                         speakers,
                     )
                     const speaker = speakersFiltered[0]
-                    const newSpeaker = {
-                        name: speaker.name,
-                        timestamp: speaker.timestamp - PROVIDER.SPEAKER_LATENCY,
-                    }
 
                     if (speaker) {
+                        const newSpeaker = {
+                            name: speaker.name,
+                            timestamp:
+                                speaker.timestamp - PROVIDER.SPEAKER_LATENCY,
+                        }
                         const speakerDuration =
                             newSpeaker.timestamp - previousSpeaker.timestamp
                         if (

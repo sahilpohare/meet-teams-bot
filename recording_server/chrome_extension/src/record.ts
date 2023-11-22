@@ -196,7 +196,7 @@ export async function startRecording(
     SESSION = newSession
 
     // console.log(`before media recorder start`)
-    MEDIA_RECORDER.start(3000)
+    MEDIA_RECORDER.start(1000)
     MEDIA_RECORDER.onerror = function (e) {
         console.error('media recorder error', e)
     }
@@ -283,6 +283,7 @@ async function unsetAllStream(): Promise<void> {
     STREAM?.getTracks().forEach((track) => track.stop())
     await CONTEXT?.close()
 }
+let LAST_SPEAKER_INDEX = 0
 
 const DURATION_MAX_SPEAKER = 180
 
@@ -294,18 +295,21 @@ function handleDataAvailable() {
         //        console.log('RECORDING TIMESTAMP', e.timecode)
 
         RECORDED_CHUNKS.push(e)
-        const lastSpeaker = SPEAKERS[SPEAKERS.length - 1]
-        const speakerChanged =
+        const lastSpeaker = SPEAKERS[LAST_SPEAKER_INDEX + 1]
+        console.log('[handleDataAvailable]', { lastSpeaker })
+        const durationSecond = (last - first) / 1000
+        if (
             first &&
             lastSpeaker &&
-            lastSpeaker.timestamp > first &&
-            lastSpeaker.timestamp < last
-        const durationSecond = (last - first) / 1000
-        if (first && speakerChanged && SPEAKERS.length >= 2) {
-            const prevSpeaker = SPEAKERS[SPEAKERS.length - 2]
+            SPEAKERS.length > LAST_SPEAKER_INDEX + 1 &&
+            SPEAKERS.length >= 2
+        ) {
+            const prevSpeaker = SPEAKERS[LAST_SPEAKER_INDEX]
+            console.log('[handleDataAvailable]', { prevSpeaker })
             const cutEndTimestamp = lastSpeaker.timestamp
             spokeSession.cut_times.push(cutEndTimestamp)
             handleChunk(first, cutEndTimestamp, false, prevSpeaker.name)
+            LAST_SPEAKER_INDEX += 1
         } else if (durationSecond && durationSecond > DURATION_MAX_SPEAKER) {
             const prevSpeaker = SPEAKERS[SPEAKERS.length - 1]
             const cutEndTimestamp = last
