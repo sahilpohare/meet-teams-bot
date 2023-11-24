@@ -70,18 +70,15 @@ export function getSpeakerFromDocument(
             'voice-level-stream-outline'
         ) {
             if (currentBorderColor.trim() === 'rgb(127, 133, 245)') {
-                console.log(targetElement)
+                console.log('[teams observe speaker]', targetElement)
                 if (span != null && speaker != null && speaker.trim() !== '') {
                     speakerStatus.set(speaker, true)
                     removeShityHtml()
                     console.log('Speaker started:', speaker)
                     let currentSpeakers = Array.from(speakerStatus.entries())
                         .filter(([, value]) => value === true)
-                        .map(([key]) => key)
-
-                    if (currentSpeaker != null) {
-                        return [{ name: currentSpeaker, timestamp: Date.now() }]
-                    }
+                        .map(([key]) => ({ name: key, timestamp: Date.now() }))
+                    return currentSpeakers
                 }
             } else if (currentBorderColor.trim() !== 'rgb(127, 133, 245)') {
                 if (span != null && speaker != null && speaker.trim() !== '') {
@@ -90,11 +87,9 @@ export function getSpeakerFromDocument(
                     console.log('Speaker stopped:', speaker)
                     let currentSpeakers = Array.from(speakerStatus.entries())
                         .filter(([, value]) => value === true)
-                        .map(([key]) => key)
+                        .map(([key]) => ({ name: key, timestamp: Date.now() }))
 
-                    if (currentSpeaker != null) {
-                        return [{ name: currentSpeaker, timestamp: Date.now() }]
-                    }
+                    return currentSpeakers
                 }
             }
         }
@@ -112,8 +107,6 @@ function getDocumentRoot() {
 }
 
 export function removeShityHtml() {
-    console.log('je repasse dans la divToFIlm')
-
     try {
         var documentInIframe = getDocumentRoot()!
         var menus = documentInIframe.querySelectorAll('[role="menu"]')
