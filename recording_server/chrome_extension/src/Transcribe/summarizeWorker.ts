@@ -61,8 +61,12 @@ async function detectClients(): Promise<string[]> {
                     if (
                         m.firstname != null &&
                         m.lastname != null &&
-                        attendee.includes(m.firstname) &&
-                        attendee.includes(m.lastname)
+                        attendee
+                            .toLowerCase()
+                            .includes(m.firstname.toLowerCase()) &&
+                        attendee
+                            .toLowerCase()
+                            .includes(m.lastname.toLowerCase())
                     ) {
                         clients = clients.filter((c) => c !== attendee)
                     }
@@ -239,7 +243,7 @@ async function autoHighlight(agenda: Agenda, sentences: Sentence[]) {
             sentences,
             lang: parameters.language,
             context: CONTEXT,
-            client_name: CLIENTS.join(', '),
+            client_name: CLIENTS.length > 0 ? CLIENTS.join(', ') : undefined,
         }
         const highlights: AutoHighlightResponse = await api.autoHighlight(res)
         CONTEXT.clips = R.concat(CONTEXT.clips, highlights.clips)

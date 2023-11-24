@@ -67,15 +67,19 @@ async function removeShityHtmlLoop() {
 
 async function refreshAttendeesLoop() {
     while (true) {
-        const allAttendees = R.filter(
-            (attendee) => attendee != BOT_NAME,
-            PROVIDER.findAllAttendees(),
-        )
-        console.log('refresh participants loop', allAttendees)
-        chrome.runtime.sendMessage({
-            type: 'REFRESH_ATTENDEES',
-            payload: allAttendees,
-        })
+        try {
+            const allAttendees = R.filter(
+                (attendee) => attendee != BOT_NAME,
+                PROVIDER.findAllAttendees(),
+            )
+            console.log('refresh participants loop', allAttendees)
+            chrome.runtime.sendMessage({
+                type: 'REFRESH_ATTENDEES',
+                payload: allAttendees,
+            })
+        } catch (e) {
+            console.error('an exception occured in refresh attendees', e)
+        }
         await sleep(10000)
     }
 }

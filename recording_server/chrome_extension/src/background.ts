@@ -63,7 +63,9 @@ function addListener() {
     ) {
         switch (request.type) {
             case 'REFRESH_ATTENDEES': {
-                ATTENDEES = request.payload
+                if (request.payload.length > ATTENDEES.length) {
+                    ATTENDEES = request.payload
+                }
                 break
             }
             case 'REFRESH_SPEAKERS': {
