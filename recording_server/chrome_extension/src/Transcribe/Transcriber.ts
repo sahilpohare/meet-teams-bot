@@ -10,7 +10,7 @@ import { newSerialQueue, newTranscribeQueue } from '../queue'
 import * as asyncLib from 'async'
 import { START_RECORD_OFFSET, SESSION, CONTEXT } from '../record'
 import { wordPosterWorker } from './wordPosterWorker'
-import { trySummarizeNext, summarizeWorker } from './summarizeWorker'
+import { summarizeWorker } from './summarizeWorker'
 import { calcHighlights, highlightWorker } from './highlightWorker'
 import RecordRTC, { StereoAudioRecorder } from 'recordrtc'
 
@@ -136,8 +136,6 @@ export class Transcriber {
 
         await this.summarizeWorker
         await this.highlightWorker
-
-        while (await trySummarizeNext(true)) {}
 
         try {
             await calcHighlights(true)

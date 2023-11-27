@@ -1,6 +1,6 @@
 import { Transcriber } from './Transcriber'
 import * as R from 'ramda'
-import { parameters } from '../background'
+import { ATTENDEES, parameters } from '../background'
 import { SESSION } from '../record'
 import { sleep } from '../utils'
 import {
@@ -11,6 +11,7 @@ import {
     AutoHighlightResponse,
     Sentence,
     Label,
+    Workspace,
 } from 'spoke_api_js'
 
 const MIN_TOKEN_GPT4 = 1500
@@ -18,12 +19,15 @@ const CONTEXT: AutoHighlightResponse = { clips: [] }
 
 export async function summarizeWorker(): Promise<void> {
     let i = 1
+    let isFirst = true
 
     while (!Transcriber.TRANSCRIBER?.stopped) {
         if (SESSION) {
             if (i % 10 === 0) {
                 try {
-                    await trySummarizeNext(false)
+                    if (await trySummarizeNext(isFirst, false)) {
+                        isFirst = false
+                    }
                 } catch (e) {
                     console.log(e, 'summarize failed')
                 }
@@ -33,13 +37,67 @@ export async function summarizeWorker(): Promise<void> {
 
         await sleep(3_000)
     }
+    try {
+        while (true) {
+            if (await trySummarizeNext(isFirst, true)) {
+                isFirst = false
+            } else {
+                break
+            }
+        }
+    } catch (e) {
+        console.error('summarize failed in summarize worker end')
+    }
 }
 
-export async function trySummarizeNext(isFinal: boolean): Promise<boolean> {
+// detect who is the client in the meeting and who is the spoker
+async function detectClients(): Promise<string[]> {
+    let clients = ATTENDEES
+    if (ATTENDEES.length > 0) {
+        const allWorkspaces: Workspace[] = await api.getAllWorkspaces()
+        for (const w of allWorkspaces) {
+            for (const m of w.members) {
+                for (const attendee of clients) {
+                    if (
+                        m.firstname != null &&
+                        m.lastname != null &&
+                        attendee
+                            .toLowerCase()
+                            .includes(m.firstname.toLowerCase()) &&
+                        attendee
+                            .toLowerCase()
+                            .includes(m.lastname.toLowerCase())
+                    ) {
+                        clients = clients.filter((c) => c !== attendee)
+                    }
+                }
+            }
+        }
+    }
+    return clients
+}
+
+let CLIENTS: string[] = []
+
+async function trySummarizeNext(
+    isFirst: boolean,
+    isFinal: boolean,
+): Promise<boolean> {
     if (SESSION) {
         const labels = parameters.agenda ? extractLabels(parameters.agenda) : []
         const collect = await collectSentenceToAutoHighlight(isFinal, labels)
 
+        if (isFirst && collect != null && collect.length > 0) {
+            try {
+                CLIENTS = await detectClients()
+                await api.patchProject({
+                    id: SESSION.project.id,
+                    client_name: CLIENTS.join(', '),
+                })
+            } catch (e) {
+                console.error('error detecting client', e)
+            }
+        }
         if (collect != null && collect.length > 0) {
             if (parameters.agenda) {
                 const agenda = await api.getAgendaWithId(parameters.agenda.id)
@@ -185,6 +243,7 @@ async function autoHighlight(agenda: Agenda, sentences: Sentence[]) {
             sentences,
             lang: parameters.language,
             context: CONTEXT,
+            client_name: CLIENTS.length > 0 ? CLIENTS.join(', ') : undefined,
         }
         const highlights: AutoHighlightResponse = await api.autoHighlight(res)
         CONTEXT.clips = R.concat(CONTEXT.clips, highlights.clips)

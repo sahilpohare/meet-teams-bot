@@ -19,7 +19,8 @@ let PROVIDER = {
     removeShityHtml: ZoomProvider.removeShityHtml,
     MIN_SPEAKER_DURATION: ZoomProvider.MIN_SPEAKER_DURATION,
     SPEAKER_LATENCY: ZoomProvider.SPEAKER_LATENCY,
-    getSpeakerRootToObserve: MeetProvider.getSpeakerRootToObserve,
+    getSpeakerRootToObserve: ZoomProvider.getSpeakerRootToObserve,
+    findAllAttendees: ZoomProvider.findAllAttendees,
 }
 
 setMeetingProvider()
@@ -33,6 +34,7 @@ function setMeetingProvider() {
             MIN_SPEAKER_DURATION: TeamsProvider.MIN_SPEAKER_DURATION,
             SPEAKER_LATENCY: TeamsProvider.SPEAKER_LATENCY,
             getSpeakerRootToObserve: TeamsProvider.getSpeakerRootToObserve,
+            findAllAttendees: TeamsProvider.findAllAttendees,
         }
     } else if (MEETING_PROVIDER === 'Meet') {
         PROVIDER = {
@@ -41,6 +43,7 @@ function setMeetingProvider() {
             MIN_SPEAKER_DURATION: MeetProvider.MIN_SPEAKER_DURATION,
             SPEAKER_LATENCY: MeetProvider.SPEAKER_LATENCY,
             getSpeakerRootToObserve: MeetProvider.getSpeakerRootToObserve,
+            findAllAttendees: MeetProvider.findAllAttendees,
         }
     } else {
         PROVIDER = {
@@ -49,6 +52,7 @@ function setMeetingProvider() {
             MIN_SPEAKER_DURATION: ZoomProvider.MIN_SPEAKER_DURATION,
             SPEAKER_LATENCY: ZoomProvider.SPEAKER_LATENCY,
             getSpeakerRootToObserve: ZoomProvider.getSpeakerRootToObserve,
+            findAllAttendees: ZoomProvider.findAllAttendees,
         }
     }
 }
@@ -60,11 +64,29 @@ async function removeShityHtmlLoop() {
         await sleep(1000)
     }
 }
+
+async function refreshAttendeesLoop() {
+    while (true) {
+        try {
+            const allAttendees = R.filter(
+                (attendee) => attendee != BOT_NAME,
+                PROVIDER.findAllAttendees(),
+            )
+            console.log('refresh participants loop', allAttendees)
+            chrome.runtime.sendMessage({
+                type: 'REFRESH_ATTENDEES',
+                payload: allAttendees,
+            })
+        } catch (e) {
+            console.error('an exception occured in refresh attendees', e)
+        }
+        await sleep(10000)
+    }
+}
 async function observeSpeakers() {
-    // console.log('repush')
     try {
         removeShityHtmlLoop()
-        // PROVIDER.removeShityHtml()
+        refreshAttendeesLoop()
     } catch (e) {
         console.log('an exception occured in remove shity html', e)
     }

@@ -317,3 +317,30 @@ export function removeShityHtml() {
     // let meetingControls = document.getElementsByClassName("calling-controls")
     // meetingControls[0].remove()
 }
+
+export function findAllAttendees(): string[] {
+    let images = document.querySelectorAll('img')
+
+    let participants = Array.from(images).filter(
+        (img) => img.clientWidth === 32 && img.clientHeight === 32,
+    )
+    const names: string[] = []
+    // https://www.lifewire.com/change-your-name-on-google-meet-5112077
+    for (const participant of participants) {
+        let currentElement: any = participant
+
+        while (currentElement) {
+            // Check if this parent has a child span
+            const span = currentElement.querySelector('span')
+            if (span) {
+                // Found a parent with a child span
+                names.push(span.innerText)
+                break
+            }
+
+            // Move to the next parent
+            currentElement = currentElement.parentElement
+        }
+    }
+    return names
+}

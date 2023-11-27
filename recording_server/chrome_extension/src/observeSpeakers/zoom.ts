@@ -262,3 +262,7 @@ export function removeShityHtml() {
     } catch (e) {}
     // fullScreenIcon[0].remove()
 }
+
+export function findAllAttendees(): string[] {
+    return []
+}
