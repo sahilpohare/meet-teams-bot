@@ -69,7 +69,9 @@ async function refreshAttendeesLoop() {
     while (true) {
         try {
             const allAttendees = R.filter(
-                (attendee) => attendee != BOT_NAME,
+                (attendee) =>
+                    attendee != BOT_NAME &&
+                    !attendee.toLowerCase().includes('notetaker'),
                 PROVIDER.findAllAttendees(),
             )
             console.log('refresh participants loop', allAttendees)
