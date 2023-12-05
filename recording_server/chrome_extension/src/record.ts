@@ -470,6 +470,21 @@ async function uploadEditorsTask(
     videoInformationIndex: number,
     videoInfo: VideoInformation,
 ) {
+    if (
+        spokeSession.project.complete_preview_path == null &&
+        videoInfo.tcout - videoInfo.tcin > MIN_DURTATION_EXTRACT
+    ) {
+        try {
+            const preview = await api.generatePreview(SESSION!.id)
+            spokeSession.project.complete_preview_path = preview.s3_path
+            await api.patchProject({
+                id: spokeSession.project.id,
+                complete_preview_path: preview.s3_path,
+            })
+        } catch (e) {
+            console.error('error generating preview: ', e)
+        }
+    }
     if (videoInfo.thumbnail_path == null) {
         if (
             videoInformationIndex > 0 &&
@@ -491,16 +506,6 @@ async function uploadEditorsTask(
                         extract.image_s3_path
                 } catch (e) {
                     console.error('error extracting image: ', e)
-                }
-                try {
-                    const preview = await api.generatePreview(SESSION!.id)
-
-                    await api.patchProject({
-                        id: spokeSession.project.id,
-                        complete_preview_path: preview.s3_path,
-                    })
-                } catch (e) {
-                    console.error('error generating preview: ', e)
                 }
             } else {
                 videoInfo.thumbnail_path = ''
