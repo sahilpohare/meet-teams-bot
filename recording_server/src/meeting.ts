@@ -195,6 +195,23 @@ export function setInitalParams(meetingParams: MeetingParams, logger: Logger) {
     CURRENT_MEETING.logger = logger
 }
 
+function meetingTimeout() {
+    CURRENT_MEETING.logger.info('stoping meeting tiemout reason')
+    try {
+        stopRecording('timeout')
+    } catch (e) {
+        console.error(e)
+    }
+    setTimeout(async () => {
+        CURRENT_MEETING.logger.info('killing process')
+        try {
+            await uploadLog()
+        } catch (e) {
+            console.error(e)
+        }
+        process.exit(0)
+    }, 5 * 60 * 1000)
+}
 // Starts the record
 // Returns when the bot is accepted in the meeting
 export async function startRecordMeeting(meetingParams: MeetingParams) {
@@ -239,7 +256,10 @@ export async function startRecordMeeting(meetingParams: MeetingParams) {
         CURRENT_MEETING.logger.info('meeting page opened')
 
         CURRENT_MEETING.meeting.meetingTimeoutInterval = setTimeout(
-            () => stopRecording('timeout'),
+            () => {
+                CURRENT_MEETING.logger.error('Meeting timeout')
+                meetingTimeout()
+            },
             4 * 60 * 60 * 1000, // 4 hours
         )
 
