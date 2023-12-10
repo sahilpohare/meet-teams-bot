@@ -70,9 +70,7 @@ type VideoSize = {
 }
 
 export async function initMediaRecorder(): Promise<void> {
-    const width = 1280
     const fps = 30
-    const height = 720
 
     return new Promise((resolve, reject) => {
         chrome.tabCapture.capture(
@@ -82,10 +80,6 @@ export async function initMediaRecorder(): Promise<void> {
                 videoConstraints: {
                     mandatory: {
                         chromeMediaSource: 'tab',
-                        minWidth: width,
-                        minHeight: height,
-                        maxWidth: width,
-                        maxHeight: height,
                         maxFrameRate: fps,
                     },
                 },

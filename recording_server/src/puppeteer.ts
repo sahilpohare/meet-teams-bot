@@ -14,7 +14,8 @@ const StealthPlugin = require('puppeteer-extra-plugin-stealth')
 const EXTENSION_NAME = 'spoke'
 // NOTE: local scripts sed this! (correct value: '<slash>usr<slash>bin<slash>google-chrome')
 // TODO: make an env for this, stop overriding with local scripts...
-const GOOGLE_CHROME_EXECTUTABLE_PATH = process.env.GOOGLE_CHROME_EXECTUTABLE_PATH || '/usr/bin/google-chrome'
+const GOOGLE_CHROME_EXECTUTABLE_PATH =
+    process.env.GOOGLE_CHROME_EXECTUTABLE_PATH || '/usr/bin/google-chrome'
 
 puppeteer.use(StealthPlugin())
 
@@ -163,9 +164,8 @@ export async function tryGetExtensionId() {
         'dist',
     )
     // const pathToExtension = getPathToExtension()
-    const width = 1280
-    // 120 is chrome interface
-    const height = 720 + 120
+    const width = 905
+    const height = 510 + 120
     const browser = await puppeteer.launch({
         args: [
             '--remote-debugging-address=0.0.0.0',
@@ -227,8 +227,8 @@ export async function tryOpenBrowser(extensionId: string): Promise<Browser> {
         'chrome_extension',
         'dist',
     )
-    const width = 1280
-    const height = 720 + 120
+    const width = 905
+    const height = 510 + 120
     const browser = await puppeteer.launch({
         args: [
             '--remote-debugging-address=0.0.0.0',
