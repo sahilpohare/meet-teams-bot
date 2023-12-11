@@ -4,6 +4,7 @@ import { LOGGER } from './server'
 import { LOCK_INSTANCE_AT_STARTUP, setProtection } from './instance'
 import { notify, notifyApp } from './calendar'
 import { setLoggerProjectId } from './logger'
+import axios from 'axios'
 
 const POD_NAME = process.env.POD_NAME
 
@@ -54,6 +55,25 @@ export class Consumer {
                         const meetingParams = JSON.parse(
                             message.content.toString(),
                         )
+
+                        // Ping /meeting_bot/received_message to record waiting time stats
+                        try {
+                            const url = `/meeting_bot/received_message?session_id=${meetingParams.session_id}`
+                            console.log(`POST ${url}`)
+                            await axios({
+                                method: 'POST',
+                                url,
+                                headers: {
+                                    Authorization: meetingParams.user_token,
+                                },
+                            })
+                        } catch (e) {
+                            console.error(
+                                'POST /meeting_bot/received_message FAILED',
+                                e,
+                            )
+                        }
+
                         let error = null
                         try {
                             await handler(meetingParams)

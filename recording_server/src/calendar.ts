@@ -1,5 +1,4 @@
 import { MeetingParams } from './meeting'
-
 import axios from 'axios'
 
 export async function patchEvent(user_token: string, payload: any) {
