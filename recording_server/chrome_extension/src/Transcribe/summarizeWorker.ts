@@ -12,6 +12,7 @@ import {
     Sentence,
     Label,
     Workspace,
+    DetectClientResponse,
 } from 'spoke_api_js'
 
 const MIN_TOKEN_GPT4 = 1500
@@ -51,7 +52,7 @@ export async function summarizeWorker(): Promise<void> {
 }
 
 // detect who is the client in the meeting and who is the spoker
-async function detectClients(): Promise<string[]> {
+async function detectClients(sentences: Sentence[]): Promise<string[]> {
     let clients = ATTENDEES
     if (ATTENDEES.length > 0) {
         const allWorkspaces: Workspace[] = await api.getAllWorkspaces()
@@ -73,8 +74,14 @@ async function detectClients(): Promise<string[]> {
                 }
             }
         }
+        return clients
+    } else {
+        const param: SummaryParam = {
+            sentences,
+        }
+        const res: DetectClientResponse = await api.detectClient(param)
+        return res.client_names
     }
-    return clients
 }
 
 let CLIENTS: string[] = []
@@ -89,7 +96,7 @@ async function trySummarizeNext(
 
         if (isFirst && collect != null && collect.length > 0) {
             try {
-                CLIENTS = await detectClients()
+                CLIENTS = await detectClients(collect)
                 await api.patchProject({
                     id: SESSION.project.id,
                     client_name: CLIENTS.join(', '),
