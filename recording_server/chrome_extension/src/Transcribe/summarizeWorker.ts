@@ -21,7 +21,7 @@ export async function summarizeWorker(): Promise<void> {
     let i = 1
     let isFirst = true
 
-    while (!Transcriber.TRANSCRIBER?.stopped) {
+    while (!Transcriber.TRANSCRIBER?.stopped && isFirst) {
         if (SESSION) {
             if (i % 10 === 0) {
                 try {
@@ -37,14 +37,9 @@ export async function summarizeWorker(): Promise<void> {
 
         await sleep(3_000)
     }
-    try {
-        await summarize()
-    } catch (e) {
-        console.error('summarize failed in summarize worker end')
-    }
 }
 
-async function summarize() {
+export async function summarize() {
     if (parameters.agenda) {
         const agenda = await api.getAgendaWithId(parameters.agenda.id)
 
@@ -69,7 +64,12 @@ async function summarize() {
 
 async function useNewAi(): Promise<boolean> {
     const workspaceId = SESSION?.project.workspace_id
+    if (workspaceId == null) {
+        console.error('workspaceId is null')
+        return false
+    }
     const subscriptions = await api.getSubscriptionInfos(workspaceId)
+    console.log('payer', subscriptions?.payer)
 
     return subscriptions?.payer.appsumoPlanId == null
 }
@@ -144,6 +144,7 @@ async function tryDetectClientAndTemplate(
                     payload: { agenda_id: parameters.agenda.id },
                 })
             }
+            return true
         }
     }
 

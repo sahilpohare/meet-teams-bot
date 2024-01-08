@@ -10,7 +10,7 @@ import { newSerialQueue, newTranscribeQueue } from '../queue'
 import * as asyncLib from 'async'
 import { START_RECORD_OFFSET, SESSION, CONTEXT } from '../record'
 import { wordPosterWorker } from './wordPosterWorker'
-import { summarizeWorker } from './summarizeWorker'
+import { summarize, summarizeWorker } from './summarizeWorker'
 import { calcHighlights, highlightWorker } from './highlightWorker'
 import RecordRTC, { StereoAudioRecorder } from 'recordrtc'
 
@@ -98,6 +98,7 @@ export class Transcriber {
 
     /** Waits for the workers to finish, and destroys the transcbriber. */
     async waitUntilComplete(): Promise<void> {
+        this.stopped = true
         await this.wordPosterWorker
 
         if (
@@ -131,9 +132,13 @@ export class Transcriber {
         } catch (e) {
             console.error('[waitUntilComplete]', 'error patching video')
         }
-
-        this.stopped = true
         await this.summarizeWorker
+
+        try {
+            await summarize()
+        } catch (e) {
+            console.error('summarize failed in summarize worker end')
+        }
         await this.highlightWorker
 
         try {
