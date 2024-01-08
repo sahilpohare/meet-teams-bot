@@ -15,8 +15,7 @@ import {
     DetectClientResponse,
 } from 'spoke_api_js'
 
-const MIN_TOKEN_GPT4 = 1500
-const CONTEXT: AutoHighlightResponse = { clips: [] }
+const MIN_TOKEN_GPT4 = 1000
 
 export async function summarizeWorker(): Promise<void> {
     let i = 1
@@ -26,7 +25,7 @@ export async function summarizeWorker(): Promise<void> {
         if (SESSION) {
             if (i % 10 === 0) {
                 try {
-                    if (await trySummarizeNext(isFirst, false)) {
+                    if (await tryDetectClientAndTemplate(isFirst, false)) {
                         isFirst = false
                     }
                 } catch (e) {
@@ -39,16 +38,40 @@ export async function summarizeWorker(): Promise<void> {
         await sleep(3_000)
     }
     try {
-        while (true) {
-            if (await trySummarizeNext(isFirst, true)) {
-                isFirst = false
-            } else {
-                break
-            }
-        }
+        await summarize()
     } catch (e) {
         console.error('summarize failed in summarize worker end')
     }
+}
+
+async function summarize() {
+    if (parameters.agenda) {
+        const agenda = await api.getAgendaWithId(parameters.agenda.id)
+
+        let useFunctionCalling = false
+        try {
+            useFunctionCalling = await useNewAi()
+        } catch (e) {
+            console.error('use useNewAi failed failed', e)
+        }
+        await autoHighlight(useFunctionCalling, agenda)
+        try {
+            await api.notifyApp(parameters.user_token, {
+                message: 'RefreshProject',
+                user_id: parameters.user_id,
+                payload: { project_id: SESSION?.project.id },
+            })
+        } catch (e) {
+            console.error('notify failed', e)
+        }
+    }
+}
+
+async function useNewAi(): Promise<boolean> {
+    const workspaceId = SESSION?.project.workspace_id
+    const subscriptions = await api.getSubscriptionInfos(workspaceId)
+
+    return subscriptions?.payer.appsumoPlanId == null
 }
 
 // detect who is the client in the meeting and who is the spoker
@@ -86,7 +109,7 @@ async function detectClients(sentences: Sentence[]): Promise<string[]> {
 
 let CLIENTS: string[] = []
 
-async function trySummarizeNext(
+async function tryDetectClientAndTemplate(
     isFirst: boolean,
     isFinal: boolean,
 ): Promise<boolean> {
@@ -104,14 +127,8 @@ async function trySummarizeNext(
             } catch (e) {
                 console.error('error detecting client', e)
             }
-        }
-        if (collect != null && collect.length > 0) {
-            if (parameters.agenda) {
-                const agenda = await api.getAgendaWithId(parameters.agenda.id)
-                await autoHighlight(agenda, collect)
-            } else {
+            if (!parameters.agenda) {
                 parameters.agenda = await detectTemplate(collect)
-
                 try {
                     await api.patchProject({
                         id: SESSION.project.id,
@@ -126,22 +143,7 @@ async function trySummarizeNext(
                     user_id: parameters.user_id,
                     payload: { agenda_id: parameters.agenda.id },
                 })
-
-                await autoHighlight(parameters.agenda, collect)
             }
-            try {
-                await api.notifyApp(parameters.user_token, {
-                    message: 'RefreshProject',
-                    user_id: parameters.user_id,
-                    payload: { project_id: SESSION.project.id },
-                })
-            } catch (e) {
-                console.error('notify failed')
-            }
-
-            return true
-        } else {
-            return false
         }
     }
 
@@ -242,19 +244,18 @@ async function autoHighlightCountToken(
     return count
 }
 
-async function autoHighlight(agenda: Agenda, sentences: Sentence[]) {
+async function autoHighlight(useFunctionCalling: boolean, agenda: Agenda) {
     const labels = extractLabels(agenda)
     if (labels.length > 0) {
         const res: SummaryParam = {
             labels: labels,
-            sentences,
+            project_id: SESSION!.project.id,
+            sentences: [],
+            use_function_calling: useFunctionCalling,
             lang: parameters.language,
-            context: CONTEXT,
             client_name: CLIENTS.length > 0 ? CLIENTS.join(', ') : undefined,
         }
         const highlights: AutoHighlightResponse = await api.autoHighlight(res)
-        CONTEXT.clips = R.concat(CONTEXT.clips, highlights.clips)
-        console.log('[autoHighlight]', highlights)
 
         for (const clip of highlights.clips) {
             let label = findLabel(agenda, clip.label)
@@ -263,19 +264,17 @@ async function autoHighlight(agenda: Agenda, sentences: Sentence[]) {
             }
 
             // do not take into accounts too short clips
-            if (clip.end_timestamp - clip.start_timestamp > 2.0) {
-                await api.postClipitem(
-                    {
-                        notes: [],
-                        in_time: clip.start_timestamp,
-                        out_time: clip.end_timestamp,
-                        label_ids: [label.id],
-                        summary: clip.summary,
-                    },
-                    SESSION!.project.id,
-                    SESSION!.asset.id,
-                )
-            }
+            await api.postClipitem(
+                {
+                    notes: [],
+                    in_time: clip.start_timestamp,
+                    out_time: clip.end_timestamp,
+                    label_ids: [label.id],
+                    summary: clip.summary,
+                },
+                SESSION!.project.id,
+                SESSION!.asset.id,
+            )
         }
     }
 }

@@ -98,8 +98,6 @@ export class Transcriber {
 
     /** Waits for the workers to finish, and destroys the transcbriber. */
     async waitUntilComplete(): Promise<void> {
-        this.stopped = true
-
         await this.wordPosterWorker
 
         if (
@@ -134,6 +132,7 @@ export class Transcriber {
             console.error('[waitUntilComplete]', 'error patching video')
         }
 
+        this.stopped = true
         await this.summarizeWorker
         await this.highlightWorker
 
