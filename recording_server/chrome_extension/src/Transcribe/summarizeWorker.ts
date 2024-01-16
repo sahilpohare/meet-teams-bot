@@ -13,6 +13,7 @@ import {
     Label,
     Workspace,
     DetectClientResponse,
+    TypedLabel,
 } from 'spoke_api_js'
 
 const MIN_TOKEN_GPT4 = 1000
@@ -37,9 +38,13 @@ export async function summarizeWorker(): Promise<void> {
 
         await sleep(3_000)
     }
+    if (isFirst) {
+        await tryDetectClientAndTemplate(isFirst, false)
+    }
 }
 
 export async function summarize() {
+    console.log('[summarize]', parameters.agenda)
     if (parameters.agenda) {
         const agenda = await api.getAgendaWithId(parameters.agenda.id)
 
@@ -240,6 +245,7 @@ async function autoHighlightCountToken(sentences: Sentence[]): Promise<number> {
 
 async function autoHighlight(useFunctionCalling: boolean, agenda: Agenda) {
     const labels = getTemplateLabels(agenda)
+    console.log('[autoHighlight]', labels)
     if (labels.length > 0) {
         let typed_labels = (
             await Promise.all(
@@ -258,10 +264,10 @@ async function autoHighlight(useFunctionCalling: boolean, agenda: Agenda) {
             labels: labels.map((l) => l.name),
             project_id: SESSION!.project.id,
             sentences: [],
-            use_function_calling: useFunctionCalling,
+            test_gpt4: useFunctionCalling,
             lang: parameters.language,
             client_name: CLIENTS.length > 0 ? CLIENTS.join(', ') : undefined,
-            typed_labels,
+            typed_labels: typed_labels as unknown as TypedLabel[],
         }
         const highlights: AutoHighlightResponse = await api.autoHighlight(res)
 
