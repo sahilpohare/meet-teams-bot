@@ -114,8 +114,7 @@ async function tryDetectClientAndTemplate(
     isFinal: boolean,
 ): Promise<boolean> {
     if (SESSION) {
-        const labels = parameters.agenda ? extractLabels(parameters.agenda) : []
-        const collect = await collectSentenceToAutoHighlight(isFinal, labels)
+        const collect = await collectSentenceToAutoHighlight(isFinal)
 
         if (isFirst && collect != null && collect.length > 0) {
             try {
@@ -153,7 +152,6 @@ async function tryDetectClientAndTemplate(
 
 async function collectSentenceToAutoHighlight(
     isFinal: boolean,
-    labels: string[],
 ): Promise<Sentence[] | undefined> {
     const res: SummaryParam = {
         sentences: [],
@@ -184,8 +182,7 @@ async function collectSentenceToAutoHighlight(
             })
             if (
                 !(SESSION.transcribed_until >= video_info.tcout || isFinal) ||
-                (await autoHighlightCountToken(res.sentences, labels)) >
-                    MIN_TOKEN_GPT4
+                (await autoHighlightCountToken(res.sentences)) > MIN_TOKEN_GPT4
             ) {
                 break
             }
@@ -201,8 +198,7 @@ async function collectSentenceToAutoHighlight(
             next_index_to_summarise = i + 1
         }
         if (
-            (await autoHighlightCountToken(res.sentences, labels)) >
-                MIN_TOKEN_GPT4 ||
+            (await autoHighlightCountToken(res.sentences)) > MIN_TOKEN_GPT4 ||
             isFinal
         ) {
             SESSION.next_editor_index_to_summarise = next_index_to_summarise
@@ -230,12 +226,9 @@ async function detectTemplate(sentences: Sentence[]) {
     }
 }
 
-async function autoHighlightCountToken(
-    sentences: Sentence[],
-    labels: string[],
-): Promise<number> {
+async function autoHighlightCountToken(sentences: Sentence[]): Promise<number> {
     const res: SummaryParam = {
-        labels: labels,
+        labels: [],
         sentences,
         lang: parameters.language,
     }
@@ -246,15 +239,29 @@ async function autoHighlightCountToken(
 }
 
 async function autoHighlight(useFunctionCalling: boolean, agenda: Agenda) {
-    const labels = extractLabels(agenda)
+    const labels = getTemplateLabels(agenda)
     if (labels.length > 0) {
+        let typed_labels = (
+            await Promise.all(
+                labels.map(async (l) => {
+                    try {
+                        const label = await api.getLabel(l.id)
+                        return label
+                    } catch (e) {
+                        console.error('error getting label', e)
+                        return null
+                    }
+                }),
+            )
+        ).filter((l) => l != null) as Label[]
         const res: SummaryParam = {
-            labels: labels,
+            labels: labels.map((l) => l.name),
             project_id: SESSION!.project.id,
             sentences: [],
             use_function_calling: useFunctionCalling,
             lang: parameters.language,
             client_name: CLIENTS.length > 0 ? CLIENTS.join(', ') : undefined,
+            typed_labels,
         }
         const highlights: AutoHighlightResponse = await api.autoHighlight(res)
 
@@ -291,10 +298,17 @@ export function findLabel(agenda: Agenda, label: string): Label | undefined {
         )?.data as any
     )?.label
 }
-export function extractLabels(agenda: Agenda): string[] {
-    return agenda.json.blocks
-        .filter((b) => b.type === 'talkingpoint' && b.data.name !== '')
-        .map((t) => (t.data as any).name)
+
+export function getTemplateLabels(agenda: Agenda): Label[] {
+    return R.flatten(
+        agenda?.json.blocks?.map((b) => {
+            if (b.type === 'talkingpoint') {
+                return b.data.label
+            } else {
+                return undefined
+            }
+        }),
+    ).filter((l) => l != null) as Label[]
 }
 
 export async function createLabel(name?: string) {

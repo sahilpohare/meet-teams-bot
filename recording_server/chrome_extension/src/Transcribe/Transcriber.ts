@@ -11,7 +11,6 @@ import * as asyncLib from 'async'
 import { START_RECORD_OFFSET, SESSION, CONTEXT } from '../record'
 import { wordPosterWorker } from './wordPosterWorker'
 import { summarize, summarizeWorker } from './summarizeWorker'
-import { calcHighlights, highlightWorker } from './highlightWorker'
 import RecordRTC, { StereoAudioRecorder } from 'recordrtc'
 
 /**
@@ -26,7 +25,6 @@ export class Transcriber {
     private audioStream: MediaStream
     private wordPosterWorker: Promise<void>
     private summarizeWorker: Promise<void>
-    private highlightWorker: Promise<void>
     private pollTimer: NodeJS.Timer | undefined
     private transcribeQueue: asyncLib.QueueObject<() => void>
     /** Inits the transcriber. */
@@ -139,13 +137,6 @@ export class Transcriber {
         } catch (e) {
             console.error('summarize failed in summarize worker end')
         }
-        await this.highlightWorker
-
-        try {
-            await calcHighlights(true)
-        } catch (e) {
-            console.error('[waitUntilComplete]', 'error calcHighlights')
-        }
 
         if (SESSION) {
             try {
@@ -181,14 +172,12 @@ export class Transcriber {
         // Simply not to have undefined properties
         this.wordPosterWorker = new Promise((resolve) => resolve())
         this.summarizeWorker = new Promise((resolve) => resolve())
-        this.highlightWorker = new Promise((resolve) => resolve())
     }
 
     /** Launches the workers. */
     private async launchWorkers(): Promise<void> {
         this.wordPosterWorker = wordPosterWorker()
         this.summarizeWorker = summarizeWorker()
-        this.highlightWorker = highlightWorker()
     }
     /** Gets and handles recognizer results every `interval` ms. */
 }
