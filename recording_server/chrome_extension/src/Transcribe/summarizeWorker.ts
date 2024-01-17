@@ -48,7 +48,19 @@ export async function summarize() {
     if (parameters.agenda) {
         const agenda = await api.getAgendaWithId(parameters.agenda.id)
 
-        await autoHighlight(agenda)
+        try {
+            await autoHighlight(true, agenda)
+        } catch (e) {
+            console.error(
+                'error autoHighlight with function calling, trying without',
+                e,
+            )
+            try {
+                await autoHighlight(false, agenda)
+            } catch (e) {
+                console.error('error autoHighlight with function calling', e)
+            }
+        }
         try {
             await api.notifyApp(parameters.user_token, {
                 message: 'RefreshProject',
@@ -237,7 +249,7 @@ async function autoHighlightCountToken(sentences: Sentence[]): Promise<number> {
     return count
 }
 
-async function autoHighlight(agenda: Agenda) {
+async function autoHighlight(useFunctionCalling: boolean, agenda: Agenda) {
     const labels = getTemplateLabels(agenda)
     console.log('[autoHighlight]', labels)
     if (labels.length > 0) {
