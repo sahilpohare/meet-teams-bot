@@ -52,13 +52,13 @@ export async function summarize() {
             await autoHighlight(false, agenda)
         } catch (e) {
             console.error(
-                'error autoHighlight with function calling, trying without',
+                'error autoHighlight without function calling, retrying',
                 e,
             )
             try {
                 await autoHighlight(false, agenda)
             } catch (e) {
-                console.error('error autoHighlight with function calling', e)
+                console.error('error autoHighlight retried ', e)
             }
         }
         try {
