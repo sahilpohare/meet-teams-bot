@@ -260,7 +260,7 @@ async function autoHighlight(useFunctionCalling: boolean, agenda: Agenda) {
             labels: labels.map((l) => l.name),
             project_id: SESSION!.project.id,
             sentences: [],
-            test_gpt4: useFunctionCalling,
+            test_gpt4: false,
             lang: parameters.language,
             client_name: CLIENTS.length > 0 ? CLIENTS.join(', ') : undefined,
             typed_labels: typed_labels as unknown as TypedLabel[],
