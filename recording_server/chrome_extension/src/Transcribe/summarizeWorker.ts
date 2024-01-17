@@ -278,17 +278,21 @@ async function autoHighlight(useFunctionCalling: boolean, agenda: Agenda) {
             }
 
             // do not take into accounts too short clips
-            await api.postClipitem(
-                {
-                    notes: [],
-                    in_time: clip.start_timestamp,
-                    out_time: clip.end_timestamp,
-                    label_ids: [label.id],
-                    summary: clip.summary,
-                },
-                SESSION!.project.id,
-                SESSION!.asset.id,
-            )
+            try {
+                await api.postClipitem(
+                    {
+                        notes: [],
+                        in_time: clip.start_timestamp,
+                        out_time: clip.end_timestamp,
+                        label_ids: [label.id],
+                        summary: clip.summary,
+                    },
+                    SESSION!.project.id,
+                    SESSION!.asset.id,
+                )
+            } catch (e) {
+                console.error('error postClipitem', e)
+            }
         }
     }
 }
