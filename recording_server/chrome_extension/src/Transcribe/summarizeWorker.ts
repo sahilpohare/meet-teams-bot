@@ -39,7 +39,7 @@ export async function summarizeWorker(): Promise<void> {
         await sleep(3_000)
     }
     if (isFirst) {
-        await tryDetectClientAndTemplate(isFirst, false)
+        await tryDetectClientAndTemplate(isFirst, true)
     }
 }
 
@@ -48,12 +48,7 @@ export async function summarize() {
     if (parameters.agenda) {
         const agenda = await api.getAgendaWithId(parameters.agenda.id)
 
-        let useFunctionCalling = false
-        try {
-            useFunctionCalling = await useNewAi()
-        } catch (e) {
-            console.error('use useNewAi failed failed', e)
-        }
+        let useFunctionCalling = true
         await autoHighlight(useFunctionCalling, agenda)
         try {
             await api.notifyApp(parameters.user_token, {
@@ -260,6 +255,7 @@ async function autoHighlight(useFunctionCalling: boolean, agenda: Agenda) {
                 }),
             )
         ).filter((l) => l != null) as Label[]
+        console.log('[autoHighlight] typed_labels', typed_labels)
         const res: SummaryParam = {
             labels: labels.map((l) => l.name),
             project_id: SESSION!.project.id,
@@ -269,29 +265,35 @@ async function autoHighlight(useFunctionCalling: boolean, agenda: Agenda) {
             client_name: CLIENTS.length > 0 ? CLIENTS.join(', ') : undefined,
             typed_labels: typed_labels as unknown as TypedLabel[],
         }
+        console.log('[autoHighlight] res', res)
         const highlights: AutoHighlightResponse = await api.autoHighlight(res)
+        console.log('[autoHighlight] highlights', highlights)
 
         for (const clip of highlights.clips) {
-            let label = findLabel(agenda, clip.label)
-            if (label == null) {
-                label = await createLabel(clip.label)
-            }
-
-            // do not take into accounts too short clips
             try {
-                await api.postClipitem(
-                    {
-                        notes: [],
-                        in_time: clip.start_timestamp,
-                        out_time: clip.end_timestamp,
-                        label_ids: [label.id],
-                        summary: clip.summary,
-                    },
-                    SESSION!.project.id,
-                    SESSION!.asset.id,
-                )
+                let label = findLabel(agenda, clip.label)
+                if (label == null) {
+                    label = await createLabel(clip.label)
+                }
+
+                // do not take into accounts too short clips
+                try {
+                    await api.postClipitem(
+                        {
+                            notes: [],
+                            in_time: clip.start_timestamp,
+                            out_time: clip.end_timestamp,
+                            label_ids: [label.id],
+                            summary: clip.summary,
+                        },
+                        SESSION!.project.id,
+                        SESSION!.asset.id,
+                    )
+                } catch (e) {
+                    console.error('error postClipitem', e)
+                }
             } catch (e) {
-                console.error('error postClipitem', e)
+                console.error('could not find or createlabel', e)
             }
         }
     }
