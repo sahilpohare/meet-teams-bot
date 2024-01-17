@@ -48,8 +48,7 @@ export async function summarize() {
     if (parameters.agenda) {
         const agenda = await api.getAgendaWithId(parameters.agenda.id)
 
-        let useFunctionCalling = true
-        await autoHighlight(useFunctionCalling, agenda)
+        await autoHighlight(agenda)
         try {
             await api.notifyApp(parameters.user_token, {
                 message: 'RefreshProject',
@@ -238,7 +237,7 @@ async function autoHighlightCountToken(sentences: Sentence[]): Promise<number> {
     return count
 }
 
-async function autoHighlight(useFunctionCalling: boolean, agenda: Agenda) {
+async function autoHighlight(agenda: Agenda) {
     const labels = getTemplateLabels(agenda)
     console.log('[autoHighlight]', labels)
     if (labels.length > 0) {
@@ -260,7 +259,7 @@ async function autoHighlight(useFunctionCalling: boolean, agenda: Agenda) {
             labels: labels.map((l) => l.name),
             project_id: SESSION!.project.id,
             sentences: [],
-            test_gpt4: false,
+            test_gpt4: true,
             lang: parameters.language,
             client_name: CLIENTS.length > 0 ? CLIENTS.join(', ') : undefined,
             typed_labels: typed_labels as unknown as TypedLabel[],
