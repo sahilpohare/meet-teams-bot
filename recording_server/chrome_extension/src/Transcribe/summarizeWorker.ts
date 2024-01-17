@@ -49,7 +49,7 @@ export async function summarize() {
         const agenda = await api.getAgendaWithId(parameters.agenda.id)
 
         try {
-            await autoHighlight(true, agenda)
+            await autoHighlight(false, agenda)
         } catch (e) {
             console.error(
                 'error autoHighlight with function calling, trying without',
