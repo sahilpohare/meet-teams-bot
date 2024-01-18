@@ -127,9 +127,9 @@ async function tryDetectClientAndTemplate(
     if (SESSION) {
         const collect = await collectSentenceToAutoHighlight(isFinal)
 
-        if (isFirst && collect != null && collect.length > 0) {
+        if (isFirst && (isFinal || (collect != null && collect.length > 0))) {
             try {
-                CLIENTS = await detectClients(collect)
+                CLIENTS = await detectClients(collect ?? [])
                 await api.patchProject({
                     id: SESSION.project.id,
                     client_name: CLIENTS.join(', '),
@@ -138,7 +138,7 @@ async function tryDetectClientAndTemplate(
                 console.error('error detecting client', e)
             }
             if (!parameters.agenda) {
-                parameters.agenda = await detectTemplate(collect)
+                parameters.agenda = await detectTemplate(collect ?? [])
                 try {
                     await api.patchProject({
                         id: SESSION.project.id,
