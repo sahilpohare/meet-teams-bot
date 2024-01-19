@@ -8,12 +8,10 @@ import {
     SummaryParam,
     LABEL_COLORS,
     Agenda,
-    AutoHighlightResponse,
     Sentence,
     Label,
     Workspace,
     DetectClientResponse,
-    TypedLabel,
 } from 'spoke_api_js'
 
 const MIN_TOKEN_GPT4 = 1000
@@ -41,48 +39,6 @@ export async function summarizeWorker(): Promise<void> {
     if (isFirst) {
         await tryDetectClientAndTemplate(isFirst, true)
     }
-}
-
-export async function summarize() {
-    console.log('[summarize]', parameters.agenda)
-    if (parameters.agenda) {
-        const agenda = await api.getAgendaWithId(parameters.agenda.id)
-
-        try {
-            await autoHighlight(true, agenda)
-        } catch (e) {
-            console.error(
-                'error autoHighlight without function calling, retrying',
-                e,
-            )
-            try {
-                await autoHighlight(false, agenda)
-            } catch (e) {
-                console.error('error autoHighlight retried ', e)
-            }
-        }
-        try {
-            await api.notifyApp(parameters.user_token, {
-                message: 'RefreshProject',
-                user_id: parameters.user_id,
-                payload: { project_id: SESSION?.project.id },
-            })
-        } catch (e) {
-            console.error('notify failed', e)
-        }
-    }
-}
-
-async function useNewAi(): Promise<boolean> {
-    const workspaceId = SESSION?.project.workspace_id
-    if (workspaceId == null) {
-        console.error('workspaceId is null')
-        return false
-    }
-    const subscriptions = await api.getSubscriptionInfos(workspaceId)
-    console.log('payer', subscriptions?.payer)
-
-    return subscriptions?.payer.appsumoPlanId == null
 }
 
 // detect who is the client in the meeting and who is the spoker
@@ -247,67 +203,6 @@ async function autoHighlightCountToken(sentences: Sentence[]): Promise<number> {
 
     console.log('[autoHighlightCountToken]', count)
     return count
-}
-
-async function autoHighlight(useFunctionCalling: boolean, agenda: Agenda) {
-    const labels = getTemplateLabels(agenda)
-    console.log('[autoHighlight]', labels)
-    if (labels.length > 0) {
-        let typed_labels = (
-            await Promise.all(
-                labels.map(async (l) => {
-                    try {
-                        const label = await api.getLabel(l.id)
-                        return label
-                    } catch (e) {
-                        console.error('error getting label', e)
-                        return null
-                    }
-                }),
-            )
-        ).filter((l) => l != null) as Label[]
-        console.log('[autoHighlight] typed_labels', typed_labels)
-        const res: SummaryParam = {
-            labels: labels.map((l) => l.name),
-            project_id: SESSION!.project.id,
-            sentences: [],
-            test_gpt4: true,
-            lang: parameters.language,
-            client_name: CLIENTS.length > 0 ? CLIENTS.join(', ') : undefined,
-            typed_labels: typed_labels as unknown as TypedLabel[],
-        }
-        console.log('[autoHighlight] res', res)
-        const highlights: AutoHighlightResponse = await api.autoHighlight(res)
-        console.log('[autoHighlight] highlights', highlights)
-
-        for (const clip of highlights.clips) {
-            try {
-                let label = findLabel(agenda, clip.label)
-                if (label == null) {
-                    label = await createLabel(clip.label)
-                }
-
-                // do not take into accounts too short clips
-                try {
-                    await api.postClipitem(
-                        {
-                            notes: [],
-                            in_time: clip.start_timestamp,
-                            out_time: clip.end_timestamp,
-                            label_ids: [label.id],
-                            summary: clip.summary,
-                        },
-                        SESSION!.project.id,
-                        SESSION!.asset.id,
-                    )
-                } catch (e) {
-                    console.error('error postClipitem', e)
-                }
-            } catch (e) {
-                console.error('could not find or createlabel', e)
-            }
-        }
-    }
 }
 
 export function findLabel(agenda: Agenda, label: string): Label | undefined {

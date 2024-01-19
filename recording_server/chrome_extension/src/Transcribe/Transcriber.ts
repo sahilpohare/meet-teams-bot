@@ -10,7 +10,7 @@ import { newSerialQueue, newTranscribeQueue } from '../queue'
 import * as asyncLib from 'async'
 import { START_RECORD_OFFSET, SESSION, CONTEXT } from '../record'
 import { wordPosterWorker } from './wordPosterWorker'
-import { summarize, summarizeWorker } from './summarizeWorker'
+import { summarizeWorker } from './summarizeWorker'
 import RecordRTC, { StereoAudioRecorder } from 'recordrtc'
 
 /**
@@ -131,35 +131,8 @@ export class Transcriber {
             console.error('[waitUntilComplete]', 'error patching video')
         }
         await this.summarizeWorker
-
-        try {
-            await summarize()
-        } catch (e) {
-            console.error('summarize failed in summarize worker end')
-        }
-
-        if (SESSION) {
-            try {
-                await api.patchAsset({
-                    id: SESSION?.asset.id,
-                    uploading: false,
-                })
-            } catch (e) {
-                console.error('[waitUntilComplete]', 'error patching asset')
-            }
-            try {
-                await api.workerSendMessage({
-                    NewSpoke: {
-                        project_id: SESSION?.project.id,
-                        user: { id: parameters.user_id },
-                    },
-                })
-            } catch (e) {
-                console.error(
-                    '[waitUntilComplete]',
-                    'error worker send message',
-                )
-            }
+        if (SESSION?.project.id) {
+            api.endMeeting(SESSION?.project.id)
         }
     }
 
