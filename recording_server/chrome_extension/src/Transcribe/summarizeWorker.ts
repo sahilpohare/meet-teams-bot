@@ -126,49 +126,32 @@ async function collectSentenceToAutoHighlight(
     }
     let withNextIsMaxToken = false
 
-    if (
-        SESSION &&
-        SESSION.next_editor_index_to_summarise <
-            SESSION.video_informations.length
-    ) {
-        const video_infos = SESSION.video_informations
-        let next_index_to_summarise = SESSION.next_editor_index_to_summarise
-        for (
-            let i = SESSION.next_editor_index_to_summarise;
-            i < video_infos.length;
-            i++
-        ) {
-            const video_info = video_infos[i]
-            console.log('[collectSentenceToSummarize]', {
-                next_editor_index_to_summarize:
-                    SESSION.next_editor_index_to_summarise,
-                i: i,
-                transcribed_until: SESSION.transcribed_until,
-                tcout: video_info.tcout,
-                sentences: res.sentences,
-            })
+    if (SESSION) {
+        const editors = SESSION.completeEditors
+        let next_index_to_summarise = 0
+        for (let i = 0; i < editors.length; i++) {
+            const editor = editors[i]
             if (
-                !(SESSION.transcribed_until >= video_info.tcout || isFinal) ||
+                !isFinal ||
                 (await autoHighlightCountToken(res.sentences)) > MIN_TOKEN_GPT4
             ) {
                 break
             }
-            if (video_info.words.length > 0) {
+            const transcript = editor.video.transcripts[0]
+            if (transcript != null && transcript?.words.length > 0) {
                 res.sentences.push({
-                    speaker: video_info.speaker_name,
-                    words: video_info.words.map((w) => ({ text: w.text! })),
-                    start_timestamp: video_info.words[0].start_time,
+                    speaker: transcript.speaker,
+                    words: transcript.words.map((w) => ({ text: w.text! })),
+                    start_timestamp: transcript.words[0].start_time,
                     end_timestamp:
-                        video_info.words[video_info.words.length - 1].end_time,
+                        transcript.words[transcript.words.length - 1].end_time,
                 })
             }
-            next_index_to_summarise = i + 1
         }
         if (
             (await autoHighlightCountToken(res.sentences)) > MIN_TOKEN_GPT4 ||
             isFinal
         ) {
-            SESSION.next_editor_index_to_summarise = next_index_to_summarise
             return res.sentences
         }
     }
