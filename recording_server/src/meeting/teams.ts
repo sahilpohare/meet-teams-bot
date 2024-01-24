@@ -3,6 +3,7 @@ import { Page } from 'puppeteer'
 import { sleep } from '../utils'
 import { CURRENT_MEETING, MeetingParams } from '../meeting'
 import { screenshot } from '../puppeteer'
+const jsdom = require('jsdom')
 
 export async function parseMeetingUrl(
     browser: puppeteer.Browser,
@@ -10,25 +11,55 @@ export async function parseMeetingUrl(
 ) {
     // return { meetingId: 'https://teams.live.com/_#/meet/9487829875851?anon=true', password: "" }
     // 'https://teams.live.com/_#/meet/9487829875851&anon=true'
-    if (meeting_url.includes('teams.live.com')) {
+
+    let newMeetingUrl = meeting_url
+    try {
+        newMeetingUrl = parseMeetingUrlFromJoinInfos(meeting_url)
+    } catch (e) {
+        console.error(
+            'failed to parse meeting url from join info, trying another method',
+            e,
+        )
+    }
+    console.log({ newMeetingUrl })
+    if (newMeetingUrl.includes('teams.live.com')) {
         // https://teams.live.com/meet/9460778358093
         // https://teams.microsoft.com/l/meetup-join/19%3AA2UA3NRD5KMJxGE2RQvY-IuCJTFV7NzfEWvaYgqiqE41%40thread.tacv2/1648544446696?context=%7B%22Tid%22%3A%2261f3e3b8-9b52-433a-a4eb-c67334ce54d5%22%2C%22Oid%22%3A%22e0bccd79-3e39-43dd-ba50-7b98ab2f8a10%22%7D
         // https://teams.live.com/_#/meet/9487829875851?anon=true&deeplinkId=d6a1aa8d-b724-4e71-be9b-f922da7fd8e7
         const newMeetingId =
-            meeting_url.replace('teams.live.com/', 'teams.live.com/_#/') +
+            newMeetingUrl.replace('teams.live.com/', 'teams.live.com/_#/') +
             '?anon=true'
         console.log({ newMeetingId })
         return { meetingId: newMeetingId, password: '' }
     } else {
         return {
             meetingId:
-                meeting_url.replace(
+                newMeetingUrl.replace(
                     'teams.microsoft.com/',
                     'teams.microsoft.com/_#/',
                 ) + '&anon=true',
             password: '',
         }
     }
+}
+function parseMeetingUrlFromJoinInfos(joinInfo: string) {
+    // Parse the HTML string with jsdom
+    const { JSDOM } = jsdom
+    const dom = new JSDOM(joinInfo)
+
+    // Use the document object as you would in a browser
+    const document = dom.window.document
+    const meetingLinkTag = document.querySelector(
+        'a[href*="teams.live.com/meet"]',
+    )
+
+    // Extract the href attribute, which is the meeting URL
+    const meetingUrl = meetingLinkTag
+        ? meetingLinkTag.getAttribute('href')
+        : null
+
+    console.log(meetingUrl) // Output the meeting URL
+    return meetingUrl
 }
 
 export function getMeetingLink(

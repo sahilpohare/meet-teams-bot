@@ -239,6 +239,7 @@ export async function startRecordMeeting(meetingParams: MeetingParams) {
             CURRENT_MEETING.meeting.browser,
             meetingParams.meeting_url,
         )
+        meetingParams.meeting_url = meetingId
         CURRENT_MEETING.logger.info('meeting id found', { meetingId })
 
         const meetingLink = MEETING_PROVIDER.getMeetingLink(
