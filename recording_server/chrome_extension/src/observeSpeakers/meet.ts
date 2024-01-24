@@ -190,7 +190,7 @@ export function getSpeakerFromDocument(
             let differentSpeakerCount = 0
             for (let j = i; j < maxOccurrences.length; j++) {
                 if (maxOccurrences[j].speaker === differentSpeaker.speaker) {
-                    if (differentSpeakerCount >= 3) {
+                    if (differentSpeakerCount >= 4) {
                         maxOccurrences = maxOccurrences.slice(j)
                         return [
                             {
