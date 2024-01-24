@@ -140,6 +140,15 @@ function calcSpeaker() {
         }
     })
 
+    // let stringified = ''
+    // speakerCounts.forEach((count, speaker) => {
+    //     stringified += `${speaker}: ${count}, `
+    // })
+
+    // chrome.runtime.sendMessage({
+    //     type: 'LOG_FROM_SCRIPT',
+    //     payload: { log: stringified, timestamp: Date.now() },
+    // })
     // Only add to array if a speaker was found
     if (maxSpeaker) {
         const currentDate = Date.now()
@@ -162,12 +171,19 @@ export function getSpeakerFromDocument(
     currentSpeaker: string | null,
     mutation,
 ): Speaker[] {
-    const speakers = getSpeakerFromMutation(mutation)
-    speakers.forEach((speaker) => {
+    const speaker = getSpeakerFromMutation(mutation)
+    // chrome.runtime.sendMessage({
+    //     type: 'LOG_FROM_SCRIPT',
+    //     payload: {
+    //         log: `mutation speaker found: ${speaker}`,
+    //         timestamp: Date.now(),
+    //     },
+    // })
+    if (speaker != null) {
         speakerCounts.set(speaker, (speakerCounts.get(speaker) || 0) + 1)
-    })
+    }
 
-    // Check for more than 5 adjacent occurrences of a different speaker
+    // Check for more than 3 adjacent occurrences of a different speaker
     for (let i = 0; i < maxOccurrences.length; i++) {
         if (maxOccurrences[i].speaker !== currentSpeaker) {
             let differentSpeaker = maxOccurrences[i]
@@ -200,23 +216,24 @@ export function getSpeakerFromDocument(
     return []
 }
 
-export function getSpeakerFromMutation(mutation): string[] {
+export function getSpeakerFromMutation(mutation): string | null {
     if (mutation == null) {
-        return []
+        return null
     }
     try {
         const target = mutation.target
         let color = getComputedStyle(target).backgroundColor
         if (color !== 'rgba(26, 115, 232, 0.9)') {
-            return []
+            return null
         }
         // console.log({ color })
         let styleBar = getComputedStyle(target.children[1])
         const height = styleBar.height
         // console.log(height)
 
-        if (height === '4px') {
-            return []
+        // when speaker is not speaking, height is 4px
+        if (height == '4px') {
+            return null
         }
         let speakers: string[] = []
         const divButton = target.parentElement.parentElement.parentElement
@@ -227,16 +244,23 @@ export function getSpeakerFromMutation(mutation): string[] {
                     .parentElement.parentElement.parentElement
             const speakerName = divSpeaker && findSpeakerName(divSpeaker)
             if (speakerName) {
-                speakers.push(speakerName)
+                return speakerName
             } else {
                 const divSpeaker =
                     divButton.parentElement.parentElement.parentElement
                         .parentElement
                 const speakerName = divSpeaker && findSpeakerName(divSpeaker)
                 if (speakerName) {
-                    speakers.push(speakerName)
+                    return speakerName
                 } else {
-                    console.log('no div speaker button', { mutation })
+                    console.error('no div speaker button', { mutation })
+                    // chrome.runtime.sendMessage({
+                    //     type: 'LOG_FROM_SCRIPT',
+                    //     payload: {
+                    //         log: 'no div speaker button',
+                    //         timestamp: Date.now(),
+                    //     },
+                    // })
                 }
             }
         } else {
@@ -246,16 +270,32 @@ export function getSpeakerFromMutation(mutation): string[] {
             if (divSpeaker) {
                 const speakerName = findSpeakerName(divSpeaker)
                 if (speakerName) {
-                    speakers.push(speakerName)
+                    return speakerName
+                } else {
+                    // chrome.runtime.sendMessage({
+                    //     type: 'LOG_FROM_SCRIPT',
+                    //     payload: {
+                    //         log: 'no div speaker',
+                    //         timestamp: Date.now(),
+                    //     },
+                    // })
+                    console.error('no div speaker', { mutation })
                 }
             } else {
-                console.log('no div speaker', { mutation })
+                // chrome.runtime.sendMessage({
+                //     type: 'LOG_FROM_SCRIPT',
+                //     payload: {
+                //         log: 'no div speaker',
+                //         timestamp: Date.now(),
+                //     },
+                // })
+                console.error('no div speaker', { mutation })
             }
         }
         // })
-        return speakers
+        return null
     } catch (e) {
-        return []
+        return null
     }
 }
 function findSpeakerName(divSpeaker: any) {
