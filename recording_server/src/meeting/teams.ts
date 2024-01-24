@@ -58,7 +58,9 @@ function parseMeetingUrlFromJoinInfos(joinInfo: string) {
         ? meetingLinkTag.getAttribute('href')
         : null
 
-    console.log(meetingUrl) // Output the meeting URL
+    if (meetingUrl == null) {
+        throw 'failed to parse meeting url from join info'
+    }
     return meetingUrl
 }
 
