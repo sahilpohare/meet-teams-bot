@@ -106,6 +106,40 @@ export async function getSpeakerRootToObserve(
                 )
             }
 
+            try {
+                // Find all div elements
+                const allDivs = document.querySelectorAll('div')
+
+                // Filter divs to include padding in their size (assuming border-box sizing)
+                const filteredDivs = Array.from(allDivs).filter((div) => {
+                    // Use offsetWidth and offsetHeight to include padding (and border)
+                    const width = div.offsetWidth
+                    const height = div.offsetHeight
+
+                    return (
+                        width === 360 &&
+                        (height === 64 ||
+                            height === 63 ||
+                            height === 50.99 ||
+                            height === 51 ||
+                            height === 66.63)
+                    )
+                })
+
+                // Log the filtered divs
+                console.log(filteredDivs)
+
+                // Example action: outline the filtered divs
+                filteredDivs.forEach((div) => {
+                    div.remove()
+                })
+            } catch (e) {
+                console.error(
+                    '[getSpeakerRootToObserve] on meet error removing useless divs',
+                    e,
+                )
+            }
+
             mutationObserver.observe(root, {
                 attributes: true,
                 characterData: true,
