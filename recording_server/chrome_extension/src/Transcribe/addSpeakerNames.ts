@@ -21,8 +21,10 @@ export function addSpeakerNames(
         let transcript = transcripts[i]
         let scores = speakerScores.get(transcripts[i].speaker) || new Map()
         console.log('scores is', scores)
-        let timestampStart = START_RECORD_TIMESTAMP + transcripts[i].startTime
-        let timestampEnd = START_RECORD_TIMESTAMP + transcripts[i].endTime
+        let timestampStart =
+            START_RECORD_TIMESTAMP + transcripts[i].startTime * 1000
+        let timestampEnd =
+            START_RECORD_TIMESTAMP + transcripts[i].endTime * 1000
 
         // Find intersection between timestamps and speakerIntervals
         for (const interval of speakerIntervals) {
@@ -33,6 +35,8 @@ export function addSpeakerNames(
             if (intersection != null) {
                 const duration = intersection[1] - intersection[0]
                 console.log(
+                    timestampStart,
+                    timestampEnd,
                     'found intersection between ',
                     interval.speaker,
                     transcript.speaker,
