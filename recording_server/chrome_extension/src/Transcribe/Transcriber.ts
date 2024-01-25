@@ -187,19 +187,26 @@ export class TranscriberSession {
                 console.log('blob', blob)
                 if (blob != null) {
                     console.log('blob ready requesting gladia')
+                    let res
                     try {
-                        let res = await api.transcribeWithGladia(
+                        res = await api.transcribeWithGladia(
                             blob,
                             parameters.vocabulary,
                             parameters.force_lang === true
                                 ? googleToGladia(parameters.language)
                                 : undefined,
                         )
-                        console.log('[stopRecorder]', res.prediction.length)
-                        console.log('[stopRecorder]', onResult)
-                        await onResult(res, this.offset)
                     } catch (e) {
                         console.error('an error occured calling gladia, ', e)
+                        resolve()
+                    }
+                    try {
+                        await onResult(res, this.offset)
+                    } catch (e) {
+                        console.error(
+                            'an error occured parsing gladia result ',
+                            e,
+                        )
                     }
                 }
                 resolve()
@@ -226,7 +233,9 @@ async function onResult(json: GladiaResult, offset: number) {
         }
     }
     let transcripts = parseGladia(json, offset)
+    console.log('transcripts after parsing gladia', transcripts)
     let transcriptsWithSpeaker = addSpeakerNames(transcripts, SPEAKERS)
+    console.log('transcripts with speakers', transcriptsWithSpeaker)
     for (let t of transcriptsWithSpeaker) {
         await uploadEditorsTask(t)
     }

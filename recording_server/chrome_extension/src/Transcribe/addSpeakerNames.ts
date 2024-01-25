@@ -16,28 +16,26 @@ export function addSpeakerNames(
 ): TranscriptWithSpeaker[] {
     let speakerScores: Map<number, Map<string, number>> = new Map()
     let speakerIntervals = timestampToInterval(speakers)
+    console.log('speaker intervals', speakerIntervals)
     for (let i = 0; i < transcripts.length; i++) {
         let transcript = transcripts[i]
         let scores = speakerScores.get(transcripts[i].speaker) || new Map()
-        console.log(scores)
+        console.log('scores is', scores)
         let timestampStart = START_RECORD_TIMESTAMP + transcripts[i].startTime
-        let timestampEnd = START_RECORD_TIMESTAMP + transcripts[i].startTime
+        let timestampEnd = START_RECORD_TIMESTAMP + transcripts[i].endTime
 
         // Find intersection between timestamps and speakerIntervals
         for (const interval of speakerIntervals) {
-            if (
-                timestampEnd >= interval.start_timestamp &&
-                timestampStart <= interval.end_timestamp
-            ) {
-                const intersection = getIntervalIntersection(
-                    [timestampStart, timestampEnd],
-                    [interval.start_timestamp, interval.end_timestamp],
-                )!
+            const intersection = getIntervalIntersection(
+                [timestampStart, timestampEnd],
+                [interval.start_timestamp, interval.end_timestamp],
+            )
+            if (intersection != null) {
                 const duration = intersection[1] - intersection[0]
                 console.log(
                     'found intersection between ',
                     interval.speaker,
-                    transcript[i].speaker,
+                    transcript.speaker,
                     ' of duration',
                     duration,
                 )
@@ -61,12 +59,14 @@ export function addSpeakerNames(
         }
         speakerAssociations.set(speaker, maxSpeaker)
     }
+    console.log('speaker associations', speakerAssociations)
     let newTranscripts = transcripts.map((t) => {
         return {
             ...t,
             speaker: speakerAssociations.get(t.speaker) || 'unknown',
         }
     })
+    console.log('new transcripts', newTranscripts)
     return newTranscripts
 }
 

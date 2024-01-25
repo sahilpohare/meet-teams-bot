@@ -31,7 +31,7 @@ export function parseGladia(
 
                 return {
                     type: 'text',
-                    value: word.word,
+                    value: word.word.trim(),
                     ts,
                     end_ts,
                     confidence: 1.0,

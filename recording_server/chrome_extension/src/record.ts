@@ -244,8 +244,8 @@ async function handleChunk(isFinal: boolean) {
     const spokeSession = SESSION!
     const recordedChunks = RECORDED_CHUNKS
     RECORDED_CHUNKS = []
-    spokeSession.uploadChunkCounter = spokeSession.uploadChunkCounter + 1
     const index = spokeSession.uploadChunkCounter
+    spokeSession.uploadChunkCounter = spokeSession.uploadChunkCounter + 1
 
     const recordedDataChunk = recordedChunks.map((c) => c.data)
     const blob = new Blob(recordedDataChunk, {
