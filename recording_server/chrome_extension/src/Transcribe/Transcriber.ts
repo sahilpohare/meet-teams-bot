@@ -236,7 +236,12 @@ async function onResult(json: GladiaResult, offset: number) {
     console.log('transcripts after parsing gladia', transcripts)
     let transcriptsWithSpeaker = addSpeakerNames(transcripts, SPEAKERS)
     console.log('transcripts with speakers', transcriptsWithSpeaker)
+    let prevAudioOffset = 0
     for (let t of transcriptsWithSpeaker) {
-        await uploadEditorsTask(t)
+        if (t.startTime === prevAudioOffset) {
+            console.error('transcript with same offset as previous one')
+        }
+        prevAudioOffset = t.startTime
+        await uploadEditorsTask(R.clone(t))
     }
 }

@@ -41,7 +41,7 @@ export async function uploadEditorsTask(transcript: TranscriptWithSpeaker) {
         }
     }
 
-    console.log(`[resuming] uploadCompleteEditor`)
+    console.log(`[resuming] uploadCompleteEditor`, transcript)
     try {
         const postableCompleteEditor = createEditorWrapper(
             transcript,
@@ -51,17 +51,9 @@ export async function uploadEditorsTask(transcript: TranscriptWithSpeaker) {
         const completeEditor = await api.postCompleteEditor(
             postableCompleteEditor,
         )
-        console.log(
-            `before inserting complete editor `,
-            spokeSession.completeEditors,
-        )
         insertIntoSortedArrayInPlace(
             spokeSession.completeEditors,
-            completeEditor,
-        )
-        console.log(
-            `after inserting complete editor `,
-            spokeSession.completeEditors,
+            R.clone(completeEditor),
         )
     } catch (e) {
         console.error('[uploadEditorTasks] error posting editor', e)
