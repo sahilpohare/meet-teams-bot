@@ -45,7 +45,7 @@ export function addSpeakerNames(
                 )
                 scores?.set(
                     interval.speaker,
-                    scores?.get(interval.speaker) || 0 + duration,
+                    (scores?.get(interval.speaker) || 0) + duration,
                 )
             }
         }
