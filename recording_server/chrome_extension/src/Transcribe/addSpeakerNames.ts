@@ -20,23 +20,32 @@ export function addSpeakerNames(
     for (let i = 0; i < transcripts.length; i++) {
         let transcript = transcripts[i]
         let scores = speakerScores.get(transcripts[i].speaker) || new Map()
-        console.log('scores is', scores)
-        let timestampStart =
-            START_RECORD_TIMESTAMP + transcripts[i].startTime * 1000
-        let timestampEnd =
-            START_RECORD_TIMESTAMP + transcripts[i].endTime * 1000
+        for (const [name, score] of scores) {
+            console.log(
+                'for speaker',
+                transcripts[i].speaker,
+                'of transcript: ',
+                transcript.words.map((w) => w.value).join(' '),
+                'score of ',
+                name,
+                'is',
+                score,
+            )
+        }
+        let start = transcripts[i].startTime * 1000
+        let end = transcripts[i].endTime * 1000
 
         // Find intersection between timestamps and speakerIntervals
         for (const interval of speakerIntervals) {
             const intersection = getIntervalIntersection(
-                [timestampStart, timestampEnd],
-                [interval.start_timestamp, interval.end_timestamp],
+                [start, end],
+                [interval.start_time, interval.end_time],
             )
             if (intersection != null) {
                 const duration = intersection[1] - intersection[0]
                 console.log(
-                    timestampStart,
-                    timestampEnd,
+                    start,
+                    end,
                     'found intersection between ',
                     interval.speaker,
                     transcript.speaker,
@@ -63,7 +72,9 @@ export function addSpeakerNames(
         }
         speakerAssociations.set(speaker, maxSpeaker)
     }
-    console.log('speaker associations', speakerAssociations)
+    for (const [speaker, speakerName] of speakerAssociations) {
+        console.log('speaker association: ', speaker, 'is', speakerName)
+    }
     let newTranscripts = transcripts.map((t) => {
         return {
             ...t,
@@ -75,8 +86,8 @@ export function addSpeakerNames(
 }
 
 type SpeakerInterval = {
-    start_timestamp: number
-    end_timestamp: number
+    start_time: number
+    end_time: number
     speaker: string
 }
 
@@ -103,8 +114,8 @@ function timestampToInterval(speakers: Speaker[]): SpeakerInterval[] {
                 : speaker.timestamp + 3600000
 
         return {
-            start_timestamp: speaker.timestamp,
-            end_timestamp: endTimestamp,
+            start_time: speaker.timestamp - START_RECORD_TIMESTAMP,
+            end_time: endTimestamp - START_RECORD_TIMESTAMP,
             speaker: speaker.name,
         }
     })
