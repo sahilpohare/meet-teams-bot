@@ -130,6 +130,7 @@ export type MeetingParams = {
     custom_branding_bot_path?: string
     vocabulary: string[]
     force_lang: boolean
+    translation_lang?: string
 }
 
 export type MarkMomentParams = {

@@ -211,6 +211,9 @@ export class TranscriberSession {
                             parameters.force_lang === true
                                 ? googleToGladia(parameters.language)
                                 : undefined,
+                            parameters.translation_lang === true
+                                ? googleToGladia(parameters.translation_lang)
+                                : undefined,
                         )
                         console.log('[stopRecorder]', res.prediction.length)
                         console.log('[stopRecorder]', onResult)
