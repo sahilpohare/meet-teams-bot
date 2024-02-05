@@ -211,7 +211,7 @@ export class TranscriberSession {
                             parameters.force_lang === true
                                 ? googleToGladia(parameters.language)
                                 : undefined,
-                            parameters.translation_lang === true
+                            parameters.translation_lang != null
                                 ? googleToGladia(parameters.translation_lang)
                                 : undefined,
                         )
