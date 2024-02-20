@@ -1,15 +1,14 @@
 import * as asyncLib from 'async'
-import { Transcriber } from './Transcribe/Transcriber'
 import {
     Agenda,
-    RecognizerWord,
-    Word,
-    EditorWrapper,
     Asset,
+    EditorWrapper,
     Project,
+    RecognizerWord,
     api,
 } from 'spoke_api_js'
-import { SPEAKERS, parameters } from './background'
+import { Transcriber } from './Transcribe/Transcriber'
+import { parameters } from './background'
 import { newSerialQueue } from './queue'
 import { sleep } from './utils'
 
@@ -224,8 +223,6 @@ export async function waitUntilComplete(kill = false) {
         await spokeSession.upload_queue.drain()
         console.log('[waitForUpload]', 'after transcribe queue drain')
     }
-    // "Your video is available online"
-    await stopRecordServer(spokeSession)
 }
 
 async function unsetAllStream(): Promise<void> {

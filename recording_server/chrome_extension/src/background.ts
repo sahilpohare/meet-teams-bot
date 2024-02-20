@@ -1,7 +1,9 @@
-import * as record from './record'
-import { api, setConfig } from 'spoke_api_js'
-import { Project, Note } from 'spoke_api_js'
 import axios from 'axios'
+import { Note, Project, api, setConfig } from 'spoke_api_js'
+import { Transcriber } from './Transcribe/Transcriber'
+import * as record from './record'
+import * as State from './state'
+import { sleep } from './utils'
 
 type Speaker = {
     name: string
@@ -13,9 +15,6 @@ export let SPEAKERS: Speaker[] = []
 export let ATTENDEES: string[] = []
 
 export * from './state'
-import * as State from './state'
-import { sleep } from './utils'
-import { Transcriber } from './Transcribe/Transcriber'
 
 export function addDefaultHeader(name: string, value: string) {
     axios.defaults.headers.common[name] = value
@@ -145,6 +144,8 @@ export async function stopMediaRecorder() {
 export async function waitForUpload() {
     await record.waitUntilComplete()
     await Transcriber.TRANSCRIBER?.waitUntilComplete()
+    // "Your video is available online"
+    await record.stopRecordServer(record.SESSION)
 }
 
 export async function markMoment(

@@ -1,3 +1,4 @@
+import * as R from 'ramda'
 import {
     Asset,
     Editor,
@@ -7,10 +8,9 @@ import {
     Word,
     api,
 } from 'spoke_api_js'
-import * as R from 'ramda'
+import { TranscriptWithSpeaker } from './Transcribe/addSpeakerNames'
 import { SESSION, SpokeSession } from './record'
 import { parameters } from './state'
-import { TranscriptWithSpeaker } from './Transcribe/addSpeakerNames'
 
 export async function uploadEditorsTask(transcript: TranscriptWithSpeaker) {
     const spokeSession = SESSION as SpokeSession
@@ -29,12 +29,7 @@ export async function uploadEditorsTask(transcript: TranscriptWithSpeaker) {
     if (spokeSession.thumbnailPath == null) {
         console.log(`[resuming] extract audio and image`)
         try {
-            const extract = await api.extractAudioAndImage(
-                0,
-                1,
-                true,
-                SESSION!.id,
-            )
+            const extract = await api.extractImage(0, 1, SESSION!.id)
             spokeSession.thumbnailPath = extract.image_s3_path
         } catch (e) {
             console.error('error extracting image: ', e)
