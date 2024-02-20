@@ -37,7 +37,7 @@ export class Transcriber {
     /** Stops and restarts the recorder (to free some memory) and the recognizer (to update its tokens and language). */
     async transcribe(): Promise<void> {
         try {
-            let path = (await api.extractAudio(SESSION.id)).audio_s3_path
+            let path = (await api.extractAudio(SESSION!.id)).audio_s3_path
             let res = await api.transcribeWithGladia(
                 path,
                 parameters.vocabulary,

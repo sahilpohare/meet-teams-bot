@@ -138,11 +138,11 @@ export async function startRecording(
 
 export async function stopMediaRecorder() {
     await record.stop()
-    await Transcriber.TRANSCRIBER?.stop()
 }
 
 export async function waitForUpload() {
     await record.waitUntilComplete()
+    await Transcriber.TRANSCRIBER?.transcribe()
     await Transcriber.TRANSCRIBER?.waitUntilComplete()
     // "Your video is available online"
     await record.stopRecordServer(record.SESSION)
