@@ -1,17 +1,17 @@
-import {
-    api,
-    GladiaResult,
-    googleToGladia,
-    gladiaToGoogleLang,
-} from 'spoke_api_js'
-import * as R from 'ramda'
-import { parameters } from '../background'
-import { newSerialQueue, newTranscribeQueue } from '../queue'
 import * as asyncLib from 'async'
-import { START_RECORD_OFFSET, SESSION, CONTEXT } from '../record'
-import { wordPosterWorker } from './wordPosterWorker'
-import { summarizeWorker } from './summarizeWorker'
+import * as R from 'ramda'
 import RecordRTC, { StereoAudioRecorder } from 'recordrtc'
+import {
+    GladiaResult,
+    api,
+    gladiaToGoogleLang,
+    googleToGladia,
+} from 'spoke_api_js'
+import { parameters } from '../background'
+import { newTranscribeQueue } from '../queue'
+import { CONTEXT, SESSION, START_RECORD_OFFSET } from '../record'
+import { summarizeWorker } from './summarizeWorker'
+import { wordPosterWorker } from './wordPosterWorker'
 
 /**
  * Transcribes an audio stream using the recognizer of the underlying Node server.
@@ -130,9 +130,21 @@ export class Transcriber {
         } catch (e) {
             console.error('[waitUntilComplete]', 'error patching video')
         }
-        await this.summarizeWorker
+        try {
+            await this.summarizeWorker
+        } catch (e) {
+            console.error('error in summarize worker')
+        }
         if (SESSION?.project.id) {
-            api.endMeeting(SESSION?.project.id)
+            console.log('call end meeting trampoline')
+            try {
+                await api.endMeetingTrampoline(SESSION?.project.id)
+            } catch (e) {
+                console.error('error in endMeetingTranpoline', e)
+            }
+            console.log('after call end meeting trampoline')
+        } else {
+            console.error('SESSION?.project.id is undefined')
         }
     }
 
