@@ -576,7 +576,7 @@ function createTranscripts(videoInfo: VideoInformation): Partial<Transcript>[] {
         {
             speaker: videoInfo.speaker_name,
             words: [],
-            google_lang: parameters.language,
+            google_lang: parameters.detected_lang,
         },
     ]
     return transcripts

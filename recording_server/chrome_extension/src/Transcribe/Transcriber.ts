@@ -261,10 +261,8 @@ function onResult(json: GladiaResult, offset: number): void {
 
 /** Handles detected language. */
 function handleLanguage(language: string): void {
-    if (language === '' || parameters.language === language) return
-    const googleLang = gladiaToGoogleLang(language) ?? 'en-US'
-
-    parameters.language = googleLang
+    if (language === '' || parameters.detected_lang === language) return
+    parameters.detected_lang = gladiaToGoogleLang(language) ?? 'en-US'
 }
 
 /** Handles detected language. */

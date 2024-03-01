@@ -38,6 +38,7 @@ export type State = {
     vocabulary: string[]
     force_lang: boolean
     translation_lang?: string
+    detected_lang?: string
 }
 
 export type Preferences = {
@@ -66,6 +67,7 @@ export const parameters: State = {
     vocabulary: [],
     force_lang: false,
     translation_lang: undefined,
+    detected_lang: undefined,
 }
 
 export function addMeetingParams(meetingParams: MeetingParams) {

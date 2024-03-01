@@ -122,7 +122,7 @@ async function collectSentenceToAutoHighlight(
 ): Promise<Sentence[] | undefined> {
     const res: SummaryParam = {
         sentences: [],
-        lang: parameters.language,
+        lang: parameters.detected_lang,
     }
     let withNextIsMaxToken = false
 
