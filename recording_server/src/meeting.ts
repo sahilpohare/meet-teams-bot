@@ -110,6 +110,8 @@ export type StatusParams = {
     user_id: number
 }
 
+export type SpeechToTextProvider = 'Gladia'
+
 export type MeetingParams = {
     use_my_vocabulary: boolean
     language: string
@@ -131,6 +133,8 @@ export type MeetingParams = {
     vocabulary: string[]
     force_lang: boolean
     translation_lang?: string
+    speech_to_text?: SpeechToTextProvider
+    bot_id?: number
 }
 
 export type MarkMomentParams = {

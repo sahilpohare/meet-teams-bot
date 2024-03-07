@@ -138,7 +138,10 @@ export class Transcriber {
         if (SESSION?.project.id) {
             console.log('call end meeting trampoline')
             try {
-                await api.endMeetingTrampoline(SESSION?.project.id)
+                await api.endMeetingTrampoline(
+                    SESSION?.project.id,
+                    parameters.bot_id,
+                )
             } catch (e) {
                 console.error('error in endMeetingTranpoline', e)
             }

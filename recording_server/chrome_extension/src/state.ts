@@ -1,6 +1,8 @@
 import { ChangeAgenda, ChangeLanguage } from './background'
 import { MeetingProvider, Marker, Agenda } from 'spoke_api_js'
 
+export type SpeechToTextProvider = 'Gladia'
+
 export type MeetingParams = {
     use_my_vocabulary: boolean
     language: string
@@ -18,6 +20,8 @@ export type MeetingParams = {
     vocabulary: string[]
     force_lang: boolean
     translation_lang?: string
+    speech_to_text?: SpeechToTextProvider
+    bot_id?: number
 }
 
 export type State = {
@@ -39,6 +43,7 @@ export type State = {
     force_lang: boolean
     translation_lang?: string
     detected_lang?: string
+    bot_id?: number
 }
 
 export type Preferences = {
@@ -68,6 +73,7 @@ export const parameters: State = {
     force_lang: false,
     translation_lang: undefined,
     detected_lang: undefined,
+    bot_id: undefined,
 }
 
 export function addMeetingParams(meetingParams: MeetingParams) {
@@ -86,6 +92,7 @@ export function addMeetingParams(meetingParams: MeetingParams) {
     parameters.vocabulary = meetingParams.vocabulary
     parameters.force_lang = meetingParams.force_lang
     parameters.translation_lang = meetingParams.translation_lang
+    parameters.bot_id = meetingParams.bot_id
     console.log({ meetingParams })
     console.log({ parameters })
 }
