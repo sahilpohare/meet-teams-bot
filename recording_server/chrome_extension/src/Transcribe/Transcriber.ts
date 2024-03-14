@@ -171,7 +171,10 @@ export class Transcriber {
     /** Launches the workers. */
     private async launchWorkers(): Promise<void> {
         this.wordPosterWorker = wordPosterWorker()
-        this.summarizeWorker = summarizeWorker()
+
+        if (parameters.bot_id == null) {
+            this.summarizeWorker = summarizeWorker()
+        }
     }
     /** Gets and handles recognizer results every `interval` ms. */
 }
