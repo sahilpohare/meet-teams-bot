@@ -136,7 +136,13 @@ export class Transcriber {
             console.error('error in summarize worker')
         }
         if (SESSION?.project.id) {
-            console.log('call end meeting trampoline')
+            console.log(
+                'call end meeting trampoline',
+                'project id',
+                SESSION?.project.id,
+                'bot_id',
+                parameters.bot_id,
+            )
             try {
                 await api.endMeetingTrampoline(
                     SESSION?.project.id,
