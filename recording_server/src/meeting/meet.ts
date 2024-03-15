@@ -121,6 +121,22 @@ export async function joinMeeting(
     }
 
     await findShowEveryOne(page, false)
+
+    // Send a message in chat
+    try {
+        const CHAT_WITH_EVERYONE = 'button[aria-label="Chat with everyone"]'
+        const SEND_A_MESSAGE = 'button[aria-label="Send a message"]'
+        const message = "Hello, world! I'm a bot." // TODO
+
+        clickFirst(CHAT_WITH_EVERYONE)
+        await sleep(1000)
+        await page.keyboard.type(message)
+        clickFirst(SEND_A_MESSAGE)
+        clickFirst(CHAT_WITH_EVERYONE)
+    } catch (e) {
+        console.error('Error caught when sending message in chat', e)
+    }
+
     try {
         await page.$$eval('i', (elems) => {
             for (const e of elems) {
@@ -262,4 +278,14 @@ export async function waitForEndMeeting(
         }
         await sleep(5000)
     }
+}
+
+function clickFirst(selector: string) {
+    console.log(`clickFirst(${selector})`)
+    page.$$eval(selector, (elems) => {
+        for (const elem of elems) {
+            ;(elem as any).click()
+            break
+        }
+    })
 }
