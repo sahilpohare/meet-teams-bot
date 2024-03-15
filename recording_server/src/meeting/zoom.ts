@@ -128,10 +128,8 @@ async function bypass_modal(page: puppeteer.Page) {
     }
 }
 
-async function joinAudio(page: puppeteer.Page) {
+async function clickJoinAudio(page: puppeteer.Page) {
     try {
-        await screenshot(page, `findJoinAudio`)
-
         const [button] = await page.$x(
             "//button[contains(., 'Join Audio by Computer')]",
         )
@@ -143,24 +141,7 @@ async function joinAudio(page: puppeteer.Page) {
             CURRENT_MEETING.logger.info('see join audio button')
 
             await button.click()
-            await sleep(100)
-            try {
-                const [button] = await page.$x(
-                    "//button[contains(., 'Join Audio by Computer')]",
-                )
-                if (
-                    button &&
-                    button._remoteObject.description ===
-                        'button.zm-btn.join-audio-by-voip__join-btn.zm-btn--primary.zm-btn__outline--white.zm-btn--lg'
-                ) {
-                    CURRENT_MEETING.logger.error(
-                        'there still is the join audio button',
-                    )
-                }
-                await button.click()
-            } catch (e) {
-                CURRENT_MEETING.logger.error('no more join audio button')
-            }
+            await sleep(500)
             return true
         } else if (
             button &&
@@ -174,8 +155,6 @@ async function joinAudio(page: puppeteer.Page) {
             await page.click(selectorClose)
             await sleep(100)
             return true
-        } else {
-            console.log('no join audio button found')
         }
     } catch (e) {
         if (!(e instanceof puppeteer.errors.TimeoutError)) {
@@ -183,9 +162,32 @@ async function joinAudio(page: puppeteer.Page) {
         } else {
             CURRENT_MEETING.logger.info(`error in wait button join audio ${e}`)
         }
-        // break;
     }
     return false
+}
+
+async function joinAudio(page: puppeteer.Page) {
+    await screenshot(page, `findJoinAudio`)
+    if (await clickJoinAudio(page)) {
+        if (await clickJoinAudio(page)) {
+            CURRENT_MEETING.logger.error(
+                'there still was the join audio button',
+            )
+            if (await clickJoinAudio(page)) {
+                CURRENT_MEETING.logger.error(
+                    'there still was the join audio button',
+                )
+                if (await clickJoinAudio(page)) {
+                    CURRENT_MEETING.logger.error(
+                        'there still was the join audio button',
+                    )
+                }
+            }
+        }
+        return true
+    } else {
+        return false
+    }
 }
 
 async function joining(page: puppeteer.Page) {
