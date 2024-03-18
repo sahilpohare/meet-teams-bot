@@ -160,7 +160,7 @@ export async function startRecording(
     SESSION = newSession
 
     // console.log(`before media recorder start`)
-    MEDIA_RECORDER.start(30000)
+    MEDIA_RECORDER.start(10000)
     MEDIA_RECORDER.onerror = function (e) {
         console.error('media recorder error', e)
     }

@@ -1,9 +1,10 @@
 import * as asyncLib from 'async'
 import * as R from 'ramda'
-import { api, googleToGladia, sleep } from 'spoke_api_js'
+import { api, googleToGladia } from 'spoke_api_js'
 import { parameters } from '../background'
 import { newTranscribeQueue } from '../queue'
 import { SESSION, START_RECORD_TIMESTAMP } from '../record'
+import { sleep } from '../utils'
 import {
     RecognizerTranscript,
     parseGladia,
@@ -52,24 +53,28 @@ export class Transcriber {
         this.launchWorkers()
         this.rebootTimer = setInterval(() => {
             this.transcribeQueue.push(async () => {
-                await Transcriber.TRANSCRIBER?.transcribe()
+                await Transcriber.TRANSCRIBER?.transcribe(false)
             })
         }, TRANSCRIPTION_CHUNK_DURATION)
     }
 
-    async transcribe(): Promise<void> {
+    async transcribe(final: boolean): Promise<void> {
         let currentOffset = this.transcriptionOffset
         let newOffset = (Date.now() - START_RECORD_TIMESTAMP) / 1000
         this.transcriptionOffset = newOffset
+        await sleep(15000)
         console.log(
             'ready to do transcription between: ',
             currentOffset,
             newOffset,
         )
-        await sleep(30000)
         try {
             let path = (
-                await api.extractAudio(SESSION!.id, currentOffset, newOffset)
+                await api.extractAudio(
+                    SESSION!.id,
+                    currentOffset,
+                    final ? -1 : newOffset,
+                )
             ).audio_s3_path
             //TODO: delete audio
             let audio_url = `https://${parameters.s3_bucket}.s3.eu-west-3.amazonaws.com/${path}`
@@ -100,7 +105,7 @@ export class Transcriber {
     async stop(): Promise<void> {
         this.rebootTimer = setInterval(() => {})
         this.transcribeQueue.push(async () => {
-            await Transcriber.TRANSCRIBER?.transcribe()
+            await Transcriber.TRANSCRIBER?.transcribe(true)
         })
     }
     /**  Ends the transcribing, and destroys resources. */
