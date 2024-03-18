@@ -36,6 +36,7 @@ export type SpokeSession = {
     //last word transcribe time
     // complete_video_file_path: string,
     uploadChunkCounter: number
+    transcribedUntil: number
 }
 
 type VideoSize = {
@@ -151,6 +152,7 @@ export async function startRecording(
         completeEditors: [],
         words: [],
         uploadChunkCounter: 0,
+        transcribedUntil: 0,
 
         // complete_video_file_path,
     }

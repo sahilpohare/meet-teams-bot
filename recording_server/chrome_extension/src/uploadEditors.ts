@@ -5,53 +5,57 @@ import {
     EditorWrapper,
     Transcript,
     Video,
-    Word,
     api,
 } from 'spoke_api_js'
-import { TranscriptWithSpeaker } from './Transcribe/addSpeakerNames'
-import { SESSION, SpokeSession } from './record'
+import { Speaker } from './observeSpeakers'
+import { SESSION, START_RECORD_TIMESTAMP, SpokeSession } from './record'
 import { parameters } from './state'
 
-export async function uploadEditorsTask(transcript: TranscriptWithSpeaker) {
+export async function uploadEditorsTask(speakers: Speaker[]) {
+    let intervals = timestampToInterval(speakers)
+    intervals.pop()
     const spokeSession = SESSION as SpokeSession
-    if (spokeSession.project.complete_preview_path == null) {
-        try {
-            const preview = await api.generatePreview(SESSION!.id)
-            spokeSession.project.complete_preview_path = preview.s3_path
-            await api.patchProject({
-                id: spokeSession.project.id,
-                complete_preview_path: preview.s3_path,
-            })
-        } catch (e) {
-            console.error('error generating preview: ', e)
+    if (intervals.length > spokeSession.completeEditors.length) {
+        let interval = intervals[intervals.length - 1]
+        if (spokeSession.project.complete_preview_path == null) {
+            try {
+                const preview = await api.generatePreview(SESSION!.id)
+                spokeSession.project.complete_preview_path = preview.s3_path
+                await api.patchProject({
+                    id: spokeSession.project.id,
+                    complete_preview_path: preview.s3_path,
+                })
+            } catch (e) {
+                console.error('error generating preview: ', e)
+            }
         }
-    }
-    if (spokeSession.thumbnailPath == null) {
-        console.log(`[resuming] extract audio and image`)
-        try {
-            const extract = await api.extractImage(0, 1, SESSION!.id)
-            spokeSession.thumbnailPath = extract.image_s3_path
-        } catch (e) {
-            console.error('error extracting image: ', e)
+        if (spokeSession.thumbnailPath == null) {
+            console.log(`[resuming] extract audio and image`)
+            try {
+                const extract = await api.extractImage(0, 1, SESSION!.id)
+                spokeSession.thumbnailPath = extract.image_s3_path
+            } catch (e) {
+                console.error('error extracting image: ', e)
+            }
         }
-    }
 
-    console.log(`[resuming] uploadCompleteEditor`, transcript)
-    try {
-        const postableCompleteEditor = createEditorWrapper(
-            transcript,
-            spokeSession.project.id,
-            spokeSession.asset,
-        )
-        const completeEditor = await api.postCompleteEditor(
-            postableCompleteEditor,
-        )
-        insertIntoSortedArrayInPlace(
-            spokeSession.completeEditors,
-            R.clone(completeEditor),
-        )
-    } catch (e) {
-        console.error('[uploadEditorTasks] error posting editor', e)
+        console.log(`[resuming] uploadCompleteEditor`, interval)
+        try {
+            const postableCompleteEditor = createEditorWrapper(
+                interval,
+                spokeSession.project.id,
+                spokeSession.asset,
+            )
+            const completeEditor = await api.postCompleteEditor(
+                postableCompleteEditor,
+            )
+            insertIntoSortedArrayInPlace(
+                spokeSession.completeEditors,
+                R.clone(completeEditor),
+            )
+        } catch (e) {
+            console.error('[uploadEditorTasks] error posting editor', e)
+        }
     }
 }
 const insertIntoSortedArrayInPlace = (arr: EditorWrapper[], value) => {
@@ -74,18 +78,18 @@ const insertIntoSortedArrayInPlace = (arr: EditorWrapper[], value) => {
 }
 
 function createEditorWrapper(
-    videoInfo: TranscriptWithSpeaker,
+    speaker: SpeakerInterval,
     projectId: number,
     asset: Asset,
 ): EditorWrapper {
     return {
-        editor: createEditor(videoInfo, projectId) as Editor,
-        video: createVideo(videoInfo, asset) as Video,
+        editor: createEditor(speaker, projectId) as Editor,
+        video: createVideo(speaker, asset) as Video,
     }
 }
 
 function createEditor(
-    transcript: TranscriptWithSpeaker,
+    speaker: SpeakerInterval,
     projectId: number,
 ): Partial<Editor> {
     return {
@@ -95,37 +99,52 @@ function createEditor(
     } as Partial<Editor>
 }
 
-function createVideo(
-    transcript: TranscriptWithSpeaker,
-    asset: Asset,
-): Partial<Video> {
+function createVideo(speaker: SpeakerInterval, asset: Asset): Partial<Video> {
     return {
         s3_path: SESSION?.videoS3Path,
-        transcripts: createTranscripts(transcript) as Transcript[],
+        transcripts: createTranscripts(speaker) as Transcript[],
         thumbnail_path: SESSION?.thumbnailPath,
-        duration: transcript.endTime - transcript.startTime,
+        duration: speaker.end_time / 1000 - speaker.start_time / 1000,
         width: 0,
         height: 0,
-        audio_offset: transcript.startTime,
+        audio_offset: speaker.start_time / 1000,
         asset_id: asset.id,
         transcription_completed: true,
     }
 }
 
-function createTranscripts(
-    transcript: TranscriptWithSpeaker,
-): Partial<Transcript>[] {
+function createTranscripts(speaker: SpeakerInterval): Partial<Transcript>[] {
     const transcripts = [
         {
-            speaker: transcript.speaker,
-            words: transcript.words.map((w) => ({
-                text: w.value,
-                start_time: w.ts,
-                end_time: w.end_ts,
-                is_temporary: false,
-            })) as Word[],
+            speaker: speaker.speaker,
+            words: [],
             google_lang: parameters.language,
         },
     ]
     return transcripts
+}
+
+type SpeakerInterval = {
+    start_time: number
+    end_time: number
+    speaker: string
+}
+
+function timestampToInterval(speakers: Speaker[]): SpeakerInterval[] {
+    const intervals = speakers.map((speaker, index) => {
+        // For the last speaker, we might want to set a specific end timestamp.
+        // Here, we're simply using the next hour as an example.
+        const endTimestamp =
+            index < speakers.length - 1
+                ? speakers[index + 1].timestamp
+                : speaker.timestamp + 3600000
+
+        return {
+            start_time: speaker.timestamp - START_RECORD_TIMESTAMP,
+            end_time: endTimestamp - START_RECORD_TIMESTAMP,
+            speaker: speaker.name,
+        }
+    })
+
+    return intervals
 }

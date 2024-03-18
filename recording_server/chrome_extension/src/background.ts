@@ -3,6 +3,7 @@ import { Note, Project, api, setConfig } from 'spoke_api_js'
 import { Transcriber } from './Transcribe/Transcriber'
 import * as record from './record'
 import * as State from './state'
+import { uploadEditorsTask } from './uploadEditors'
 import { sleep } from './utils'
 
 type Speaker = {
@@ -68,7 +69,12 @@ function addListener() {
                 break
             }
             case 'REFRESH_SPEAKERS': {
+                const prevSpeakers = SPEAKERS
                 SPEAKERS = request.payload
+                if (SPEAKERS.length > prevSpeakers.length) {
+                    console.log('new speaker, pushing complete editor')
+                    uploadEditorsTask(SPEAKERS)
+                }
                 break
             }
             case 'OBSERVE_SPEAKERS': {
@@ -138,12 +144,19 @@ export async function startRecording(
 
 export async function stopMediaRecorder() {
     await record.stop()
+    const timestamp = new Date().getTime()
+    // add a last fake speaker to trigger the upload of the last editor ( generates an interval )
+    SPEAKERS.push({ name: 'END', timestamp })
+    await uploadEditorsTask(SPEAKERS)
+
+    console.log('stoping transcriber')
 }
 
 export async function waitForUpload() {
     await record.waitUntilComplete()
-    await Transcriber.TRANSCRIBER?.transcribe()
+    await Transcriber.TRANSCRIBER?.stop()
     await Transcriber.TRANSCRIBER?.waitUntilComplete()
+
     // "Your video is available online"
     await record.stopRecordServer(record.SESSION)
 }

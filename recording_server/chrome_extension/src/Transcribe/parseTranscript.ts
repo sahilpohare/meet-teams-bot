@@ -1,6 +1,5 @@
 import { GladiaResult, RecognizerWord, gladiaToGoogleLang } from 'spoke_api_js'
 import { parameters } from '../state'
-import { SESSION, START_RECORD_OFFSET } from '../record'
 
 export type RecognizerTranscript = {
     speaker: number
@@ -26,8 +25,8 @@ export function parseGladia(
             let words = p.words.flatMap((word) => {
                 let ts = word.time_begin
                 let end_ts = word.time_end
-                ts += offset - START_RECORD_OFFSET
-                end_ts += offset - START_RECORD_OFFSET
+                ts += offset
+                end_ts += offset
 
                 return {
                     type: 'text',
@@ -39,8 +38,8 @@ export function parseGladia(
             })
 
             return {
-                startTime: p.time_begin + offset - START_RECORD_OFFSET,
-                endTime: p.time_end + offset - START_RECORD_OFFSET,
+                startTime: p.time_begin + offset,
+                endTime: p.time_end + offset,
                 speaker: speaker,
                 words: words,
                 language: gladiaToGoogleLang(p.language)
