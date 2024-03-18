@@ -1,29 +1,26 @@
 import * as asyncLib from 'async'
 import * as R from 'ramda'
-import RecordRTC, { StereoAudioRecorder } from 'recordrtc'
-import {
-    GladiaResult,
-    api,
-    gladiaToGoogleLang,
-    googleToGladia,
-} from 'spoke_api_js'
-import { parameters } from '../background'
+import { api, GladiaResult, googleToGladia } from 'spoke_api_js'
+import { parameters, SPEAKERS } from '../background'
 import { newTranscribeQueue } from '../queue'
-import { CONTEXT, SESSION, START_RECORD_OFFSET } from '../record'
+import { SESSION } from '../record'
+import { uploadEditorsTask } from '../uploadEditors'
+import { addSpeakerNames } from './addSpeakerNames'
+import { parseGladia } from './parseTranscript'
 import { summarizeWorker } from './summarizeWorker'
-import { wordPosterWorker } from './wordPosterWorker'
+
+// milisseconds transcription chunk duration
+const TRANSCRIPTION_CHUNK_DURATION = 60_000 * 3
+
 
 /**
  * Transcribes an audio stream using the recognizer of the underlying Node server.
  */
-
 export class Transcriber {
     static TRANSCRIBER: Transcriber | undefined
     public stopped = false
-    private transcriber_session: TranscriberSession | undefined
     private rebootTimer: NodeJS.Timer
     private audioStream: MediaStream
-    private wordPosterWorker: Promise<void>
     private summarizeWorker: Promise<void>
     private pollTimer: NodeJS.Timer | undefined
     private transcribeQueue: asyncLib.QueueObject<() => void>
@@ -34,74 +31,36 @@ export class Transcriber {
     }
     async start(audioStream: MediaStream): Promise<void> {
         this.launchWorkers()
-        this.transcriber_session = new TranscriberSession(audioStream)
-
-        this.transcriber_session.startRecorder()
-        this.rebootTimer = setInterval(
-            () => this.reboot(),
-            // restart transcription every 9 minutes as microsoft token expriration
-            60_000 * 3,
-        )
     }
 
     /** Stops and restarts the recorder (to free some memory) and the recognizer (to update its tokens and language). */
-    async reboot(): Promise<void> {
-        // We reboot the recorder as well to (hopefully) reduce memory usage
-        // We restart instantly to (hopefully) resume where we just left off
-        let newTranscriber
+    async transcribe(): Promise<void> {
         try {
-            newTranscriber = new TranscriberSession(this.audioStream.clone())
-            newTranscriber.startRecorder()
-            console.log('[reboot]', 'newTranscriber = new TranscriberSession')
+            let path = (await api.extractAudio(SESSION!.id)).audio_s3_path
+            let res = await api.transcribeWithGladia(
+                path,
+                parameters.vocabulary,
+                parameters.force_lang === true
+                    ? googleToGladia(parameters.language)
+                    : undefined,
+            )
+            await onResult(res, 0)
         } catch (e) {
-            console.error('[reboot]', 'error stopping recorder', e)
+            console.error('an error occured calling gladia, ', e)
         }
-        const transcriberSession = this.transcriber_session
-        this.transcribeQueue.push(async () => {
-            try {
-                console.log(
-                    '[reboot]',
-                    'before Transcriber.TRANSCRIBER.stopRecorder',
-                )
-                await transcriberSession?.stopRecorder()
-                console.log(
-                    '[reboot]',
-                    'after Transcriber.TRANSCRIBER.stopRecorder',
-                )
-            } catch (e) {
-                console.error('[reboot]', 'error stopping recorder', e)
-            }
-        })
-        // Reboot the recognizer (audio data is buffered in the meantime)
-        this.transcriber_session = newTranscriber
     }
 
     /**  Ends the transcribing, and destroys resources. */
-    async stop(): Promise<void> {
-        clearInterval(this.rebootTimer)
-        try {
-            await this.transcriber_session?.stopRecorder()
-        } catch (e) {
-            console.error('[stop]', 'error stopping recorder', e)
-        }
-
-        this.transcribeQueue.push(async () => {
-            return
-        })
-
-        await this.transcribeQueue.drain()
-
-        // Retreive last results that weren't polled
-    }
-
     /** Waits for the workers to finish, and destroys the transcbriber. */
     async waitUntilComplete(): Promise<void> {
         this.stopped = true
-        await this.wordPosterWorker
 
         if (
             SESSION?.project.id &&
-            R.all((v) => v.words.length === 0, SESSION.video_informations)
+            R.all(
+                (e) => e.video.transcripts[0]?.words.length === 0,
+                SESSION.completeEditors,
+            )
         ) {
             try {
                 await api.patchProject({
@@ -114,26 +73,9 @@ export class Transcriber {
         }
 
         try {
-            if (!SESSION) return
-
-            for (const infos of SESSION.video_informations) {
-                const video = infos.complete_editor?.video
-
-                if (video != null && video.transcription_completed === false) {
-                    await api.patchVideo({
-                        id: video.id,
-                        transcription_completed: true,
-                    })
-                    video.transcription_completed = true
-                }
-            }
-        } catch (e) {
-            console.error('[waitUntilComplete]', 'error patching video')
-        }
-        try {
             await this.summarizeWorker
         } catch (e) {
-            console.error('error in summarize worker')
+            console.error('error in summarizeWorker', e)
         }
         if (SESSION?.project.id) {
             console.log(
@@ -164,21 +106,25 @@ export class Transcriber {
 
         this.transcribeQueue = newTranscribeQueue()
         // Simply not to have undefined properties
-        this.wordPosterWorker = new Promise((resolve) => resolve())
         this.summarizeWorker = new Promise((resolve) => resolve())
     }
 
     /** Launches the workers. */
     private async launchWorkers(): Promise<void> {
+<<<<<<< HEAD
         this.wordPosterWorker = wordPosterWorker()
 
         if (parameters.bot_id == null) {
             this.summarizeWorker = summarizeWorker()
         }
+=======
+        this.summarizeWorker = summarizeWorker()
+>>>>>>> gladia2
     }
     /** Gets and handles recognizer results every `interval` ms. */
 }
 
+<<<<<<< HEAD
 export class TranscriberSession {
     private recorder: RecordRTC | undefined
     private offset: number
@@ -251,14 +197,17 @@ export class TranscriberSession {
         })
     }
 }
+=======
+let NO_TRANSCRIPT_DURATION = 0
+>>>>>>> gladia2
 
 /** Gets and handles recognizer results. */
-function onResult(json: GladiaResult, offset: number): void {
+async function onResult(json: GladiaResult, offset: number) {
     console.log('[onResult] ')
-    for (const prediction of json.prediction) {
-        const language = prediction.language
-        const words = prediction.words
+    if (R.all((v) => v.words.length === 0, json.prediction)) {
+        NO_TRANSCRIPT_DURATION += TRANSCRIPTION_CHUNK_DURATION
 
+<<<<<<< HEAD
         if (language) {
             handleLanguage(language)
         }
@@ -308,8 +257,27 @@ function handleResult(
                 })
             } else {
                 console.error('[handleResult]', 'SESSION is null')
+=======
+        if (NO_TRANSCRIPT_DURATION > MAX_NO_TRANSCRIPT_DURATION) {
+            let params = {
+                session_id: parameters.session_id,
+                user_token: parameters.user_token,
+>>>>>>> gladia2
             }
+            console.error('no speaker since too long')
+            api.stopBot(params)
         }
     }
-    console.log('[handleResult]', new Date(), words.length)
+    let transcripts = parseGladia(json, offset)
+    console.log('transcripts after parsing gladia', transcripts)
+    let transcriptsWithSpeaker = addSpeakerNames(transcripts, SPEAKERS)
+    console.log('transcripts with speakers', transcriptsWithSpeaker)
+    let prevAudioOffset = 0
+    for (let t of transcriptsWithSpeaker) {
+        if (t.startTime === prevAudioOffset) {
+            console.error('transcript with same offset as previous one')
+        }
+        prevAudioOffset = t.startTime
+        await uploadEditorsTask(R.clone(t))
+    }
 }
