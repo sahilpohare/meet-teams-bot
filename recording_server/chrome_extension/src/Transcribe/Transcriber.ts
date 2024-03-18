@@ -1,10 +1,15 @@
 import * as asyncLib from 'async'
 import * as R from 'ramda'
-import { api, GladiaResult, googleToGladia, Utterances } from 'spoke_api_js'
+import { api, googleToGladia, sleep } from 'spoke_api_js'
 import { parameters } from '../background'
 import { newTranscribeQueue } from '../queue'
 import { SESSION, START_RECORD_TIMESTAMP } from '../record'
-import { parseGladia } from './parseTranscript'
+import {
+    RecognizerTranscript,
+    parseGladia,
+    parseRunPod,
+} from './parseTranscript'
+import { speakerWorker } from './speakerWorker'
 import { summarizeWorker } from './summarizeWorker'
 import { wordPosterWorker } from './wordPosterWorker'
 
@@ -20,6 +25,7 @@ export class Transcriber {
     private rebootTimer: NodeJS.Timer
     private audioStream: MediaStream
     private summarizeWorker: Promise<void>
+    private speakerWorker: Promise<void>
     private pollTimer: NodeJS.Timer | undefined
     public transcribeQueue: asyncLib.QueueObject<() => void>
     private wordPosterWorker: Promise<void>
@@ -35,6 +41,7 @@ export class Transcriber {
         this.transcribeQueue = newTranscribeQueue()
         // Simply not to have undefined properties
         this.summarizeWorker = new Promise((resolve) => resolve())
+        this.speakerWorker = new Promise((resolve) => resolve())
         this.wordPosterWorker = new Promise((resolve) => resolve())
     }
     static async init(audioStream: MediaStream): Promise<void> {
@@ -52,13 +59,14 @@ export class Transcriber {
 
     async transcribe(): Promise<void> {
         let currentOffset = this.transcriptionOffset
-        let newOffset = Date.now() - START_RECORD_TIMESTAMP / 1000
+        let newOffset = (Date.now() - START_RECORD_TIMESTAMP) / 1000
         this.transcriptionOffset = newOffset
         console.log(
             'ready to do transcription between: ',
             currentOffset,
             newOffset,
         )
+        await sleep(30000)
         try {
             let path = (
                 await api.extractAudio(SESSION!.id, currentOffset, newOffset)
@@ -66,14 +74,24 @@ export class Transcriber {
             //TODO: delete audio
             let audio_url = `https://${parameters.s3_bucket}.s3.eu-west-3.amazonaws.com/${path}`
             console.log('audio url', audio_url)
-            let res = await api.transcribeWithGladia(
-                audio_url,
-                parameters.vocabulary,
-                parameters.force_lang === true
-                    ? googleToGladia(parameters.language)
-                    : undefined,
-            )
-            await onResult(res, currentOffset)
+            if (true) {
+                let res = await api.transcribeWithGladia(
+                    audio_url,
+                    parameters.vocabulary,
+                    parameters.force_lang === true
+                        ? googleToGladia(parameters.language)
+                        : undefined,
+                )
+                let transcripts = parseGladia(res, currentOffset)
+                await onResult(transcripts, currentOffset)
+            } else {
+                let res = await api.recognizeRunPod(
+                    audio_url,
+                    parameters.vocabulary,
+                )
+                let transcripts = parseRunPod(res, currentOffset)
+                await onResult(transcripts, currentOffset)
+            }
         } catch (e) {
             console.error('an error occured calling gladia, ', e)
         }
@@ -113,6 +131,7 @@ export class Transcriber {
                 console.error('[waitUntilComplete]', 'error patching project')
             }
         }
+        await this.speakerWorker
         await this.wordPosterWorker
 
         try {
@@ -145,6 +164,7 @@ export class Transcriber {
     /** Launches the workers. */
     private async launchWorkers(): Promise<void> {
         this.wordPosterWorker = wordPosterWorker()
+        this.speakerWorker = speakerWorker()
 
         if (parameters.bot_id == null) {
             this.summarizeWorker = summarizeWorker()
@@ -157,11 +177,10 @@ let NO_TRANSCRIPT_DURATION = 0
 let MAX_NO_TRANSCRIPT_DURATION = 60_000 * 3
 
 /** Gets and handles recognizer results. */
-async function onResult(json: GladiaResult, offset: number) {
+async function onResult(transcripts: RecognizerTranscript[], offset: number) {
     console.log('[onResult] ')
     //TODO REPORT
-    let utterances: Utterances[] = json.transcription.utterances
-    if (R.all((x) => x.words.length === 0, utterances)) {
+    if (R.all((x) => x.words.length === 0, transcripts)) {
         NO_TRANSCRIPT_DURATION += TRANSCRIPTION_CHUNK_DURATION
 
         if (NO_TRANSCRIPT_DURATION > MAX_NO_TRANSCRIPT_DURATION) {
@@ -173,7 +192,6 @@ async function onResult(json: GladiaResult, offset: number) {
             api.stopBot(params)
         }
     }
-    let transcripts = parseGladia(json, offset)
     console.log('transcripts after parsing gladia', transcripts)
     for (let t of transcripts) {
         for (let w of t.words) {
