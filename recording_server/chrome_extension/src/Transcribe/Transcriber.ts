@@ -1,6 +1,6 @@
 import * as asyncLib from 'async'
 import * as R from 'ramda'
-import { api, GladiaResult, googleToGladia } from 'spoke_api_js'
+import { api, GladiaResult, googleToGladia, Utterances } from 'spoke_api_js'
 import { parameters } from '../background'
 import { newTranscribeQueue } from '../queue'
 import { SESSION, START_RECORD_TIMESTAMP } from '../record'
@@ -64,8 +64,10 @@ export class Transcriber {
                 await api.extractAudio(SESSION!.id, currentOffset, newOffset)
             ).audio_s3_path
             //TODO: delete audio
+            let audio_url = `https://${parameters.s3_bucket}.s3.eu-west-3.amazonaws.com/${path}`
+            console.log('audio url', audio_url)
             let res = await api.transcribeWithGladia(
-                path,
+                audio_url,
                 parameters.vocabulary,
                 parameters.force_lang === true
                     ? googleToGladia(parameters.language)
@@ -158,7 +160,8 @@ let MAX_NO_TRANSCRIPT_DURATION = 60_000 * 3
 async function onResult(json: GladiaResult, offset: number) {
     console.log('[onResult] ')
     //TODO REPORT
-    if (R.all((v) => v.words.length === 0, json.prediction)) {
+    let utterances: Utterances[] = json.transcription.utterances
+    if (R.all((x) => x.words.length === 0, utterances)) {
         NO_TRANSCRIPT_DURATION += TRANSCRIPTION_CHUNK_DURATION
 
         if (NO_TRANSCRIPT_DURATION > MAX_NO_TRANSCRIPT_DURATION) {

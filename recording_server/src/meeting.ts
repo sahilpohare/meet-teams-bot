@@ -1,22 +1,22 @@
 import * as puppeteer from 'puppeteer'
-import { notifyApp } from './calendar'
 import { Page } from 'puppeteer'
+import { Agenda, MeetingProvider, Note } from 'spoke_api_js'
+import { notifyApp } from './calendar'
+import { delSessionInRedis } from './instance'
+import { Logger, uploadLog } from './logger'
 import {
-    openBrowser,
     findBackgroundPage,
-    listenPage,
-    removeListenPage,
     getCachedExtensionId,
+    listenPage,
+    openBrowser,
+    removeListenPage,
 } from './puppeteer'
 import { sleep } from './utils'
-import { delSessionInRedis } from './instance'
-import { Agenda, Note, MeetingProvider } from 'spoke_api_js'
-import { Logger, uploadLog } from './logger'
 
+import { BrandingHandle, generateBranding, playBranding } from './branding'
+import * as MeetProvider from './meeting/meet'
 import * as TeamsProvider from './meeting/teams'
 import * as ZoomProvider from './meeting/zoom'
-import * as MeetProvider from './meeting/meet'
-import { BrandingHandle, generateBranding, playBranding } from './branding'
 
 function detectMeetingProvider(url: string) {
     if (url.includes('https://teams')) {
@@ -284,7 +284,7 @@ export async function startRecordMeeting(meetingParams: MeetingParams) {
                 const w = window as any
                 return await w.startRecording(meetingParams)
             },
-            meetingParams,
+            { ...meetingParams, s3_bucket: process.env.AWS_S3_BUCKET },
         )
         CURRENT_MEETING.logger.info('startRecording called')
 

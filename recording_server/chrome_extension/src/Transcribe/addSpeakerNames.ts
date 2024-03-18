@@ -13,7 +13,7 @@ export function addSpeakerNames(
     transcripts: RecognizerTranscript[],
     speakers: Speaker[],
 ): TranscriptWithSpeaker[] {
-    let speakerIntervals = timestampToInterval(speakers)
+    //    let speakerIntervals = timestampToInterval(speakers)
     return []
 
     //    let speakerScores: Map<number, Map<string, number>> = new Map()

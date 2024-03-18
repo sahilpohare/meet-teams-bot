@@ -13,7 +13,7 @@ export function parseGladia(
     offset: number,
 ): RecognizerTranscript[] {
     return mergeAdjacentTranscripts(
-        apiResponse.prediction.map((p) => {
+        apiResponse.transcription.utterances.map((p) => {
             if (p.language) {
                 handleLanguage(p.language)
             }
@@ -23,8 +23,8 @@ export function parseGladia(
             }
 
             let words = p.words.flatMap((word) => {
-                let ts = word.time_begin
-                let end_ts = word.time_end
+                let ts = word.start
+                let end_ts = word.end
                 ts += offset
                 end_ts += offset
 
@@ -38,8 +38,8 @@ export function parseGladia(
             })
 
             return {
-                startTime: p.time_begin + offset,
-                endTime: p.time_end + offset,
+                startTime: p.start + offset,
+                endTime: p.end + offset,
                 speaker: speaker,
                 words: words,
                 language: gladiaToGoogleLang(p.language)
