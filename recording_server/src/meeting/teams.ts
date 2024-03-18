@@ -90,6 +90,56 @@ export async function openMeetingPage(
     return page
 }
 
+export async function innerTextWithSelector(
+    page: puppeteer.Page,
+    selector: string,
+    message: string,
+    iterations: number,
+): Promise<boolean> {
+    let i = 0
+    let continueButton = false
+    while (!continueButton && i < iterations) {
+        try {
+            continueButton = await page.evaluate(
+                (selector, i, message) => {
+                    var iframe = document.querySelectorAll('iframe')[0]
+                    var documentDansIframe =
+                        iframe.contentDocument || iframe.contentWindow.document
+
+                    let elements
+                    if (i % 2 === 0) {
+                        elements = Array.from(
+                            documentDansIframe.querySelectorAll(selector),
+                        )
+                    } else {
+                        elements = Array.from(
+                            document.querySelectorAll(selector),
+                        )
+                    }
+
+                    for (const e of elements) {
+                        let elem = e as any
+                        elem.innerText = message
+                        return true
+                    }
+                    return false
+                },
+                selector,
+                i,
+                message,
+            )
+        } catch (e) {
+            console.error('failed to find button', e)
+        }
+        await sleep(1000)
+        console.log(
+            `element with selector ${selector} clicked:`,
+            continueButton,
+        )
+        i += 1
+    }
+    return continueButton
+}
 export async function clickWithSelector(
     page: puppeteer.Page,
     selector: string,
@@ -219,20 +269,12 @@ export async function joinMeeting(
     meetingParams: MeetingParams,
 ): Promise<void> {
     CURRENT_MEETING.logger.info('joining meeting')
-    // await sleep(1000000)
 
     await clickWithInnerText(page, 'button', 'Continue without audio or video')
-
-    //await clickWithInnerText(page, 'a', 'Use the web app instead')
     await sleep(2000)
-
-    // await clickWithInnerText(page, 'button', 'Join now')
     await page.keyboard.type(meetingParams.bot_name)
     console.log(`botname typed`)
-
-    //await clickWithInnerText(page, 'button', 'Join now')
     await clickWithInnerText(page, 'button', 'Join now')
-
     await screenshot(page, `afterjoinnow`)
 
     // wait for the view button
@@ -247,6 +289,26 @@ export async function joinMeeting(
     if (!(await clickWithInnerText(page, 'button', 'Speaker', 300))) {
         throw 'timeout accepting the bot'
     }
+
+    function clickFirst(selector: string) {
+        console.log(`clickFirst(${selector})`)
+        return page.$$eval(selector, (elems) => {
+            for (const elem of elems) {
+                ;(elem as any).click()
+                break
+            }
+        })
+    }
+
+    const message = `Hello, world! I'm a bot.`
+    await clickWithSelector(page, '#chat-button', 50)
+    await innerTextWithSelector(page, 'div[data-tid="ckeditor"] p', message, 50)
+    await clickWithSelector(
+        page,
+        'button[data-tid="newMessageCommands-send"]',
+        50,
+    )
+    await clickWithSelector(page, '#chat-button', 50)
 }
 
 export async function waitForEndMeeting(
