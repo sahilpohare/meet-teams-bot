@@ -122,29 +122,31 @@ export async function joinMeeting(
 
     await findShowEveryOne(page, false)
 
-    // Send a message in chat
-    try {
-        const CHAT_WITH_EVERYONE = 'button[aria-label="Chat with everyone"]'
-        const SEND_A_MESSAGE = 'button[aria-label="Send a message"]'
-        const message = "Hello, world! I'm a bot." // TODO
+    // Send enter message in chat
+    if (meetingParams.enter_message) {
+        try {
+            const CHAT_BUTTON_SELECTOR =
+                'button[aria-label="Chat with everyone"]'
+            const CHAT_SEND_SELECTOR = 'button[aria-label="Send a message"]'
 
-        function clickFirst(selector: string) {
-            console.log(`clickFirst(${selector})`)
-            return page.$$eval(selector, (elems) => {
-                for (const elem of elems) {
-                    ;(elem as any).click()
-                    break
-                }
-            })
+            function clickFirst(selector: string) {
+                console.log(`clickFirst(${selector})`)
+                return page.$$eval(selector, (elems) => {
+                    for (const elem of elems) {
+                        ;(elem as any).click()
+                        break
+                    }
+                })
+            }
+
+            await clickFirst(CHAT_BUTTON_SELECTOR)
+            await sleep(1000)
+            await page.keyboard.type(meetingParams.enter_message)
+            await clickFirst(CHAT_SEND_SELECTOR)
+            await clickFirst(CHAT_BUTTON_SELECTOR)
+        } catch (e) {
+            console.error('Unable to send enter message in chat', e)
         }
-
-        await clickFirst(CHAT_WITH_EVERYONE)
-        await sleep(1000)
-        await page.keyboard.type(message)
-        await clickFirst(SEND_A_MESSAGE)
-        await clickFirst(CHAT_WITH_EVERYONE)
-    } catch (e) {
-        console.error('Error caught when sending message in chat', e)
     }
 
     try {

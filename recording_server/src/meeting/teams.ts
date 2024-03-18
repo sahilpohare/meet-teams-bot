@@ -290,25 +290,37 @@ export async function joinMeeting(
         throw 'timeout accepting the bot'
     }
 
-    function clickFirst(selector: string) {
-        console.log(`clickFirst(${selector})`)
-        return page.$$eval(selector, (elems) => {
-            for (const elem of elems) {
-                ;(elem as any).click()
-                break
-            }
-        })
-    }
+    // Send enter message in chat
+    if (meetingParams.enter_message != null) {
+        const ITERATIONS = 50
+        const CHAT_BUTTON_SELECTOR = 'button[data-tid="chat-button"]'
+        const CHAT_INPUT_SELECTOR = 'div[data-tid="ckeditor"] p'
+        const CHAT_SEND_SELECTOR = 'button[data-tid="newMessageCommands-send"]'
 
-    const message = `Hello, world! I'm a bot.`
-    await clickWithSelector(page, '#chat-button', 50)
-    await innerTextWithSelector(page, 'div[data-tid="ckeditor"] p', message, 50)
-    await clickWithSelector(
-        page,
-        'button[data-tid="newMessageCommands-send"]',
-        50,
-    )
-    await clickWithSelector(page, '#chat-button', 50)
+        function clickFirst(selector: string) {
+            console.log(`clickFirst(${selector})`)
+            return page.$$eval(selector, (elems) => {
+                for (const elem of elems) {
+                    ;(elem as any).click()
+                    break
+                }
+            })
+        }
+
+        try {
+            await clickWithSelector(page, CHAT_BUTTON_SELECTOR, ITERATIONS)
+            await innerTextWithSelector(
+                page,
+                CHAT_INPUT_SELECTOR,
+                meetingParams.enter_message,
+                ITERATIONS,
+            )
+            await clickWithSelector(page, CHAT_SEND_SELECTOR, ITERATIONS)
+            await clickWithSelector(page, CHAT_BUTTON_SELECTOR, ITERATIONS)
+        } catch (e) {
+            console.error('Unable to send enter message in chat', e)
+        }
+    }
 }
 
 export async function waitForEndMeeting(
