@@ -135,6 +135,7 @@ export async function joinMeeting(
                 throw 'Timeout waiting for meeting to start'
             }
         }
+
         try {
             await screenshot(page, `findJoinAudio`)
             await page.waitForSelector('.zm-btn.join-audio-by-voip__join-btn', {
@@ -214,10 +215,10 @@ export async function joinMeeting(
                     `error in wait button join audio ${e}`,
                 )
             }
-            // break;
         } finally {
             i++
         }
+
         // meeting didnt start
         try {
             await page.waitForSelector(
@@ -256,9 +257,36 @@ export async function joinMeeting(
         }
     }
 
+    // Send a message in chat
+    try {
+        const OPEN_THE_CHAT_PANE = 'button[aria-label="open the chat pane"]'
+        const CHAT_TEXTAREA = 'textarea.chat-box__chat-textarea'
+        const CLOSE_THE_CHAT_PANE = 'button[aria-label="close the chat pane"]'
+        const message = "Hello, world! I'm a bot." // TODO
+
+        function clickFirst(selector: string) {
+            console.log(`clickFirst(${selector})`)
+            return page.$$eval(selector, (elems) => {
+                for (const elem of elems) {
+                    ;(elem as any).click()
+                    break
+                }
+            })
+        }
+
+        await clickFirst(OPEN_THE_CHAT_PANE)
+        await page.focus(CHAT_TEXTAREA)
+        await page.keyboard.type(message)
+        await page.type(CHAT_TEXTAREA, '\n')
+        await clickFirst(CLOSE_THE_CHAT_PANE)
+    } catch (e) {
+        console.error('Error caught when sending message in chat', e)
+    }
+
     try {
         await joinCamera(page)
     } catch (e) {}
+
     CURRENT_MEETING.logger.info('wait for camera done')
 }
 
