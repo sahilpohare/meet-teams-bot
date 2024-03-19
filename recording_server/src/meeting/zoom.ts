@@ -168,26 +168,27 @@ async function clickJoinAudio(page: puppeteer.Page) {
 
 async function joinAudio(page: puppeteer.Page) {
     await screenshot(page, `findJoinAudio`)
-    if (await clickJoinAudio(page)) {
+    let audioButtonClicked = false
+    for (let i = 0; i < 10; i++) {
         if (await clickJoinAudio(page)) {
-            CURRENT_MEETING.logger.error(
-                'there still was the join audio button',
-            )
-            if (await clickJoinAudio(page)) {
+            if (audioButtonClicked) {
                 CURRENT_MEETING.logger.error(
                     'there still was the join audio button',
+                    i,
                 )
-                if (await clickJoinAudio(page)) {
-                    CURRENT_MEETING.logger.error(
-                        'there still was the join audio button',
-                    )
-                }
+            }
+            audioButtonClicked = true
+            await sleep(1000)
+        } else {
+            // if can't click on button and the button was cliced return true
+            if (audioButtonClicked) {
+                return true
+            } else {
+                break
             }
         }
-        return true
-    } else {
-        return false
     }
+    return audioButtonClicked
 }
 
 async function joining(page: puppeteer.Page) {
