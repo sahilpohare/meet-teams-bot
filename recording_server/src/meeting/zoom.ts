@@ -1,9 +1,8 @@
 import * as puppeteer from 'puppeteer'
 import { Page } from 'puppeteer'
-import { sleep } from '../utils'
 import { CURRENT_MEETING, MeetingParams } from '../meeting'
-import axios from 'axios'
 import { screenshot } from '../puppeteer'
+import { sleep } from '../utils'
 
 const url_parse = require('url-parse')
 
@@ -99,17 +98,7 @@ export function getMeetingLink(
     return `${MEETINGJS_BASEURL}?meeting_id=${meeting_id}&password=${password}&role=${role}&name=${bot_name}`
 }
 
-export async function joinMeeting(
-    page: puppeteer.Page,
-    meetingParams: MeetingParams,
-    iterationsMax?: number,
-): Promise<void> {
-    //default try iterations is 60 times
-    const meetingUrl = meetingParams.meeting_url
-    let waitingButton = false
-    await sleep(1000)
-
-    let clicked = false
+async function clickJoinMeetingButton(page: puppeteer.Page) {
     const buttonJoinClicked = await page.$$eval('button', (elems) => {
         for (const e of elems) {
             let elem = e as any
@@ -122,139 +111,129 @@ export async function joinMeeting(
         return false
     })
     console.log({ buttonJoinClicked })
+}
+
+async function bypass_modal(page: puppeteer.Page) {
+    try {
+        CURRENT_MEETING.logger.info('[joinMeeting] try to find modal')
+        let element = await findModal(page)
+        if (element != null) {
+            CURRENT_MEETING.logger.info('[joinMeeting] found modal clicking')
+            await continueModal(page, 'joinMeeting')
+        } else {
+            CURRENT_MEETING.logger.info('[joinMeeting] modale not found')
+        }
+    } catch (e) {
+        CURRENT_MEETING.logger.error('[joinMeeting] error finding modale')
+    }
+}
+
+async function clickJoinAudio(page: puppeteer.Page) {
+    try {
+        const [button] = await page.$x(
+            "//button[contains(., 'Join Audio by Computer')]",
+        )
+        if (
+            button &&
+            button._remoteObject.description ===
+                'button.zm-btn.join-audio-by-voip__join-btn.zm-btn--primary.zm-btn__outline--white.zm-btn--lg'
+        ) {
+            CURRENT_MEETING.logger.info('see join audio button')
+
+            await button.click()
+            await sleep(500)
+            return true
+        } else if (
+            button &&
+            button._remoteObject.description ===
+                'button.zm-btn.join-audio-by-voip__join-btn.zm-btn--brown.zm-btn__outline--white.zm-btn--lg'
+        ) {
+            CURRENT_MEETING.logger.info('see leave audio button')
+            const selectorClose =
+                '.zm-btn.join-dialog__close.zm-btn--default.zm-btn__outline--blue'
+            await page.waitForSelector(selectorClose)
+            await page.click(selectorClose)
+            await sleep(100)
+            return true
+        }
+    } catch (e) {
+        if (!(e instanceof puppeteer.errors.TimeoutError)) {
+            CURRENT_MEETING.logger.info(`in wait for audio timeout: ${e}`)
+        } else {
+            CURRENT_MEETING.logger.info(`error in wait button join audio ${e}`)
+        }
+    }
+    return false
+}
+
+async function joinAudio(page: puppeteer.Page) {
+    await screenshot(page, `findJoinAudio`)
+    let audioButtonClicked = false
+    for (let i = 0; i < 10; i++) {
+        if (await clickJoinAudio(page)) {
+            if (audioButtonClicked) {
+                CURRENT_MEETING.logger.error(
+                    'there still was the join audio button',
+                    i,
+                )
+            }
+            audioButtonClicked = true
+            await sleep(1000)
+        } else {
+            // if can't click on button and the button was cliced return true
+            if (audioButtonClicked) {
+                return true
+            } else {
+                break
+            }
+        }
+    }
+    return audioButtonClicked
+}
+
+async function joining(page: puppeteer.Page) {
+    try {
+        const joinFound = await page.$$eval('button', (elems) => {
+            for (const e of elems) {
+                let elem = e as any
+                if (elem.innerText === 'joining') {
+                    elem.click()
+                    return true
+                }
+            }
+            return false
+        })
+    } catch (e) {
+        if (!(e instanceof puppeteer.errors.TimeoutError)) {
+            CURRENT_MEETING.logger.info(`wait for audio timeout: ${e}`)
+        } else {
+            CURRENT_MEETING.logger.info(`error in wait button joining ${e}`)
+        }
+    }
+}
+
+export async function joinMeeting(
+    page: puppeteer.Page,
+    meetingParams: MeetingParams,
+    iterationsMax?: number,
+): Promise<void> {
+    await sleep(1000)
+
+    await clickJoinMeetingButton(page)
+    let waitingButton = false
     let i = 0
     while (true) {
-        if (waitingButton) {
-            if (i > 60 || (iterationsMax != null && i > iterationsMax)) {
-                await screenshot(page, `findJoinAudioTimeout`)
-                throw 'Timeout waiting for audio (user probably not accept the bot)'
-            }
-        } else {
-            if (i > 60 * 15 || (iterationsMax != null && i > iterationsMax)) {
-                await screenshot(page, `findJoinAudioTimeout`)
-                throw 'Timeout waiting for meeting to start'
-            }
+        if (i > 60 * 15 || (iterationsMax != null && i > iterationsMax)) {
+            throw 'timeout waiting for meeting to stat'
         }
-
-        try {
-            await screenshot(page, `findJoinAudio`)
-            await page.waitForSelector('.zm-btn.join-audio-by-voip__join-btn', {
-                timeout: 500,
-            })
-            CURRENT_MEETING.logger.info('wait audio')
-
-            try {
-                CURRENT_MEETING.logger.info('[joinMeeting] find modal')
-                let element = await findModal(page)
-                if (element != null) {
-                    CURRENT_MEETING.logger.info(
-                        '[joinMeeting] found modal clicking',
-                    )
-                    await continueModal(page, 'joinMeeting')
-                    await sleep(1000)
-                } else {
-                    CURRENT_MEETING.logger.info(
-                        '[joinMeeting] modale not found',
-                    )
-                }
-            } catch (e) {
-                CURRENT_MEETING.logger.error(
-                    '[joinMeeting] error finding modale',
-                )
-                break
-            }
-
-            const [button] = await page.$x(
-                "//button[contains(., 'Join Audio by Computer')]",
-            )
-            if (
-                button &&
-                button._remoteObject.description ===
-                    'button.zm-btn.join-audio-by-voip__join-btn.zm-btn--primary.zm-btn__outline--white.zm-btn--lg'
-            ) {
-                CURRENT_MEETING.logger.info('see join audio button')
-
-                await button.click()
-                await sleep(100)
-                try {
-                    const [button] = await page.$x(
-                        "//button[contains(., 'Join Audio by Computer')]",
-                    )
-                    if (
-                        button &&
-                        button._remoteObject.description ===
-                            'button.zm-btn.join-audio-by-voip__join-btn.zm-btn--primary.zm-btn__outline--white.zm-btn--lg'
-                    ) {
-                        CURRENT_MEETING.logger.error(
-                            'there still is the join audio button',
-                        )
-                    }
-                    await button.click()
-                } catch (e) {
-                    CURRENT_MEETING.logger.error('no more join audio button')
-                }
-                break
-            } else if (
-                button &&
-                button._remoteObject.description ===
-                    'button.zm-btn.join-audio-by-voip__join-btn.zm-btn--brown.zm-btn__outline--white.zm-btn--lg'
-            ) {
-                CURRENT_MEETING.logger.info('see leave audio button')
-                const selectorClose =
-                    '.zm-btn.join-dialog__close.zm-btn--default.zm-btn__outline--blue'
-                await page.waitForSelector(selectorClose)
-                await page.click(selectorClose)
-                await sleep(100)
-                break
-            }
-        } catch (e) {
-            if (!(e instanceof puppeteer.errors.TimeoutError)) {
-                CURRENT_MEETING.logger.info(`in wait for audio timeout: ${e}`)
-            } else {
-                CURRENT_MEETING.logger.info(
-                    `error in wait button join audio ${e}`,
-                )
-            }
-        } finally {
-            i++
-        }
-
         // meeting didnt start
-        try {
-            await page.waitForSelector(
-                '.zm-btn.joinWindowBtn.btn.btn-primary.btn-block.btn-lg.submit.zm-btn--default.zm-btn__outline--blue',
-                { timeout: 500 },
-            )
+        await bypass_modal(page)
 
-            const joinFound = await page.$$eval('button', (elems) => {
-                for (const e of elems) {
-                    let elem = e as any
-                    if (elem.innerText === 'joining') {
-                        elem.click()
-                        return true
-                    }
-                }
-                return false
-            })
-            if (!joinFound && !waitingButton) {
-                waitingButton = await page.$$eval('button', (elems) => {
-                    for (const e of elems) {
-                        let elem = e as any
-                        if (elem.innerText === 'waiting') {
-                            return true
-                        }
-                    }
-                    return false
-                })
-                CURRENT_MEETING.logger.info(`waiting button found`)
-            }
-        } catch (e) {
-            if (!(e instanceof puppeteer.errors.TimeoutError)) {
-                CURRENT_MEETING.logger.info(`wait for audio timeout: ${e}`)
-            } else {
-                CURRENT_MEETING.logger.info(`error in wait button joining ${e}`)
-            }
+        if (await joinAudio(page)) {
+            break
         }
+        await sleep(1000)
+        //await joining()
     }
 
     // Send enter message in chat
@@ -289,7 +268,6 @@ export async function joinMeeting(
     try {
         await joinCamera(page)
     } catch (e) {}
-
     CURRENT_MEETING.logger.info('wait for camera done')
 }
 
@@ -417,7 +395,6 @@ async function findModal(
             return undefined
         } else {
             CURRENT_MEETING.logger.error(`Faild to wait for selector ${e}`)
-            throw e
         }
     }
     return element
