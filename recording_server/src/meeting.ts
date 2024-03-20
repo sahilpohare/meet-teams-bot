@@ -17,6 +17,7 @@ import * as TeamsProvider from './meeting/teams'
 import * as ZoomProvider from './meeting/zoom'
 import * as MeetProvider from './meeting/meet'
 import { BrandingHandle, generateBranding, playBranding } from './branding'
+import { Events } from './events'
 
 function detectMeetingProvider(url: string) {
     if (url.includes('https://teams')) {
@@ -136,6 +137,8 @@ export type MeetingParams = {
     speech_to_text?: SpeechToTextProvider
     bot_id?: number
     enter_message?: string
+    bots_api_key?: string
+    bots_webhook_url?: string
 }
 
 export type MarkMomentParams = {
@@ -270,12 +273,14 @@ export async function startRecordMeeting(meetingParams: MeetingParams) {
             4 * 60 * 60 * 1000, // 4 hours
         )
 
+        await Events.inWaitingRoom()
         await MEETING_PROVIDER.joinMeeting(
             CURRENT_MEETING.meeting.page,
             meetingParams,
         )
         CURRENT_MEETING.logger.info('meeting page joined')
         listenPage(CURRENT_MEETING.meeting.backgroundPage)
+        await Events.inCallNotRecording()
 
         meetingParams.api_server_baseurl = process.env.API_SERVER_BASEURL
         meetingParams.api_bot_baseurl = process.env.API_BOT_BASEURL
@@ -288,6 +293,7 @@ export async function startRecordMeeting(meetingParams: MeetingParams) {
             meetingParams,
         )
         CURRENT_MEETING.logger.info('startRecording called')
+        await Events.inCallRecording()
 
         if (project == null) {
             throw 'failed creating project'
@@ -331,6 +337,7 @@ export async function recordMeetingToEnd() {
         CURRENT_MEETING.meeting.page,
     )
     CURRENT_MEETING.logger.info('after waitForEndMeeting')
+    Events.callEnded()
 
     try {
         await stopRecordingInternal(CURRENT_MEETING.param)
