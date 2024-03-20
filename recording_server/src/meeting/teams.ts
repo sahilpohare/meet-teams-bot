@@ -102,14 +102,14 @@ export async function innerTextWithSelector(
         try {
             continueButton = await page.evaluate(
                 (selector, i, message) => {
-                    var iframe = document.querySelectorAll('iframe')[0]
-                    var documentDansIframe =
+                    const iframe = document.querySelectorAll('iframe')[0]
+                    const iframeDocument =
                         iframe.contentDocument || iframe.contentWindow.document
 
                     let elements
                     if (i % 2 === 0) {
                         elements = Array.from(
-                            documentDansIframe.querySelectorAll(selector),
+                            iframeDocument.querySelectorAll(selector),
                         )
                     } else {
                         elements = Array.from(
@@ -270,10 +270,39 @@ export async function joinMeeting(
 ): Promise<void> {
     CURRENT_MEETING.logger.info('joining meeting')
 
+    const INPUT = 'input[placeholder="Type your name"]'
+
     await clickWithInnerText(page, 'button', 'Continue without audio or video')
     await sleep(2000)
+    await (async () => {
+        // Focus input inside iframe
+        try {
+            const focused = await page.evaluate(
+                (selector, name) => {
+                    const iframe = document.querySelectorAll('iframe')[0]
+                    const iframeDocument =
+                        iframe.contentDocument || iframe.contentWindow.document
+                    const elements = Array.from(
+                        iframeDocument.querySelectorAll(selector),
+                    )
+
+                    for (const elem of elements) {
+                        ;(elem as any).focus()
+                        return true
+                    }
+                    return false
+                },
+                INPUT,
+                meetingParams.bot_name,
+            )
+            console.log('Focused input?', focused)
+        } catch (e) {
+            console.error('Failed to focus input', e)
+        }
+    })()
     await page.keyboard.type(meetingParams.bot_name)
     console.log(`botname typed`)
+    await sleep(500)
     await clickWithInnerText(page, 'button', 'Join now')
     await screenshot(page, `afterjoinnow`)
 
@@ -286,14 +315,14 @@ export async function joinMeeting(
     await clickWithInnerText(page, 'button', 'View', 1)
     await sleep(1000)
 
-    if (!(await clickWithInnerText(page, 'button', 'Speaker', 300))) {
+    if (!(await clickWithInnerText(page, 'div', 'Speaker', 300))) {
         throw 'timeout accepting the bot'
     }
 
     // Send enter message in chat
     if (meetingParams.enter_message != null) {
         const ITERATIONS = 50
-        const CHAT_BUTTON_SELECTOR = 'button[data-tid="chat-button"]'
+        const CHAT_BUTTON_SELECTOR = 'button[id="chat-button"]'
         const CHAT_INPUT_SELECTOR = 'div[data-tid="ckeditor"] p'
         const CHAT_SEND_SELECTOR = 'button[data-tid="newMessageCommands-send"]'
 
