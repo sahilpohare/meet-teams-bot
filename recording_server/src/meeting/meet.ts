@@ -270,7 +270,7 @@ async function countParticipants(page: Page): Promise<number> {
 }
 
 async function removedFromMeeting(page: Page): Promise<boolean> {
-    return await page.$$eval('div', (elems) => {
+    return await page.$$eval('*', (elems) => {
         for (const e of elems) {
             let elem = e as any
             // console.log(elem.innerText)
