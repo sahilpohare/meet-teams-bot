@@ -82,7 +82,6 @@ function addListener() {
                 break
             }
             case 'RECORD': {
-                State.parameters.language = 'en'
                 record.initMediaRecorder()
                 break
             }

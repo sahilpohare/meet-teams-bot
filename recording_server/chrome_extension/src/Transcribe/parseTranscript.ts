@@ -17,8 +17,11 @@ export function parseGladia(
     apiResponse: GladiaResult,
     offset: number,
 ): RecognizerTranscript[] {
+    const utterances =
+        apiResponse.translation?.results[0]?.utterances ??
+        apiResponse.transcription?.utterances
     return mergeAdjacentTranscripts(
-        apiResponse.transcription.utterances.map((p) => {
+        utterances.map((p) => {
             if (p.language) {
                 handleLanguage(p.language)
             }
@@ -82,10 +85,10 @@ function mergeAdjacentTranscripts(transcripts: RecognizerTranscript[]) {
 
 /** Handles detected language. */
 function handleLanguage(language: string): void {
-    if (language === '' || parameters.language === language) return
+    if (language === '') return
     const googleLang = gladiaToGoogleLang(language) ?? 'en-US'
 
-    parameters.language = googleLang
+    parameters.detected_lang = language
 }
 
 //TODO: handle language

@@ -204,7 +204,7 @@ async function onResult(transcripts: RecognizerTranscript[], offset: number) {
             api.stopBot(params)
         }
     }
-    console.log('transcripts after parsing gladia', transcripts)
+    //console.log('transcripts after parsing gladia', transcripts)
     for (let t of transcripts) {
         for (let w of t.words) {
             SESSION?.words.push(w)

@@ -118,7 +118,7 @@ function createTranscripts(speaker: SpeakerInterval): Partial<Transcript>[] {
         {
             speaker: speaker.speaker,
             words: [],
-            google_lang: parameters.language,
+            google_lang: parameters.detected_lang ?? parameters.language,
         },
     ]
     return transcripts
