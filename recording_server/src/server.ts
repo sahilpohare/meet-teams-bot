@@ -1,12 +1,12 @@
-import * as meeting from './meeting'
-import * as express from 'express'
 import * as bodyParser from 'body-parser'
-import { ChangeLanguage, MarkMomentParams, StopRecordParams } from './meeting'
-import { Logger } from './logger'
-import { PORT } from './instance'
+import * as express from 'express'
 import * as redis from 'redis'
-import { sleep } from './utils'
 import { setConfig } from 'spoke_api_js'
+import { PORT } from './instance'
+import { Logger } from './logger'
+import * as meeting from './meeting'
+import { ChangeLanguage, MarkMomentParams, StopRecordParams } from './meeting'
+import { sleep } from './utils'
 
 export let PROJECT_ID: number | undefined = undefined
 export const LOGGER = new Logger({})

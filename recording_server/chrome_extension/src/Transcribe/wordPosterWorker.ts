@@ -1,7 +1,7 @@
-import { sleep } from '../utils'
-import { api, RecognizerWord } from 'spoke_api_js'
 import * as R from 'ramda'
+import { api, RecognizerWord } from 'spoke_api_js'
 import { SESSION } from '../record'
+import { sleep } from '../utils'
 import { Transcriber } from './Transcriber'
 
 export async function wordPosterWorker() {
@@ -15,9 +15,12 @@ export async function wordPosterWorker() {
                 RecognizerWord[],
             ] = R.partition((w: RecognizerWord) => {
                 const v = R.find((v) => {
-                    return w.ts >= v.tcin && w.ts <= v.tcout
-                }, session.video_informations)
-                return v != null && v.complete_editor != null
+                    return (
+                        w.ts >= v.video.audio_offset &&
+                        w.ts <= v.video.audio_offset + v.video.duration
+                    )
+                }, session.completeEditors)
+                return v != null
             }, session.words)
 
             session.words = nonPushable
@@ -25,12 +28,13 @@ export async function wordPosterWorker() {
             await pushWords(pushableClone)
 
             if (pushable.length > 0) {
-                for (const v of session.video_informations) {
-                    const video = v.complete_editor?.video
+                for (const v of session.completeEditors) {
+                    const video = v?.video
                     if (
                         video != null &&
                         video.transcription_completed === false &&
-                        session.transcribed_until >= v.tcout
+                        session.transcribedUntil >=
+                            v.video.audio_offset + v.video.duration
                     ) {
                         await api.patchVideo({
                             id: video.id,
@@ -56,28 +60,36 @@ export async function wordPosterWorker() {
 }
 
 async function pushWords(pushable: RecognizerWord[]) {
-    for (const v of SESSION!.video_informations) {
+    for (const v of SESSION!.completeEditors) {
         if (pushable.length === 0) {
             break
         }
         const [wordsWithin, wordNotWithin]: [
             RecognizerWord[],
             RecognizerWord[],
-        ] = R.partition((w) => w.ts >= v.tcin && w.ts <= v.tcout, pushable)
+        ] = R.partition(
+            (w) =>
+                w.ts >= v.video.audio_offset &&
+                w.ts <= v.video.audio_offset + v.video.duration,
+            pushable,
+        )
         pushable = wordNotWithin
         if (wordsWithin.length > 0) {
-            const transcript_id = v.complete_editor?.video.transcripts[0].id!
-            const video_id = v.complete_editor?.video.id!
+            const transcript_id = v.video.transcripts[0].id!
+            const video_id = v.video.id!
 
+            console.log('[wordPosterWorker]', 'posting words', wordsWithin)
+            const wordFiltered = wordsWithin.filter((w) => w != null)
+            console.log('[wordPosterWorker]', 'filtered words', wordFiltered)
             const words = await api.postWord(
-                wordsWithin,
+                wordFiltered,
                 transcript_id,
                 video_id,
             )
             for (const w of words) {
-                v.words.push(w)
-                SESSION!.transcribed_until = Math.max(
-                    SESSION!.transcribed_until,
+                v.video.transcripts[0].words.push(w)
+                SESSION!.transcribedUntil = Math.max(
+                    SESSION!.transcribedUntil,
                     w.end_time,
                 )
             }

@@ -1,7 +1,10 @@
-import * as record from './record'
-import { api, setConfig } from 'spoke_api_js'
-import { Project, Note } from 'spoke_api_js'
 import axios from 'axios'
+import { Note, Project, api, setConfig } from 'spoke_api_js'
+import { Transcriber } from './Transcribe/Transcriber'
+import * as record from './record'
+import * as State from './state'
+import { uploadEditorsTask } from './uploadEditors'
+import { sleep } from './utils'
 
 type Speaker = {
     name: string
@@ -13,9 +16,6 @@ export let SPEAKERS: Speaker[] = []
 export let ATTENDEES: string[] = []
 
 export * from './state'
-import * as State from './state'
-import { sleep } from './utils'
-import { Transcriber } from './Transcribe/Transcriber'
 
 export function addDefaultHeader(name: string, value: string) {
     axios.defaults.headers.common[name] = value
@@ -69,7 +69,12 @@ function addListener() {
                 break
             }
             case 'REFRESH_SPEAKERS': {
+                const prevSpeakers = SPEAKERS
                 SPEAKERS = request.payload
+                if (SPEAKERS.length > prevSpeakers.length) {
+                    console.log('new speaker, pushing complete editor')
+                    uploadEditorsTask(SPEAKERS)
+                }
                 break
             }
             case 'OBSERVE_SPEAKERS': {
@@ -112,8 +117,6 @@ export async function startRecording(
     try {
         State.addMeetingParams(meetingParams)
 
-        console.log('new version', '1.1')
-
         addDefaultHeader('Authorization', State.parameters.user_token)
         setConfig({
             api_server_internal_url: State.parameters.api_server_baseurl,
@@ -131,20 +134,28 @@ export async function startRecording(
         )
         return project
     } catch (e) {
-        console.log('ERROR', e)
-        console.log(JSON.stringify(e))
+        console.log('ERROR while start recording', JSON.stringify(e))
     }
     // setTimeout(() => { record.stopRecording() }, 60000)
 }
 
 export async function stopMediaRecorder() {
     await record.stop()
-    await Transcriber.TRANSCRIBER?.stop()
+    const timestamp = new Date().getTime()
+    // add a last fake speaker to trigger the upload of the last editor ( generates an interval )
+    SPEAKERS.push({ name: 'END', timestamp })
+    await uploadEditorsTask(SPEAKERS)
+
+    console.log('stoping transcriber')
 }
 
 export async function waitForUpload() {
     await record.waitUntilComplete()
+    await Transcriber.TRANSCRIBER?.stop()
     await Transcriber.TRANSCRIBER?.waitUntilComplete()
+
+    // "Your video is available online"
+    await record.stopRecordServer(record.SESSION)
 }
 
 export async function markMoment(
@@ -173,7 +184,6 @@ export async function getAgenda() {
     }
 }
 export async function changeAgenda(data: ChangeAgenda) {
-    console.log('[changeagenda]', data)
     if (State.parameters.agenda?.id !== data.agenda_id) {
         try {
             const agenda = await api.getAgendaWithId(data.agenda_id)
