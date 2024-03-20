@@ -90,6 +90,56 @@ export async function openMeetingPage(
     return page
 }
 
+export async function innerTextWithSelector(
+    page: puppeteer.Page,
+    selector: string,
+    message: string,
+    iterations: number,
+): Promise<boolean> {
+    let i = 0
+    let continueButton = false
+    while (!continueButton && i < iterations) {
+        try {
+            continueButton = await page.evaluate(
+                (selector, i, message) => {
+                    const iframe = document.querySelectorAll('iframe')[0]
+                    const iframeDocument =
+                        iframe.contentDocument || iframe.contentWindow.document
+
+                    let elements
+                    if (i % 2 === 0) {
+                        elements = Array.from(
+                            iframeDocument.querySelectorAll(selector),
+                        )
+                    } else {
+                        elements = Array.from(
+                            document.querySelectorAll(selector),
+                        )
+                    }
+
+                    for (const e of elements) {
+                        let elem = e as any
+                        elem.innerText = message
+                        return true
+                    }
+                    return false
+                },
+                selector,
+                i,
+                message,
+            )
+        } catch (e) {
+            console.error('failed to find button', e)
+        }
+        await sleep(1000)
+        console.log(
+            `element with selector ${selector} clicked:`,
+            continueButton,
+        )
+        i += 1
+    }
+    return continueButton
+}
 export async function clickWithSelector(
     page: puppeteer.Page,
     selector: string,
@@ -219,20 +269,41 @@ export async function joinMeeting(
     meetingParams: MeetingParams,
 ): Promise<void> {
     CURRENT_MEETING.logger.info('joining meeting')
-    // await sleep(1000000)
+
+    const INPUT = 'input[placeholder="Type your name"]'
 
     await clickWithInnerText(page, 'button', 'Continue without audio or video')
-
-    //await clickWithInnerText(page, 'a', 'Use the web app instead')
     await sleep(2000)
+    await (async () => {
+        // Focus input inside iframe
+        try {
+            const focused = await page.evaluate(
+                (selector, name) => {
+                    const iframe = document.querySelectorAll('iframe')[0]
+                    const iframeDocument =
+                        iframe.contentDocument || iframe.contentWindow.document
+                    const elements = Array.from(
+                        iframeDocument.querySelectorAll(selector),
+                    )
 
-    // await clickWithInnerText(page, 'button', 'Join now')
+                    for (const elem of elements) {
+                        ;(elem as any).focus()
+                        return true
+                    }
+                    return false
+                },
+                INPUT,
+                meetingParams.bot_name,
+            )
+            console.log('Focused input?', focused)
+        } catch (e) {
+            console.error('Failed to focus input', e)
+        }
+    })()
     await page.keyboard.type(meetingParams.bot_name)
     console.log(`botname typed`)
-
-    //await clickWithInnerText(page, 'button', 'Join now')
+    await sleep(500)
     await clickWithInnerText(page, 'button', 'Join now')
-
     await screenshot(page, `afterjoinnow`)
 
     // wait for the view button
@@ -244,8 +315,40 @@ export async function joinMeeting(
     await clickWithInnerText(page, 'button', 'View', 1)
     await sleep(1000)
 
-    if (!(await clickWithInnerText(page, 'button', 'Speaker', 300))) {
+    if (!(await clickWithInnerText(page, 'div', 'Speaker', 300))) {
         throw 'timeout accepting the bot'
+    }
+
+    // Send enter message in chat
+    if (meetingParams.enter_message != null) {
+        const ITERATIONS = 50
+        const CHAT_BUTTON_SELECTOR = 'button[id="chat-button"]'
+        const CHAT_INPUT_SELECTOR = 'div[data-tid="ckeditor"] p'
+        const CHAT_SEND_SELECTOR = 'button[data-tid="newMessageCommands-send"]'
+
+        function clickFirst(selector: string) {
+            console.log(`clickFirst(${selector})`)
+            return page.$$eval(selector, (elems) => {
+                for (const elem of elems) {
+                    ;(elem as any).click()
+                    break
+                }
+            })
+        }
+
+        try {
+            await clickWithSelector(page, CHAT_BUTTON_SELECTOR, ITERATIONS)
+            await innerTextWithSelector(
+                page,
+                CHAT_INPUT_SELECTOR,
+                meetingParams.enter_message,
+                ITERATIONS,
+            )
+            await clickWithSelector(page, CHAT_SEND_SELECTOR, ITERATIONS)
+            await clickWithSelector(page, CHAT_BUTTON_SELECTOR, ITERATIONS)
+        } catch (e) {
+            console.error('Unable to send enter message in chat', e)
+        }
     }
 }
 

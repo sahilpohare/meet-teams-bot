@@ -135,6 +135,7 @@ export type MeetingParams = {
     translation_lang?: string
     speech_to_text?: SpeechToTextProvider
     bot_id?: number
+    enter_message?: string
 }
 
 export type MarkMomentParams = {

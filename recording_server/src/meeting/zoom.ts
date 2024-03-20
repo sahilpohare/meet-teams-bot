@@ -235,6 +235,36 @@ export async function joinMeeting(
         await sleep(1000)
         //await joining()
     }
+
+    // Send enter message in chat
+    if (meetingParams.enter_message) {
+        try {
+            const CHAT_INPUT_SELECTOR = 'textarea.chat-box__chat-textarea'
+            const CHAT_OPEN_BUTTON_SELECTOR =
+                'button[aria-label="open the chat pane"]'
+            const CHAT_CLOSE_BUTTON_SELECTOR =
+                'button[aria-label="close the chat pane"]'
+
+            function clickFirst(selector: string) {
+                console.log(`clickFirst(${selector})`)
+                return page.$$eval(selector, (elems) => {
+                    for (const elem of elems) {
+                        ;(elem as any).click()
+                        break
+                    }
+                })
+            }
+
+            await clickFirst(CHAT_OPEN_BUTTON_SELECTOR)
+            await page.focus(CHAT_INPUT_SELECTOR)
+            await page.keyboard.type(meetingParams.enter_message)
+            await page.type(CHAT_INPUT_SELECTOR, '\n')
+            await clickFirst(CHAT_CLOSE_BUTTON_SELECTOR)
+        } catch (e) {
+            console.error('Unable to send enter message in chat', e)
+        }
+    }
+
     try {
         await joinCamera(page)
     } catch (e) {}

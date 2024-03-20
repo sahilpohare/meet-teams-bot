@@ -70,6 +70,7 @@ export async function joinMeeting(
     } catch (e) {
         console.error('[joinMeeting] meet find dismiss', e)
     }
+    console.log('after click dismiss:')
     await sleep(300)
 
     let i = 0
@@ -93,12 +94,42 @@ export async function joinMeeting(
         console.log('Use without an account:', { useWithoutAccountClicked })
         i += 1
     }
+
+    const typeBotName = async () => {
+        const INPUT = 'input[type=text]'
+        const GOT_IT = 'button[aria-label="Got it"]'
+
+        // This triggers:
+        // - The "Ask to join" button (good, must be non empty to be clickable)
+        // - the "Sign in with your Google Account" popup (bad, defocuses the input while typing)
+        await page.focus(INPUT)
+        await page.keyboard.type(meetingParams.bot_name || 'Bot')
+
+        // Wait for the "Got it" button to appear (probably appeared when typing)
+        const foundGotIt = await (async () => {
+            try {
+                await page.waitForSelector(GOT_IT, { timeout: 1000 })
+                return true
+            } catch (e) {
+                return false
+            }
+        })()
+        console.log('Found "Got it" button?', foundGotIt)
+
+        // Now it is safe to type the bot name, resetting the input first (it's garbage)
+        await page.$$eval(INPUT, (elems) => {
+            for (const elem of elems) {
+                ;(elem as any).value = ''
+            }
+        })
+        await page.focus(INPUT)
+        await page.keyboard.type(meetingParams.bot_name)
+    }
+
     await screenshot(page, `before_typing_bot_name`)
-    await page.focus('input[type=text]')
-    await page.keyboard.type(meetingParams.bot_name)
+    await typeBotName()
     await screenshot(page, `after_typing_bot_name`)
 
-    console.log('after click dismiss:')
     let askToJoinClicked = false
     i = 0
     while (!askToJoinClicked && i < 10) {
@@ -121,6 +152,34 @@ export async function joinMeeting(
     }
 
     await findShowEveryOne(page, false)
+
+    // Send enter message in chat
+    if (meetingParams.enter_message) {
+        try {
+            const CHAT_BUTTON_SELECTOR =
+                'button[aria-label="Chat with everyone"]'
+            const CHAT_SEND_SELECTOR = 'button[aria-label="Send a message"]'
+
+            function clickFirst(selector: string) {
+                console.log(`clickFirst(${selector})`)
+                return page.$$eval(selector, (elems) => {
+                    for (const elem of elems) {
+                        ;(elem as any).click()
+                        break
+                    }
+                })
+            }
+
+            await clickFirst(CHAT_BUTTON_SELECTOR)
+            await sleep(1000)
+            await page.keyboard.type(meetingParams.enter_message)
+            await clickFirst(CHAT_SEND_SELECTOR)
+            await clickFirst(CHAT_BUTTON_SELECTOR)
+        } catch (e) {
+            console.error('Unable to send enter message in chat', e)
+        }
+    }
+
     try {
         await page.$$eval('i', (elems) => {
             for (const e of elems) {
