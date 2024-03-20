@@ -81,10 +81,8 @@ export async function initMediaRecorder(): Promise<void> {
                     return
                 }
 
-                console.log('Initing')
                 Transcriber.init(new MediaStream(stream.getAudioTracks()))
                     .then(() => {
-                        console.log('Inited')
                         MEDIA_RECORDER.ondataavailable = handleDataAvailable()
                         MEDIA_RECORDER.onstop = handleStop
                         resolve()
@@ -108,7 +106,7 @@ export async function startRecording(
     const newSessionId = await api.startRecordingSession()
     console.log(`[startRecording]`, { newSessionId })
 
-    console.log(`before post project`)
+    console.log(`[startRecording] before post project`)
     let agendaRefreshed = agenda
     if (agendaRefreshed != null) {
         try {
@@ -128,7 +126,7 @@ export async function startRecording(
         original_agenda_id: agendaRefreshed.id,
         meeting_provider: parameters.meeting_provider,
     })
-    console.log(`after post project`)
+    console.log(`[startRecording] after post project`)
     const asset = await api.postAsset(
         {
             name: projectName,
@@ -139,7 +137,7 @@ export async function startRecording(
         true,
     )
 
-    console.log(`after post asset`)
+    console.log(`[startRecording] after post asset`)
     const date = new Date()
     const now = date.getTime()
     const newSession = {
@@ -159,7 +157,6 @@ export async function startRecording(
 
     SESSION = newSession
 
-    // console.log(`before media recorder start`)
     MEDIA_RECORDER.start(10000)
     MEDIA_RECORDER.onerror = function (e) {
         console.error('media recorder error', e)
@@ -176,7 +173,6 @@ let HANDLE_STOP_DONE = false
 async function handleStop(this: MediaRecorder, _e: Event) {
     console.log('[handle stop]')
     const spokeSession = SESSION!
-    // console.log('[handle stop]', spokeSession)
     if (spokeSession) {
         await handleChunk(true)
     }

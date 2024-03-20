@@ -28,6 +28,4 @@ export async function speakerWorker() {
         await routine()
         await sleep(5_000)
     }
-
-    console.log('[speaker worker] execute last routine')
 }

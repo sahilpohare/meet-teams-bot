@@ -1,4 +1,9 @@
 import * as R from 'ramda'
+import * as MeetProvider from './observeSpeakers/meet'
+import * as TeamsProvider from './observeSpeakers/teams'
+import * as ZoomProvider from './observeSpeakers/zoom'
+import { parameters } from './state'
+import { sleep } from './utils'
 export type Speaker = {
     name: string
     timestamp: number
@@ -8,11 +13,6 @@ declare var BOT_NAME: string
 declare var MEETING_PROVIDER: string
 
 const SPEAKERS: Speaker[] = []
-import * as ZoomProvider from './observeSpeakers/zoom'
-import * as TeamsProvider from './observeSpeakers/teams'
-import * as MeetProvider from './observeSpeakers/meet'
-import { sleep } from './utils'
-import { parameters } from './state'
 
 let PROVIDER = {
     getSpeakerFromDocument: ZoomProvider.getSpeakerFromDocument,
@@ -59,7 +59,6 @@ function setMeetingProvider() {
 
 async function removeShityHtmlLoop() {
     while (true) {
-        console.log('remove shity html loop')
         PROVIDER.removeShityHtml()
         await sleep(1000)
     }
@@ -92,7 +91,6 @@ async function observeSpeakers() {
     } catch (e) {
         console.log('an exception occured in remove shity html', e)
     }
-    console.log('after remove shity html')
     function refreshSpeaker(index: number) {
         console.log('timeout refresh speaker')
         if (index < SPEAKERS.length) {
@@ -210,8 +208,7 @@ async function observeSpeakers() {
                 payload: SPEAKERS,
             })
         } else {
-            console.error('NO INITIAL SPEAKER')
-            console.log('forcing first speaker')
+            console.error('NO INITIAL SPEAKER, forcing to empty speaker')
             SPEAKERS.push({ timestamp: Date.now(), name: `` })
             chrome.runtime.sendMessage({
                 type: 'REFRESH_SPEAKERS',

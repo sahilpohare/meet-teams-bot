@@ -68,17 +68,15 @@ export class Transcriber {
             currentOffset,
             newOffset,
         )
+        let audioExtract = null
         try {
-            let path = (
-                await api.extractAudio(
-                    SESSION!.id,
-                    currentOffset,
-                    final ? -1 : newOffset,
-                )
-            ).audio_s3_path
-            //TODO: delete audio
+            let audioExtract = await api.extractAudio(
+                SESSION!.id,
+                currentOffset,
+                final ? -1 : newOffset,
+            )
+            let path = audioExtract.audio_s3_path
             let audio_url = `https://${parameters.s3_bucket}.s3.eu-west-3.amazonaws.com/${path}`
-            console.log('audio url', audio_url)
             if (true) {
                 let res = await api.transcribeWithGladia(
                     audio_url,
@@ -99,6 +97,15 @@ export class Transcriber {
             }
         } catch (e) {
             console.error('an error occured calling gladia, ', e)
+        } finally {
+            try {
+                if (audioExtract != null) {
+                    console.log({ audioExtract })
+                    await api.deleteAudio(audioExtract)
+                }
+            } catch (e) {
+                console.error('an error occured deleting audio, ', e)
+            }
         }
     }
 
@@ -179,7 +186,7 @@ export class Transcriber {
 }
 
 let NO_TRANSCRIPT_DURATION = 0
-let MAX_NO_TRANSCRIPT_DURATION = 60_000 * 3
+let MAX_NO_TRANSCRIPT_DURATION = 60_000 * 6
 
 /** Gets and handles recognizer results. */
 async function onResult(transcripts: RecognizerTranscript[], offset: number) {
@@ -203,14 +210,4 @@ async function onResult(transcripts: RecognizerTranscript[], offset: number) {
             SESSION?.words.push(w)
         }
     }
-    //let transcriptsWithSpeaker = addSpeakerNames(transcripts, SPEAKERS)
-    //console.log('transcripts with speakers', transcriptsWithSpeaker)
-    //let prevAudioOffset = 0
-    // for (let t of transcriptsWithSpeaker) {
-    //     if (t.startTime === prevAudioOffset) {
-    //         console.error('transcript with same offset as previous one')
-    //     }
-    //     prevAudioOffset = t.startTime
-    //     await uploadEditorsTask(R.clone(t))
-    // }
 }

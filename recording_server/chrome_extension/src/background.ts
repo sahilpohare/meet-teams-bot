@@ -117,8 +117,6 @@ export async function startRecording(
     try {
         State.addMeetingParams(meetingParams)
 
-        console.log('new version', '1.1')
-
         addDefaultHeader('Authorization', State.parameters.user_token)
         setConfig({
             api_server_internal_url: State.parameters.api_server_baseurl,
@@ -136,8 +134,7 @@ export async function startRecording(
         )
         return project
     } catch (e) {
-        console.log('ERROR', e)
-        console.log(JSON.stringify(e))
+        console.log('ERROR while start recording', JSON.stringify(e))
     }
     // setTimeout(() => { record.stopRecording() }, 60000)
 }
@@ -187,7 +184,6 @@ export async function getAgenda() {
     }
 }
 export async function changeAgenda(data: ChangeAgenda) {
-    console.log('[changeagenda]', data)
     if (State.parameters.agenda?.id !== data.agenda_id) {
         try {
             const agenda = await api.getAgendaWithId(data.agenda_id)
