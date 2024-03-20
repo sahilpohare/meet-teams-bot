@@ -68,9 +68,9 @@ export class Transcriber {
             currentOffset,
             newOffset,
         )
-        let audioExtract = null
+        let audioExtract: any = null
         try {
-            let audioExtract = await api.extractAudio(
+            audioExtract = await api.extractAudio(
                 SESSION!.id,
                 currentOffset,
                 final ? -1 : newOffset,
