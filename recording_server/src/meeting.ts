@@ -337,7 +337,7 @@ export async function recordMeetingToEnd() {
         CURRENT_MEETING.meeting.page,
     )
     CURRENT_MEETING.logger.info('after waitForEndMeeting')
-    Events.callEnded()
+    await Events.callEnded()
 
     try {
         await stopRecordingInternal(CURRENT_MEETING.param)
