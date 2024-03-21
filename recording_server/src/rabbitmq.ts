@@ -4,6 +4,7 @@ import { LOGGER } from './server'
 import { LOCK_INSTANCE_AT_STARTUP, setProtection } from './instance'
 import { notify, notifyApp } from './calendar'
 import { setLoggerProjectId } from './logger'
+import { Events } from './events'
 import axios from 'axios'
 
 const POD_NAME = process.env.POD_NAME
@@ -99,13 +100,12 @@ export class Consumer {
 
     // throw error if start recoridng fail
     static async handleStartRecord(data: MeetingParams) {
-        // Prevent instance for beeing scaled down
-
         let logger = LOGGER.new({
             user_id: data.user_id,
             meeting_url: data.meeting_url,
         })
 
+        // Prevent instance for beeing scaled down
         await setProtection(true)
         if (LOCK_INSTANCE_AT_STARTUP) {
             try {
@@ -116,6 +116,9 @@ export class Consumer {
         }
 
         setInitalParams(data, logger)
+
+        Events.init(data)
+        await Events.joiningCall()
 
         const project = await startRecordMeeting(data)
         setLoggerProjectId(project?.id)

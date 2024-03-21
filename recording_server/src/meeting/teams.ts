@@ -282,11 +282,18 @@ export async function joinMeeting(
                     const iframe = document.querySelectorAll('iframe')[0]
                     const iframeDocument =
                         iframe.contentDocument || iframe.contentWindow.document
-                    const elements = Array.from(
+                    const documentElements = Array.from(
+                        document.querySelectorAll(selector),
+                    )
+                    const iframeElements = Array.from(
                         iframeDocument.querySelectorAll(selector),
                     )
 
-                    for (const elem of elements) {
+                    for (const elem of documentElements) {
+                        ;(elem as any).focus()
+                        return true
+                    }
+                    for (const elem of iframeElements) {
                         ;(elem as any).focus()
                         return true
                     }
