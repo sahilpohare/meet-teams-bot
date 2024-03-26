@@ -103,6 +103,7 @@ async function handleErrorInStartRecording(e: any, data: MeetingParams) {
             data.meeting_url,
             data.event?.id,
             data.bot_id,
+            CURRENT_MEETING.error,
         )
     } catch (e) {
         console.error(
