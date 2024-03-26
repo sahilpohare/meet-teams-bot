@@ -5,7 +5,7 @@ import { setConfig } from 'spoke_api_js'
 import { PORT } from './instance'
 import { Logger } from './logger'
 import * as meeting from './meeting'
-import { ChangeLanguage, MarkMomentParams, StopRecordParams } from './meeting'
+import { ChangeLanguage, StopRecordParams } from './meeting'
 import { sleep } from './utils'
 
 export let PROJECT_ID: number | undefined = undefined
@@ -159,16 +159,6 @@ export async function server() {
         }
         meeting.stopRecording('API request')
         res.send('ok')
-    })
-
-    app.post('/mark_moment', jsonParser, async (req, res) => {
-        const data: MarkMomentParams = req.body
-        try {
-            await meeting.markMoment(data)
-            res.send('ok')
-        } catch (e) {
-            res.status(500).send(JSON.stringify(e))
-        }
     })
 
     app.get('/shutdown', async (_req, res) => {

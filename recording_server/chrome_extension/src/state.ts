@@ -24,7 +24,8 @@ export type MeetingParams = {
     s3_bucket: string
 }
 
-export let parameters: MeetingParams = undefined as any as MeetingParams
+export let parameters: MeetingParams & { detected_lang?: string } =
+    undefined as any as MeetingParams
 
 export function addMeetingParams(meetingParams: MeetingParams) {
     console.log({ meetingParams })

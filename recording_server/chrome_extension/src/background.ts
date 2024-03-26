@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { Note, Project, api, setConfig } from 'spoke_api_js'
+import { Project, api, setConfig } from 'spoke_api_js'
 import { Transcriber } from './Transcribe/Transcriber'
 import * as record from './record'
 import * as State from './state'
@@ -157,15 +157,6 @@ export async function waitForUpload() {
     await record.stopRecordServer(record.SESSION)
 }
 
-export async function markMoment(
-    timestamp: number,
-    duration: number,
-    label_id: number | undefined,
-    notes?: Note[],
-) {
-    State.markMoment({ date: timestamp, duration, label_id, notes })
-}
-
 export type ChangeLanguage = {
     meeting_url: string
     use_my_vocabulary: boolean
@@ -194,7 +185,6 @@ export async function changeAgenda(data: ChangeAgenda) {
 }
 const w = window as any
 w.startRecording = startRecording
-w.markMoment = markMoment
 w.stopMediaRecorder = stopMediaRecorder
 w.waitForUpload = waitForUpload
 w.changeAgenda = changeAgenda

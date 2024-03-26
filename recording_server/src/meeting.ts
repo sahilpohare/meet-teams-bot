@@ -1,6 +1,6 @@
 import * as puppeteer from 'puppeteer'
 import { Page } from 'puppeteer'
-import { Agenda, MeetingProvider, Note } from 'spoke_api_js'
+import { Agenda, MeetingProvider } from 'spoke_api_js'
 import { notifyApp } from './calendar'
 import { delSessionInRedis } from './instance'
 import { Logger, uploadLog } from './logger'
@@ -139,14 +139,6 @@ export type MeetingParams = {
     enter_message?: string
     bots_api_key?: string
     bots_webhook_url?: string
-}
-
-export type MarkMomentParams = {
-    meeting_url: string
-    user_id: number
-    label_id?: number
-    duration?: number
-    notes?: Note[]
 }
 
 function getMeetingGlobal(): Meeting | null {
@@ -485,24 +477,5 @@ async function stopRecordingInternal(param: Session) {
         CURRENT_MEETING.logger.info('Meeting successfully terminated')
     } else {
         CURRENT_MEETING.logger.error('Meeting already ended')
-    }
-}
-
-export async function markMoment(markMomentParams: MarkMomentParams) {
-    const meeting = getMeetingGlobal()
-    console.log('[markMoment]')
-    if (meeting != null) {
-        let backgroundPage = meeting.backgroundPage
-        await backgroundPage.evaluate((markMomentParams) => {
-            const w = window as any
-            //TODO: what if the computer is not in time
-            const timestamp = new Date().getTime()
-            w.markMoment(
-                timestamp,
-                markMomentParams.duration,
-                markMomentParams.label_id,
-                markMomentParams.notes,
-            )
-        }, markMomentParams)
     }
 }
