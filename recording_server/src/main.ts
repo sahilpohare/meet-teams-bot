@@ -1,11 +1,8 @@
-import { getExtensionId } from './puppeteer'
-import { server, LOGGER, clientRedis } from './server'
-import { generateBranding } from './branding'
-import { CURRENT_MEETING, MeetingParams, recordMeetingToEnd } from './meeting'
-import { getCachedExtensionId, openBrowser } from './puppeteer'
-import { Consumer } from './rabbitmq'
-import { api, setConfig } from 'spoke_api_js'
 import axios from 'axios'
+import { exit } from 'process'
+import { api, setConfig } from 'spoke_api_js'
+import { generateBranding } from './branding'
+import { notifyApp } from './calendar'
 import {
     API_SERVER_BASEURL,
     LOCK_INSTANCE_AT_STARTUP,
@@ -14,9 +11,11 @@ import {
     setSessionInRedis,
     terminateInstance,
 } from './instance'
+import { CURRENT_MEETING, MeetingParams, recordMeetingToEnd } from './meeting'
+import { getCachedExtensionId, getExtensionId, openBrowser } from './puppeteer'
+import { Consumer } from './rabbitmq'
+import { LOGGER, clientRedis, server } from './server'
 import { sleep } from './utils'
-import { notifyApp } from './calendar'
-import { exit } from 'process'
 
 console.log('version 1.0')
 ;(async () => {
@@ -100,7 +99,11 @@ async function handleErrorInStartRecording(e: any, data: MeetingParams) {
             { error: JSON.stringify(e) },
             { error: JSON.stringify(e) },
         )
-        await api.meetingBotStartRecordFailed(data.meeting_url, data.event?.id)
+        await api.meetingBotStartRecordFailed(
+            data.meeting_url,
+            data.event?.id,
+            data.bot_id,
+        )
     } catch (e) {
         console.error(
             `error in handleErrorInStartRecording, terminating instance`,
