@@ -1,9 +1,9 @@
-import { LOGGER } from './server'
-import { exec } from 'child_process'
 import axios from 'axios'
-import { rmdir, unlink } from 'fs/promises'
+import { exec } from 'child_process'
+import { rmdir } from 'fs/promises'
 import { CURRENT_MEETING } from './meeting'
-import { s3cp, BUCKET_NAME } from './s3'
+import { BUCKET_NAME, s3cp } from './s3'
+import { LOGGER } from './server'
 import { getFiles } from './utils'
 
 let PROJECT_ID: number | undefined = undefined

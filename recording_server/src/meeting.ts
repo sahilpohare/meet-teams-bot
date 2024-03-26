@@ -76,7 +76,7 @@ export const CURRENT_MEETING: MeetingHandle = {
     status: null,
     project: null,
     error: null,
-    logger: new Logger({ owner_id: -1 }),
+    logger: null,
     brandingGenerateProcess: null,
     brandingPlayProcess: null,
 }
