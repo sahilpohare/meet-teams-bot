@@ -188,7 +188,11 @@ async function joinAudio(page: puppeteer.Page) {
             }
         }
     }
-    return audioButtonClicked
+    if (audioButtonClicked) {
+        throw 'cant join audio'
+    } else {
+        return false
+    }
 }
 
 async function joining(page: puppeteer.Page) {
