@@ -81,7 +81,7 @@ export async function initMediaRecorder(): Promise<void> {
                     return
                 }
 
-                Transcriber.init(new MediaStream(stream.getAudioTracks()))
+                Transcriber.init()
                     .then(() => {
                         MEDIA_RECORDER.ondataavailable = handleDataAvailable()
                         MEDIA_RECORDER.onstop = handleStop

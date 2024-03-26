@@ -24,10 +24,8 @@ export class Transcriber {
     static TRANSCRIBER: Transcriber | undefined
     public stopped = false
     private rebootTimer: NodeJS.Timer
-    private audioStream: MediaStream
     private summarizeWorker: Promise<void>
     private speakerWorker: Promise<void>
-    private pollTimer: NodeJS.Timer | undefined
     public transcribeQueue: asyncLib.QueueObject<() => void>
     private wordPosterWorker: Promise<void>
     // in seconds
@@ -35,9 +33,7 @@ export class Transcriber {
     /** Inits the transcriber. */
 
     /** Returns a new `Transcriber`. */
-    private constructor(audioStream: MediaStream) {
-        this.audioStream = audioStream
-
+    private constructor() {
         this.rebootTimer = setInterval(() => {}, 60000)
         this.transcribeQueue = newTranscribeQueue()
         // Simply not to have undefined properties
@@ -45,11 +41,11 @@ export class Transcriber {
         this.speakerWorker = new Promise((resolve) => resolve())
         this.wordPosterWorker = new Promise((resolve) => resolve())
     }
-    static async init(audioStream: MediaStream): Promise<void> {
-        Transcriber.TRANSCRIBER = new Transcriber(audioStream)
-        await Transcriber.TRANSCRIBER.start(audioStream)
+    static async init(): Promise<void> {
+        Transcriber.TRANSCRIBER = new Transcriber()
+        await Transcriber.TRANSCRIBER.start()
     }
-    async start(audioStream: MediaStream): Promise<void> {
+    async start(): Promise<void> {
         this.launchWorkers()
         this.rebootTimer = setInterval(() => {
             this.transcribeQueue.push(async () => {
