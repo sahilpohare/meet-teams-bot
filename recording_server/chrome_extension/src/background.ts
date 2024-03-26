@@ -99,7 +99,7 @@ function observeSpeakers() {
             code: `var BOT_NAME = ${JSON.stringify(
                 State.parameters.bot_name,
             )}; var MEETING_PROVIDER=${JSON.stringify(
-                State.parameters.meeting_provider,
+                State.parameters.meetingProvider,
             )}`,
         },
         function () {

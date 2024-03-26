@@ -47,11 +47,13 @@ export class Transcriber {
     }
     async start(): Promise<void> {
         this.launchWorkers()
-        this.rebootTimer = setInterval(() => {
-            this.transcribeQueue.push(async () => {
-                await Transcriber.TRANSCRIBER?.transcribe(false)
-            })
-        }, TRANSCRIPTION_CHUNK_DURATION)
+        if (parameters.bot_id == null || parameters.speech_to_text != null) {
+            this.rebootTimer = setInterval(() => {
+                this.transcribeQueue.push(async () => {
+                    await Transcriber.TRANSCRIBER?.transcribe(false)
+                })
+            }, TRANSCRIPTION_CHUNK_DURATION)
+        }
     }
 
     async transcribe(final: boolean): Promise<void> {

@@ -110,7 +110,7 @@ async function observeSpeakers() {
 
     var mutationObserver = new MutationObserver(function (mutations) {
         mutations.forEach(function (mutation) {
-            if (parameters.meeting_provider === 'Teams') {
+            if (parameters.meetingProvider === 'Teams') {
                 PROVIDER.removeShityHtml()
             }
             try {

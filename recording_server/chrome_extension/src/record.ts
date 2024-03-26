@@ -124,7 +124,7 @@ export async function startRecording(
         name: projectName,
         template: agendaRefreshed.json,
         original_agenda_id: agendaRefreshed.id,
-        meeting_provider: parameters.meeting_provider,
+        meeting_provider: parameters.meetingProvider,
     })
     console.log(`[startRecording] after post project`)
     const asset = await api.postAsset(
