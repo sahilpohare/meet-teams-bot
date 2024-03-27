@@ -61,7 +61,11 @@ console.log('version 1.0')
         }
         if (error) {
             console.error('error in start meeting', error)
-            await handleErrorInStartRecording(error, params)
+            try {
+                await handleErrorInStartRecording(error, params)
+            } catch (e) {
+                console.error('error in handleErrorInStartRecording', e)
+            }
         } else {
             try {
                 await recordMeetingToEnd()

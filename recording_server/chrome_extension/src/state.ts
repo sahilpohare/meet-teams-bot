@@ -24,12 +24,15 @@ export type MeetingParams = {
     s3_bucket: string
 }
 
-export let parameters: MeetingParams & { detected_lang?: string } =
-    undefined as any as MeetingParams
+export const parameters: MeetingParams & { detected_lang?: string } =
+    {} as MeetingParams
 
 export function addMeetingParams(meetingParams: MeetingParams) {
     console.log({ meetingParams })
-    parameters = meetingParams
+    Object.keys(meetingParams).forEach((key) => {
+        parameters[key] = meetingParams[key]
+    })
+    console.log({ parameters })
 }
 
 export function changeAgenda(agenda: Agenda) {
