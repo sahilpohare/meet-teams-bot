@@ -42,17 +42,35 @@ export class Transcriber {
         this.wordPosterWorker = new Promise((resolve) => resolve())
     }
     static async init(): Promise<void> {
-        Transcriber.TRANSCRIBER = new Transcriber()
+        try {
+            Transcriber.TRANSCRIBER = new Transcriber()
+        } catch (e) {
+            console.error('error creating transcriber', e)
+            throw e
+        }
         await Transcriber.TRANSCRIBER.start()
     }
     async start(): Promise<void> {
-        this.launchWorkers()
-        if (parameters.bot_id == null || parameters.speech_to_text != null) {
-            this.rebootTimer = setInterval(() => {
-                this.transcribeQueue.push(async () => {
-                    await Transcriber.TRANSCRIBER?.transcribe(false)
-                })
-            }, TRANSCRIPTION_CHUNK_DURATION)
+        try {
+            this.launchWorkers()
+        } catch (e) {
+            console.error('error launching workers', e)
+            throw e
+        }
+        try {
+            if (
+                parameters.bot_id == null ||
+                parameters.speech_to_text != null
+            ) {
+                this.rebootTimer = setInterval(() => {
+                    this.transcribeQueue.push(async () => {
+                        await Transcriber.TRANSCRIBER?.transcribe(false)
+                    })
+                }, TRANSCRIPTION_CHUNK_DURATION)
+            }
+        } catch (e) {
+            console.error('error initializing reboot timer', e)
+            throw e
         }
     }
 

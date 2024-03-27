@@ -83,15 +83,18 @@ export async function initMediaRecorder(): Promise<void> {
 
                 Transcriber.init()
                     .then(() => {
-                        MEDIA_RECORDER.ondataavailable = handleDataAvailable()
-                        MEDIA_RECORDER.onstop = handleStop
+                        try {
+                            MEDIA_RECORDER.ondataavailable =
+                                handleDataAvailable()
+                            MEDIA_RECORDER.onstop = handleStop
+                        } catch (e) {
+                            console.error('error starting media recorder', e)
+                            throw e
+                        }
                         resolve()
                     })
                     .catch((e) => {
-                        console.error(
-                            'an error occured in streaming transcribe',
-                            e,
-                        )
+                        console.error('an error occured in transcriber init', e)
                         reject()
                     })
             },

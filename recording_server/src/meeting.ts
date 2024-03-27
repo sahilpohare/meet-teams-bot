@@ -145,21 +145,6 @@ function getMeetingGlobal(): Meeting | null {
     return CURRENT_MEETING.meeting
 }
 
-export function unsetMeetingGlobal() {
-    CURRENT_MEETING.logger.info(`Deregistering meeting`)
-    CURRENT_MEETING.meeting = {
-        page: null,
-        backgroundPage: null,
-        browser: null,
-        meetingTimeoutInterval: null,
-        session_id: null,
-    }
-    CURRENT_MEETING.param = null
-    CURRENT_MEETING.status = null
-    CURRENT_MEETING.error = null
-    CURRENT_MEETING.project = null
-}
-
 async function cleanMeeting(meeting: Meeting) {
     CURRENT_MEETING.logger.info(`Cleaning old meeting`)
     // try { removeListenPage(meeting.backgroundPage) } catch (e) { console.error(e) }
@@ -189,7 +174,6 @@ export function setInitalParams(meetingParams: MeetingParams, logger: Logger) {
     meetingParams.meetingProvider = detectMeetingProvider(
         meetingParams.meeting_url,
     )
-    unsetMeetingGlobal()
     setMeetingProvide(meetingParams.meetingProvider)
     CURRENT_MEETING.param = meetingParams
     CURRENT_MEETING.status = 'Recording'
@@ -240,7 +224,6 @@ export async function startRecordMeeting(meetingParams: MeetingParams) {
             CURRENT_MEETING.meeting.browser,
             meetingParams.meeting_url,
         )
-        meetingParams.meeting_url = meetingId
         CURRENT_MEETING.logger.info('meeting id found', { meetingId })
 
         const meetingLink = MEETING_PROVIDER.getMeetingLink(
