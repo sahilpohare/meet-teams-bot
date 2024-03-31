@@ -1,15 +1,11 @@
 import * as asyncLib from 'async'
 import * as R from 'ramda'
-import { api, googleToGladia } from 'spoke_api_js'
+import { api } from 'spoke_api_js'
 import { parameters } from '../background'
 import { newTranscribeQueue } from '../queue'
 import { SESSION, START_RECORD_TIMESTAMP } from '../record'
 import { sleep } from '../utils'
-import {
-    RecognizerTranscript,
-    parseGladia,
-    parseRunPod,
-} from './parseTranscript'
+import { RecognizerTranscript, parseRunPod } from './parseTranscript'
 import { speakerWorker } from './speakerWorker'
 import { summarizeWorker } from './summarizeWorker'
 import { wordPosterWorker } from './wordPosterWorker'
@@ -93,24 +89,12 @@ export class Transcriber {
             )
             let path = audioExtract.audio_s3_path
             let audio_url = `https://${parameters.s3_bucket}.s3.eu-west-3.amazonaws.com/${path}`
-            if (true) {
-                let res = await api.transcribeWithGladia(
-                    audio_url,
-                    parameters.vocabulary,
-                    parameters.force_lang === true
-                        ? googleToGladia(parameters.language)
-                        : undefined,
-                )
-                let transcripts = parseGladia(res, currentOffset)
-                await onResult(transcripts, currentOffset)
-            } else {
-                let res = await api.recognizeRunPod(
-                    audio_url,
-                    parameters.vocabulary,
-                )
-                let transcripts = parseRunPod(res, currentOffset)
-                await onResult(transcripts, currentOffset)
-            }
+            let res = await api.recognizeRunPod(
+                audio_url,
+                parameters.vocabulary,
+            )
+            let transcripts = parseRunPod(res, currentOffset)
+            await onResult(transcripts, currentOffset)
         } catch (e) {
             console.error('an error occured calling gladia, ', e)
         } finally {
