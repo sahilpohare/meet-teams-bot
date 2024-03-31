@@ -215,6 +215,17 @@ async function joining(page: puppeteer.Page) {
         }
     }
 }
+class CancellationToken {
+    isCancellationRequested: boolean
+
+    constructor() {
+        this.isCancellationRequested = false
+    }
+
+    cancel() {
+        this.isCancellationRequested = true
+    }
+}
 
 export async function joinMeeting(
     page: puppeteer.Page,
@@ -224,10 +235,16 @@ export async function joinMeeting(
     await sleep(1000)
 
     await clickJoinMeetingButton(page)
+    const cancellationToken = new CancellationToken()
+    const timeout = setTimeout(
+        () => cancellationToken.cancel(),
+        15 * 60 * 60 * 1000,
+    )
+
     let waitingButton = false
     let i = 0
     while (true) {
-        if (i > 60 * 15 || (iterationsMax != null && i > iterationsMax)) {
+        if (cancellationToken.isCancellationRequested) {
             throw 'timeout waiting for meeting to stat'
         }
         // meeting didnt start
@@ -239,6 +256,7 @@ export async function joinMeeting(
         await sleep(1000)
         //await joining()
     }
+    clearTimeout(timeout)
 
     // Send enter message in chat
     if (meetingParams.enter_message) {
