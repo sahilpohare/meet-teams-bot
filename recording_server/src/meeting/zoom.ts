@@ -236,10 +236,7 @@ export async function joinMeeting(
 
     await clickJoinMeetingButton(page)
     const cancellationToken = new CancellationToken()
-    const timeout = setTimeout(
-        () => cancellationToken.cancel(),
-        15 * 60 * 60 * 1000,
-    )
+    const timeout = setTimeout(() => cancellationToken.cancel(), 15 * 60 * 1000)
 
     let waitingButton = false
     let i = 0
