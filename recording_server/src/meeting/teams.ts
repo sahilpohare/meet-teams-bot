@@ -1,8 +1,12 @@
 import * as puppeteer from 'puppeteer'
-import { Page } from 'puppeteer'
-import { sleep } from '../utils'
+
 import { CURRENT_MEETING, MeetingParams } from '../meeting'
+
+import { Page } from 'puppeteer'
+import { log } from 'console'
 import { screenshot } from '../puppeteer'
+import { sleep } from '../utils'
+
 const jsdom = require('jsdom')
 
 export async function parseMeetingUrl(
@@ -21,7 +25,7 @@ export async function parseMeetingUrl(
             e,
         )
     }
-    console.log({ newMeetingUrl })
+
     if (newMeetingUrl.includes('teams.live.com')) {
         // https://teams.live.com/meet/9460778358093
         // https://teams.microsoft.com/l/meetup-join/19%3AA2UA3NRD5KMJxGE2RQvY-IuCJTFV7NzfEWvaYgqiqE41%40thread.tacv2/1648544446696?context=%7B%22Tid%22%3A%2261f3e3b8-9b52-433a-a4eb-c67334ce54d5%22%2C%22Oid%22%3A%22e0bccd79-3e39-43dd-ba50-7b98ab2f8a10%22%7D
@@ -36,7 +40,7 @@ export async function parseMeetingUrl(
             meetingId:
                 newMeetingUrl.replace(
                     'teams.microsoft.com/',
-                    'teams.microsoft.com/_#/',
+                    'teams.microsoft.com/',
                 ) + '&anon=true',
             password: '',
         }
@@ -208,21 +212,19 @@ export async function clickWithInnerText(
     let continueButton = false
     while (!continueButton && i < iterations) {
         console.log(i)
+
         try {
             continueButton = await page.evaluate(
                 (innerText, htmlType, i, click) => {
-                    // Access the window.document object instead of the default document object
-
-                    // Perform your desired operations using the window.document object
-                    // For example:
-                    var iframes = document.querySelectorAll('iframe')
-                    var premierIframe = iframes[0]
-                    var documentDansIframe =
-                        premierIframe.contentDocument ||
-                        premierIframe.contentWindow.document
-
                     let elements
+
+                    var iframes = document.querySelectorAll('iframe')
+                    console.log('iframes : ', iframes)
                     if (i % 2 === 0) {
+                        var premierIframe = iframes[0]
+                        var documentDansIframe =
+                            premierIframe.contentDocument ||
+                            premierIframe.contentWindow.document
                         elements = Array.from(
                             documentDansIframe.querySelectorAll(htmlType),
                         )
