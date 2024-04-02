@@ -3,7 +3,6 @@ import * as puppeteer from 'puppeteer'
 import { CURRENT_MEETING, MeetingParams } from '../meeting'
 
 import { Page } from 'puppeteer'
-import { log } from 'console'
 import { screenshot } from '../puppeteer'
 import { sleep } from '../utils'
 
@@ -106,12 +105,13 @@ export async function innerTextWithSelector(
         try {
             continueButton = await page.evaluate(
                 (selector, i, message) => {
-                    const iframe = document.querySelectorAll('iframe')[0]
-                    const iframeDocument =
-                        iframe.contentDocument || iframe.contentWindow.document
-
                     let elements
                     if (i % 2 === 0) {
+                        const iframe = document.querySelectorAll('iframe')[0]
+                        const iframeDocument =
+                            iframe.contentDocument ||
+                            iframe.contentWindow.document
+
                         elements = Array.from(
                             iframeDocument.querySelectorAll(selector),
                         )
@@ -161,12 +161,12 @@ export async function clickWithSelector(
                     // For example:
                     var iframes = document.querySelectorAll('iframe')
                     var premierIframe = iframes[0]
-                    var documentDansIframe =
-                        premierIframe.contentDocument ||
-                        premierIframe.contentWindow.document
 
                     let elements
                     if (i % 2 === 0) {
+                        var documentDansIframe =
+                            premierIframe.contentDocument ||
+                            premierIframe.contentWindow.document
                         elements = Array.from(
                             documentDansIframe.querySelectorAll(selector),
                         )
@@ -266,49 +266,66 @@ export async function clickWithInnerText(
     return continueButton
 }
 
-export async function joinMeeting(
-    page: puppeteer.Page,
-    meetingParams: MeetingParams,
-): Promise<void> {
-    CURRENT_MEETING.logger.info('joining meeting')
-
+async function forcusInput(page: puppeteer.Page, iterations: number) {
     const INPUT = 'input[placeholder="Type your name"]'
-
-    await clickWithInnerText(page, 'button', 'Continue without audio or video')
-    await sleep(2000)
-    await (async () => {
-        // Focus input inside iframe
+    for (let i = 0; i < iterations; i++) {
         try {
             const focused = await page.evaluate(
-                (selector, name) => {
-                    const iframe = document.querySelectorAll('iframe')[0]
-                    const iframeDocument =
-                        iframe.contentDocument || iframe.contentWindow.document
-                    const documentElements = Array.from(
-                        document.querySelectorAll(selector),
-                    )
-                    const iframeElements = Array.from(
-                        iframeDocument.querySelectorAll(selector),
-                    )
+                (selector, i) => {
+                    let elements
 
-                    for (const elem of documentElements) {
-                        ;(elem as any).focus()
-                        return true
+                    if (i % 2 === 0) {
+                        const iframe = document.querySelectorAll('iframe')[0]
+                        const iframeDocument =
+                            iframe.contentDocument ||
+                            iframe.contentWindow.document
+                        elements = Array.from(
+                            iframeDocument.querySelectorAll(selector),
+                        )
+                        console.log('search iframes', elements)
+                        console.log('search inside iframe')
+                    } else {
+                        elements = Array.from(
+                            document.querySelectorAll(selector),
+                        )
+                        console.log('search document', elements)
                     }
-                    for (const elem of iframeElements) {
+
+                    for (const elem of elements) {
                         ;(elem as any).focus()
                         return true
                     }
                     return false
                 },
                 INPUT,
-                meetingParams.bot_name,
+                i,
             )
-            console.log('Focused input?', focused)
+            if (focused) {
+                return
+            } else {
+                console.log('input not focused, retrying')
+            }
         } catch (e) {
             console.error('Failed to focus input', e)
         }
-    })()
+        await sleep(1000)
+    }
+}
+
+export async function joinMeeting(
+    page: puppeteer.Page,
+    meetingParams: MeetingParams,
+): Promise<void> {
+    CURRENT_MEETING.logger.info('joining meeting')
+
+    await clickWithInnerText(
+        page,
+        'button',
+        'Continue without audio or video',
+        20,
+    )
+    await sleep(2000)
+    await forcusInput(page, 20)
     await page.keyboard.type(meetingParams.bot_name)
     console.log(`botname typed`)
     await sleep(500)
@@ -329,6 +346,10 @@ export async function joinMeeting(
     }
 
     // Send enter message in chat
+    await sendMessageInChat(page, meetingParams)
+}
+
+async function sendMessageInChat(page: Page, meetingParams: MeetingParams) {
     if (meetingParams.enter_message != null) {
         const ITERATIONS = 50
         const CHAT_BUTTON_SELECTOR = 'button[id="chat-button"]'
