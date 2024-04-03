@@ -2,7 +2,6 @@ import * as puppeteer from 'puppeteer'
 
 import { CURRENT_MEETING, CancellationToken, MeetingParams } from '../meeting'
 
-import { Cancel } from 'axios'
 import { Page } from 'puppeteer'
 import { screenshot } from '../puppeteer'
 import { sleep } from '../utils'
@@ -213,18 +212,11 @@ export async function clickWithInnerText(
     iterations = iterations ?? 10
     let continueButton = false
 
-    console.log(
-        'JE SUIS LAAAAAAAAAAAAAAAAAAAAAAA  CANCELLATIONTOKEN',
-        cancellationToken?.isCancellationRequested,
-    )
     while (
         !continueButton &&
-        i < iterations &&
+        (iterations == null || i < iterations) &&
         cancellationToken?.isCancellationRequested !== true
     ) {
-        console.log(i)
-        console.log('JE SUIS LAAAAAAAAAAAAAAAAAAAAAAA', innerText)
-
         try {
             continueButton = await page.evaluate(
                 (innerText, htmlType, i, click) => {
@@ -356,7 +348,7 @@ export async function joinMeeting(
             page,
             'button',
             'View',
-            900,
+            null,
             false,
             cancellationToken,
         ))
@@ -441,34 +433,4 @@ async function spokeIsAlone(page: Page): Promise<boolean> {
         )
     }
     return false
-}
-
-function waitForSuccess(
-    timeoutMinutes: number,
-    intervalMs: number,
-    action: () => Promise<boolean>,
-): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-        const timeoutMs = timeoutMinutes * 60 * 1000 // Convert minutes to milliseconds
-        const startTime = Date.now()
-
-        const intervalId = setInterval(async () => {
-            if (Date.now() - startTime > timeoutMs) {
-                clearInterval(intervalId)
-                reject(new Error('timeout accepting the bot'))
-            } else {
-                try {
-                    const success = await action()
-                    if (success) {
-                        clearInterval(intervalId)
-                        resolve() // Now correctly specifying Promise<void>
-                    }
-                    // No else needed as the interval continues until success or timeout
-                } catch (error) {
-                    clearInterval(intervalId)
-                    reject(error)
-                }
-            }
-        }, intervalMs)
-    })
 }

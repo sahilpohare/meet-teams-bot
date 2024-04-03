@@ -1,7 +1,7 @@
+import * as puppeteer from 'puppeteer'
 import * as MeetProvider from './meeting/meet'
 import * as TeamsProvider from './meeting/teams'
 import * as ZoomProvider from './meeting/zoom'
-import * as puppeteer from 'puppeteer'
 
 import { Agenda, MeetingProvider } from 'spoke_api_js'
 import { BrandingHandle, generateBranding, playBranding } from './branding'
@@ -14,13 +14,11 @@ import {
     removeListenPage,
 } from './puppeteer'
 
-import { Events } from './events'
 import { Page } from 'puppeteer'
-import { delSessionInRedis } from './instance'
 import { notifyApp } from './calendar'
-import { set } from 'ramda'
+import { Events } from './events'
+import { delSessionInRedis } from './instance'
 import { sleep } from './utils'
-import { time } from 'console'
 
 function detectMeetingProvider(url: string) {
     if (url.includes('https://teams')) {
@@ -238,10 +236,6 @@ export class CancellationToken {
 export async function startRecordMeeting(meetingParams: MeetingParams) {
     CURRENT_MEETING.param = meetingParams
 
-    const waintingRoomToken = new CancellationToken(
-        meetingParams.automatic_leave.waiting_room_timeout,
-    )
-
     try {
         if (meetingParams.bot_branding) {
             CURRENT_MEETING.brandingGenerateProcess = generateBranding(
@@ -289,6 +283,10 @@ export async function startRecordMeeting(meetingParams: MeetingParams) {
         )
 
         await Events.inWaitingRoom()
+
+        const waintingRoomToken = new CancellationToken(
+            meetingParams.automatic_leave.waiting_room_timeout,
+        )
 
         try {
             await MEETING_PROVIDER.joinMeeting(

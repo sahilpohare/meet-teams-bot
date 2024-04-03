@@ -1,10 +1,10 @@
-import * as R from 'ramda'
 import * as puppeteer from 'puppeteer'
+import * as R from 'ramda'
 
 import { CURRENT_MEETING, MeetingParams } from '../meeting'
 
-import { CancellationToken } from '../meeting'
 import { Page } from 'puppeteer'
+import { CancellationToken } from '../meeting'
 import { screenshot } from '../puppeteer'
 import { sleep } from '../utils'
 
@@ -80,9 +80,6 @@ export async function joinMeeting(
     let i = 0
     let useWithoutAccountClicked = false
     while (!useWithoutAccountClicked && i < 5) {
-        if (cancellationToken.isCancellationRequested) {
-            throw 'timeout waiting for meeting to stat'
-        }
         try {
             useWithoutAccountClicked = await page.$$eval('span', (elems) => {
                 for (const e of elems) {
