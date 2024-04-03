@@ -329,7 +329,7 @@ export async function joinMeeting(
     )
     await sleep(2000)
     await focusInput(page, 20)
-    await sleep(1000)
+    await sleep(2000)
     await page.keyboard.type(meetingParams.bot_name)
     console.log(`botname typed`)
     await sleep(500)
