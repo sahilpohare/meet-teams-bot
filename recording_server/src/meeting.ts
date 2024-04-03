@@ -219,7 +219,7 @@ export async function startRecordMeeting(meetingParams: MeetingParams) {
 
     const cancellationToken = new CancellationToken()
     // const timeout = setTimeout(() => cancellationToken.cancel(), 15 * 60 * 1000)
-    const timeout = setTimeout(() => cancellationToken.cancel(), 6000)
+    const timeout = setTimeout(() => cancellationToken.cancel(), 30000)
 
     try {
         if (meetingParams.bot_branding) {
@@ -278,6 +278,7 @@ export async function startRecordMeeting(meetingParams: MeetingParams) {
             CURRENT_MEETING.logger.info('meeting page joined')
         } catch (error) {
             console.error(error)
+            throw error
         } finally {
             clearTimeout(timeout)
         }

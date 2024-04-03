@@ -339,8 +339,6 @@ export async function joinMeeting(
         'button',
         'Continue without audio or video',
         20,
-        true,
-        cancellationToken,
     )
     await sleep(2000)
     await focusInput(page, 20)
@@ -348,7 +346,7 @@ export async function joinMeeting(
     await page.keyboard.type(meetingParams.bot_name)
     console.log(`botname typed`)
     await sleep(500)
-    await clickWithInnerText(page, 'button', 'Join now')
+    await clickWithInnerText(page, 'button', 'Join now', 20)
     await screenshot(page, `afterjoinnow`)
 
     // wait for the view button
