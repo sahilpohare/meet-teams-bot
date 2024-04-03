@@ -201,8 +201,25 @@ function meetingTimeout() {
 }
 // Starts the record
 // Returns when the bot is accepted in the meeting
+
+export class CancellationToken {
+    isCancellationRequested: boolean
+
+    constructor() {
+        this.isCancellationRequested = false
+    }
+
+    cancel() {
+        this.isCancellationRequested = true
+    }
+}
+
 export async function startRecordMeeting(meetingParams: MeetingParams) {
     CURRENT_MEETING.param = meetingParams
+
+    const cancellationToken = new CancellationToken()
+    // const timeout = setTimeout(() => cancellationToken.cancel(), 15 * 60 * 1000)
+    const timeout = setTimeout(() => cancellationToken.cancel(), 6000)
 
     try {
         if (meetingParams.bot_branding) {
@@ -251,11 +268,20 @@ export async function startRecordMeeting(meetingParams: MeetingParams) {
         )
 
         await Events.inWaitingRoom()
-        await MEETING_PROVIDER.joinMeeting(
-            CURRENT_MEETING.meeting.page,
-            meetingParams,
-        )
-        CURRENT_MEETING.logger.info('meeting page joined')
+
+        try {
+            await MEETING_PROVIDER.joinMeeting(
+                CURRENT_MEETING.meeting.page,
+                cancellationToken,
+                meetingParams,
+            )
+            CURRENT_MEETING.logger.info('meeting page joined')
+        } catch (error) {
+            console.error(error)
+        } finally {
+            clearTimeout(timeout)
+        }
+
         listenPage(CURRENT_MEETING.meeting.backgroundPage)
         await Events.inCallNotRecording()
 

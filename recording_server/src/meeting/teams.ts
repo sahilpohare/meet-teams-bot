@@ -1,7 +1,8 @@
 import * as puppeteer from 'puppeteer'
 
-import { CURRENT_MEETING, MeetingParams } from '../meeting'
+import { CURRENT_MEETING, CancellationToken, MeetingParams } from '../meeting'
 
+import { Cancel } from 'axios'
 import { Page } from 'puppeteer'
 import { screenshot } from '../puppeteer'
 import { sleep } from '../utils'
@@ -206,12 +207,23 @@ export async function clickWithInnerText(
     innerText: string,
     iterations?: number,
     click: boolean = true,
+    cancellationToken?: CancellationToken,
 ): Promise<boolean> {
     let i = 0
     iterations = iterations ?? 10
     let continueButton = false
-    while (!continueButton && i < iterations) {
+
+    console.log(
+        'JE SUIS LAAAAAAAAAAAAAAAAAAAAAAA  CANCELLATIONTOKEN',
+        cancellationToken?.isCancellationRequested,
+    )
+    while (
+        !continueButton &&
+        i < iterations &&
+        cancellationToken?.isCancellationRequested !== true
+    ) {
         console.log(i)
+        console.log('JE SUIS LAAAAAAAAAAAAAAAAAAAAAAA', innerText)
 
         try {
             continueButton = await page.evaluate(
@@ -314,6 +326,7 @@ async function focusInput(page: puppeteer.Page, iterations: number) {
 
 export async function joinMeeting(
     page: puppeteer.Page,
+    cancellationToken: CancellationToken,
     meetingParams: MeetingParams,
 ): Promise<void> {
     CURRENT_MEETING.logger.info('joining meeting')
@@ -326,6 +339,8 @@ export async function joinMeeting(
         'button',
         'Continue without audio or video',
         20,
+        true,
+        cancellationToken,
     )
     await sleep(2000)
     await focusInput(page, 20)
@@ -336,24 +351,18 @@ export async function joinMeeting(
     await clickWithInnerText(page, 'button', 'Join now')
     await screenshot(page, `afterjoinnow`)
 
-    try {
-        await waitForSuccess(
-            3000, // Timeout in millisecons
-            async () => {
-                // Insert the function you want to execute
-                return clickWithInnerText(page, 'button', 'View', 900, false)
-            },
-        )
-
-        // Code to run if action is successful before the timeout
-        console.log('Action succeeded before timeout!')
-    } catch (error) {
-        // Error handling if action fails or timeout is reached
-        console.error(error)
-    }
-
     // wait for the view button
-    if (!(await clickWithInnerText(page, 'button', 'View', 900, false))) {
+
+    if (
+        !(await clickWithInnerText(
+            page,
+            'button',
+            'View',
+            900,
+            false,
+            cancellationToken,
+        ))
+    ) {
         throw 'timeout accepting the bot'
     }
     await sleep(2000)
@@ -362,7 +371,7 @@ export async function joinMeeting(
     await sleep(1000)
 
     if (!(await clickWithInnerText(page, 'div', 'Speaker', 300))) {
-        throw 'timeout accepting the speaker'
+        throw 'timeout accepting the bot'
     }
 
     // Send enter message in chat
@@ -442,11 +451,12 @@ async function spokeIsAlone(page: Page): Promise<boolean> {
 }
 
 function waitForSuccess(
-    timeoutMs: number,
+    timeoutMinutes: number,
+    intervalMs: number,
     action: () => Promise<boolean>,
 ): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-        // const timeoutMs = 600000
+        const timeoutMs = timeoutMinutes * 60 * 1000 // Convert minutes to milliseconds
         const startTime = Date.now()
 
         const intervalId = setInterval(async () => {
@@ -460,11 +470,12 @@ function waitForSuccess(
                         clearInterval(intervalId)
                         resolve() // Now correctly specifying Promise<void>
                     }
+                    // No else needed as the interval continues until success or timeout
                 } catch (error) {
                     clearInterval(intervalId)
                     reject(error)
                 }
             }
-        }, 900)
+        }, intervalMs)
     })
 }

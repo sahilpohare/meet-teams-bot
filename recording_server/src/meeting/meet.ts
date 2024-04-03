@@ -1,9 +1,12 @@
-import * as puppeteer from 'puppeteer'
-import { Page } from 'puppeteer'
-import { sleep } from '../utils'
-import { CURRENT_MEETING, MeetingParams } from '../meeting'
 import * as R from 'ramda'
+import * as puppeteer from 'puppeteer'
+
+import { CURRENT_MEETING, MeetingParams } from '../meeting'
+
+import { CancellationToken } from '../meeting'
+import { Page } from 'puppeteer'
 import { screenshot } from '../puppeteer'
+import { sleep } from '../utils'
 
 export async function parseMeetingUrl(
     browser: puppeteer.Browser,
@@ -54,6 +57,7 @@ export async function openMeetingPage(
 
 export async function joinMeeting(
     page: puppeteer.Page,
+    cancellationToken: CancellationToken,
     meetingParams: MeetingParams,
 ): Promise<void> {
     CURRENT_MEETING.logger.info('joining meeting')
@@ -76,6 +80,9 @@ export async function joinMeeting(
     let i = 0
     let useWithoutAccountClicked = false
     while (!useWithoutAccountClicked && i < 5) {
+        if (cancellationToken.isCancellationRequested) {
+            throw 'timeout waiting for meeting to stat'
+        }
         try {
             useWithoutAccountClicked = await page.$$eval('span', (elems) => {
                 for (const e of elems) {
@@ -151,7 +158,7 @@ export async function joinMeeting(
         throw "Error bot can't join"
     }
 
-    await findShowEveryOne(page, false)
+    await findShowEveryOne(page, false, cancellationToken)
 
     // Send enter message in chat
     if (meetingParams.enter_message) {
@@ -221,12 +228,16 @@ export async function joinMeeting(
         await page.mouse.click(10, 10)
     } catch (e) {}
     await sleep(500)
-    await findShowEveryOne(page, true)
+    await findShowEveryOne(page, true, cancellationToken)
 
     CURRENT_MEETING.logger.info('after join meeting')
 }
 
-async function findShowEveryOne(page: puppeteer.Page, click: boolean) {
+async function findShowEveryOne(
+    page: puppeteer.Page,
+    click: boolean,
+    cancellationToken: CancellationToken,
+) {
     let showEveryOneFound = false
     let i = 0
 
@@ -249,8 +260,8 @@ async function findShowEveryOne(page: puppeteer.Page, click: boolean) {
         )
         await screenshot(page, `findShowEveryone`)
         console.log({ showEveryOneFound })
-        if (i > 60 * 15) {
-            throw 'Timeout accepting the bot'
+        if (cancellationToken.isCancellationRequested) {
+            throw 'timeout waiting for meeting to stat'
         }
         if (showEveryOneFound === false) {
             await sleep(1000)

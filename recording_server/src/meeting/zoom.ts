@@ -1,6 +1,8 @@
 import * as puppeteer from 'puppeteer'
+
+import { CURRENT_MEETING, CancellationToken, MeetingParams } from '../meeting'
+
 import { Page } from 'puppeteer'
-import { CURRENT_MEETING, MeetingParams } from '../meeting'
 import { screenshot } from '../puppeteer'
 import { sleep } from '../utils'
 
@@ -215,28 +217,16 @@ async function joining(page: puppeteer.Page) {
         }
     }
 }
-class CancellationToken {
-    isCancellationRequested: boolean
-
-    constructor() {
-        this.isCancellationRequested = false
-    }
-
-    cancel() {
-        this.isCancellationRequested = true
-    }
-}
 
 export async function joinMeeting(
     page: puppeteer.Page,
+    cancellationToken: CancellationToken,
     meetingParams: MeetingParams,
     iterationsMax?: number,
 ): Promise<void> {
     await sleep(1000)
 
     await clickJoinMeetingButton(page)
-    const cancellationToken = new CancellationToken()
-    const timeout = setTimeout(() => cancellationToken.cancel(), 15 * 60 * 1000)
 
     let waitingButton = false
     let i = 0
@@ -253,7 +243,6 @@ export async function joinMeeting(
         await sleep(1000)
         //await joining()
     }
-    clearTimeout(timeout)
 
     // Send enter message in chat
     if (meetingParams.enter_message) {
@@ -341,6 +330,9 @@ export async function waitForEndMeeting(
     CURRENT_MEETING.logger.info('[waitForEndMeeting]')
     CURRENT_MEETING.logger.info(meetingParams.toString())
 
+    const cancellationToken = new CancellationToken()
+    const timeout = setTimeout(() => cancellationToken.cancel(), 15 * 60 * 1000)
+
     while (CURRENT_MEETING && CURRENT_MEETING.status == 'Recording') {
         let element = null
         try {
@@ -349,7 +341,19 @@ export async function waitForEndMeeting(
 
             if (audio != null) {
                 try {
-                    await joinMeeting(page, meetingParams, 3)
+                    try {
+                        await joinMeeting(
+                            page,
+                            cancellationToken,
+                            meetingParams,
+                            3,
+                        )
+                        CURRENT_MEETING.logger.info('meeting page joined')
+                    } catch (error) {
+                        console.error(error)
+                    } finally {
+                        clearTimeout(timeout)
+                    }
                 } catch (e) {
                     CURRENT_MEETING.logger.error(
                         'joinMeeting after modal failed',
