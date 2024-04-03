@@ -18,7 +18,9 @@ import { Events } from './events'
 import { Page } from 'puppeteer'
 import { delSessionInRedis } from './instance'
 import { notifyApp } from './calendar'
+import { set } from 'ramda'
 import { sleep } from './utils'
+import { time } from 'console'
 
 function detectMeetingProvider(url: string) {
     if (url.includes('https://teams')) {
@@ -140,7 +142,20 @@ export type MeetingParams = {
     enter_message?: string
     bots_api_key?: string
     bots_webhook_url?: string
-    waiting_room_timeout?: number
+    automatic_leave: {
+        // The number of seconds after which the bot will automatically leave the call, if it has not been let in from the waiting room.
+        waiting_room_timeout: number
+        // The number of seconds after which the bot will automatically leave the call, if it has joined the meeting but no other participant has joined.
+        noone_joined_timeout: number
+        // The number of seconds after which the bot will automatically leave the call, if there were other participants in the call who have all left.
+        // everyone_left_timeout?: number
+        // The number of seconds after which the bot will automatically leave the call, if it has joined the call but not started recording.
+        // in_call_not_recording_timeout?: number
+        // The number of seconds after which the bot will automatically leave the call, if it has joined the call and started recording it. This can be used to enforce a maximum recording time limit for a bot. There is no default value for this parameter, meaning a bot will continue to record for as long as the meeting lasts.
+        // in_call_recording_timeout?: number
+        // The number of seconds after which the bot will automatically leave the call, if it has joined the call but has not started recording. For e.g This can occur due to bot being denied permission to record(Zoom meetings).
+        // recording_permission_denied_timeout?: number
+    }
 }
 
 function getMeetingGlobal(): Meeting | null {
@@ -204,22 +219,28 @@ function meetingTimeout() {
 
 export class CancellationToken {
     isCancellationRequested: boolean
-
-    constructor() {
+    timeInSec: number
+    timeout: NodeJS.Timeout
+    constructor(timeInSec: number) {
         this.isCancellationRequested = false
+        this.timeInSec = timeInSec
+        this.timeout = setTimeout(() => this.cancel(), this.timeInSec * 1000)
     }
-
     cancel() {
         this.isCancellationRequested = true
+    }
+    reset() {
+        clearTimeout(this.timeout)
+        this.timeout = setTimeout(() => this.cancel(), this.timeInSec * 1000)
     }
 }
 
 export async function startRecordMeeting(meetingParams: MeetingParams) {
     CURRENT_MEETING.param = meetingParams
 
-    const cancellationToken = new CancellationToken()
-    // const timeout = setTimeout(() => cancellationToken.cancel(), 15 * 60 * 1000)
-    const timeout = setTimeout(() => cancellationToken.cancel(), 30000)
+    const waintingRoomToken = new CancellationToken(
+        meetingParams.automatic_leave.waiting_room_timeout,
+    )
 
     try {
         if (meetingParams.bot_branding) {
@@ -272,15 +293,13 @@ export async function startRecordMeeting(meetingParams: MeetingParams) {
         try {
             await MEETING_PROVIDER.joinMeeting(
                 CURRENT_MEETING.meeting.page,
-                cancellationToken,
+                waintingRoomToken,
                 meetingParams,
             )
             CURRENT_MEETING.logger.info('meeting page joined')
         } catch (error) {
             console.error(error)
             throw error
-        } finally {
-            clearTimeout(timeout)
         }
 
         listenPage(CURRENT_MEETING.meeting.backgroundPage)
@@ -297,6 +316,7 @@ export async function startRecordMeeting(meetingParams: MeetingParams) {
             { ...meetingParams, s3_bucket: process.env.AWS_S3_BUCKET },
         )
         CURRENT_MEETING.logger.info('startRecording called')
+
         await Events.inCallRecording()
 
         if (project == null) {
@@ -339,7 +359,11 @@ export async function recordMeetingToEnd() {
     await MEETING_PROVIDER.waitForEndMeeting(
         CURRENT_MEETING.param,
         CURRENT_MEETING.meeting.page,
+        new CancellationToken(
+            CURRENT_MEETING.param.automatic_leave.noone_joined_timeout,
+        ),
     )
+
     CURRENT_MEETING.logger.info('after waitForEndMeeting')
     await Events.callEnded()
 

@@ -326,12 +326,10 @@ async function findJoinAudio(
 export async function waitForEndMeeting(
     meetingParams: MeetingParams,
     page: Page,
+    cancellationToken: CancellationToken,
 ) {
     CURRENT_MEETING.logger.info('[waitForEndMeeting]')
     CURRENT_MEETING.logger.info(meetingParams.toString())
-
-    const cancellationToken = new CancellationToken()
-    const timeout = setTimeout(() => cancellationToken.cancel(), 15 * 60 * 1000)
 
     while (CURRENT_MEETING && CURRENT_MEETING.status == 'Recording') {
         let element = null
@@ -351,8 +349,6 @@ export async function waitForEndMeeting(
                         CURRENT_MEETING.logger.info('meeting page joined')
                     } catch (error) {
                         console.error(error)
-                    } finally {
-                        clearTimeout(timeout)
                     }
                 } catch (e) {
                     CURRENT_MEETING.logger.error(

@@ -296,7 +296,10 @@ async function removedFromMeeting(page: Page): Promise<boolean> {
     })
 }
 
-async function findEndMeeting(page: Page): Promise<boolean> {
+async function findEndMeeting(
+    page: Page,
+    cancellationToken: CancellationToken,
+): Promise<boolean> {
     try {
         if (await removedFromMeeting(page)) {
             return true
@@ -305,9 +308,9 @@ async function findEndMeeting(page: Page): Promise<boolean> {
         console.error(e)
     }
     try {
-        const numberParticipants = await countParticipants(page)
-        //const numberOfBot = await numberOfBotInMeeting()
-        if (numberParticipants === 1) {
+        if ((await countParticipants(page)) > 1) {
+            cancellationToken.reset()
+        } else if (cancellationToken.isCancellationRequested) {
             return true
         }
     } catch (e) {
@@ -319,17 +322,18 @@ async function findEndMeeting(page: Page): Promise<boolean> {
 export async function waitForEndMeeting(
     _meetingParams: MeetingParams,
     page: Page,
+    cancellationToken: CancellationToken,
 ) {
     CURRENT_MEETING.logger.info('[waitForEndMeeting]')
     while (CURRENT_MEETING && CURRENT_MEETING.status == 'Recording') {
         try {
-            if (await findEndMeeting(page)) {
+            if (await findEndMeeting(page, cancellationToken)) {
                 break
             }
             //CURRENT_MEETING.logger.info('[findendmeeting]  false')
         } catch (e) {
             CURRENT_MEETING.logger.info('[findendmeeting]  error', e)
         }
-        await sleep(5000)
+        await sleep(1000)
     }
 }

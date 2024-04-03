@@ -412,23 +412,18 @@ async function sendMessageInChat(page: Page, meetingParams: MeetingParams) {
 export async function waitForEndMeeting(
     _meetingParams: MeetingParams,
     page: Page,
+    cancellationToken: CancellationToken,
 ) {
     CURRENT_MEETING.logger.info('[waitForEndMeeting]')
-    let i = 0
-    let aloneCount = 0
+
     while (CURRENT_MEETING && CURRENT_MEETING.status == 'Recording') {
-        if (i % 20 === 0) {
-            if (await spokeIsAlone(page)) {
-                aloneCount++
-                if (aloneCount >= 3) {
-                    return
-                }
-            } else {
-                aloneCount = 0
-            }
+        if ((await spokeIsAlone(page)) === false) {
+            cancellationToken.reset()
+        } else if (cancellationToken.isCancellationRequested === true) {
+            return
         }
-        i++
-        await sleep(1000)
+
+        sleep(1000)
     }
 }
 
