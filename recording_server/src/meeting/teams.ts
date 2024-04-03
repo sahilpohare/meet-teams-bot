@@ -336,6 +336,22 @@ export async function joinMeeting(
     await clickWithInnerText(page, 'button', 'Join now')
     await screenshot(page, `afterjoinnow`)
 
+    try {
+        await waitForSuccess(
+            3000, // Timeout in millisecons
+            async () => {
+                // Insert the function you want to execute
+                return clickWithInnerText(page, 'button', 'View', 900, false)
+            },
+        )
+
+        // Code to run if action is successful before the timeout
+        console.log('Action succeeded before timeout!')
+    } catch (error) {
+        // Error handling if action fails or timeout is reached
+        console.error(error)
+    }
+
     // wait for the view button
     if (!(await clickWithInnerText(page, 'button', 'View', 900, false))) {
         throw 'timeout accepting the bot'
@@ -346,7 +362,7 @@ export async function joinMeeting(
     await sleep(1000)
 
     if (!(await clickWithInnerText(page, 'div', 'Speaker', 300))) {
-        throw 'timeout accepting the bot'
+        throw 'timeout accepting the speaker'
     }
 
     // Send enter message in chat
@@ -423,4 +439,32 @@ async function spokeIsAlone(page: Page): Promise<boolean> {
         )
     }
     return false
+}
+
+function waitForSuccess(
+    timeoutMs: number,
+    action: () => Promise<boolean>,
+): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+        // const timeoutMs = 600000
+        const startTime = Date.now()
+
+        const intervalId = setInterval(async () => {
+            if (Date.now() - startTime > timeoutMs) {
+                clearInterval(intervalId)
+                reject(new Error('timeout accepting the bot'))
+            } else {
+                try {
+                    const success = await action()
+                    if (success) {
+                        clearInterval(intervalId)
+                        resolve() // Now correctly specifying Promise<void>
+                    }
+                } catch (error) {
+                    clearInterval(intervalId)
+                    reject(error)
+                }
+            }
+        }, 900)
+    })
 }

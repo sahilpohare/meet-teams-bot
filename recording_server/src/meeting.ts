@@ -1,8 +1,10 @@
+import * as MeetProvider from './meeting/meet'
+import * as TeamsProvider from './meeting/teams'
+import * as ZoomProvider from './meeting/zoom'
 import * as puppeteer from 'puppeteer'
-import { Page } from 'puppeteer'
+
 import { Agenda, MeetingProvider } from 'spoke_api_js'
-import { notifyApp } from './calendar'
-import { delSessionInRedis } from './instance'
+import { BrandingHandle, generateBranding, playBranding } from './branding'
 import { Logger, uploadLog } from './logger'
 import {
     findBackgroundPage,
@@ -11,13 +13,12 @@ import {
     openBrowser,
     removeListenPage,
 } from './puppeteer'
-import { sleep } from './utils'
 
-import { BrandingHandle, generateBranding, playBranding } from './branding'
 import { Events } from './events'
-import * as MeetProvider from './meeting/meet'
-import * as TeamsProvider from './meeting/teams'
-import * as ZoomProvider from './meeting/zoom'
+import { Page } from 'puppeteer'
+import { delSessionInRedis } from './instance'
+import { notifyApp } from './calendar'
+import { sleep } from './utils'
 
 function detectMeetingProvider(url: string) {
     if (url.includes('https://teams')) {
@@ -139,6 +140,7 @@ export type MeetingParams = {
     enter_message?: string
     bots_api_key?: string
     bots_webhook_url?: string
+    waiting_room_timeout?: number
 }
 
 function getMeetingGlobal(): Meeting | null {
