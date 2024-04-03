@@ -266,7 +266,7 @@ export async function clickWithInnerText(
     return continueButton
 }
 
-async function forcusInput(page: puppeteer.Page, iterations: number) {
+async function focusInput(page: puppeteer.Page, iterations: number) {
     const INPUT = 'input[placeholder="Type your name"]'
     for (let i = 0; i < iterations; i++) {
         try {
@@ -318,6 +318,9 @@ export async function joinMeeting(
 ): Promise<void> {
     CURRENT_MEETING.logger.info('joining meeting')
 
+    await clickWithInnerText(page, 'button', 'Continue on this browser', 20)
+    await sleep(2000)
+
     await clickWithInnerText(
         page,
         'button',
@@ -325,7 +328,8 @@ export async function joinMeeting(
         20,
     )
     await sleep(2000)
-    await forcusInput(page, 20)
+    await focusInput(page, 20)
+    await sleep(1000)
     await page.keyboard.type(meetingParams.bot_name)
     console.log(`botname typed`)
     await sleep(500)
