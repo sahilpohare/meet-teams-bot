@@ -363,42 +363,6 @@ export async function joinMeeting(
     if (!(await clickWithInnerText(page, 'div', 'Speaker', 300))) {
         throw 'timeout accepting the bot'
     }
-
-    // Send enter message in chat
-    await sendMessageInChat(page, meetingParams)
-}
-
-async function sendMessageInChat(page: Page, meetingParams: MeetingParams) {
-    if (meetingParams.enter_message != null) {
-        const ITERATIONS = 50
-        const CHAT_BUTTON_SELECTOR = 'button[id="chat-button"]'
-        const CHAT_INPUT_SELECTOR = 'div[data-tid="ckeditor"] p'
-        const CHAT_SEND_SELECTOR = 'button[data-tid="newMessageCommands-send"]'
-
-        function clickFirst(selector: string) {
-            console.log(`clickFirst(${selector})`)
-            return page.$$eval(selector, (elems) => {
-                for (const elem of elems) {
-                    ;(elem as any).click()
-                    break
-                }
-            })
-        }
-
-        try {
-            await clickWithSelector(page, CHAT_BUTTON_SELECTOR, ITERATIONS)
-            await innerTextWithSelector(
-                page,
-                CHAT_INPUT_SELECTOR,
-                meetingParams.enter_message,
-                ITERATIONS,
-            )
-            await clickWithSelector(page, CHAT_SEND_SELECTOR, ITERATIONS)
-            await clickWithSelector(page, CHAT_BUTTON_SELECTOR, ITERATIONS)
-        } catch (e) {
-            console.error('Unable to send enter message in chat', e)
-        }
-    }
 }
 
 export async function waitForEndMeeting(
