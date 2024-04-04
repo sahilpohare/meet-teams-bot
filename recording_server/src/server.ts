@@ -1,7 +1,6 @@
 import * as bodyParser from 'body-parser'
 import * as express from 'express'
 import * as redis from 'redis'
-import { setConfig } from 'spoke_api_js'
 import { PORT } from './instance'
 import { Logger } from './logger'
 import * as meeting from './meeting'
@@ -27,11 +26,6 @@ export async function server() {
 
     const jsonParser = bodyParser.json({ limit: '50mb' })
     const allowed_origin = ALLOWED_ORIGIN
-
-    setConfig({
-        api_server_internal_url: process.env.API_SERVER_BASEURL,
-        logError: null,
-    })
 
     app.options('*', (_req, res) => {
         res.header('Access-Control-Allow-Origin', allowed_origin)

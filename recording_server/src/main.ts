@@ -1,6 +1,5 @@
 import axios from 'axios'
 import { exit } from 'process'
-import { api, setConfig } from 'spoke_api_js'
 import { generateBranding } from './branding'
 import { notifyApp } from './calendar'
 import {
@@ -24,10 +23,6 @@ console.log('version 1.0')
     } else {
         // set default axios config
         axios.defaults.baseURL = API_SERVER_BASEURL
-        setConfig({
-            defaultUrl: API_SERVER_BASEURL,
-            logError: () => {},
-        })
         try {
             await triggerCache()
         } catch (e) {
@@ -103,7 +98,7 @@ async function handleErrorInStartRecording(e: any, data: MeetingParams) {
             { error: JSON.stringify(e) },
             { error: JSON.stringify(e) },
         )
-        await api.meetingBotStartRecordFailed(
+        await meetingBotStartRecordFailed(
             data.meeting_url,
             data.event?.id,
             data.bot_id,
@@ -116,6 +111,26 @@ async function handleErrorInStartRecording(e: any, data: MeetingParams) {
         )
     }
 }
+
+export async function meetingBotStartRecordFailed(
+    meetingLink: string,
+    eventId?: number,
+    bot_id?: number,
+    message?: string,
+): Promise<void> {
+    let meetingParams = {
+        meeting_url: meetingLink,
+        event_id: eventId,
+        message,
+    }
+    await axios({
+        method: 'POST',
+        url: `/meeting_bot/start_record_failed`,
+        data: meetingParams,
+        params: { bot_id },
+    })
+}
+
 /// open the browser a first time to speed up the next openings
 async function triggerCache() {
     const extensionId = await getCachedExtensionId()
