@@ -1,11 +1,9 @@
 const { readFile, mkdir } = require('fs').promises
-import { spawn, exec } from 'child_process'
 import { dirname } from 'path'
 const chalk = require('chalk')
 // import * as puppeteer from 'puppeteer'
-import { ConsoleMessage, Page, Browser } from 'puppeteer'
-import { unlink } from 'fs/promises'
-import { CURRENT_MEETING } from './meeting'
+import { Browser, ConsoleMessage, Page } from 'puppeteer'
+import { MeetingHandle } from './meeting'
 import { s3cp } from './s3'
 const puppeteer = require('puppeteer-extra')
 // add stealth plugin and use defaults (all evasion techniques)
@@ -61,12 +59,12 @@ export function listenPage(page: Page) {
             const location = message.location()
             const tags = { location: `${location.url}:${location.lineNumber}` }
             if (type === 'LOG') {
-                CURRENT_MEETING.logger.info(text, tags)
+                console.log(text, tags)
             } else {
-                CURRENT_MEETING.logger.error(text, tags)
+                console.log(text, tags)
             }
         } catch (e) {
-            CURRENT_MEETING.logger.error(`Failed to log forward logs: ${e}`)
+            console.log(`Failed to log forward logs: ${e}`)
         }
     })
 }
@@ -84,16 +82,17 @@ export async function screenshot(page: Page, name: string) {
                 day: 'numeric',
             })
             .replace(/\//g, '-')
-        const link = `./screenshot/${date}/${
-            CURRENT_MEETING.param?.user_id
-        }/${name.replaceAll('/', '')}.jpg`
+        const link = `./screenshot/${date}/${MeetingHandle.getUserId()}/${name.replaceAll(
+            '/',
+            '',
+        )}.jpg`
         // try { await unlink(link) } catch (e) { }
         await mkdir(dirname(link), { recursive: true })
         await page.screenshot({ path: link })
 
         await s3cp(link, link.substring(2))
     } catch (e) {
-        CURRENT_MEETING.logger.error(`Failed to take screenshot ${e}`)
+        console.error(`Failed to take screenshot ${e}`)
     }
 }
 
@@ -101,7 +100,7 @@ export async function findBackgroundPage(
     browser: Browser,
     extensionId: string,
 ): Promise<Page> {
-    CURRENT_MEETING.logger.info('waiting for target')
+    console.log('waiting for target')
     console.log(await browser.version())
     try {
         const extensionTarget = await browser.waitForTarget((target: any) => {
@@ -114,7 +113,7 @@ export async function findBackgroundPage(
         const backgroundPage = await extensionTarget.page()
         return backgroundPage
     } catch (e) {
-        CURRENT_MEETING.logger.error(`wait for target error ${e}`)
+        console.error(`wait for target error ${e}`)
     }
     throw 'failed to get background page'
 
@@ -144,7 +143,7 @@ export async function getExtensionId() {
             console.log(extensionId)
             return extensionId
         } catch (e) {
-            CURRENT_MEETING.logger.info(`Failed to get extension id: ${e}`, {
+            console.log(`Failed to get extension id: ${e}`, {
                 retry: i,
             })
             error = e
@@ -210,7 +209,7 @@ export async function openBrowser(extensionId: string): Promise<Browser> {
             const browser = await tryOpenBrowser(extensionId)
             return browser
         } catch (e) {
-            CURRENT_MEETING.logger.error(`Failed to open browser: ${e}`, {
+            console.error(`Failed to open browser: ${e}`, {
                 retry: i,
             })
             error = e

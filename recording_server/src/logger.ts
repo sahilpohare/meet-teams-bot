@@ -1,7 +1,6 @@
 import axios from 'axios'
 import { exec } from 'child_process'
 import { rmdir } from 'fs/promises'
-import { CURRENT_MEETING } from './meeting'
 import { BUCKET_NAME, s3cp } from './s3'
 import { LOGGER } from './server'
 import { getFiles } from './utils'
@@ -78,10 +77,11 @@ const months = [
     'December',
 ]
 
-export async function uploadLog() {
-    const user_id = CURRENT_MEETING.param.user_id
-    const email = CURRENT_MEETING.param.email
-    const project_id = CURRENT_MEETING.project?.id
+export async function uploadLog(
+    user_id: number,
+    email: string,
+    project_id?: number,
+) {
     const date = new Date()
         .toLocaleDateString('en-US', {
             year: 'numeric',

@@ -100,10 +100,7 @@ export class Consumer {
 
     // throw error if start recoridng fail
     static async handleStartRecord(data: MeetingParams) {
-        let logger = LOGGER.new({
-            user_id: data.user_id,
-            meeting_url: data.meeting_url,
-        })
+        let logger = LOGGER.new({})
 
         // Prevent instance for beeing scaled down
         await setProtection(true)

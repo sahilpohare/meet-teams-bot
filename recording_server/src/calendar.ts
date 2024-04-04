@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { MeetingParams } from './meeting'
+import { MeetingParams } from './types'
 
 export async function patchEvent(payload: any) {
     console.log('patching event payload: ', { payload })

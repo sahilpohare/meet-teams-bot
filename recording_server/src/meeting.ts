@@ -43,6 +43,9 @@ export class MeetingHandle {
             this.instance = new MeetingHandle(meetingParams, logger)
         }
     }
+    static getUserId(): number | null {
+        return MeetingHandle.instance.param.user_id
+    }
     static getProject(): { id: number } | null {
         return MeetingHandle.instance?.project
     }
@@ -190,7 +193,11 @@ export class MeetingHandle {
 
     private async cleanEverything(failed: boolean) {
         try {
-            await uploadLog()
+            await uploadLog(
+                this.param.user_id,
+                this.param.email,
+                this.project?.id,
+            )
         } catch (e) {
             this.logger.error(`failed to upload logs: ${e}`)
         }
@@ -371,7 +378,11 @@ export class MeetingHandle {
         setTimeout(async () => {
             this.logger.info('killing process')
             try {
-                await uploadLog()
+                await uploadLog(
+                    this.param.user_id,
+                    this.param.email,
+                    this.project?.id,
+                )
             } catch (e) {
                 console.error(e)
             }

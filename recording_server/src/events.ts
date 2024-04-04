@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { MeetingParams } from './meeting'
+import { MeetingParams } from './types'
 
 export class Events {
     private static EVENTS: Events | null = null
