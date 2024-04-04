@@ -1,4 +1,7 @@
 import * as asyncLib from 'async'
+import { Transcriber } from './Transcribe/Transcriber'
+import { parameters } from './background'
+import { newSerialQueue } from './queue'
 import {
     Agenda,
     Asset,
@@ -6,10 +9,7 @@ import {
     Project,
     RecognizerWord,
     api,
-} from 'spoke_api_js'
-import { Transcriber } from './Transcribe/Transcriber'
-import { parameters } from './background'
-import { newSerialQueue } from './queue'
+} from './spoke_api_js'
 import { sleep } from './utils'
 
 const STREAM: MediaStream | null = null

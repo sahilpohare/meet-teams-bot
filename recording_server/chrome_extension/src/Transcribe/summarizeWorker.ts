@@ -1,18 +1,18 @@
-import { Transcriber } from './Transcriber'
 import * as R from 'ramda'
 import { ATTENDEES, parameters } from '../background'
 import { SESSION } from '../record'
-import { sleep } from '../utils'
 import {
-    api,
-    SummaryParam,
-    LABEL_COLORS,
     Agenda,
-    Sentence,
-    Label,
-    Workspace,
     DetectClientResponse,
-} from 'spoke_api_js'
+    LABEL_COLORS,
+    Label,
+    Sentence,
+    SummaryParam,
+    Workspace,
+    api,
+} from '../spoke_api_js'
+import { sleep } from '../utils'
+import { Transcriber } from './Transcriber'
 
 const MIN_TOKEN_GPT4 = 1000
 

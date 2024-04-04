@@ -388,7 +388,7 @@ export type ChangeLanguage = {
     user_id: number
 }
 
-export async function getAgenda(): Promise<Agenda | undefined> {
+export async function getAgenda(): Promise<any | undefined> {
     const meeting = getMeetingGlobal()
     if (meeting != null) {
         const agenda = await CURRENT_MEETING.meeting.backgroundPage.evaluate(

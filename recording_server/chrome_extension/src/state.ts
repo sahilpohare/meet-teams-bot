@@ -1,5 +1,5 @@
-import { Agenda, MeetingProvider } from 'spoke_api_js'
 import { ChangeLanguage } from './background'
+import { Agenda, MeetingProvider } from './spoke_api_js'
 
 export type SpeechToTextProvider = 'Gladia'
 

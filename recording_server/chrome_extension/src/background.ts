@@ -1,7 +1,7 @@
 import axios from 'axios'
-import { Project, api, setConfig } from 'spoke_api_js'
 import { Transcriber } from './Transcribe/Transcriber'
 import * as record from './record'
+import { Project, api, setConfig } from './spoke_api_js'
 import * as State from './state'
 import { uploadEditorsTask } from './uploadEditors'
 import { sleep } from './utils'

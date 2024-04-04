@@ -1,6 +1,6 @@
 import * as R from 'ramda'
-import { api, RecognizerWord } from 'spoke_api_js'
 import { SESSION } from '../record'
+import { api, RecognizerWord } from '../spoke_api_js'
 import { sleep } from '../utils'
 import { Transcriber } from './Transcriber'
 

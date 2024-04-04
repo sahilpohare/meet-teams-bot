@@ -1,4 +1,6 @@
 import * as R from 'ramda'
+import { Speaker } from './observeSpeakers'
+import { SESSION, START_RECORD_TIMESTAMP, SpokeSession } from './record'
 import {
     Asset,
     Editor,
@@ -6,9 +8,7 @@ import {
     Transcript,
     Video,
     api,
-} from 'spoke_api_js'
-import { Speaker } from './observeSpeakers'
-import { SESSION, START_RECORD_TIMESTAMP, SpokeSession } from './record'
+} from './spoke_api_js'
 import { parameters } from './state'
 
 export async function uploadEditorsTask(speakers: Speaker[]) {
