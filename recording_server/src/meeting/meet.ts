@@ -1,10 +1,10 @@
-import * as puppeteer from 'puppeteer'
 import * as R from 'ramda'
+import * as puppeteer from 'puppeteer'
 
 import { CURRENT_MEETING, MeetingParams } from '../meeting'
 
-import { Page } from 'puppeteer'
 import { CancellationToken } from '../meeting'
+import { Page } from 'puppeteer'
 import { screenshot } from '../puppeteer'
 import { sleep } from '../utils'
 
@@ -158,30 +158,9 @@ export async function joinMeeting(
     await findShowEveryOne(page, false, cancellationToken)
 
     // Send enter message in chat
+    console.log('meetingParams.enter_message:', meetingParams.enter_message)
     if (meetingParams.enter_message) {
-        try {
-            const CHAT_BUTTON_SELECTOR =
-                'button[aria-label="Chat with everyone"]'
-            const CHAT_SEND_SELECTOR = 'button[aria-label="Send a message"]'
-
-            function clickFirst(selector: string) {
-                console.log(`clickFirst(${selector})`)
-                return page.$$eval(selector, (elems) => {
-                    for (const elem of elems) {
-                        ;(elem as any).click()
-                        break
-                    }
-                })
-            }
-
-            await clickFirst(CHAT_BUTTON_SELECTOR)
-            await sleep(1000)
-            await page.keyboard.type(meetingParams.enter_message)
-            await clickFirst(CHAT_SEND_SELECTOR)
-            await clickFirst(CHAT_BUTTON_SELECTOR)
-        } catch (e) {
-            console.error('Unable to send enter message in chat', e)
-        }
+        await sendEntryMessage(page, meetingParams.enter_message)
     }
 
     try {
@@ -267,6 +246,30 @@ async function findShowEveryOne(
     }
 }
 
+async function sendEntryMessage(page: puppeteer.Page, enter_message: string) {
+    try {
+        const CHAT_BUTTON_SELECTOR = 'button[aria-label="Chat with everyone"]'
+        const CHAT_SEND_SELECTOR = 'button[aria-label="Send a message"]'
+
+        // await clickFirst(CHAT_BUTTON_SELECTOR)
+        console.log(
+            'Click First CHAT_BUTTON_SELECTOR',
+            await clickFirst(page, CHAT_BUTTON_SELECTOR),
+        )
+        await sleep(1000)
+        await page.keyboard.type(enter_message)
+        console.log(
+            'Click First CHAT_SEND_SELECTOR',
+            await clickFirst(page, CHAT_SEND_SELECTOR),
+        )
+        console.log(
+            'Click First CHAT_BUTTON_SELECTOR',
+            await clickFirst(page, CHAT_BUTTON_SELECTOR),
+        )
+    } catch (e) {
+        console.error('Unable to send enter message in chat', e)
+    }
+}
 async function countParticipants(page: Page): Promise<number> {
     const count = await page.evaluate(() => {
         const images = Array.from(document.querySelectorAll('img'))
@@ -275,6 +278,30 @@ async function countParticipants(page: Page): Promise<number> {
         ).length
     })
     return count
+}
+
+async function clickFirst(
+    page: Page,
+    selector: string,
+    retry: number = 5,
+): Promise<boolean> {
+    console.log(`clickFirst(${selector})`)
+    for (let i = 0; i < retry; i++) {
+        if (
+            await page.$$eval(selector, (elems) => {
+                for (const elem of elems) {
+                    ;(elem as any).click()
+                    return true
+                }
+                return false
+            })
+        ) {
+            return true
+        } else {
+            await sleep(500)
+        }
+    }
+    return false
 }
 
 async function removedFromMeeting(page: Page): Promise<boolean> {
