@@ -151,7 +151,7 @@ export async function server() {
             res.send('ok')
             return
         }
-        meeting.stopRecording('API request')
+        meeting.stopRecording('api request')
         res.send('ok')
     })
 

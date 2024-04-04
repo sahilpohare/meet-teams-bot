@@ -1,29 +1,23 @@
-import { MeetingParams } from './meeting'
 import axios from 'axios'
+import { MeetingParams } from './meeting'
 
-export async function patchEvent(user_token: string, payload: any) {
+export async function patchEvent(payload: any) {
     console.log('patching event payload: ', { payload })
     return (
         await axios({
             method: 'PATCH',
             url: `/calendar/event`,
             data: payload,
-            headers: {
-                Authorization: user_token,
-            },
         })
     ).data
 }
 
-export async function notify(user_token: string, payload: any) {
+export async function notify(payload: any) {
     return (
         await axios({
             method: 'POST',
             url: `/notification/broadcast`,
             data: payload,
-            headers: {
-                Authorization: user_token,
-            },
         })
     ).data
 }
@@ -38,7 +32,7 @@ export async function notifyApp(
         try {
             const eventStatus = status === 'EndRecording' ? 'None' : status
             if (data.event?.id != null) {
-                await patchEvent(data.user_token, {
+                await patchEvent({
                     status: eventStatus,
                     id: data.event?.id,
                     ...event,
@@ -49,7 +43,7 @@ export async function notifyApp(
         }
     }
     try {
-        await notify(data.user_token, {
+        await notify({
             message: status,
             user_id: data.user_id,
             payload,

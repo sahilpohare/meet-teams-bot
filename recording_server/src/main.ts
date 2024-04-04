@@ -23,6 +23,8 @@ console.log('version 1.0')
     } else {
         // set default axios config
         axios.defaults.baseURL = API_SERVER_BASEURL
+        axios.defaults.withCredentials = true
+
         try {
             await triggerCache()
         } catch (e) {

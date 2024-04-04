@@ -1,11 +1,11 @@
-import { connect, Channel } from 'amqplib'
-import { MeetingParams, startRecordMeeting, setInitalParams } from './meeting'
-import { LOGGER } from './server'
-import { LOCK_INSTANCE_AT_STARTUP, setProtection } from './instance'
-import { notify, notifyApp } from './calendar'
-import { setLoggerProjectId } from './logger'
-import { Events } from './events'
+import { Channel, connect } from 'amqplib'
 import axios from 'axios'
+import { notify, notifyApp } from './calendar'
+import { Events } from './events'
+import { LOCK_INSTANCE_AT_STARTUP, setProtection } from './instance'
+import { setLoggerProjectId } from './logger'
+import { MeetingParams, init, startRecordMeeting } from './meeting'
+import { LOGGER } from './server'
 
 const POD_NAME = process.env.POD_NAME
 
@@ -57,6 +57,8 @@ export class Consumer {
                             message.content.toString(),
                         )
 
+                        axios.defaults.headers.common['Authorization'] =
+                            meetingParams.user_token
                         // Ping /meeting_bot/received_message to record waiting time stats
                         try {
                             const url = `/meeting_bot/received_message?session_id=${meetingParams.session_id}`
@@ -64,9 +66,6 @@ export class Consumer {
                             await axios({
                                 method: 'POST',
                                 url,
-                                headers: {
-                                    Authorization: meetingParams.user_token,
-                                },
                             })
                         } catch (e) {
                             console.error(
@@ -115,7 +114,7 @@ export class Consumer {
             }
         }
 
-        setInitalParams(data, logger)
+        init(data, logger)
 
         Events.init(data)
         await Events.joiningCall()
@@ -123,7 +122,7 @@ export class Consumer {
         const project = await startRecordMeeting(data)
         setLoggerProjectId(project?.id)
         try {
-            await notify(data.user_token, {
+            await notify({
                 message: 'BotEntered',
                 user_id: data.user_id,
                 payload: {
