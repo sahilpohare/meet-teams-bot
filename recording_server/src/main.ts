@@ -10,10 +10,11 @@ import {
     setSessionInRedis,
     terminateInstance,
 } from './instance'
-import { CURRENT_MEETING, MeetingParams, recordMeetingToEnd } from './meeting'
+import { MeetingHandle } from './meeting'
 import { getCachedExtensionId, getExtensionId, openBrowser } from './puppeteer'
 import { Consumer } from './rabbitmq'
 import { LOGGER, clientRedis, server } from './server'
+import { MeetingParams } from './types'
 import { sleep } from './utils'
 
 console.log('version 1.0')
@@ -65,7 +66,7 @@ console.log('version 1.0')
             }
         } else {
             try {
-                await recordMeetingToEnd()
+                await MeetingHandle.instance.recordMeetingToEnd()
             } catch (e) {
                 console.error('record meeting to end failed: ', e)
             }
@@ -92,7 +93,6 @@ console.log('version 1.0')
 })()
 
 async function handleErrorInStartRecording(e: any, data: MeetingParams) {
-    CURRENT_MEETING.error = e
     try {
         await notifyApp(
             'Error',
@@ -104,7 +104,7 @@ async function handleErrorInStartRecording(e: any, data: MeetingParams) {
             data.meeting_url,
             data.event?.id,
             data.bot_id,
-            CURRENT_MEETING.error,
+            MeetingHandle.getError(),
         )
     } catch (e) {
         console.error(

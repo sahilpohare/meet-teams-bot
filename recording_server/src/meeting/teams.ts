@@ -1,14 +1,11 @@
 import * as puppeteer from 'puppeteer'
-
+import { Page } from 'puppeteer'
+import { screenshot } from '../puppeteer'
 import {
-    CURRENT_MEETING,
     CancellationToken,
     MeetingParams,
     MeetingProviderInterface,
-} from '../meeting'
-
-import { Page } from 'puppeteer'
-import { screenshot } from '../puppeteer'
+} from '../types'
 import { sleep } from '../utils'
 
 const jsdom = require('jsdom')
@@ -79,7 +76,7 @@ export class TeamsProvider implements MeetingProviderInterface {
         cancellationToken: CancellationToken,
         meetingParams: MeetingParams,
     ): Promise<void> {
-        CURRENT_MEETING.logger.info('joining meeting')
+        console.log('joining meeting')
 
         await clickWithInnerText(page, 'button', 'Continue on this browser', 20)
         await sleep(2000)
@@ -123,22 +120,17 @@ export class TeamsProvider implements MeetingProviderInterface {
         }
     }
 
-    async waitForEndMeeting(
+    async findEndMeeting(
         _meetingParams: MeetingParams,
         page: Page,
         cancellationToken: CancellationToken,
-    ) {
-        CURRENT_MEETING.logger.info('[waitForEndMeeting]')
-
-        while (CURRENT_MEETING && CURRENT_MEETING.status == 'Recording') {
-            if ((await spokeIsAlone(page)) === false) {
-                cancellationToken.reset()
-            } else if (cancellationToken.isCancellationRequested === true) {
-                return
-            }
-
-            sleep(1000)
+    ): Promise<boolean> {
+        if ((await spokeIsAlone(page)) === false) {
+            cancellationToken.reset()
+        } else if (cancellationToken.isCancellationRequested === true) {
+            return true
         }
+        return false
     }
 }
 function parseMeetingUrlFromJoinInfos(joinInfo: string) {
@@ -388,16 +380,16 @@ async function focusInput(page: puppeteer.Page, iterations: number) {
 
 async function spokeIsAlone(page: Page): Promise<boolean> {
     return false
-    try {
-        const participants = await page.$$('.participantInfo')
-        CURRENT_MEETING.logger.info('PARTICIPANTS: ', participants?.length)
-        if (participants && participants.length === 1) {
-            return true
-        }
-    } catch (e) {
-        CURRENT_MEETING.logger.error(
-            `[spokeIsAlone] an error occured in spoke is alone: ${e}`,
-        )
-    }
-    return false
+    //  try {
+    //      const participants = await page.$$('.participantInfo')
+    //      console.log('PARTICIPANTS: ', participants?.length)
+    //      if (participants && participants.length === 1) {
+    //          return true
+    //      }
+    //  } catch (e) {
+    //      CURRENT_MEETING.logger.error(
+    //          `[spokeIsAlone] an error occured in spoke is alone: ${e}`,
+    //      )
+    //  }
+    //  return false
 }

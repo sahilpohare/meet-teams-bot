@@ -4,8 +4,9 @@ import { notify, notifyApp } from './calendar'
 import { Events } from './events'
 import { LOCK_INSTANCE_AT_STARTUP, setProtection } from './instance'
 import { setLoggerProjectId } from './logger'
-import { MeetingParams, init, startRecordMeeting } from './meeting'
+import { MeetingHandle } from './meeting'
 import { LOGGER } from './server'
+import { MeetingParams } from './types'
 
 const POD_NAME = process.env.POD_NAME
 
@@ -114,12 +115,12 @@ export class Consumer {
             }
         }
 
-        init(data, logger)
+        MeetingHandle.init(data, logger)
 
         Events.init(data)
         await Events.joiningCall()
 
-        const project = await startRecordMeeting(data)
+        const project = await MeetingHandle.instance.startRecordMeeting()
         setLoggerProjectId(project?.id)
         try {
             await notify({

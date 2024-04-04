@@ -1,15 +1,12 @@
 import * as puppeteer from 'puppeteer'
+import { Page } from 'puppeteer'
 import * as R from 'ramda'
-
+import { screenshot } from '../puppeteer'
 import {
-    CURRENT_MEETING,
+    CancellationToken,
     MeetingParams,
     MeetingProviderInterface,
-} from '../meeting'
-
-import { Page } from 'puppeteer'
-import { CancellationToken } from '../meeting'
-import { screenshot } from '../puppeteer'
+} from '../types'
 import { sleep } from '../utils'
 const url_parse = require('url-parse')
 
@@ -59,7 +56,7 @@ export class MeetProvider implements MeetingProviderInterface {
         cancellationToken: CancellationToken,
         meetingParams: MeetingParams,
     ): Promise<void> {
-        CURRENT_MEETING.logger.info('joining meeting')
+        console.log('joining meeting')
 
         try {
             await page.$$eval('div[role=button]', (elems) => {
@@ -208,25 +205,22 @@ export class MeetProvider implements MeetingProviderInterface {
         await sleep(500)
         await findShowEveryOne(page, true, cancellationToken)
 
-        CURRENT_MEETING.logger.info('after join meeting')
+        console.log('after join meeting')
     }
-    async waitForEndMeeting(
+    async findEndMeeting(
         _meetingParams: MeetingParams,
         page: Page,
         cancellationToken: CancellationToken,
-    ) {
-        CURRENT_MEETING.logger.info('[waitForEndMeeting]')
-        while (CURRENT_MEETING && CURRENT_MEETING.status == 'Recording') {
-            try {
-                if (await findEndMeeting(page, cancellationToken)) {
-                    break
-                }
-                //CURRENT_MEETING.logger.info('[findendmeeting]  false')
-            } catch (e) {
-                CURRENT_MEETING.logger.info('[findendmeeting]  error', e)
+    ): Promise<boolean> {
+        try {
+            if (await findEndMeeting(page, cancellationToken)) {
+                return true
             }
-            await sleep(1000)
+            //console.log('[findendmeeting]  false')
+        } catch (e) {
+            console.log('[findendmeeting]  error', e)
         }
+        return false
     }
 }
 

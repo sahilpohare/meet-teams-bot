@@ -3,8 +3,13 @@ import * as express from 'express'
 import * as redis from 'redis'
 import { PORT } from './instance'
 import { Logger } from './logger'
-import * as meeting from './meeting'
-import { ChangeLanguage, StopRecordParams } from './meeting'
+import { MeetingHandle } from './meeting'
+import {
+    ChangeAgendaRequest,
+    ChangeLanguage,
+    StatusParams,
+    StopRecordParams,
+} from './types'
 import { sleep } from './utils'
 
 export let PROJECT_ID: number | undefined = undefined
@@ -64,36 +69,33 @@ export async function server() {
     app.post('/status', jsonParser, async (req, res) => {
         function statusReady() {
             return (
-                meeting.CURRENT_MEETING.error != null ||
-                meeting.CURRENT_MEETING.project != null
+                MeetingHandle.getProject() != null ||
+                MeetingHandle.getError() != null
             )
         }
-        const data: meeting.StatusParams = req.body
+        const data: StatusParams = req.body
         try {
             let logger = LOGGER.new({
                 user_id: data.user_id,
                 meeting_url: data.meeting_url,
             })
-            logger.info(`status request`, {
-                user_id: data.user_id,
-                meeting_url: data.meeting_url,
-                current_meeting: meeting.CURRENT_MEETING,
-            })
+            logger.info('status request')
             for (let i = 0; i < 100; i++) {
                 if (statusReady()) {
-                    if (meeting.CURRENT_MEETING.error != null) {
+                    const error = MeetingHandle.getError()
+                    const project = MeetingHandle.getProject()
+                    const status = MeetingHandle.getStatus()
+                    if (error != null) {
                         logger.info('status ready, returning error')
-                        const error = meeting.CURRENT_MEETING.error
                         res.status(500).send(JSON.stringify(error))
                         return
-                    } else if (meeting.CURRENT_MEETING.project != null) {
+                    } else if (project != null) {
                         logger.info('status ready, returning project')
                         let agenda = null
                         try {
-                            if (
-                                meeting.CURRENT_MEETING.status === 'Recording'
-                            ) {
-                                agenda = await meeting.getAgenda()
+                            if (status === 'Recording') {
+                                agenda =
+                                    await MeetingHandle.instance.getAgenda()
                             }
                         } catch (e) {
                             logger.error(
@@ -101,9 +103,9 @@ export async function server() {
                             )
                         }
                         res.json({
-                            project: meeting.CURRENT_MEETING.project,
+                            project: project,
                             agenda: agenda,
-                            status: meeting.CURRENT_MEETING.status,
+                            status: status,
                         })
                         return
                     }
@@ -119,10 +121,10 @@ export async function server() {
     })
 
     app.post('/change_agenda', jsonParser, async (req, res) => {
-        const data: meeting.ChangeAgendaRequest = req.body
+        const data: ChangeAgendaRequest = req.body
         console.log('change agenda request', data)
         try {
-            await meeting.changeAgenda(data)
+            await MeetingHandle.instance.changeAgenda(data)
             res.send('ok')
         } catch (e) {
             LOGGER.error(`changing agenda error ${e}`)
@@ -133,7 +135,7 @@ export async function server() {
     app.post('/change_language', jsonParser, async (req, res) => {
         const data: ChangeLanguage = req.body
         try {
-            await meeting.changeLanguage(data)
+            await MeetingHandle.instance.changeLanguage(data)
             res.send('ok')
         } catch (e) {
             res.status(500).send(JSON.stringify(e))
@@ -143,15 +145,9 @@ export async function server() {
     app.post('/stop_record', jsonParser, async (req, res) => {
         const data: StopRecordParams = req.body
         console.log('stop record request: ', data)
-        if (
-            meeting.CURRENT_MEETING.param?.meeting_url != null &&
-            meeting.CURRENT_MEETING.param?.meeting_url !== '' &&
-            meeting.CURRENT_MEETING.param?.meeting_url !== data.meeting_url
-        ) {
-            res.send('ok')
-            return
-        }
-        meeting.stopRecording('api request')
+        MeetingHandle.instance.stopRecording('api request').catch((e) => {
+            LOGGER.error(`stop recording error ${e}`)
+        })
         res.send('ok')
     })
 

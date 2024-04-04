@@ -1,14 +1,12 @@
 import * as puppeteer from 'puppeteer'
 
+import { Page } from 'puppeteer'
+import { screenshot } from '../puppeteer'
 import {
-    CURRENT_MEETING,
     CancellationToken,
     MeetingParams,
     MeetingProviderInterface,
-} from '../meeting'
-
-import { Page } from 'puppeteer'
-import { screenshot } from '../puppeteer'
+} from '../types'
 import { sleep } from '../utils'
 
 const url_parse = require('url-parse')
@@ -116,87 +114,72 @@ export class ZoomProvider implements MeetingProviderInterface {
         try {
             await joinCamera(page)
         } catch (e) {}
-        CURRENT_MEETING.logger.info('wait for camera done')
+        console.log('wait for camera done')
     }
 
-    async waitForEndMeeting(
+    async findEndMeeting(
         meetingParams: MeetingParams,
         page: Page,
         cancellationToken: CancellationToken,
-    ) {
-        CURRENT_MEETING.logger.info('[waitForEndMeeting]')
-        CURRENT_MEETING.logger.info(meetingParams.toString())
+    ): Promise<boolean> {
+        let element = null
+        try {
+            element = await findModal(page)
+            const audio = await findJoinAudio(page)
 
-        while (CURRENT_MEETING && CURRENT_MEETING.status == 'Recording') {
-            let element = null
-            try {
-                element = await findModal(page)
-                const audio = await findJoinAudio(page)
-
-                if (audio != null) {
+            if (audio != null) {
+                try {
                     try {
-                        try {
-                            await this.joinMeeting(
-                                page,
-                                cancellationToken,
-                                meetingParams,
-                                3,
-                            )
-                            CURRENT_MEETING.logger.info('meeting page joined')
-                        } catch (error) {
-                            console.error(error)
-                        }
-                    } catch (e) {
-                        CURRENT_MEETING.logger.error(
-                            'joinMeeting after modal failed',
-                            e,
+                        await this.joinMeeting(
+                            page,
+                            cancellationToken,
+                            meetingParams,
+                            3,
                         )
+                        console.log('meeting page joined')
+                    } catch (error) {
+                        console.error(error)
                     }
+                } catch (e) {
+                    console.log('joinMeeting after modal failed', e)
                 }
-                if (element == null) {
-                    continue
-                }
-            } catch (e) {
-                break
             }
-            let textContent = null
-            try {
-                textContent = await element.evaluate((el) => el.textContent)
-            } catch (e) {
-                CURRENT_MEETING.logger.error(
-                    '[waitForEndMeeting] error in element evaluate',
-                    e,
+            if (element == null) {
+                return false
+            }
+        } catch (e) {
+            return true
+        }
+        let textContent = null
+        try {
+            textContent = await element.evaluate((el) => el.textContent)
+        } catch (e) {
+            console.log('[waitForEndMeeting] error in element evaluate', e)
+        }
+
+        console.log('[waitForEndMeeting] modale text content', {
+            textContent,
+        })
+
+        if (element != null) {
+            if (
+                textContent === 'The meeting has been ended' ||
+                textContent === 'You have been removed'
+            ) {
+                console.log(
+                    '[waitForEndMeeting] the meeting has been ended found',
                 )
-            }
 
-            CURRENT_MEETING.logger.info(
-                '[waitForEndMeeting] modale text content',
-                {
-                    textContent,
-                },
-            )
-
-            if (element != null) {
-                if (
-                    textContent === 'The meeting has been ended' ||
-                    textContent === 'You have been removed'
-                ) {
-                    CURRENT_MEETING.logger.info(
-                        '[waitForEndMeeting] the meeting has been ended found',
-                    )
-
-                    break
-                } else {
-                    CURRENT_MEETING.logger.info(
-                        '[waitForEndMeeting] text content is not meeting has been ended, finding button',
-                    )
-                    if (await continueModal(page, 'waitForEndMeeting')) {
-                        continue
-                    }
-                    await sleep(500)
-                }
+                return true
+            } else {
+                console.log(
+                    '[waitForEndMeeting] text content is not meeting has been ended, finding button',
+                )
+                await continueModal(page, 'waitForEndMeeting')
+                await sleep(500)
             }
         }
+        return false
     }
 }
 
@@ -237,16 +220,16 @@ async function clickJoinMeetingButton(page: puppeteer.Page) {
 
 async function bypass_modal(page: puppeteer.Page) {
     try {
-        CURRENT_MEETING.logger.info('[joinMeeting] try to find modal')
+        console.log('[joinMeeting] try to find modal')
         let element = await findModal(page)
         if (element != null) {
-            CURRENT_MEETING.logger.info('[joinMeeting] found modal clicking')
+            console.log('[joinMeeting] found modal clicking')
             await continueModal(page, 'joinMeeting')
         } else {
-            CURRENT_MEETING.logger.info('[joinMeeting] modale not found')
+            console.log('[joinMeeting] modale not found')
         }
     } catch (e) {
-        CURRENT_MEETING.logger.error('[joinMeeting] error finding modale')
+        console.log('[joinMeeting] error finding modale')
     }
 }
 
@@ -260,7 +243,7 @@ async function clickJoinAudio(page: puppeteer.Page) {
             button._remoteObject.description ===
                 'button.zm-btn.join-audio-by-voip__join-btn.zm-btn--primary.zm-btn__outline--white.zm-btn--lg'
         ) {
-            CURRENT_MEETING.logger.info('see join audio button')
+            console.log('see join audio button')
 
             await button.click()
             await sleep(500)
@@ -270,7 +253,7 @@ async function clickJoinAudio(page: puppeteer.Page) {
             button._remoteObject.description ===
                 'button.zm-btn.join-audio-by-voip__join-btn.zm-btn--brown.zm-btn__outline--white.zm-btn--lg'
         ) {
-            CURRENT_MEETING.logger.info('see leave audio button')
+            console.log('see leave audio button')
             const selectorClose =
                 '.zm-btn.join-dialog__close.zm-btn--default.zm-btn__outline--blue'
             await page.waitForSelector(selectorClose)
@@ -280,9 +263,9 @@ async function clickJoinAudio(page: puppeteer.Page) {
         }
     } catch (e) {
         if (!(e instanceof puppeteer.errors.TimeoutError)) {
-            CURRENT_MEETING.logger.info(`in wait for audio timeout: ${e}`)
+            console.log(`in wait for audio timeout: ${e}`)
         } else {
-            CURRENT_MEETING.logger.info(`error in wait button join audio ${e}`)
+            console.log(`error in wait button join audio ${e}`)
         }
     }
     return false
@@ -294,10 +277,7 @@ async function joinAudio(page: puppeteer.Page) {
     for (let i = 0; i < 10; i++) {
         if (await clickJoinAudio(page)) {
             if (audioButtonClicked) {
-                CURRENT_MEETING.logger.error(
-                    'there still was the join audio button',
-                    i,
-                )
+                console.log('there still was the join audio button', i)
             }
             audioButtonClicked = true
             await sleep(1000)
@@ -405,10 +385,10 @@ async function findJoinAudio(
         )
     } catch (e) {
         if (e instanceof puppeteer.errors.TimeoutError) {
-            // CURRENT_MEETING.logger.info(`[find modal] timeout finding modale`)
+            // console.log(`[find modal] timeout finding modale`)
             return undefined
         } else {
-            CURRENT_MEETING.logger.error(`Faild to wait for selector ${e}`)
+            console.log(`Faild to wait for selector ${e}`)
             throw e
         }
     }
@@ -425,10 +405,10 @@ async function findModal(
         })
     } catch (e) {
         if (e instanceof puppeteer.errors.TimeoutError) {
-            // CURRENT_MEETING.logger.info(`[find modal] timeout finding modale`)
+            // console.log(`[find modal] timeout finding modale`)
             return undefined
         } else {
-            CURRENT_MEETING.logger.error(`Faild to wait for selector ${e}`)
+            console.log(`Faild to wait for selector ${e}`)
         }
     }
     return element
@@ -442,15 +422,13 @@ async function continueModal(page: Page, functionName: string) {
             { timeout: 500 },
         )
         if (element) {
-            CURRENT_MEETING.logger.info(
-                `[${functionName}] primary button found`,
-            )
+            console.log(`[${functionName}] primary button found`)
             await element.click()
             return true
         }
     } catch (e) {
         try {
-            CURRENT_MEETING.logger.error(
+            console.log(
                 `Failed to find zoom primary button trying other approach`,
             )
 
@@ -459,14 +437,12 @@ async function continueModal(page: Page, functionName: string) {
                 { timeout: 500 },
             )
             if (element) {
-                CURRENT_MEETING.logger.info(
-                    `[${functionName}] legacy button found`,
-                )
+                console.log(`[${functionName}] legacy button found`)
                 await element.click()
                 return true
             }
         } catch (e) {
-            CURRENT_MEETING.logger.error(
+            console.log(
                 `Failed to find zoom legacy button trying other approach`,
             )
         }
@@ -475,31 +451,25 @@ async function continueModal(page: Page, functionName: string) {
     const [buttonContinue] = await page.$x("//button[contains(., 'Continue')]")
     try {
         if (buttonContinue) {
-            CURRENT_MEETING.logger.info(
-                `[${functionName}] button continue`,
-                buttonContinue,
-            )
+            console.log(`[${functionName}] button continue`, buttonContinue)
             await buttonContinue.click()
             return true
         }
     } catch (e) {
-        CURRENT_MEETING.logger.error(`Failed to perform end meeting hook`)
+        console.log(`Failed to perform end meeting hook`)
     }
 
     const [buttonGotIt] = await page.$x("//button[contains(., 'Got it')]")
     try {
         if (buttonGotIt) {
-            CURRENT_MEETING.logger.info(
-                `[${functionName}] button got It`,
-                buttonGotIt,
-            )
+            console.log(`[${functionName}] button got It`, buttonGotIt)
             await buttonGotIt.click()
             return true
         }
     } catch (e) {
-        CURRENT_MEETING.logger.error(`Failed to perform end meeting hook`)
+        console.log(`Failed to perform end meeting hook`)
     }
-    CURRENT_MEETING.logger.info(`[${functionName}] fail to find the button`)
+    console.log(`[${functionName}] fail to find the button`)
     return false
 }
 
