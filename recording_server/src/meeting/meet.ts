@@ -1,17 +1,21 @@
-import * as puppeteer from 'puppeteer'
-import { Page } from 'puppeteer'
 import * as R from 'ramda'
-import { screenshot } from '../puppeteer'
+import * as puppeteer from 'puppeteer'
+
 import {
     CancellationToken,
     MeetingParams,
     MeetingProviderInterface,
-} from '../types'
+} from '../meeting'
+
+import { CancellationToken } from '../meeting'
+import { Page } from 'puppeteer'
+import { screenshot } from '../puppeteer'
 import { sleep } from '../utils'
+
 const url_parse = require('url-parse')
 
 export class MeetProvider implements MeetingProviderInterface {
-    constructor() {}
+    constructor() { }
     async parseMeetingUrl(browser: puppeteer.Browser, meeting_url: string) {
         // try parsing this liinks
         // To join the video meeting, click this link: https://meet.google.com/zdg-teai-fhz
@@ -122,7 +126,7 @@ export class MeetProvider implements MeetingProviderInterface {
             // Now it is safe to type the bot name, resetting the input first (it's garbage)
             await page.$$eval(INPUT, (elems) => {
                 for (const elem of elems) {
-                    ;(elem as any).value = ''
+                    ; (elem as any).value = ''
                 }
             })
             await page.focus(INPUT)
@@ -183,25 +187,40 @@ export class MeetProvider implements MeetingProviderInterface {
             })
             await sleep(500)
             console.log('found change layout')
-            const spotlightFound = await page.$$eval('span', (elems) => {
+
+            const textToSearch = await (() => {
+                switch (meetingParams.recording_mode) {
+                    case 'speaker_view':
+                        return 'Spotlight'
+                    case 'gallery_view':
+                        return 'Auto'
+                    case 'gallery_view_v2':
+                        return 'Tiled'
+                    default:
+                        return 'Spotlight'
+                }
+            })()
+
+            console.log('TEEEEEEEEEEEXXTE TO SEARCH', textToSearch)
+            const recordingModeFound = await page.$$eval('span', (elems) => {
                 for (const e of elems) {
                     let elem = e as any
                     console.log(elem.innerText)
-                    if (elem.innerText === 'Spotlight') {
+                    if (elem.innerText === textToSearch) {
                         elem.parentElement.click()
                         return true
                     }
                 }
                 return false
             })
-            await sleep(500)
-            console.log('found spotlight', { spotlightFound })
+            await sleep(1000)
+            console.log('Gallery mode found', { recordingModeFound })
             await page.mouse.click(10, 10)
-            await sleep(10)
+            await sleep(100)
             await page.mouse.click(10, 10)
-            await sleep(10)
+            await sleep(100)
             await page.mouse.click(10, 10)
-        } catch (e) {}
+        } catch (e) { }
         await sleep(500)
         await findShowEveryOne(page, true, cancellationToken)
 
@@ -305,7 +324,7 @@ async function clickFirst(
         if (
             await page.$$eval(selector, (elems) => {
                 for (const elem of elems) {
-                    ;(elem as any).click()
+                    ; (elem as any).click()
                     return true
                 }
                 return false
