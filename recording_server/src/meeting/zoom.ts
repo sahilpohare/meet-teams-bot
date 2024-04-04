@@ -285,6 +285,8 @@ async function sendEnterMessage(page: puppeteer.Page, message: string) {
             'button[aria-label="open the chat pane"]'
         const CHAT_CLOSE_BUTTON_SELECTOR =
             'button[aria-label="close the chat pane"]'
+        const MORE_BUTTON_SELECTOR = 'button[aria-label="More meeting control"]'
+        // selector for span with inner text Chat
 
         console.log(
             'fn clickFirst CHAT_CLOSE_BUTTON_SELECTOR',
@@ -293,9 +295,14 @@ async function sendEnterMessage(page: puppeteer.Page, message: string) {
         await page.focus(CHAT_INPUT_SELECTOR)
         await page.keyboard.type(message)
         await page.type(CHAT_INPUT_SELECTOR, '\n')
+
         console.log(
-            'fn clickFirst CHAT_CLOSE_BUTTON_SELECTOR',
-            await clickFirst(page, CHAT_CLOSE_BUTTON_SELECTOR),
+            'fn clickFirst MORE_BUTTON_SELECTOR',
+            await clickFirst(page, MORE_BUTTON_SELECTOR),
+        )
+        console.log(
+            'fn click with inner text Chat',
+            await clickWithInnerText(page, 'span', 'Chat'),
         )
     } catch (e) {
         console.error('Unable to send enter message in chat', e)
@@ -509,4 +516,53 @@ async function continueModal(page: Page, functionName: string) {
     }
     CURRENT_MEETING.logger.info(`[${functionName}] fail to find the button`)
     return false
+}
+
+export async function clickWithInnerText(
+    page: puppeteer.Page,
+    htmlType: string,
+    innerText: string,
+    iterations?: number,
+    click: boolean = true,
+    cancellationToken?: CancellationToken,
+): Promise<boolean> {
+    let i = 0
+    iterations = iterations ?? 10
+    let continueButton = false
+
+    while (
+        !continueButton &&
+        (iterations == null || i < iterations) &&
+        cancellationToken?.isCancellationRequested !== true
+    ) {
+        try {
+            continueButton = await page.evaluate(
+                (innerText, htmlType, i, click) => {
+                    const elements = Array.from(
+                        document.querySelectorAll(htmlType),
+                    )
+                    for (const e of elements) {
+                        let elem = e as any
+                        if (elem.innerText === innerText) {
+                            if (click) {
+                                elem.click()
+                            }
+                            return true
+                        }
+                    }
+                    return false
+                },
+                innerText,
+                htmlType,
+                i,
+                click,
+            )
+        } catch (e) {
+            console.error('failed to find button', e)
+        }
+        await sleep(500)
+        console.log(`${innerText} clicked:`, continueButton)
+        i += 1
+    }
+    return continueButton
 }
