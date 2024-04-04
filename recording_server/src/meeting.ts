@@ -1,11 +1,9 @@
 import * as puppeteer from 'puppeteer'
-import * as MeetProvider from './meeting/meet'
-import * as TeamsProvider from './meeting/teams'
-import * as ZoomProvider from './meeting/zoom'
-
-import { Agenda, MeetingProvider } from 'spoke_api_js'
 import { BrandingHandle, generateBranding, playBranding } from './branding'
 import { Logger, uploadLog } from './logger'
+import { MeetProvider } from './meeting/meet'
+import { TeamsProvider } from './meeting/teams'
+import { ZoomProvider } from './meeting/zoom'
 import {
     findBackgroundPage,
     getCachedExtensionId,
@@ -14,11 +12,41 @@ import {
     removeListenPage,
 } from './puppeteer'
 
+export type MeetingProvider = 'Zoom' | 'Meet' | 'Teams'
+
 import { Page } from 'puppeteer'
 import { notifyApp } from './calendar'
 import { Events } from './events'
 import { delSessionInRedis } from './instance'
 import { sleep } from './utils'
+
+export interface MeetingProviderInterface {
+    openMeetingPage(
+        browser: puppeteer.Browser,
+        link: string,
+    ): Promise<puppeteer.Page>
+
+    joinMeeting(
+        page: puppeteer.Page,
+        cancellationToken: CancellationToken,
+        meetingParams: MeetingParams,
+    ): Promise<void>
+    waitForEndMeeting(
+        _meetingParams: MeetingParams,
+        page: Page,
+        cancellationToken: CancellationToken,
+    ): Promise<void>
+    parseMeetingUrl(
+        browser: puppeteer.Browser,
+        meeting_url: string,
+    ): Promise<{ meetingId: string; password: string }>
+    getMeetingLink(
+        meeting_id: string,
+        _password: string,
+        _role: number,
+        _bot_name: string,
+    ): string
+}
 
 function detectMeetingProvider(url: string) {
     if (url.includes('https://teams')) {
@@ -29,41 +57,27 @@ function detectMeetingProvider(url: string) {
         return 'Zoom'
     }
 }
-function setMeetingProvide(meetingProvider: MeetingProvider) {
+export function init(meetingParams: MeetingParams, logger: Logger) {
+    meetingParams.meetingProvider = detectMeetingProvider(
+        meetingParams.meeting_url,
+    )
+    initMeetingProvider(meetingParams.meetingProvider)
+    CURRENT_MEETING.param = meetingParams
+    CURRENT_MEETING.status = 'Recording'
+    CURRENT_MEETING.logger = logger
+}
+
+function initMeetingProvider(meetingProvider: MeetingProvider) {
     if (meetingProvider === 'Teams') {
-        MEETING_PROVIDER = {
-            openMeetingPage: TeamsProvider.openMeetingPage,
-            joinMeeting: TeamsProvider.joinMeeting,
-            waitForEndMeeting: TeamsProvider.waitForEndMeeting,
-            parseMeetingUrl: TeamsProvider.parseMeetingUrl,
-            getMeetingLink: TeamsProvider.getMeetingLink,
-        }
+        MEETING_PROVIDER = new TeamsProvider()
     } else if (meetingProvider === 'Meet') {
-        MEETING_PROVIDER = {
-            openMeetingPage: MeetProvider.openMeetingPage,
-            joinMeeting: MeetProvider.joinMeeting,
-            waitForEndMeeting: MeetProvider.waitForEndMeeting,
-            parseMeetingUrl: MeetProvider.parseMeetingUrl,
-            getMeetingLink: MeetProvider.getMeetingLink,
-        }
+        MEETING_PROVIDER = new MeetProvider()
     } else {
-        MEETING_PROVIDER = {
-            openMeetingPage: ZoomProvider.openMeetingPage,
-            joinMeeting: ZoomProvider.joinMeeting,
-            waitForEndMeeting: ZoomProvider.waitForEndMeeting,
-            parseMeetingUrl: ZoomProvider.parseMeetingUrl,
-            getMeetingLink: ZoomProvider.getMeetingLink,
-        }
+        MEETING_PROVIDER = new ZoomProvider()
     }
 }
 
-let MEETING_PROVIDER = {
-    openMeetingPage: ZoomProvider.openMeetingPage,
-    joinMeeting: ZoomProvider.joinMeeting,
-    waitForEndMeeting: ZoomProvider.waitForEndMeeting,
-    parseMeetingUrl: ZoomProvider.parseMeetingUrl,
-    getMeetingLink: ZoomProvider.getMeetingLink,
-}
+let MEETING_PROVIDER: MeetingProviderInterface = new ZoomProvider()
 
 export const CURRENT_MEETING: MeetingHandle = {
     meeting: {
@@ -128,7 +142,7 @@ export type MeetingParams = {
     api_server_baseurl?: string
     api_bot_baseurl?: string
     event?: { id: number }
-    agenda?: Agenda
+    agenda?: any
     bot_branding: boolean
     has_installed_extension: boolean
     custom_branding_bot_path?: string
@@ -183,16 +197,6 @@ async function cleanMeeting(meeting: Meeting) {
     } catch (e) {
         console.error(e)
     }
-}
-
-export function setInitalParams(meetingParams: MeetingParams, logger: Logger) {
-    meetingParams.meetingProvider = detectMeetingProvider(
-        meetingParams.meeting_url,
-    )
-    setMeetingProvide(meetingParams.meetingProvider)
-    CURRENT_MEETING.param = meetingParams
-    CURRENT_MEETING.status = 'Recording'
-    CURRENT_MEETING.logger = logger
 }
 
 function meetingTimeout() {

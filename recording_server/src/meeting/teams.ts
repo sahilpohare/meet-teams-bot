@@ -1,47 +1,143 @@
 import * as puppeteer from 'puppeteer'
 
-import { CURRENT_MEETING, CancellationToken, MeetingParams } from '../meeting'
+import {
+    CURRENT_MEETING,
+    CancellationToken,
+    MeetingParams,
+    MeetingProviderInterface,
+} from '../meeting'
 
 import { Page } from 'puppeteer'
 import { screenshot } from '../puppeteer'
 import { sleep } from '../utils'
 
 const jsdom = require('jsdom')
+const url_parse = require('url-parse')
 
-export async function parseMeetingUrl(
-    browser: puppeteer.Browser,
-    meeting_url: string,
-) {
-    // return { meetingId: 'https://teams.live.com/_#/meet/9487829875851?anon=true', password: "" }
-    // 'https://teams.live.com/_#/meet/9487829875851&anon=true'
+export class TeamsProvider implements MeetingProviderInterface {
+    constructor() {}
+    getMeetingLink(
+        meeting_id: string,
+        _password: string,
+        _role: number,
+        _bot_name: string,
+    ) {
+        return meeting_id
+    }
+    async parseMeetingUrl(browser: puppeteer.Browser, meeting_url: string) {
+        // return { meetingId: 'https://teams.live.com/_#/meet/9487829875851?anon=true', password: "" }
+        // 'https://teams.live.com/_#/meet/9487829875851&anon=true'
 
-    let newMeetingUrl = meeting_url
-    try {
-        newMeetingUrl = parseMeetingUrlFromJoinInfos(meeting_url)
-    } catch (e) {
-        console.error(
-            'failed to parse meeting url from join info, trying another method',
-            e,
-        )
+        let newMeetingUrl = meeting_url
+        try {
+            newMeetingUrl = parseMeetingUrlFromJoinInfos(meeting_url)
+        } catch (e) {
+            console.error(
+                'failed to parse meeting url from join info, trying another method',
+                e,
+            )
+        }
+
+        if (newMeetingUrl.includes('teams.live.com')) {
+            // https://teams.live.com/meet/9460778358093
+            // https://teams.microsoft.com/l/meetup-join/19%3AA2UA3NRD5KMJxGE2RQvY-IuCJTFV7NzfEWvaYgqiqE41%40thread.tacv2/1648544446696?context=%7B%22Tid%22%3A%2261f3e3b8-9b52-433a-a4eb-c67334ce54d5%22%2C%22Oid%22%3A%22e0bccd79-3e39-43dd-ba50-7b98ab2f8a10%22%7D
+            // https://teams.live.com/_#/meet/9487829875851?anon=true&deeplinkId=d6a1aa8d-b724-4e71-be9b-f922da7fd8e7
+            const newMeetingId =
+                newMeetingUrl.replace('teams.live.com/', 'teams.live.com/_#/') +
+                '?anon=true'
+            console.log({ newMeetingId })
+            return { meetingId: newMeetingId, password: '' }
+        } else {
+            return {
+                meetingId:
+                    newMeetingUrl.replace(
+                        'teams.microsoft.com/',
+                        'teams.microsoft.com/',
+                    ) + '&anon=true',
+                password: '',
+            }
+        }
+    }
+    async openMeetingPage(
+        browser: puppeteer.Browser,
+        link: string,
+    ): Promise<puppeteer.Page> {
+        const url = url_parse(link, true)
+        console.log({ url })
+
+        const context = browser.defaultBrowserContext()
+        await context.clearPermissionOverrides()
+        await context.overridePermissions(url.origin, ['camera'])
+
+        const page = await browser.newPage()
+        await page.goto(link, { waitUntil: 'networkidle2' })
+        return page
     }
 
-    if (newMeetingUrl.includes('teams.live.com')) {
-        // https://teams.live.com/meet/9460778358093
-        // https://teams.microsoft.com/l/meetup-join/19%3AA2UA3NRD5KMJxGE2RQvY-IuCJTFV7NzfEWvaYgqiqE41%40thread.tacv2/1648544446696?context=%7B%22Tid%22%3A%2261f3e3b8-9b52-433a-a4eb-c67334ce54d5%22%2C%22Oid%22%3A%22e0bccd79-3e39-43dd-ba50-7b98ab2f8a10%22%7D
-        // https://teams.live.com/_#/meet/9487829875851?anon=true&deeplinkId=d6a1aa8d-b724-4e71-be9b-f922da7fd8e7
-        const newMeetingId =
-            newMeetingUrl.replace('teams.live.com/', 'teams.live.com/_#/') +
-            '?anon=true'
-        console.log({ newMeetingId })
-        return { meetingId: newMeetingId, password: '' }
-    } else {
-        return {
-            meetingId:
-                newMeetingUrl.replace(
-                    'teams.microsoft.com/',
-                    'teams.microsoft.com/',
-                ) + '&anon=true',
-            password: '',
+    async joinMeeting(
+        page: puppeteer.Page,
+        cancellationToken: CancellationToken,
+        meetingParams: MeetingParams,
+    ): Promise<void> {
+        CURRENT_MEETING.logger.info('joining meeting')
+
+        await clickWithInnerText(page, 'button', 'Continue on this browser', 20)
+        await sleep(2000)
+
+        await clickWithInnerText(
+            page,
+            'button',
+            'Continue without audio or video',
+            20,
+        )
+        await sleep(2000)
+        await focusInput(page, 20)
+        await sleep(2000)
+        await page.keyboard.type(meetingParams.bot_name)
+        console.log(`botname typed`)
+        await sleep(500)
+        await clickWithInnerText(page, 'button', 'Join now', 20)
+        await screenshot(page, `afterjoinnow`)
+
+        // wait for the view button
+
+        if (
+            !(await clickWithInnerText(
+                page,
+                'button',
+                'View',
+                null,
+                false,
+                cancellationToken,
+            ))
+        ) {
+            throw 'timeout accepting the bot'
+        }
+        await sleep(2000)
+        // once the view button is found reclick on it
+        await clickWithInnerText(page, 'button', 'View', 1)
+        await sleep(1000)
+
+        if (!(await clickWithInnerText(page, 'div', 'Speaker', 300))) {
+            throw 'timeout accepting the bot'
+        }
+    }
+
+    async waitForEndMeeting(
+        _meetingParams: MeetingParams,
+        page: Page,
+        cancellationToken: CancellationToken,
+    ) {
+        CURRENT_MEETING.logger.info('[waitForEndMeeting]')
+
+        while (CURRENT_MEETING && CURRENT_MEETING.status == 'Recording') {
+            if ((await spokeIsAlone(page)) === false) {
+                cancellationToken.reset()
+            } else if (cancellationToken.isCancellationRequested === true) {
+                return
+            }
+
+            sleep(1000)
         }
     }
 }
@@ -65,32 +161,6 @@ function parseMeetingUrlFromJoinInfos(joinInfo: string) {
         throw 'failed to parse meeting url from join info'
     }
     return meetingUrl
-}
-
-export function getMeetingLink(
-    meeting_id: string,
-    _password: string,
-    _role: number,
-    _bot_name: string,
-) {
-    return meeting_id
-}
-
-const url_parse = require('url-parse')
-export async function openMeetingPage(
-    browser: puppeteer.Browser,
-    link: string,
-): Promise<puppeteer.Page> {
-    const url = url_parse(link, true)
-    console.log({ url })
-
-    const context = browser.defaultBrowserContext()
-    await context.clearPermissionOverrides()
-    await context.overridePermissions(url.origin, ['camera'])
-
-    const page = await browser.newPage()
-    await page.goto(link, { waitUntil: 'networkidle2' })
-    return page
 }
 
 export async function innerTextWithSelector(
@@ -313,73 +383,6 @@ async function focusInput(page: puppeteer.Page, iterations: number) {
             console.error('Failed to focus input', e)
         }
         await sleep(1000)
-    }
-}
-
-export async function joinMeeting(
-    page: puppeteer.Page,
-    cancellationToken: CancellationToken,
-    meetingParams: MeetingParams,
-): Promise<void> {
-    CURRENT_MEETING.logger.info('joining meeting')
-
-    await clickWithInnerText(page, 'button', 'Continue on this browser', 20)
-    await sleep(2000)
-
-    await clickWithInnerText(
-        page,
-        'button',
-        'Continue without audio or video',
-        20,
-    )
-    await sleep(2000)
-    await focusInput(page, 20)
-    await sleep(2000)
-    await page.keyboard.type(meetingParams.bot_name)
-    console.log(`botname typed`)
-    await sleep(500)
-    await clickWithInnerText(page, 'button', 'Join now', 20)
-    await screenshot(page, `afterjoinnow`)
-
-    // wait for the view button
-
-    if (
-        !(await clickWithInnerText(
-            page,
-            'button',
-            'View',
-            null,
-            false,
-            cancellationToken,
-        ))
-    ) {
-        throw 'timeout accepting the bot'
-    }
-    await sleep(2000)
-    // once the view button is found reclick on it
-    await clickWithInnerText(page, 'button', 'View', 1)
-    await sleep(1000)
-
-    if (!(await clickWithInnerText(page, 'div', 'Speaker', 300))) {
-        throw 'timeout accepting the bot'
-    }
-}
-
-export async function waitForEndMeeting(
-    _meetingParams: MeetingParams,
-    page: Page,
-    cancellationToken: CancellationToken,
-) {
-    CURRENT_MEETING.logger.info('[waitForEndMeeting]')
-
-    while (CURRENT_MEETING && CURRENT_MEETING.status == 'Recording') {
-        if ((await spokeIsAlone(page)) === false) {
-            cancellationToken.reset()
-        } else if (cancellationToken.isCancellationRequested === true) {
-            return
-        }
-
-        sleep(1000)
     }
 }
 

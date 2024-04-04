@@ -1,6 +1,11 @@
 import * as puppeteer from 'puppeteer'
 
-import { CURRENT_MEETING, CancellationToken, MeetingParams } from '../meeting'
+import {
+    CURRENT_MEETING,
+    CancellationToken,
+    MeetingParams,
+    MeetingProviderInterface,
+} from '../meeting'
 
 import { Page } from 'puppeteer'
 import { screenshot } from '../puppeteer'
@@ -8,52 +13,190 @@ import { sleep } from '../utils'
 
 const url_parse = require('url-parse')
 
-export async function parseMeetingUrl(
-    browser: puppeteer.Browser,
-    meeting_url: string,
-) {
-    if (meeting_url.startsWith('https://www.google.com')) {
-        try {
-            const url = url_parse(meeting_url, true)
-            const q = url.query.q
-            console.log({ q })
-            const { meetingId, password } = parse(q)
-            return { meetingId, password }
-        } catch (e) {
-            console.error('[parseMeetingUrl] parse meeting url', e)
-            throw 'invalid meeting url'
-        }
-    }
-    try {
-        try {
-            const { meetingId, password } = parse(meeting_url)
-            if (!(/^\d+$/.test(meetingId) || meetingId === '')) {
-                throw 'invalid meetingId'
-            }
-            return { meetingId, password }
-        } catch (e) {
-            console.error('error requesting meeting url')
+export class ZoomProvider implements MeetingProviderInterface {
+    constructor() {}
+    async parseMeetingUrl(browser: puppeteer.Browser, meeting_url: string) {
+        if (meeting_url.startsWith('https://www.google.com')) {
             try {
-                const page = await browser.newPage()
-                console.log('goto: ', meeting_url)
-                await page.goto(meeting_url, { waitUntil: 'networkidle2' })
-                const url = page.url()
-                console.log({ url })
-                const { meetingId, password } = parse(url)
-
-                try {
-                    await page.close()
-                } catch (e) {}
+                const url = url_parse(meeting_url, true)
+                const q = url.query.q
+                console.log({ q })
+                const { meetingId, password } = parse(q)
                 return { meetingId, password }
-                // https://ghlsuccess.com/zoom
             } catch (e) {
-                console.error('error goto page: ', e)
+                console.error('[parseMeetingUrl] parse meeting url', e)
                 throw 'invalid meeting url'
             }
         }
-    } catch (e) {
-        console.error('[parseMeetingUrl] invalid meeting url', e)
-        throw 'invalid meeting url'
+        try {
+            try {
+                const { meetingId, password } = parse(meeting_url)
+                if (!(/^\d+$/.test(meetingId) || meetingId === '')) {
+                    throw 'invalid meetingId'
+                }
+                return { meetingId, password }
+            } catch (e) {
+                console.error('error requesting meeting url')
+                try {
+                    const page = await browser.newPage()
+                    console.log('goto: ', meeting_url)
+                    await page.goto(meeting_url, { waitUntil: 'networkidle2' })
+                    const url = page.url()
+                    console.log({ url })
+                    const { meetingId, password } = parse(url)
+
+                    try {
+                        await page.close()
+                    } catch (e) {}
+                    return { meetingId, password }
+                    // https://ghlsuccess.com/zoom
+                } catch (e) {
+                    console.error('error goto page: ', e)
+                    throw 'invalid meeting url'
+                }
+            }
+        } catch (e) {
+            console.error('[parseMeetingUrl] invalid meeting url', e)
+            throw 'invalid meeting url'
+        }
+    }
+    getMeetingLink(
+        meeting_id: string,
+        password: string,
+        role: number,
+        bot_name: string,
+    ) {
+        return `${MEETINGJS_BASEURL}?meeting_id=${meeting_id}&password=${password}&role=${role}&name=${bot_name}`
+    }
+    async openMeetingPage(
+        browser: puppeteer.Browser,
+        link: string,
+    ): Promise<puppeteer.Page> {
+        const url = url_parse(link, true)
+        console.log({ url })
+        const context = browser.defaultBrowserContext()
+        await context.clearPermissionOverrides()
+        await context.overridePermissions(url.origin, ['camera'])
+        const page = await browser.newPage()
+        await page.goto(link, { waitUntil: 'networkidle2' })
+        return page
+    }
+
+    async joinMeeting(
+        page: puppeteer.Page,
+        cancellationToken: CancellationToken,
+        meetingParams: MeetingParams,
+        iterationsMax?: number,
+    ): Promise<void> {
+        await sleep(1000)
+
+        await clickJoinMeetingButton(page)
+
+        let waitingButton = false
+        let i = 0
+        while (true) {
+            if (cancellationToken.isCancellationRequested) {
+                throw 'timeout waiting for meeting to stat'
+            }
+            // meeting didnt start
+            await bypass_modal(page)
+
+            if (await joinAudio(page)) {
+                break
+            }
+            await sleep(1000)
+            //await joining()
+        }
+
+        // Send enter message in chat
+        if (meetingParams.enter_message) {
+            await sendEnterMessage(page, meetingParams.enter_message)
+        }
+
+        try {
+            await joinCamera(page)
+        } catch (e) {}
+        CURRENT_MEETING.logger.info('wait for camera done')
+    }
+
+    async waitForEndMeeting(
+        meetingParams: MeetingParams,
+        page: Page,
+        cancellationToken: CancellationToken,
+    ) {
+        CURRENT_MEETING.logger.info('[waitForEndMeeting]')
+        CURRENT_MEETING.logger.info(meetingParams.toString())
+
+        while (CURRENT_MEETING && CURRENT_MEETING.status == 'Recording') {
+            let element = null
+            try {
+                element = await findModal(page)
+                const audio = await findJoinAudio(page)
+
+                if (audio != null) {
+                    try {
+                        try {
+                            await this.joinMeeting(
+                                page,
+                                cancellationToken,
+                                meetingParams,
+                                3,
+                            )
+                            CURRENT_MEETING.logger.info('meeting page joined')
+                        } catch (error) {
+                            console.error(error)
+                        }
+                    } catch (e) {
+                        CURRENT_MEETING.logger.error(
+                            'joinMeeting after modal failed',
+                            e,
+                        )
+                    }
+                }
+                if (element == null) {
+                    continue
+                }
+            } catch (e) {
+                break
+            }
+            let textContent = null
+            try {
+                textContent = await element.evaluate((el) => el.textContent)
+            } catch (e) {
+                CURRENT_MEETING.logger.error(
+                    '[waitForEndMeeting] error in element evaluate',
+                    e,
+                )
+            }
+
+            CURRENT_MEETING.logger.info(
+                '[waitForEndMeeting] modale text content',
+                {
+                    textContent,
+                },
+            )
+
+            if (element != null) {
+                if (
+                    textContent === 'The meeting has been ended' ||
+                    textContent === 'You have been removed'
+                ) {
+                    CURRENT_MEETING.logger.info(
+                        '[waitForEndMeeting] the meeting has been ended found',
+                    )
+
+                    break
+                } else {
+                    CURRENT_MEETING.logger.info(
+                        '[waitForEndMeeting] text content is not meeting has been ended, finding button',
+                    )
+                    if (await continueModal(page, 'waitForEndMeeting')) {
+                        continue
+                    }
+                    await sleep(500)
+                }
+            }
+        }
     }
 }
 
@@ -76,29 +219,6 @@ function parse(meeting_url: string) {
 }
 
 const MEETINGJS_BASEURL = `http://localhost:3005`
-
-export async function openMeetingPage(
-    browser: puppeteer.Browser,
-    link: string,
-): Promise<puppeteer.Page> {
-    const url = url_parse(link, true)
-    console.log({ url })
-    const context = browser.defaultBrowserContext()
-    await context.clearPermissionOverrides()
-    await context.overridePermissions(url.origin, ['camera'])
-    const page = await browser.newPage()
-    await page.goto(link, { waitUntil: 'networkidle2' })
-    return page
-}
-
-export function getMeetingLink(
-    meeting_id: string,
-    password: string,
-    role: number,
-    bot_name: string,
-) {
-    return `${MEETINGJS_BASEURL}?meeting_id=${meeting_id}&password=${password}&role=${role}&name=${bot_name}`
-}
 
 async function clickJoinMeetingButton(page: puppeteer.Page) {
     const buttonJoinClicked = await page.$$eval('button', (elems) => {
@@ -197,64 +317,6 @@ async function joinAudio(page: puppeteer.Page) {
     }
 }
 
-async function joining(page: puppeteer.Page) {
-    try {
-        const joinFound = await page.$$eval('button', (elems) => {
-            for (const e of elems) {
-                let elem = e as any
-                if (elem.innerText === 'joining') {
-                    elem.click()
-                    return true
-                }
-            }
-            return false
-        })
-    } catch (e) {
-        if (!(e instanceof puppeteer.errors.TimeoutError)) {
-            CURRENT_MEETING.logger.info(`wait for audio timeout: ${e}`)
-        } else {
-            CURRENT_MEETING.logger.info(`error in wait button joining ${e}`)
-        }
-    }
-}
-
-export async function joinMeeting(
-    page: puppeteer.Page,
-    cancellationToken: CancellationToken,
-    meetingParams: MeetingParams,
-    iterationsMax?: number,
-): Promise<void> {
-    await sleep(1000)
-
-    await clickJoinMeetingButton(page)
-
-    let waitingButton = false
-    let i = 0
-    while (true) {
-        if (cancellationToken.isCancellationRequested) {
-            throw 'timeout waiting for meeting to stat'
-        }
-        // meeting didnt start
-        await bypass_modal(page)
-
-        if (await joinAudio(page)) {
-            break
-        }
-        await sleep(1000)
-        //await joining()
-    }
-
-    // Send enter message in chat
-    if (meetingParams.enter_message) {
-        await sendEnterMessage(page, meetingParams.enter_message)
-    }
-
-    try {
-        await joinCamera(page)
-    } catch (e) {}
-    CURRENT_MEETING.logger.info('wait for camera done')
-}
-
 async function joinCamera(page: puppeteer.Page) {
     // const [button] = await page.$x("//button[contains(., 'Start Video')]")
     // await button.click();
@@ -351,83 +413,6 @@ async function findJoinAudio(
         }
     }
     return element
-}
-
-export async function waitForEndMeeting(
-    meetingParams: MeetingParams,
-    page: Page,
-    cancellationToken: CancellationToken,
-) {
-    CURRENT_MEETING.logger.info('[waitForEndMeeting]')
-    CURRENT_MEETING.logger.info(meetingParams.toString())
-
-    while (CURRENT_MEETING && CURRENT_MEETING.status == 'Recording') {
-        let element = null
-        try {
-            element = await findModal(page)
-            const audio = await findJoinAudio(page)
-
-            if (audio != null) {
-                try {
-                    try {
-                        await joinMeeting(
-                            page,
-                            cancellationToken,
-                            meetingParams,
-                            3,
-                        )
-                        CURRENT_MEETING.logger.info('meeting page joined')
-                    } catch (error) {
-                        console.error(error)
-                    }
-                } catch (e) {
-                    CURRENT_MEETING.logger.error(
-                        'joinMeeting after modal failed',
-                        e,
-                    )
-                }
-            }
-            if (element == null) {
-                continue
-            }
-        } catch (e) {
-            break
-        }
-        let textContent = null
-        try {
-            textContent = await element.evaluate((el) => el.textContent)
-        } catch (e) {
-            CURRENT_MEETING.logger.error(
-                '[waitForEndMeeting] error in element evaluate',
-                e,
-            )
-        }
-
-        CURRENT_MEETING.logger.info('[waitForEndMeeting] modale text content', {
-            textContent,
-        })
-
-        if (element != null) {
-            if (
-                textContent === 'The meeting has been ended' ||
-                textContent === 'You have been removed'
-            ) {
-                CURRENT_MEETING.logger.info(
-                    '[waitForEndMeeting] the meeting has been ended found',
-                )
-
-                break
-            } else {
-                CURRENT_MEETING.logger.info(
-                    '[waitForEndMeeting] text content is not meeting has been ended, finding button',
-                )
-                if (await continueModal(page, 'waitForEndMeeting')) {
-                    continue
-                }
-                await sleep(500)
-            }
-        }
-    }
 }
 
 async function findModal(
