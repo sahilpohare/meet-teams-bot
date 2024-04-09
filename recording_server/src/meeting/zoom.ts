@@ -148,6 +148,7 @@ export class ZoomProvider implements MeetingProviderInterface {
                 return false
             }
         } catch (e) {
+            console.error('error in zoom join meeting, quitting', e)
             return true
         }
         let textContent = null
