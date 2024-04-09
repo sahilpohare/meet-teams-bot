@@ -350,6 +350,7 @@ async function findEndMeeting(
         if ((await countParticipants(page)) > 1) {
             cancellationToken.reset()
         } else if (cancellationToken.isCancellationRequested) {
+            console.log('only one participant detected in google meet, quiting')
             return true
         }
     } catch (e) {
