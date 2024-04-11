@@ -53,10 +53,11 @@ export async function destroyRecordingSession(
     sessionId: number,
     projectId: number | undefined,
     doNotSetUploading: boolean,
+    botId: number | undefined,
 ) {
     await axios({
         method: 'POST',
-        url: `${API_BOT_BASEURL}/video/destroy_recording_session?session_id=${sessionId}&project_id=${projectId}&do_not_set_uploading=${doNotSetUploading}`,
+        url: `${API_BOT_BASEURL}/video/destroy_recording_session?session_id=${sessionId}&project_id=${projectId}&do_not_set_uploading=${doNotSetUploading}&bot_id=${botId}`,
     })
 }
 
