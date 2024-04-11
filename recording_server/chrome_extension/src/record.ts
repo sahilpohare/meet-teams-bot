@@ -266,6 +266,7 @@ export async function stopRecordServer(
             spokeSession.id,
             spokeSession.project?.id,
             true,
+            parameters.bot_id,
         )
         await api.patchProject({
             id: spokeSession.project.id,
