@@ -1,3 +1,4 @@
+import * as jsdom from 'jsdom'
 import * as puppeteer from 'puppeteer'
 import { Page } from 'puppeteer'
 import { screenshot } from '../puppeteer'
@@ -7,9 +8,6 @@ import {
     MeetingProviderInterface,
 } from '../types'
 import { sleep } from '../utils'
-
-const jsdom = require('jsdom')
-const url_parse = require('url-parse')
 
 export class TeamsProvider implements MeetingProviderInterface {
     constructor() {}
@@ -59,7 +57,7 @@ export class TeamsProvider implements MeetingProviderInterface {
         browser: puppeteer.Browser,
         link: string,
     ): Promise<puppeteer.Page> {
-        const url = url_parse(link, true)
+        const url = new URL(link)
         console.log({ url })
 
         const context = browser.defaultBrowserContext()

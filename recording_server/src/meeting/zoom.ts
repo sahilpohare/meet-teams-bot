@@ -1,6 +1,6 @@
 import * as puppeteer from 'puppeteer'
-
 import { Page } from 'puppeteer'
+import { URL } from 'url'
 import { screenshot } from '../puppeteer'
 import {
     CancellationToken,
@@ -9,15 +9,15 @@ import {
 } from '../types'
 import { sleep } from '../utils'
 
-const url_parse = require('url-parse')
-
 export class ZoomProvider implements MeetingProviderInterface {
     constructor() {}
     async parseMeetingUrl(browser: puppeteer.Browser, meeting_url: string) {
         if (meeting_url.startsWith('https://www.google.com')) {
             try {
-                const url = url_parse(meeting_url, true)
-                const q = url.query.q
+                const url = new URL(meeting_url)
+                const params = url.searchParams
+                const q = params.get('q')
+
                 console.log({ q })
                 const { meetingId, password } = parse(q)
                 return { meetingId, password }
@@ -70,7 +70,7 @@ export class ZoomProvider implements MeetingProviderInterface {
         browser: puppeteer.Browser,
         link: string,
     ): Promise<puppeteer.Page> {
-        const url = url_parse(link, true)
+        const url = new URL(link)
         console.log({ url })
         const context = browser.defaultBrowserContext()
         await context.clearPermissionOverrides()
@@ -186,10 +186,11 @@ export class ZoomProvider implements MeetingProviderInterface {
 
 function parse(meeting_url: string) {
     const urlSplited = meeting_url.split(' ')[0]
-    const url = url_parse(urlSplited, true)
+    const url = new URL(urlSplited)
+    const params = url.searchParams
     const meetingId = url.pathname.split('/')[2]
 
-    let password = url.query.pwd
+    let password = params.get('pwd')
     if (password == null) {
         try {
             const array = [...meeting_url.matchAll(/: (.*)\)/g)]

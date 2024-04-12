@@ -8,7 +8,6 @@ import {
     MeetingProviderInterface,
 } from '../types'
 import { sleep } from '../utils'
-const url_parse = require('url-parse')
 
 export class MeetProvider implements MeetingProviderInterface {
     constructor() {}
@@ -40,8 +39,7 @@ export class MeetProvider implements MeetingProviderInterface {
         browser: puppeteer.Browser,
         link: string,
     ): Promise<puppeteer.Page> {
-        const url = url_parse(link, true)
-        console.log({ url })
+        const url = new URL(link)
 
         const context = browser.defaultBrowserContext()
         await context.clearPermissionOverrides()

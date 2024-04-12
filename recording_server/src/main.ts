@@ -17,7 +17,7 @@ import { LOGGER, clientRedis, server } from './server'
 import { MeetingParams } from './types'
 import { sleep } from './utils'
 
-console.log('version 1.0')
+console.log('version 2.0')
 ;(async () => {
     if (process.argv[2]?.includes('get_extension_id')) {
         getExtensionId().then((x) => console.log(x))

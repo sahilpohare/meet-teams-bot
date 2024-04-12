@@ -1,18 +1,18 @@
-import { resolve, relative } from 'path';
-const { readdir } = require('fs').promises;
+import * as fs from 'fs'
+import { relative, resolve } from 'path'
 
 export function sleep(ms: number) {
-    return new Promise(resolve => setTimeout(resolve, ms))
+    return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 export async function* getFiles(dir) {
-    const dirents = await readdir(dir, { withFileTypes: true });
+    const dirents = await fs.promises.readdir(dir, { withFileTypes: true })
     for (const dirent of dirents) {
-        const res = resolve(dir, dirent.name);
+        const res = resolve(dir, dirent.name)
         if (dirent.isDirectory()) {
-            yield* getFiles(res);
+            yield* getFiles(res)
         } else {
-            yield relative(process.cwd(), res);
+            yield relative(process.cwd(), res)
         }
     }
 }
