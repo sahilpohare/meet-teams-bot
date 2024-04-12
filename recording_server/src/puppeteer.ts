@@ -1,11 +1,9 @@
-const { readFile, mkdir } = require('fs').promises
-import { dirname } from 'path'
-const chalk = require('chalk')
-// import * as puppeteer from 'puppeteer'
+import * as fs from 'fs'
+import { dirname, join } from 'path'
 import { Browser, ConsoleMessage, Page } from 'puppeteer'
+import puppeteer from 'puppeteer-extra'
 import { MeetingHandle } from './meeting'
 import { s3cp } from './s3'
-const puppeteer = require('puppeteer-extra')
 // add stealth plugin and use defaults (all evasion techniques)
 const StealthPlugin = require('puppeteer-extra-plugin-stealth')
 
@@ -35,13 +33,6 @@ export function listenPage(page: Page) {
 
             return `OBJ: ${typeof obj}, ${safeStringify(obj)}`
         }, jsHandle)
-    }
-
-    const colors: any = {
-        LOG: chalk.grey,
-        ERR: chalk.red,
-        WAR: chalk.yellow,
-        INF: chalk.cyan,
     }
 
     // listen to browser console there
@@ -87,7 +78,7 @@ export async function screenshot(page: Page, name: string) {
             '',
         )}.jpg`
         // try { await unlink(link) } catch (e) { }
-        await mkdir(dirname(link), { recursive: true })
+        await fs.promises.mkdir(dirname(link), { recursive: true })
         await page.screenshot({ path: link })
 
         await s3cp(link, link.substring(2))
@@ -128,7 +119,10 @@ export async function findBackgroundPage(
 }
 
 export async function getCachedExtensionId() {
-    const data: string = await readFile('./extension_id.txt', 'utf8')
+    const data: string = await fs.promises.readFile(
+        './extension_id.txt',
+        'utf8',
+    )
     // const trueExtensionId = await getExtensionId()
     // console.log({trueExtensionId}, {data})
     return data.trim()
@@ -155,7 +149,7 @@ export async function getExtensionId() {
 
 //https://gokatz.me/blog/automate-chrome-extension-testing/
 export async function tryGetExtensionId() {
-    const pathToExtension = require('path').join(
+    const pathToExtension = join(
         __dirname,
         '..',
         '..',
@@ -219,7 +213,7 @@ export async function openBrowser(extensionId: string): Promise<Browser> {
     throw error
 }
 export async function tryOpenBrowser(extensionId: string): Promise<Browser> {
-    const pathToExtension = require('path').join(
+    const pathToExtension = join(
         __dirname,
         '..',
         '..',
