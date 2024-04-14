@@ -239,6 +239,7 @@ export class MeetingHandle {
     }
 
     public async recordMeetingToEnd() {
+        console.log('[recordMeetingToEnd]')
         await this.waitForEndMeeting()
 
         this.logger.info('after waitForEndMeeting')
@@ -254,6 +255,7 @@ export class MeetingHandle {
     }
 
     private async waitForEndMeeting() {
+        console.log('waiting for end meeting')
         const cancelationToken = new CancellationToken(
             this.param.automatic_leave.noone_joined_timeout,
         )
@@ -267,6 +269,7 @@ export class MeetingHandle {
             ) {
                 return
             } else {
+                console.log('[waiting for end meeting] meeting not ended')
                 await sleep(1000)
             }
         }

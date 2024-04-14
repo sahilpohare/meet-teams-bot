@@ -290,6 +290,8 @@ async function countParticipants(page: Page): Promise<number> {
             (img) => img.clientWidth === 32 && img.clientHeight === 32,
         ).length
     })
+
+    console.log('found', count, 'participants')
     return count
 }
 
