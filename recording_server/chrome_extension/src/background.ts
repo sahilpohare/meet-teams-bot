@@ -153,8 +153,18 @@ export async function waitForUpload() {
     await Transcriber.TRANSCRIBER?.stop()
     await Transcriber.TRANSCRIBER?.waitUntilComplete()
 
-    // "Your video is available online"
     await record.stopRecordServer(record.SESSION)
+
+    if (record.SESSION?.project.id != null) {
+        try {
+            await api.endMeetingTrampoline(
+                record.SESSION?.project.id,
+                State.parameters.bot_id,
+            )
+        } catch (e) {
+            console.error('error in endMeetingTranpoline', e)
+        }
+    }
 }
 
 export type ChangeLanguage = {

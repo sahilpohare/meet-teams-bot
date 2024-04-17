@@ -159,14 +159,6 @@ export class Transcriber {
                 'bot_id',
                 parameters.bot_id,
             )
-            try {
-                await api.endMeetingTrampoline(
-                    SESSION?.project.id,
-                    parameters.bot_id,
-                )
-            } catch (e) {
-                console.error('error in endMeetingTranpoline', e)
-            }
             console.log('after call end meeting trampoline')
         } else {
             console.error('SESSION?.project.id is undefined')
