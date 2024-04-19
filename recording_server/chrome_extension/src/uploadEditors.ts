@@ -116,7 +116,7 @@ function createVideo(speaker: SpeakerInterval, asset: Asset): Partial<Video> {
 function createTranscripts(speaker: SpeakerInterval): Partial<Transcript>[] {
     const transcripts = [
         {
-            speaker: speaker.speaker,
+            speaker: speaker.speaker ?? '',
             words: [],
             google_lang: parameters.detected_lang ?? parameters.language,
         },

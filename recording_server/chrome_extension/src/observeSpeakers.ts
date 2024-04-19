@@ -140,7 +140,7 @@ async function observeSpeakers() {
                         const speakerDuration =
                             newSpeaker.timestamp - previousSpeaker.timestamp
                         if (
-                            MEETING_PROVIDER !== 'Meet' &&
+                            MEETING_PROVIDER === 'Zoom' &&
                             speakerDuration < PROVIDER.MIN_SPEAKER_DURATION
                         ) {
                             SPEAKERS[SPEAKERS.length - 1] = newSpeaker

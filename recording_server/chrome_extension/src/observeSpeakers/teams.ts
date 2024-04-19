@@ -34,14 +34,6 @@ export async function getSpeakerRootToObserve(
 }
 
 // Création d'un dictionnaire pour garder la trace de l'état de chaque speaker
-var speakerStatus: Map<string, boolean> = new Map()
-
-const config = {
-    attributes: true,
-    childList: true,
-    subtree: true,
-    attributeFilter: ['class'],
-}
 
 export function getSpeakerFromDocument(
     currentSpeaker: string | null,
@@ -72,24 +64,19 @@ export function getSpeakerFromDocument(
             if (currentBorderColor.trim() === 'rgb(127, 133, 245)') {
                 console.log('[teams observe speaker]', targetElement)
                 if (span != null && speaker != null && speaker.trim() !== '') {
-                    speakerStatus.set(speaker, true)
+                    // targetElement.style.border = '1px solid red';
+                    // span.style.color = 'red'
                     removeShityHtml()
-                    console.log('Speaker started:', speaker)
-                    let currentSpeakers = Array.from(speakerStatus.entries())
-                        .filter(([, value]) => value === true)
-                        .map(([key]) => ({ name: key, timestamp: Date.now() }))
-                    return currentSpeakers
+                    // console.log('Speaker started:', speaker, targetElement, span)
+                    return [{ name: speaker, timestamp: Date.now() }]
                 }
             } else if (currentBorderColor.trim() !== 'rgb(127, 133, 245)') {
                 if (span != null && speaker != null && speaker.trim() !== '') {
-                    speakerStatus.set(speaker, false)
+                    // targetElement.style.border = '1px solid green';
+                    // span.style.color = 'green'
                     removeShityHtml()
-                    console.log('Speaker stopped:', speaker)
-                    let currentSpeakers = Array.from(speakerStatus.entries())
-                        .filter(([, value]) => value === true)
-                        .map(([key]) => ({ name: key, timestamp: Date.now() }))
-
-                    return currentSpeakers
+                    // console.log('Speaker stopped:', speaker, targetElement, span)
+                    return []
                 }
             }
         }
