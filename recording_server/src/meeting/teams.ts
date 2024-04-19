@@ -79,7 +79,6 @@ export class TeamsProvider implements MeetingProviderInterface {
         console.log('joining meeting')
 
         await clickWithInnerText(page, 'button', 'Continue on this browser', 20)
-        await sleep(2000)
 
         await clickWithInnerText(
             page,
@@ -87,12 +86,7 @@ export class TeamsProvider implements MeetingProviderInterface {
             'Continue without audio or video',
             20,
         )
-        await sleep(2000)
-        await focusInput(page, 20)
-        await sleep(2000)
-        await page.keyboard.type(meetingParams.bot_name, { delay: 100 })
-        console.log(`botname typed`)
-        await sleep(500)
+        await typeBotName(page, meetingParams.bot_name, 20)
         await clickWithInnerText(page, 'button', 'Join now', 20)
         await screenshot(page, `afterjoinnow`)
 
@@ -112,12 +106,9 @@ export class TeamsProvider implements MeetingProviderInterface {
         }
         await sleep(2000)
         // once the view button is found reclick on it
-        await clickWithInnerText(page, 'button', 'View', 1)
-        await sleep(1000)
+        await clickWithInnerText(page, 'button', 'View', 10)
 
-        if (!(await clickWithInnerText(page, 'div', 'Speaker', 300))) {
-            throw 'timeout accepting the bot'
-        }
+        await clickWithInnerText(page, 'div', 'Speaker', 20)
     }
 
     async findEndMeeting(
@@ -131,6 +122,23 @@ export class TeamsProvider implements MeetingProviderInterface {
             return true
         }
         return false
+    }
+}
+
+async function typeBotName(page: puppeteer.Page, botName: string, iterations: number) {
+    let botnameTyped = null
+    for (let i = 0; i < iterations; i++) {
+        try {
+            await focusInput(INPUT_BOT, page, 2)
+            await page.keyboard.type(botName, { delay: 100 })
+            botnameTyped = await getInput(INPUT_BOT, page, 2)
+            if (botnameTyped != null && botnameTyped != '') {
+                console.log(`botname typed`)
+                return 
+            }
+        } catch (e) {
+            console.error('failed to type bot name', e)
+        }
     }
 }
 function parseMeetingUrlFromJoinInfos(joinInfo: string) {
@@ -333,8 +341,9 @@ export async function clickWithInnerText(
     return continueButton
 }
 
-async function focusInput(page: puppeteer.Page, iterations: number) {
-    const INPUT = 'input[placeholder="Type your name"]'
+
+const INPUT_BOT = 'input[placeholder="Type your name"]'
+async function focusInput(input: string, page: puppeteer.Page, iterations: number) {
     for (let i = 0; i < iterations; i++) {
         try {
             const focused = await page.evaluate(
@@ -364,7 +373,7 @@ async function focusInput(page: puppeteer.Page, iterations: number) {
                     }
                     return false
                 },
-                INPUT,
+                input,
                 i,
             )
             if (focused) {
@@ -379,6 +388,50 @@ async function focusInput(page: puppeteer.Page, iterations: number) {
     }
 }
 
+async function getInput(input: string, page: puppeteer.Page, iterations: number): Promise<string | null> {
+    for (let i = 0; i < iterations; i++) {
+        try {
+            const botName = await page.evaluate(
+                (selector, i) => {
+                    let elements
+
+                    if (i % 2 === 0) {
+                        const iframe = document.querySelectorAll('iframe')[0]
+                        const iframeDocument =
+                            iframe.contentDocument ||
+                            iframe.contentWindow.document
+                        elements = Array.from(
+                            iframeDocument.querySelectorAll(selector),
+                        )
+                        console.log('search iframes', elements)
+                        console.log('search inside iframe')
+                    } else {
+                        elements = Array.from(
+                            document.querySelectorAll(selector),
+                        )
+                        console.log('search document', elements)
+                    }
+
+                    for (const elem of elements) {
+                        return elem.value
+                    }
+                    return null
+                },
+                input,
+                i,
+            )
+            if (botName != null) {
+                return botName
+            } else {
+                console.log('input not focused, retrying')
+            }
+        } catch (e) {
+            console.error('Failed to focus input', e)
+        }
+        await sleep(1000)
+    }
+    return null
+}
 async function countParticipants(page: Page): Promise<number> {
     const count = await page.evaluate(() => {
         const images = Array.from(document.querySelectorAll('img'))
