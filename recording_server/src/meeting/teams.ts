@@ -1,12 +1,14 @@
 import * as jsdom from 'jsdom'
 import * as puppeteer from 'puppeteer'
-import { Page } from 'puppeteer'
-import { screenshot } from '../puppeteer'
+
 import {
     CancellationToken,
     MeetingParams,
     MeetingProviderInterface,
 } from '../types'
+
+import { Page } from 'puppeteer'
+import { screenshot } from '../puppeteer'
 import { sleep } from '../utils'
 
 export class TeamsProvider implements MeetingProviderInterface {
@@ -88,7 +90,7 @@ export class TeamsProvider implements MeetingProviderInterface {
         await sleep(2000)
         await focusInput(page, 20)
         await sleep(2000)
-        await page.keyboard.type(meetingParams.bot_name)
+        await page.keyboard.type(meetingParams.bot_name, { delay: 100 })
         console.log(`botname typed`)
         await sleep(500)
         await clickWithInnerText(page, 'button', 'Join now', 20)
@@ -101,7 +103,7 @@ export class TeamsProvider implements MeetingProviderInterface {
                 page,
                 'button',
                 'View',
-                null,
+                6000,
                 false,
                 cancellationToken,
             ))
@@ -264,12 +266,12 @@ export async function clickWithInnerText(
     page: puppeteer.Page,
     htmlType: string,
     innerText: string,
-    iterations?: number,
+    iterations: number,
     click: boolean = true,
     cancellationToken?: CancellationToken,
 ): Promise<boolean> {
     let i = 0
-    iterations = iterations ?? 10
+    iterations = iterations
     let continueButton = false
 
     while (
@@ -327,6 +329,7 @@ export async function clickWithInnerText(
         console.log(`${innerText} clicked:`, continueButton)
         i += 1
     }
+    console.log('cancellationToken', cancellationToken)
     return continueButton
 }
 
@@ -374,6 +377,18 @@ async function focusInput(page: puppeteer.Page, iterations: number) {
         }
         await sleep(1000)
     }
+}
+
+async function countParticipants(page: Page): Promise<number> {
+    const count = await page.evaluate(() => {
+        const images = Array.from(document.querySelectorAll('img'))
+        return images.filter(
+            (img) => img.clientWidth === 32 && img.clientHeight === 32,
+        ).length
+    })
+
+    console.log('found', count, 'participants')
+    return count
 }
 
 async function spokeIsAlone(page: Page): Promise<boolean> {

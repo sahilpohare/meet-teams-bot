@@ -1,8 +1,5 @@
 import { BrandingHandle, generateBranding, playBranding } from './branding'
 import { Logger, uploadLog } from './logger'
-import { MeetProvider } from './meeting/meet'
-import { TeamsProvider } from './meeting/teams'
-import { ZoomProvider } from './meeting/zoom'
 import {
     findBackgroundPage,
     getCachedExtensionId,
@@ -10,10 +7,6 @@ import {
     openBrowser,
     removeListenPage,
 } from './puppeteer'
-
-import { notifyApp } from './calendar'
-import { Events } from './events'
-import { delSessionInRedis } from './instance'
 import {
     CancellationToken,
     ChangeAgendaRequest,
@@ -24,6 +17,13 @@ import {
     MeetingProviderInterface,
     MeetingStatus,
 } from './types'
+
+import { notifyApp } from './calendar'
+import { Events } from './events'
+import { delSessionInRedis } from './instance'
+import { MeetProvider } from './meeting/meet'
+import { TeamsProvider } from './meeting/teams'
+import { ZoomProvider } from './meeting/zoom'
 import { sleep } from './utils'
 
 export class MeetingHandle {
@@ -143,7 +143,10 @@ export class MeetingHandle {
             const waintingRoomToken = new CancellationToken(
                 this.param.automatic_leave.waiting_room_timeout,
             )
-
+            console.log(
+                'waitingroom timeout',
+                this.param.automatic_leave.waiting_room_timeout,
+            )
             try {
                 await this.provider.joinMeeting(
                     this.meeting.page,
