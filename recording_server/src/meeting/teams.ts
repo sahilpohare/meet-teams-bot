@@ -116,16 +116,21 @@ export class TeamsProvider implements MeetingProviderInterface {
         page: Page,
         cancellationToken: CancellationToken,
     ): Promise<boolean> {
-        if ((await spokeIsAlone(page)) === false) {
+        if ((await countParticipants(page)) > 0) {
             cancellationToken.reset()
         } else if (cancellationToken.isCancellationRequested === true) {
             return true
         }
+        console.log((await countParticipants(page)) + ' participants')
         return false
     }
 }
 
-async function typeBotName(page: puppeteer.Page, botName: string, iterations: number) {
+async function typeBotName(
+    page: puppeteer.Page,
+    botName: string,
+    iterations: number,
+) {
     let botnameTyped = null
     for (let i = 0; i < iterations; i++) {
         try {
@@ -134,7 +139,7 @@ async function typeBotName(page: puppeteer.Page, botName: string, iterations: nu
             botnameTyped = await getInput(INPUT_BOT, page, 2)
             if (botnameTyped != null && botnameTyped != '') {
                 console.log(`botname typed`)
-                return 
+                return
             }
         } catch (e) {
             console.error('failed to type bot name', e)
@@ -341,9 +346,12 @@ export async function clickWithInnerText(
     return continueButton
 }
 
-
 const INPUT_BOT = 'input[placeholder="Type your name"]'
-async function focusInput(input: string, page: puppeteer.Page, iterations: number) {
+async function focusInput(
+    input: string,
+    page: puppeteer.Page,
+    iterations: number,
+) {
     for (let i = 0; i < iterations; i++) {
         try {
             const focused = await page.evaluate(
@@ -388,7 +396,11 @@ async function focusInput(input: string, page: puppeteer.Page, iterations: numbe
     }
 }
 
-async function getInput(input: string, page: puppeteer.Page, iterations: number): Promise<string | null> {
+async function getInput(
+    input: string,
+    page: puppeteer.Page,
+    iterations: number,
+): Promise<string | null> {
     for (let i = 0; i < iterations; i++) {
         try {
             const botName = await page.evaluate(
@@ -434,13 +446,43 @@ async function getInput(input: string, page: puppeteer.Page, iterations: number)
 }
 async function countParticipants(page: Page): Promise<number> {
     const count = await page.evaluate(() => {
-        const images = Array.from(document.querySelectorAll('img'))
-        return images.filter(
-            (img) => img.clientWidth === 32 && img.clientHeight === 32,
-        ).length
+        // Fonction pour extraire le nombre de participants à partir d'un document
+        function extractParticipantsCount(doc) {
+            const button = doc.getElementById('roster-button')
+            if (button) {
+                const participantCountSpan = button.querySelector(
+                    'span[data-tid="roster-button-tile"]',
+                )
+                if (
+                    participantCountSpan &&
+                    participantCountSpan instanceof HTMLElement
+                ) {
+                    return parseInt(participantCountSpan.innerText, 10) - 1
+                }
+            }
+            return 0
+        }
+
+        // Vérifie d'abord dans le document principal
+        let count = extractParticipantsCount(document)
+
+        // Si aucun participant n'est trouvé, cherche dans les iframes
+        if (count === 0) {
+            const iframes = document.querySelectorAll('iframe')
+            for (const iframe of iframes) {
+                const doc =
+                    iframe.contentDocument || iframe.contentWindow.document
+                if (doc) {
+                    count = extractParticipantsCount(doc)
+                    if (count > 0) break // Sortie dès que des participants sont trouvés
+                }
+            }
+        }
+
+        return count
     })
 
-    console.log('found', count, 'participants')
+    console.log('Found', count, 'participants en plus du bot')
     return count
 }
 

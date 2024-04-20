@@ -13,7 +13,10 @@ export async function getSpeakerRootToObserve(
         let meetingControls = documentInIframe!.querySelectorAll(
             `div[data-tid="app-layout-area--header"]`,
         )
-        meetingControls[0].remove()
+
+        if (meetingControls[0] && meetingControls[0] instanceof HTMLElement) {
+            meetingControls[0].style.opacity = '0'
+        }
     } catch (e) {
         console.error('fail to remove buttons header', e)
     }
