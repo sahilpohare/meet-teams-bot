@@ -458,18 +458,12 @@ async function countParticipants(page: Page): Promise<number> {
             const button = doc.getElementById('roster-button')
 
             if (button != null) {
-                console.log('button ROSTER', button)
                 const participantCountSpan = button.querySelector(
                     'span[data-tid="roster-button-tile"]',
                 )
                 if (participantCountSpan != null) {
-                    console.log(
-                        'participantCountSpan ROSTER SPAN',
-                        participantCountSpan,
-                    )
                     return parseInt(participantCountSpan.innerText, 10) - 1
                 } else {
-                    console.log('participantCountSpan ROSTER SPAN not found')
                     return 0
                 }
             } else {
@@ -478,17 +472,13 @@ async function countParticipants(page: Page): Promise<number> {
         }
 
         try {
-            console.log('enter in principal document')
             return extractParticipantsCount(document)
         } catch (e) {
             console.error('Error extracting participants count:', e)
         }
 
-        let count = 0
-
         const iframes = document.querySelectorAll('iframe')
         for (const iframe of iframes) {
-            console.log('enter in iframe', count)
             const doc = iframe.contentDocument || iframe.contentWindow.document
             if (doc) {
                 try {
@@ -497,7 +487,6 @@ async function countParticipants(page: Page): Promise<number> {
                     console.error('Error extracting participants count:', e)
                 }
             }
-            count++
         }
 
         throw new Error('Participants count not found')
