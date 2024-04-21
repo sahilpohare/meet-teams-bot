@@ -78,7 +78,7 @@ export class TeamsProvider implements MeetingProviderInterface {
     ): Promise<void> {
         console.log('joining meeting')
 
-        await clickWithInnerText(page, 'button', 'Continue on this browser', 20)
+        await clickWithInnerText(page, 'button', 'Continue on this browser', 5)
 
         await clickWithInnerText(
             page,
@@ -116,13 +116,20 @@ export class TeamsProvider implements MeetingProviderInterface {
         page: Page,
         cancellationToken: CancellationToken,
     ): Promise<boolean> {
-        if ((await countParticipants(page)) > 0) {
-            cancellationToken.reset()
-        } else if (cancellationToken.isCancellationRequested === true) {
-            return true
+        for (let i = 0; i < 10; i++) {
+            try {
+                if ((await countParticipants(page)) > 0) {
+                    console.log('no participants found for 10 seconds')
+                    return false
+                }
+            } catch (e) {
+                console.error('error in findEndMeeting', e)
+                return false
+            }
+            await sleep(1000)
         }
-        console.log((await countParticipants(page)) + ' participants')
-        return false
+        await sleep(1000000)
+        return true
     }
 }
 
@@ -458,46 +465,38 @@ async function countParticipants(page: Page): Promise<number> {
                     participantCountSpan instanceof HTMLElement
                 ) {
                     return parseInt(participantCountSpan.innerText, 10) - 1
+                } else {
+                    // this span exist only if there are more than 1 participant
+                    return 0
                 }
+            } else {
+                throw new Error('Roster button not found')
             }
-            return 0
         }
 
         // Vérifie d'abord dans le document principal
-        let count = extractParticipantsCount(document)
+        try {
+            return extractParticipantsCount(document)
+        } catch (e) {
+            console.error('Error extracting participants count:', e)
+        }
 
         // Si aucun participant n'est trouvé, cherche dans les iframes
-        if (count === 0) {
-            const iframes = document.querySelectorAll('iframe')
-            for (const iframe of iframes) {
-                const doc =
-                    iframe.contentDocument || iframe.contentWindow.document
-                if (doc) {
-                    count = extractParticipantsCount(doc)
-                    if (count > 0) break // Sortie dès que des participants sont trouvés
+        const iframes = document.querySelectorAll('iframe')
+        for (const iframe of iframes) {
+            const doc = iframe.contentDocument || iframe.contentWindow.document
+            if (doc) {
+                try {
+                    return extractParticipantsCount(doc)
+                } catch (e) {
+                    console.error('Error extracting participants count:', e)
                 }
             }
         }
 
-        return count
+        throw new Error('Participants count not found')
     })
 
     console.log('Found', count, 'participants en plus du bot')
     return count
-}
-
-async function spokeIsAlone(page: Page): Promise<boolean> {
-    return false
-    //  try {
-    //      const participants = await page.$$('.participantInfo')
-    //      console.log('PARTICIPANTS: ', participants?.length)
-    //      if (participants && participants.length === 1) {
-    //          return true
-    //      }
-    //  } catch (e) {
-    //      CURRENT_MEETING.logger.error(
-    //          `[spokeIsAlone] an error occured in spoke is alone: ${e}`,
-    //      )
-    //  }
-    //  return false
 }
