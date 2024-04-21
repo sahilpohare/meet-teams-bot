@@ -128,7 +128,6 @@ export class TeamsProvider implements MeetingProviderInterface {
             }
             await sleep(1000)
         }
-        await sleep(1000000)
         return true
     }
 }
