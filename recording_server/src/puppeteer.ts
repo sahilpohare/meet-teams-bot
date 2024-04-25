@@ -15,6 +15,10 @@ const GOOGLE_CHROME_EXECTUTABLE_PATH =
 
 puppeteer.use(StealthPlugin())
 
+const HEIGHT_INTERFACE_CHROME=120
+const HEIGHT_FRAMEBUFFER=720
+const WIDTH_FRAMEBUFFER=1280
+
 export function listenPage(page: Page) {
     const describe = (jsHandle) => {
         return jsHandle.executionContext().evaluate((obj) => {
@@ -157,8 +161,8 @@ export async function tryGetExtensionId() {
         'dist',
     )
     // const pathToExtension = getPathToExtension()
-    const width = 905
-    const height = 510 + 120
+    const width = WIDTH_FRAMEBUFFER
+    const height = HEIGHT_FRAMEBUFFER + HEIGHT_INTERFACE_CHROME
     const browser = await puppeteer.launch({
         args: [
             '--remote-debugging-address=0.0.0.0',
@@ -220,8 +224,8 @@ export async function tryOpenBrowser(extensionId: string): Promise<Browser> {
         'chrome_extension',
         'dist',
     )
-    const width = 905
-    const height = 510 + 120
+    const width = WIDTH_FRAMEBUFFER
+    const height = HEIGHT_FRAMEBUFFER + HEIGHT_INTERFACE_CHROME
     const browser = await puppeteer.launch({
         args: [
             '--remote-debugging-address=0.0.0.0',
