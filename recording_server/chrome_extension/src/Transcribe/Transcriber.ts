@@ -151,18 +151,6 @@ export class Transcriber {
         } catch (e) {
             console.error('error in summarizeWorker', e)
         }
-        if (SESSION?.project.id) {
-            console.log(
-                'call end meeting trampoline',
-                'project id',
-                SESSION?.project.id,
-                'bot_id',
-                parameters.bot_id,
-            )
-            console.log('after call end meeting trampoline')
-        } else {
-            console.error('SESSION?.project.id is undefined')
-        }
     }
 
     /** Launches the workers. */

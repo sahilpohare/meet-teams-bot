@@ -153,7 +153,11 @@ export async function waitForUpload() {
     await Transcriber.TRANSCRIBER?.stop()
     await Transcriber.TRANSCRIBER?.waitUntilComplete()
 
-    await record.stopRecordServer(record.SESSION)
+    try {
+        await record.stopRecordServer(record.SESSION)
+    } catch (e) {
+        console.error('error in stopRecordServer', e)
+    }
 
     if (record.SESSION?.project.id != null) {
         try {
