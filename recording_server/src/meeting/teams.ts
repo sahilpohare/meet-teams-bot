@@ -73,10 +73,10 @@ export class TeamsProvider implements MeetingProviderInterface {
 
     async joinMeeting(
         page: puppeteer.Page,
-        cancellationToken: CancellationToken,
+        cancelCheck: () => boolean,
         meetingParams: MeetingParams,
     ): Promise<void> {
-        console.log('joining meeting')
+        console.log('joining meeting', cancelCheck)
 
         await clickWithInnerText(page, 'button', 'Continue on this browser', 5)
 
@@ -99,7 +99,7 @@ export class TeamsProvider implements MeetingProviderInterface {
                 'View',
                 6000,
                 false,
-                cancellationToken,
+                cancelCheck,
             ))
         ) {
             throw 'timeout accepting the bot'
@@ -287,7 +287,7 @@ export async function clickWithInnerText(
     innerText: string,
     iterations: number,
     click: boolean = true,
-    cancellationToken?: CancellationToken,
+    cancelCheck?: () => boolean,
 ): Promise<boolean> {
     let i = 0
     iterations = iterations
@@ -296,7 +296,7 @@ export async function clickWithInnerText(
     while (
         !continueButton &&
         (iterations == null || i < iterations) &&
-        cancellationToken?.isCancellationRequested !== true
+        !cancelCheck?.()
     ) {
         try {
             continueButton = await page.evaluate(
@@ -348,7 +348,6 @@ export async function clickWithInnerText(
         console.log(`${innerText} clicked:`, continueButton)
         i += 1
     }
-    console.log('cancellationToken', cancellationToken)
     return continueButton
 }
 

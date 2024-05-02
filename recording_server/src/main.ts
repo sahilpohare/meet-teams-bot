@@ -47,16 +47,6 @@ console.log('version 2.0')
             Consumer.handleStartRecord,
         )
 
-        let meetingSession = {
-            bot_ip: POD_IP,
-            user_id: params.user_id,
-            meeting_url: params.meeting_url,
-        }
-        try {
-            await setSessionInRedis(params.session_id, meetingSession)
-        } catch (e) {
-            console.error('fail to set session in redis: ', e)
-        }
         if (error) {
             console.error('error in start meeting', error)
             try {

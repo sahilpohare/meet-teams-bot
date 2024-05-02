@@ -2,7 +2,12 @@ import { Channel, connect } from 'amqplib'
 import axios from 'axios'
 import { notify, notifyApp } from './calendar'
 import { Events } from './events'
-import { LOCK_INSTANCE_AT_STARTUP, setProtection } from './instance'
+import {
+    LOCK_INSTANCE_AT_STARTUP,
+    POD_IP,
+    setProtection,
+    setSessionInRedis,
+} from './instance'
 import { setLoggerProjectId } from './logger'
 import { MeetingHandle } from './meeting'
 import { LOGGER } from './server'
@@ -112,6 +117,16 @@ export class Consumer {
             }
         }
 
+        let meetingSession = {
+            bot_ip: POD_IP,
+            user_id: data.user_id,
+            meeting_url: data.meeting_url,
+        }
+        try {
+            await setSessionInRedis(data.session_id, meetingSession)
+        } catch (e) {
+            console.error('fail to set session in redis: ', e)
+        }
         MeetingHandle.init(data, logger)
 
         Events.init(data)

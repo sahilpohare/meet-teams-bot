@@ -23,7 +23,7 @@ export interface MeetingProviderInterface {
 
     joinMeeting(
         page: Page,
-        cancellationToken: CancellationToken,
+        cancelCheck: () => boolean,
         meetingParams: MeetingParams,
     ): Promise<void>
     findEndMeeting(

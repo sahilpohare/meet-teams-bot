@@ -51,7 +51,7 @@ export class MeetProvider implements MeetingProviderInterface {
     }
     async joinMeeting(
         page: puppeteer.Page,
-        cancellationToken: CancellationToken,
+        cancelCheck: () => boolean,
         meetingParams: MeetingParams,
     ): Promise<void> {
         console.log('joining meeting')
@@ -152,7 +152,7 @@ export class MeetProvider implements MeetingProviderInterface {
             throw "Error bot can't join"
         }
 
-        await findShowEveryOne(page, false, cancellationToken)
+        await findShowEveryOne(page, false, cancelCheck)
 
         // Send enter message in chat
         console.log('meetingParams.enter_message:', meetingParams.enter_message)
@@ -201,7 +201,7 @@ export class MeetProvider implements MeetingProviderInterface {
             await page.mouse.click(10, 10)
         } catch (e) {}
         await sleep(500)
-        await findShowEveryOne(page, true, cancellationToken)
+        await findShowEveryOne(page, true, cancelCheck)
 
         console.log('after join meeting')
     }
@@ -225,7 +225,7 @@ export class MeetProvider implements MeetingProviderInterface {
 async function findShowEveryOne(
     page: puppeteer.Page,
     click: boolean,
-    cancellationToken: CancellationToken,
+    cancelCheck: () => boolean,
 ) {
     let showEveryOneFound = false
     let i = 0
@@ -249,7 +249,7 @@ async function findShowEveryOne(
         )
         await screenshot(page, `findShowEveryone`)
         console.log({ showEveryOneFound })
-        if (cancellationToken.isCancellationRequested) {
+        if (cancelCheck()) {
             throw 'timeout waiting for meeting to stat'
         }
         if (showEveryOneFound === false) {

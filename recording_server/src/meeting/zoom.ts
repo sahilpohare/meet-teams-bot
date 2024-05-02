@@ -82,18 +82,15 @@ export class ZoomProvider implements MeetingProviderInterface {
 
     async joinMeeting(
         page: puppeteer.Page,
-        cancellationToken: CancellationToken,
+        cancelCheck: () => boolean,
         meetingParams: MeetingParams,
-        iterationsMax?: number,
     ): Promise<void> {
         await sleep(1000)
 
         await clickJoinMeetingButton(page)
 
-        let waitingButton = false
-        let i = 0
         while (true) {
-            if (cancellationToken.isCancellationRequested) {
+            if (cancelCheck()) {
                 throw 'timeout waiting for meeting to stat'
             }
             // meeting didnt start
@@ -130,12 +127,7 @@ export class ZoomProvider implements MeetingProviderInterface {
             if (audio != null) {
                 try {
                     try {
-                        await this.joinMeeting(
-                            page,
-                            cancellationToken,
-                            meetingParams,
-                            3,
-                        )
+                        await this.joinMeeting(page, () => false, meetingParams)
                         console.log('meeting page joined')
                     } catch (error) {
                         console.error(error)
@@ -481,17 +473,12 @@ export async function clickWithInnerText(
     innerText: string,
     iterations?: number,
     click: boolean = true,
-    cancellationToken?: CancellationToken,
 ): Promise<boolean> {
     let i = 0
     iterations = iterations ?? 10
     let continueButton = false
 
-    while (
-        !continueButton &&
-        (iterations == null || i < iterations) &&
-        cancellationToken?.isCancellationRequested !== true
-    ) {
+    while (!continueButton && (iterations == null || i < iterations)) {
         try {
             continueButton = await page.evaluate(
                 (innerText, htmlType, i, click) => {

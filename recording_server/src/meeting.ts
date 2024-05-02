@@ -26,12 +26,21 @@ import { TeamsProvider } from './meeting/teams'
 import { ZoomProvider } from './meeting/zoom'
 import { sleep } from './utils'
 
+export class Status {
+    state: MeetingStatus
+    error: any | null
+    project: { id: number } | null
+    constructor() {
+        this.state = 'Recording'
+        this.error = null
+        this.project = null
+    }
+}
+
 export class MeetingHandle {
     static instance: MeetingHandle = null
+    static status: Status = new Status()
     private logger: Logger
-    private status: MeetingStatus
-    private project: { id: number } | null
-    private error: any | null
     private meeting: Meeting
     private param: MeetingParams
     private brandingGenerateProcess: BrandingHandle | null
@@ -47,13 +56,13 @@ export class MeetingHandle {
         return MeetingHandle.instance.param.user_id
     }
     static getProject(): { id: number } | null {
-        return MeetingHandle.instance?.project
+        return MeetingHandle.status?.project
     }
     static getError(): any | null {
-        return MeetingHandle.instance?.error
+        return MeetingHandle.status?.error
     }
     static getStatus(): MeetingStatus | null {
-        return MeetingHandle.instance?.status
+        return MeetingHandle.status?.state
     }
 
     constructor(meetingParams: MeetingParams, logger: Logger) {
@@ -82,7 +91,6 @@ export class MeetingHandle {
         )
         this.provider = newMeetingProvider(meetingParams.meetingProvider)
         this.param = meetingParams
-        this.status = 'Recording'
         this.logger = logger
         this.meeting = {
             page: null,
@@ -150,7 +158,12 @@ export class MeetingHandle {
             try {
                 await this.provider.joinMeeting(
                     this.meeting.page,
-                    waintingRoomToken,
+                    () => {
+                        return (
+                            MeetingHandle.status.state !== 'Recording' ||
+                            waintingRoomToken.isCancellationRequested
+                        )
+                    },
                     this.param,
                 )
                 this.logger.info('meeting page joined')
@@ -182,12 +195,12 @@ export class MeetingHandle {
                 throw 'failed creating project'
             }
 
-            this.project = project
+            MeetingHandle.status.project = project
             return project
         } catch (e) {
             console.error('an error occured while starting recording', e)
             console.error('setting current_meeting error')
-            this.error = e
+            MeetingHandle.status.error = e
             console.error('after set current meeting error')
             await this.cleanEverything(true)
             throw e
@@ -199,7 +212,7 @@ export class MeetingHandle {
             await uploadLog(
                 this.param.user_id,
                 this.param.email,
-                this.project?.id,
+                MeetingHandle.status.project?.id,
             )
         } catch (e) {
             this.logger.error(`failed to upload logs: ${e}`)
@@ -262,7 +275,7 @@ export class MeetingHandle {
         const cancelationToken = new CancellationToken(
             this.param.automatic_leave.noone_joined_timeout,
         )
-        while (this.status == 'Recording') {
+        while (MeetingHandle.status.state === 'Recording') {
             if (
                 await this.provider.findEndMeeting(
                     this.param,
@@ -306,20 +319,14 @@ export class MeetingHandle {
         }, data)
     }
     public async stopRecording(reason: string) {
-        if (this.status == null) {
-            this.logger.error(
-                `Can't exit metting, there is no pending meeting`,
-                { exit_reason: reason },
-            )
-            return
-        } else if (this.status != 'Recording') {
+        if (MeetingHandle.status.state !== 'Recording') {
             this.logger.error(
                 `Can't exit metting, the meeting is not in recording state`,
-                { status: this.status, exit_reason: reason },
+                { status: MeetingHandle.status.state, exit_reason: reason },
             )
             return
         }
-        this.status = 'Cleanup'
+        MeetingHandle.status.state = 'Cleanup'
         this.logger.info(`Stop recording scheduled`, {
             exit_reason: reason,
         })
@@ -387,7 +394,7 @@ export class MeetingHandle {
                 await uploadLog(
                     this.param.user_id,
                     this.param.email,
-                    this.project?.id,
+                    MeetingHandle.status.project?.id,
                 )
             } catch (e) {
                 console.error(e)
