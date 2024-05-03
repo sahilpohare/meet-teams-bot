@@ -53,7 +53,7 @@ export async function destroyRecordingSession(
     sessionId: number,
     projectId: number | undefined,
     doNotSetUploading: boolean,
-    botId: number | undefined,
+    botId: string | undefined,
 ) {
     await axios({
         method: 'POST',
@@ -322,7 +322,7 @@ async function checkStatus(id: string) {
 
 export async function endMeetingTrampoline(
     project_id: number,
-    bot_id?: number,
+    bot_id?: string,
 ) {
     let url = `/v1/speech/end_meeting_trampoline?project_id=${project_id}`
     url = bot_id ? url + `&bot_id=${bot_id}` : url

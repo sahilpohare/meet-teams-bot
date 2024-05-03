@@ -107,7 +107,7 @@ async function handleErrorInStartRecording(e: any, data: MeetingParams) {
 export async function meetingBotStartRecordFailed(
     meetingLink: string,
     eventId?: number,
-    bot_id?: number,
+    bot_id?: string,
     message?: string,
 ): Promise<void> {
     let meetingParams = {

@@ -37,7 +37,7 @@ export class Events {
     }
 
     private constructor(
-        private botId: number,
+        private botId: string,
         private apiKey: string,
         private webhookUrl: string,
     ) {}

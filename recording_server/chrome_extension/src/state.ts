@@ -20,7 +20,7 @@ export type MeetingParams = {
     force_lang: boolean
     translation_lang?: string
     speech_to_text?: SpeechToTextProvider
-    bot_id?: number
+    bot_id?: string
     s3_bucket: string
 }
 

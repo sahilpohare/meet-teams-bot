@@ -65,7 +65,7 @@ export type MeetingParams = {
     force_lang: boolean
     translation_lang?: string
     speech_to_text?: SpeechToTextProvider
-    bot_id?: number
+    bot_id?: string
     enter_message?: string
     bots_api_key?: string
     bots_webhook_url?: string
