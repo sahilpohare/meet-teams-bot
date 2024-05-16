@@ -32,7 +32,7 @@ export async function getSpeakerRootToObserve(
             video.style.display = 'block'
             video.style.left = '0'
             video.style.top = '0'
-            video.style.zIndex = '90000'
+            video.style.zIndex = '900000'
             if (video?.parentElement?.style) {
                 video.parentElement.style.background = '#000'
                 video.parentElement.style.top = '0'

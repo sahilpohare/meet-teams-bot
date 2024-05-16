@@ -1,12 +1,14 @@
 import * as puppeteer from 'puppeteer'
-import { Page } from 'puppeteer'
 import * as R from 'ramda'
-import { screenshot } from '../puppeteer'
+
 import {
     CancellationToken,
     MeetingParams,
     MeetingProviderInterface,
 } from '../types'
+
+import { Page } from 'puppeteer'
+import { screenshot } from '../puppeteer'
 import { sleep } from '../utils'
 
 export class MeetProvider implements MeetingProviderInterface {
@@ -144,6 +146,7 @@ export class MeetProvider implements MeetingProviderInterface {
                 }
                 return false
             })
+
             await sleep(100)
             console.log('ask to join clicked:', { askToJoinClicked })
             i += 1
@@ -252,6 +255,10 @@ async function findShowEveryOne(
         if (cancelCheck()) {
             throw 'timeout waiting for meeting to stat'
         }
+        if (await notAcceptedInMeeting(page)) {
+            console.log('notAcceptedInMeeting')
+            throw 'bot not accepted in meeting'
+        }
         if (showEveryOneFound === false) {
             await sleep(1000)
         }
@@ -318,7 +325,18 @@ async function clickFirst(
     }
     return false
 }
-
+async function notAcceptedInMeeting(page: Page): Promise<boolean> {
+    return await page.$$eval('*', (elems) => {
+        for (const e of elems) {
+            let elem = e as any
+            // console.log(elem.innerText)
+            if (elem.innerText === "You can't join this call") {
+                return true
+            }
+        }
+        return false
+    })
+}
 async function removedFromMeeting(page: Page): Promise<boolean> {
     return await page.$$eval('*', (elems) => {
         for (const e of elems) {
