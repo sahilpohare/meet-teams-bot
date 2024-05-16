@@ -89,24 +89,6 @@ export async function getSpeakerRootToObserve(
             }
 
             try {
-                const microphone = Array.from(
-                    document.querySelectorAll('button'),
-                ).find(
-                    (d) =>
-                        (d as any)?.ariaLabel ===
-                        'Turn off microphone (ctrl + d)',
-                )
-                if (microphone) {
-                    microphone.click()
-                }
-            } catch (e) {
-                console.error(
-                    '[getSpeakerRootToObserve] on meet error turning off microphone',
-                    e,
-                )
-            }
-
-            try {
                 // Find all div elements
                 const allDivs = document.querySelectorAll('div')
 

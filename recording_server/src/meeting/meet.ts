@@ -1,5 +1,5 @@
-import * as puppeteer from 'puppeteer'
 import * as R from 'ramda'
+import * as puppeteer from 'puppeteer'
 
 import {
     CancellationToken,
@@ -97,6 +97,44 @@ export class MeetProvider implements MeetingProviderInterface {
             console.log('Use without an account:', { useWithoutAccountClicked })
             i += 1
         }
+        const MuteMicrophone = async () => {
+            try {
+                await page.evaluate(() => {
+                    const tryClickMicrophone = () => {
+                        const microphoneButtons = Array.from(
+                            document.querySelectorAll('div'),
+                        ).filter(
+                            (el) =>
+                                el.getAttribute('aria-label') &&
+                                el
+                                    .getAttribute('aria-label')
+                                    .includes('Turn off microphone'),
+                        )
+
+                        if (microphoneButtons.length > 0) {
+                            microphoneButtons.forEach((button) =>
+                                button.click(),
+                            )
+                            console.log(
+                                `${microphoneButtons.length} microphone button(s) turned off.`,
+                            )
+                        } else {
+                            console.log(
+                                'No microphone button found. Retrying...',
+                            )
+                            setTimeout(tryClickMicrophone, 1000)
+                        }
+                    }
+
+                    tryClickMicrophone()
+                })
+            } catch (e) {
+                console.error(
+                    'Error when trying to turn off the microphone:',
+                    e,
+                )
+            }
+        }
 
         const typeBotName = async () => {
             const INPUT = 'input[type=text]'
@@ -132,7 +170,7 @@ export class MeetProvider implements MeetingProviderInterface {
         await screenshot(page, `before_typing_bot_name`)
         await typeBotName()
         await screenshot(page, `after_typing_bot_name`)
-
+        await MuteMicrophone()
         let askToJoinClicked = false
         i = 0
         while (!askToJoinClicked && i < 10) {
@@ -253,7 +291,7 @@ async function findShowEveryOne(
         await screenshot(page, `findShowEveryone`)
         console.log({ showEveryOneFound })
         if (cancelCheck()) {
-            throw 'timeout waiting for meeting to stat'
+            throw 'timeout waiting for meeting to start'
         }
         if (await notAcceptedInMeeting(page)) {
             console.log('notAcceptedInMeeting')
