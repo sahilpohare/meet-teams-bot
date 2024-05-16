@@ -56,8 +56,10 @@ export function getSpeakerFromDocument(
         const currentBorderColor =
             beforeElementStyles.getPropertyValue('border-color')
 
-        const span = parentDiv?.querySelector('span')
-
+        const spans: any = Array.from(parentDiv?.querySelectorAll('span'))
+        // console.log('spans', spans)
+        const span = spans.find((span) => span.textContent.length > 1)
+        // console.log('span', span)
         const speaker = span?.textContent
         // Vérifier si la couleur de la bordure est rgb(127, 133, 245)
         if (
@@ -67,18 +69,28 @@ export function getSpeakerFromDocument(
             if (currentBorderColor.trim() === 'rgb(127, 133, 245)') {
                 console.log('[teams observe speaker]', targetElement)
                 if (span != null && speaker != null && speaker.trim() !== '') {
-                    // targetElement.style.border = '1px solid red';
+                    // targetElement.style.border = '1px solid red'
                     // span.style.color = 'red'
                     removeShityHtml()
-                    // console.log('Speaker started:', speaker, targetElement, span)
+                    console.log(
+                        'Speaker started:',
+                        speaker,
+                        targetElement,
+                        span,
+                    )
                     return [{ name: speaker, timestamp: Date.now() }]
                 }
             } else if (currentBorderColor.trim() !== 'rgb(127, 133, 245)') {
                 if (span != null && speaker != null && speaker.trim() !== '') {
-                    // targetElement.style.border = '1px solid green';
+                    // targetElement.style.border = '1px solid green'
                     // span.style.color = 'green'
                     removeShityHtml()
-                    // console.log('Speaker stopped:', speaker, targetElement, span)
+                    console.log(
+                        'Speaker stopped:',
+                        speaker,
+                        targetElement,
+                        span,
+                    )
                     return []
                 }
             }
