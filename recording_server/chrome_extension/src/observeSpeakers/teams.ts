@@ -99,7 +99,6 @@ export function getSpeakerFromDocument(
 
     return []
 }
-
 function getDocumentRoot() {
     var iframes = document.querySelectorAll('iframe')
     var firstIframe = iframes[0]

@@ -90,45 +90,39 @@ export class TeamsProvider implements MeetingProviderInterface {
         await clickWithInnerText(page, 'button', 'Join now', 20)
         await screenshot(page, `afterjoinnow`)
 
-        // wait for the view button
-
-        if (
-            !(await clickWithInnerText(
+        while (true) {
+            const botNotAccepted = await isBotNotAccepted(page)
+            if (botNotAccepted) {
+                throw 'bot not accepteeeed'
+            }
+            const clickSuccess = await clickWithInnerText(
                 page,
                 'button',
                 'View',
-                6000,
+                2,
                 false,
-                cancelCheck,
-            ))
-        ) {
-            throw 'timeout accepting the bot'
+            )
+            if (cancelCheck?.()) {
+                throw 'Timeout entering meeting'
+            }
+            if (clickSuccess) {
+                break
+            }
+            await sleep(2000)
         }
-        await sleep(2000)
-        // once the view button is found reclick on it
         await clickWithInnerText(page, 'button', 'View', 10)
-
         await clickWithInnerText(page, 'div', 'Speaker', 20)
     }
 
     async findEndMeeting(
         _meetingParams: MeetingParams,
         page: Page,
-        cancellationToken: CancellationToken,
+        _cancellationToken: CancellationToken,
     ): Promise<boolean> {
-        for (let i = 0; i < 10; i++) {
-            try {
-                if ((await countParticipants(page)) > 0) {
-                    console.log('no participants found for 10 seconds')
-                    return false
-                }
-            } catch (e) {
-                console.error('error in findEndMeeting', e)
-                return false
-            }
-            await sleep(1000)
-        }
-        return true
+        return (
+            (await isRemovedFromTheMeeting(page)) ||
+            (await noParticipantsforDuration(page, 10))
+        )
     }
 }
 
@@ -492,4 +486,63 @@ async function countParticipants(page: Page): Promise<number> {
 
     console.log('Found', count, 'participants en plus du bot')
     return count
+}
+async function noParticipantsforDuration(page: Page, duration: number) {
+    for (let i = 0; i < duration; i++) {
+        try {
+            if ((await countParticipants(page)) > 0) {
+                return false
+            }
+        } catch (e) {
+            console.error('error in findEndMeeting', e)
+            return false
+        }
+        await sleep(1000)
+    }
+    return true
+}
+
+async function checkPageForText(
+    page: Page,
+    textToFind: string,
+    logMessage: string,
+): Promise<boolean> {
+    const result = await page.evaluate((text) => {
+        function containsText(doc: Document): boolean {
+            return doc.body.textContent.includes(text)
+        }
+
+        if (containsText(document)) {
+            return true
+        }
+
+        const iframes = document.querySelectorAll('iframe')
+        for (const iframe of iframes) {
+            const doc = iframe.contentDocument || iframe.contentWindow.document
+            if (doc && containsText(doc)) {
+                return true
+            }
+        }
+
+        return false
+    }, textToFind)
+
+    console.log(logMessage, result)
+    return result
+}
+
+async function isRemovedFromTheMeeting(page: Page): Promise<boolean> {
+    return checkPageForText(
+        page,
+        "You've been removed from this meeting",
+        'Bot removed:',
+    )
+}
+
+async function isBotNotAccepted(page: Page): Promise<boolean> {
+    return checkPageForText(
+        page,
+        'Sorry, but you were denied access to the meeting.',
+        'Bot not accepted:',
+    )
 }
