@@ -55,12 +55,19 @@ export function getSpeakerFromDocument(
         )
         const currentBorderColor =
             beforeElementStyles.getPropertyValue('border-color')
-
+        chrome.runtime.sendMessage({
+            type: 'LOG',
+            payload: currentBorderColor,
+        })
         const spans: any = Array.from(parentDiv?.querySelectorAll('span'))
         // console.log('spans', spans)
         const span = spans.find((span) => span.textContent.length > 1)
         // console.log('span', span)
         const speaker = span?.textContent
+        chrome.runtime.sendMessage({
+            type: 'LOG',
+            payload: speaker,
+        })
         // Vérifier si la couleur de la bordure est rgb(127, 133, 245)
         if (
             (targetElement as Element).getAttribute('data-tid') ===
@@ -69,8 +76,8 @@ export function getSpeakerFromDocument(
             if (currentBorderColor.trim() === 'rgb(127, 133, 245)') {
                 console.log('[teams observe speaker]', targetElement)
                 if (span != null && speaker != null && speaker.trim() !== '') {
-                    // targetElement.style.border = '1px solid red'
-                    // span.style.color = 'red'
+                    targetElement.style.border = '1px solid red'
+                    span.style.color = 'red'
                     removeShityHtml()
                     console.log(
                         'Speaker started:',
@@ -82,8 +89,8 @@ export function getSpeakerFromDocument(
                 }
             } else if (currentBorderColor.trim() !== 'rgb(127, 133, 245)') {
                 if (span != null && speaker != null && speaker.trim() !== '') {
-                    // targetElement.style.border = '1px solid green'
-                    // span.style.color = 'green'
+                    targetElement.style.border = '1px solid green'
+                    span.style.color = 'green'
                     removeShityHtml()
                     console.log(
                         'Speaker stopped:',

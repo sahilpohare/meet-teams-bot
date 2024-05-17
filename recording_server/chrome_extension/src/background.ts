@@ -1,10 +1,12 @@
-import axios from 'axios'
-import { Transcriber } from './Transcribe/Transcriber'
-import * as record from './record'
-import { Project, api, setConfig } from './spoke_api_js'
 import * as State from './state'
-import { uploadEditorsTask } from './uploadEditors'
+import * as record from './record'
+
+import { Project, api, setConfig } from './spoke_api_js'
+
+import { Transcriber } from './Transcribe/Transcriber'
+import axios from 'axios'
 import { sleep } from './utils'
+import { uploadEditorsTask } from './uploadEditors'
 
 type Speaker = {
     name: string
@@ -76,6 +78,9 @@ function addListener() {
                     uploadEditorsTask(SPEAKERS)
                 }
                 break
+            }
+            case 'LOG': {
+                console.log(request.payload)
             }
             case 'OBSERVE_SPEAKERS': {
                 observeSpeakers()
