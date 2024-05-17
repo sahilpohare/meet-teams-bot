@@ -55,24 +55,24 @@ export function getSpeakerFromDocument(
         )
         const currentBorderColor =
             beforeElementStyles.getPropertyValue('border-color')
-        chrome.runtime.sendMessage({
-            type: 'LOG',
-            payload: currentBorderColor,
-        })
         const spans: any = Array.from(parentDiv?.querySelectorAll('span'))
         // console.log('spans', spans)
         const span = spans.find((span) => span.textContent.length > 1)
         // console.log('span', span)
         const speaker = span?.textContent
-        chrome.runtime.sendMessage({
-            type: 'LOG',
-            payload: speaker,
-        })
         // Vérifier si la couleur de la bordure est rgb(127, 133, 245)
         if (
             (targetElement as Element).getAttribute('data-tid') ===
             'voice-level-stream-outline'
         ) {
+            chrome.runtime.sendMessage({
+                type: 'LOG',
+                payload: currentBorderColor,
+            })
+            chrome.runtime.sendMessage({
+                type: 'LOG',
+                payload: speaker,
+            })
             if (
                 currentBorderColor.trim() === 'rgb(127, 133, 245)' ||
                 currentBorderColor.trim() === 'rgb(91, 95, 199)'
