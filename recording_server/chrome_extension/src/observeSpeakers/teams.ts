@@ -65,14 +65,6 @@ export function getSpeakerFromDocument(
             (targetElement as Element).getAttribute('data-tid') ===
             'voice-level-stream-outline'
         ) {
-            chrome.runtime.sendMessage({
-                type: 'LOG',
-                payload: currentBorderColor,
-            })
-            chrome.runtime.sendMessage({
-                type: 'LOG',
-                payload: speaker,
-            })
             if (
                 currentBorderColor.trim() === 'rgb(127, 133, 245)' ||
                 currentBorderColor.trim() === 'rgb(91, 95, 199)'
@@ -82,12 +74,6 @@ export function getSpeakerFromDocument(
                     targetElement.style.border = '1px solid red'
                     span.style.color = 'red'
                     removeShityHtml()
-                    console.log(
-                        'Speaker started:',
-                        speaker,
-                        targetElement,
-                        span,
-                    )
                     return [{ name: speaker, timestamp: Date.now() }]
                 }
             } else {
@@ -95,12 +81,6 @@ export function getSpeakerFromDocument(
                     targetElement.style.border = '1px solid green'
                     span.style.color = 'green'
                     removeShityHtml()
-                    console.log(
-                        'Speaker stopped:',
-                        speaker,
-                        targetElement,
-                        span,
-                    )
                     return []
                 }
             }
