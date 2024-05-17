@@ -73,7 +73,10 @@ export function getSpeakerFromDocument(
             (targetElement as Element).getAttribute('data-tid') ===
             'voice-level-stream-outline'
         ) {
-            if (currentBorderColor.trim() === 'rgb(127, 133, 245)') {
+            if (
+                currentBorderColor.trim() === 'rgb(127, 133, 245)' ||
+                currentBorderColor.trim() === 'rgb(91, 95, 199)'
+            ) {
                 console.log('[teams observe speaker]', targetElement)
                 if (span != null && speaker != null && speaker.trim() !== '') {
                     targetElement.style.border = '1px solid red'
@@ -87,7 +90,7 @@ export function getSpeakerFromDocument(
                     )
                     return [{ name: speaker, timestamp: Date.now() }]
                 }
-            } else if (currentBorderColor.trim() !== 'rgb(127, 133, 245)') {
+            } else {
                 if (span != null && speaker != null && speaker.trim() !== '') {
                     targetElement.style.border = '1px solid green'
                     span.style.color = 'green'
