@@ -195,11 +195,21 @@ export class MeetProvider implements MeetingProviderInterface {
 
         await findShowEveryOne(page, false, cancelCheck)
 
-        // Send enter message in chat
-        console.log('meetingParams.enter_message:', meetingParams.enter_message)
+        // Send entry message in chat if any
         if (meetingParams.enter_message) {
+            console.log('Sending entry message...')
             await sendEntryMessage(page, meetingParams.enter_message)
+        } else {
+            console.log('No entry message provided.')
         }
+
+        // Send enter message in chat
+        // console.log('meetingParams.enter_message:', meetingParams.enter_message)
+        // await sendEntryMessage(page, 'sa mere')
+        // if (meetingParams.enter_message) {
+        //     // await sendEntryMessage(page, meetingParams.enter_message)
+        //     await sendEntryMessage(page, 'sa mere')
+        // }
 
         try {
             await page.$$eval('i', (elems) => {
@@ -304,30 +314,69 @@ async function findShowEveryOne(
     }
 }
 
-async function sendEntryMessage(page: puppeteer.Page, enter_message: string) {
+async function sendEntryMessage(
+    page: Page,
+    enterMessage: string,
+): Promise<void> {
+    console.log('Attempting to send entry message...')
     try {
-        const CHAT_BUTTON_SELECTOR = 'button[aria-label="Chat with everyone"]'
-        const CHAT_SEND_SELECTOR = 'button[aria-label="Send a message"]'
+        await page.click('button[aria-label="Chat with everyone"]')
+        await page.waitForSelector('textarea[placeholder="Send a message"]')
+        await page.evaluate((message) => {
+            const textarea = document.querySelector(
+                'textarea[placeholder="Send a message"]',
+            )
+            if (textarea) {
+                const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+                    window.HTMLTextAreaElement.prototype,
+                    'value',
+                ).set
+                nativeInputValueSetter.call(textarea, message)
+                textarea.dispatchEvent(new Event('input', { bubbles: true }))
 
-        // await clickFirst(CHAT_BUTTON_SELECTOR)
-        console.log(
-            'Click First CHAT_BUTTON_SELECTOR',
-            await clickFirst(page, CHAT_BUTTON_SELECTOR),
-        )
-        await sleep(1000)
-        await page.keyboard.type(enter_message)
-        console.log(
-            'Click First CHAT_SEND_SELECTOR',
-            await clickFirst(page, CHAT_SEND_SELECTOR),
-        )
-        console.log(
-            'Click First CHAT_BUTTON_SELECTOR',
-            await clickFirst(page, CHAT_BUTTON_SELECTOR),
-        )
-    } catch (e) {
-        console.error('Unable to send enter message in chat', e)
+                // Optional: Mimic more user-like interaction
+                textarea.dispatchEvent(
+                    new KeyboardEvent('keydown', { key: 'End', bubbles: true }),
+                )
+                textarea.dispatchEvent(
+                    new KeyboardEvent('keyup', { key: 'End', bubbles: true }),
+                )
+
+                const sendButton = Array.from(document.querySelectorAll('i'))
+                    .find((icon) => icon.textContent === 'send')
+                    ?.closest('button')
+                if (sendButton) {
+                    sendButton.click()
+                }
+            }
+        }, enterMessage)
+    } catch (error) {
+        console.error('Failed to send entry message:', error)
     }
 }
+
+// try {
+//     const CHAT_BUTTON_SELECTOR = 'button[aria-label="Chat with everyone"]'
+//     const CHAT_SEND_SELECTOR = 'button[aria-label="Send a message"]'
+//     // await clickFirst(CHAT_BUTTON_SELECTOR)
+//     console.log(
+//         'Click First CHAT_BUTTON_SELECTOR',
+//         await clickFirst(page, CHAT_BUTTON_SELECTOR),
+//     )
+//     await sleep(1000)
+//     await page.keyboard.type(enter_message)
+//     console.log(
+//         'Click First CHAT_SEND_SELECTOR',
+//         await clickFirst(page, CHAT_SEND_SELECTOR),
+//     )
+//     console.log(
+//         'Click First CHAT_BUTTON_SELECTOR',
+//         await clickFirst(page, CHAT_BUTTON_SELECTOR),
+//     )
+// } catch (e) {
+//     console.error('Unable to send enter message in chat', e)
+// }
+
 async function countParticipants(page: Page): Promise<number> {
     const count = await page.evaluate(() => {
         const images = Array.from(document.querySelectorAll('img'))
