@@ -198,18 +198,14 @@ export class MeetProvider implements MeetingProviderInterface {
         // Send entry message in chat if any
         if (meetingParams.enter_message) {
             console.log('Sending entry message...')
-            await sendEntryMessage(page, meetingParams.enter_message)
+            console.log(
+                'send message?',
+                await sendEntryMessage(page, meetingParams.enter_message),
+            )
+            await sleep(100)
         } else {
             console.log('No entry message provided.')
         }
-
-        // Send enter message in chat
-        // console.log('meetingParams.enter_message:', meetingParams.enter_message)
-        // await sendEntryMessage(page, 'sa mere')
-        // if (meetingParams.enter_message) {
-        //     // await sendEntryMessage(page, meetingParams.enter_message)
-        //     await sendEntryMessage(page, 'sa mere')
-        // }
 
         try {
             await page.$$eval('i', (elems) => {
@@ -313,45 +309,67 @@ async function findShowEveryOne(
         i++
     }
 }
+// var textarea = document.querySelector(
+//     'textarea[placeholder="Send a message"]',
+// )
+// textarea.focus()
+// textarea.value = enter_message
+// var icons = document.querySelectorAll('i')
+// var sendIcon = Array.from(icons).find((icon) => icon.textContent === 'send')
+// var sendButton = sendIcon ? sendIcon.closest('button') : null
+
+// if (sendButton) {
+//     sendButton.click();
+// }
 
 async function sendEntryMessage(
     page: Page,
     enterMessage: string,
-): Promise<void> {
+): Promise<boolean> {
     console.log('Attempting to send entry message...')
     try {
         await page.click('button[aria-label="Chat with everyone"]')
         await page.waitForSelector('textarea[placeholder="Send a message"]')
-        await page.evaluate((message) => {
+
+        return await page.evaluate((message) => {
             const textarea = document.querySelector(
                 'textarea[placeholder="Send a message"]',
             )
             if (textarea) {
-                const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-                    window.HTMLTextAreaElement.prototype,
-                    'value',
-                ).set
-                nativeInputValueSetter.call(textarea, message)
+                ;(textarea as HTMLTextAreaElement).focus()
+                ;(textarea as HTMLTextAreaElement).value = message
                 textarea.dispatchEvent(new Event('input', { bubbles: true }))
 
-                // Optional: Mimic more user-like interaction
-                textarea.dispatchEvent(
-                    new KeyboardEvent('keydown', { key: 'End', bubbles: true }),
-                )
-                textarea.dispatchEvent(
-                    new KeyboardEvent('keyup', { key: 'End', bubbles: true }),
-                )
+                // Delay to ensure UI processes input before clicking send
+                setTimeout(() => {
+                    const icons = document.querySelectorAll('i')
+                    const sendIcon = Array.from(icons).find((icon) =>
+                        icon.textContent.includes('send'),
+                    )
+                    const sendButton = sendIcon
+                        ? sendIcon.closest('button')
+                        : null
 
-                const sendButton = Array.from(document.querySelectorAll('i'))
-                    .find((icon) => icon.textContent === 'send')
-                    ?.closest('button')
-                if (sendButton) {
-                    sendButton.click()
-                }
+                    if (sendButton) {
+                        if (sendButton.disabled) {
+                            sendButton.disabled = false // Make sure the send button is clickable
+                        }
+                        sendButton.click()
+                        console.log('Clicked on send button')
+                    } else {
+                        console.log('Send button not found')
+                    }
+                }, 100)
+                page.click('button[aria-label="Chat with everyone"]')
+                return true
+            } else {
+                console.log('Textarea not found')
+                return false
             }
         }, enterMessage)
     } catch (error) {
         console.error('Failed to send entry message:', error)
+        return false
     }
 }
 
