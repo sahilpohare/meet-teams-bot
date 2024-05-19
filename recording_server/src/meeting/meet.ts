@@ -342,12 +342,6 @@ async function sendEntryMessage(
                 ;(textarea as HTMLTextAreaElement).value = message
                 textarea.dispatchEvent(new Event('input', { bubbles: true }))
 
-                // Delay to ensure UI processes input before clicking send
-                await new Promise<void>((resolve) => {
-                    setTimeout(() => {
-                        resolve()
-                    }, 9999)
-                })
                 const icons = document.querySelectorAll('i')
                 const sendIcon = Array.from(icons).find((icon) =>
                     icon.textContent.includes('send'),
@@ -360,11 +354,6 @@ async function sendEntryMessage(
                     }
                     sendButton.click()
                     console.log('Clicked on send button')
-                    await new Promise<void>((resolve) => {
-                        setTimeout(() => {
-                            resolve()
-                        }, 10000)
-                    })
                     return true
                 } else {
                     console.log('Send button not found')
