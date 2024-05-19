@@ -328,7 +328,7 @@ async function sendEntryMessage(
 ): Promise<boolean> {
     console.log('Attempting to send entry message...')
     // truncate the message as meet only allows 516 characters
-    enterMessage = enterMessage.substring(0, 516)
+    enterMessage = enterMessage.substring(0, 500)
     try {
         await page.click('button[aria-label="Chat with everyone"]')
         await page.waitForSelector('textarea[placeholder="Send a message"]')
@@ -346,7 +346,7 @@ async function sendEntryMessage(
                 await new Promise<void>((resolve) => {
                     setTimeout(() => {
                         resolve()
-                    }, 10000)
+                    }, 9999)
                 })
                 const icons = document.querySelectorAll('i')
                 const sendIcon = Array.from(icons).find((icon) =>
