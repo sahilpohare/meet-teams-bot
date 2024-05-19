@@ -1,5 +1,5 @@
-import * as R from 'ramda'
 import * as puppeteer from 'puppeteer'
+import * as R from 'ramda'
 
 import {
     CancellationToken,
@@ -327,11 +327,13 @@ async function sendEntryMessage(
     enterMessage: string,
 ): Promise<boolean> {
     console.log('Attempting to send entry message...')
+    // truncate the message as meet only allows 516 characters
+    enterMessage = enterMessage.substring(0, 516)
     try {
         await page.click('button[aria-label="Chat with everyone"]')
         await page.waitForSelector('textarea[placeholder="Send a message"]')
 
-        return await page.evaluate((message) => {
+        let res = await page.evaluate(async (message) => {
             const textarea = document.querySelector(
                 'textarea[placeholder="Send a message"]',
             )
@@ -341,32 +343,40 @@ async function sendEntryMessage(
                 textarea.dispatchEvent(new Event('input', { bubbles: true }))
 
                 // Delay to ensure UI processes input before clicking send
-                setTimeout(() => {
-                    const icons = document.querySelectorAll('i')
-                    const sendIcon = Array.from(icons).find((icon) =>
-                        icon.textContent.includes('send'),
-                    )
-                    const sendButton = sendIcon
-                        ? sendIcon.closest('button')
-                        : null
+                await new Promise<void>((resolve) => {
+                    setTimeout(() => {
+                        resolve()
+                    }, 10000)
+                })
+                const icons = document.querySelectorAll('i')
+                const sendIcon = Array.from(icons).find((icon) =>
+                    icon.textContent.includes('send'),
+                )
+                const sendButton = sendIcon ? sendIcon.closest('button') : null
 
-                    if (sendButton) {
-                        if (sendButton.disabled) {
-                            sendButton.disabled = false // Make sure the send button is clickable
-                        }
-                        sendButton.click()
-                        console.log('Clicked on send button')
-                    } else {
-                        console.log('Send button not found')
+                if (sendButton) {
+                    if (sendButton.disabled) {
+                        sendButton.disabled = false // Make sure the send button is clickable
                     }
-                }, 100)
-                page.click('button[aria-label="Chat with everyone"]')
-                return true
+                    sendButton.click()
+                    console.log('Clicked on send button')
+                    await new Promise<void>((resolve) => {
+                        setTimeout(() => {
+                            resolve()
+                        }, 10000)
+                    })
+                    return true
+                } else {
+                    console.log('Send button not found')
+                    return false
+                }
             } else {
                 console.log('Textarea not found')
                 return false
             }
         }, enterMessage)
+        page.click('button[aria-label="Chat with everyone"]')
+        return res
     } catch (error) {
         console.error('Failed to send entry message:', error)
         return false
