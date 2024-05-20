@@ -57,7 +57,13 @@ export async function destroyRecordingSession(
 ) {
     await axios({
         method: 'POST',
-        url: `${API_BOT_BASEURL}/video/destroy_recording_session?session_id=${sessionId}&project_id=${projectId}&do_not_set_uploading=${doNotSetUploading}&bot_id=${botId}`,
+        url: `${API_BOT_BASEURL}/video/destroy_recording_session`,
+        params: {
+            session_id: sessionId,
+            project_id: projectId,
+            do_not_set_uploading: doNotSetUploading,
+            bot_id: botId,
+        },
     })
 }
 
@@ -324,15 +330,16 @@ export async function endMeetingTrampoline(
     project_id: number,
     bot_id?: string,
 ) {
-    let url = `/v1/speech/end_meeting_trampoline?project_id=${project_id}`
-    url = bot_id ? url + `&bot_id=${bot_id}` : url
-
     const resp = await axios({
+        params: {
+            project_id,
+            bot_id,
+        },
         raxConfig: {
             retry: 0,
         },
         method: 'POST',
-        url,
+        url: '/v1/speech/end_meeting_trampoline',
         timeout: 600000,
     })
     return resp.data

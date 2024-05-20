@@ -5,9 +5,7 @@ import { notifyApp } from './calendar'
 import {
     API_SERVER_BASEURL,
     LOCK_INSTANCE_AT_STARTUP,
-    POD_IP,
     delSessionInRedis,
-    setSessionInRedis,
     terminateInstance,
 } from './instance'
 import { MeetingHandle } from './meeting'
@@ -94,7 +92,9 @@ async function handleErrorInStartRecording(e: any, data: MeetingParams) {
             data.meeting_url,
             data.event?.id,
             data.bot_id,
-            MeetingHandle.getError(),
+            MeetingHandle.getError()
+                ? JSON.stringify(MeetingHandle.getError())
+                : 'no error found',
         )
     } catch (e) {
         console.error(
