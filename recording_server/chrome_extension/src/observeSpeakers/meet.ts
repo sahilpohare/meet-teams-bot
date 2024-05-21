@@ -366,12 +366,30 @@ export function removeShityHtml() {
                 video.parentElement.style.justifyContent = 'center'
             }
         }
-    } catch (e) {}
+    } catch (e) {
+        console.error('Error with video setup:', e)
+    }
+
     try {
         document.getElementsByTagName('video')[1].style.position = 'fixed'
-    } catch (e) {}
-    // let meetingControls = document.getElementsByClassName("calling-controls")
-    // meetingControls[0].remove()
+    } catch (e) {
+        console.error('Error with second video:', e)
+    }
+
+    // Make parent elements of 'devices' icons transparent
+    try {
+        var icons = Array.from(
+            document.querySelectorAll('i.google-material-icons'),
+        ).filter((el) => el.textContent?.trim() === 'devices')
+        icons.forEach((icon) => {
+            // Change the opacity of the parent element to 0
+            if (icon.parentElement) {
+                icon.parentElement.style.opacity = '0'
+            }
+        })
+    } catch (e) {
+        console.error('Error applying opacity:', e)
+    }
 }
 
 export function findAllAttendees(): string[] {
