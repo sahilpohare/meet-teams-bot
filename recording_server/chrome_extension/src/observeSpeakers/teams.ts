@@ -20,6 +20,24 @@ export async function getSpeakerRootToObserve(
     } catch (e) {
         console.error('fail to remove buttons header', e)
     }
+    try {
+        var documentInIframe = getDocumentRoot()!
+        const style = documentInIframe.createElement('style')
+        documentInIframe.head.appendChild(style)
+        const sheet = style.sheet
+
+        // Add the CSS rule for the ::before pseudo-element
+        sheet?.insertRule(
+            `
+              [data-tid="voice-level-stream-outline"]::before {
+                border: 0px solid rgb(127, 133, 245);
+              }
+            `,
+            sheet.cssRules.length,
+        )
+    } catch (e) {
+        console.error('error in insert before style', e)
+    }
 
     try {
         var documentInIframe = getDocumentRoot()!
