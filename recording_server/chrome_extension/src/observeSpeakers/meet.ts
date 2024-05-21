@@ -366,12 +366,53 @@ export function removeShityHtml() {
                 video.parentElement.style.justifyContent = 'center'
             }
         }
-    } catch (e) {}
+    } catch (e) {
+        console.error('Error with video setup:', e)
+    }
+
     try {
         document.getElementsByTagName('video')[1].style.position = 'fixed'
-    } catch (e) {}
-    // let meetingControls = document.getElementsByClassName("calling-controls")
-    // meetingControls[0].remove()
+    } catch (e) {
+        console.error('Error with second video:', e)
+    }
+
+    try {
+        var icons = Array.from(
+            document.querySelectorAll('i.google-material-icons'),
+        ).filter((el) => el.textContent?.trim() === 'devices')
+        icons.forEach((icon) => {
+            // Change the opacity of the parent element to 0
+            if (icon.parentElement) {
+                icon.parentElement.style.opacity = '0'
+            }
+        })
+    } catch (e) {
+        console.error('Error applying opacity:', e)
+    }
+
+    // Add opacity change for 'mood' icons with specific parent background
+    try {
+        var moodIcons = Array.from(
+            document.querySelectorAll('i.google-material-icons'),
+        ).filter((el) => el.textContent?.trim() === 'mood')
+        if (moodIcons.length > 0) {
+            var icon = moodIcons[0]
+            var currentElement = icon.parentElement
+            while (currentElement != null) {
+                var bgColor =
+                    window.getComputedStyle(currentElement).backgroundColor
+                if (bgColor === 'rgb(32, 33, 36)') {
+                    currentElement.style.opacity = '0'
+                    break
+                }
+                currentElement = currentElement.parentElement
+            }
+        } else {
+            console.log("No 'mood' icon found.")
+        }
+    } catch (e) {
+        console.error("Error finding 'mood' icon:", e)
+    }
 }
 
 export function findAllAttendees(): string[] {
