@@ -71,15 +71,13 @@ export function getSpeakerFromDocument(
             ) {
                 console.log('[teams observe speaker]', targetElement)
                 if (span != null && speaker != null && speaker.trim() !== '') {
-                    // targetElement.style.border = '1px solid green'
-                    // span.style.color = 'green'
+                    span.parentElement.style.opacity = '0'
                     removeShityHtml()
                     return [{ name: speaker, timestamp: Date.now() }]
                 }
             } else {
                 if (span != null && speaker != null && speaker.trim() !== '') {
-                    // targetElement.style.border = '1px solid red'
-                    // span.style.color = 'red'
+                    span.parentElement.style.opacity = '0'
                     removeShityHtml()
                     return []
                 }
