@@ -210,7 +210,7 @@ export class MeetingHandle {
             MeetingHandle.status.error = e
             console.error('after set current meeting error')
             await this.cleanEverything(true)
-            throw e
+            throw JoinError.Internal
         }
     }
 

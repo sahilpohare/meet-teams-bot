@@ -109,8 +109,11 @@ export class Consumer {
         let logger = LOGGER.new({})
 
         // Prevent instance for beeing scaled down
-        // TODO: pk c'est pas try
-        await setProtection(true)
+        try {
+            await setProtection(true)
+        } catch (e) {
+            console.error('fail to set protection', e)
+        }
         if (LOCK_INSTANCE_AT_STARTUP) {
             try {
                 await notifyApp('PrepareRecording', data, {}, {})

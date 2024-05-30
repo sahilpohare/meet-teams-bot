@@ -82,21 +82,19 @@ console.log('version 2.0')
     }
 })()
 
-async function handleErrorInStartRecording(e: any, data: MeetingParams) {
+async function handleErrorInStartRecording(error: string, data: MeetingParams) {
     try {
         await notifyApp(
             'Error',
             data,
-            { error: JSON.stringify(e) },
-            { error: JSON.stringify(e) },
+            { error: JSON.stringify(error) },
+            { error: JSON.stringify(error) },
         )
         await meetingBotStartRecordFailed(
             data.meeting_url,
             data.event?.id,
             data.bot_id,
-            MeetingHandle.getError()
-                ? JSON.stringify(MeetingHandle.getError())
-                : 'no error found',
+            isString(error) ? error : JSON.stringify(error),
         )
     } catch (e) {
         console.error(
@@ -104,6 +102,10 @@ async function handleErrorInStartRecording(e: any, data: MeetingParams) {
             e,
         )
     }
+}
+
+function isString(value) {
+    return typeof value === 'string' || value instanceof String
 }
 
 export async function meetingBotStartRecordFailed(
