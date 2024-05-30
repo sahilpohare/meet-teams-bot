@@ -30,12 +30,14 @@ console.log('version 2.0')
             LOGGER.error(`Failed to trigger cache: ${e}`)
         }
 
+        // TODO: what to do if we cant connect to redis
         try {
             await clientRedis.connect()
         } catch (e) {
             console.error('fail to connect to redis: ', e)
         }
 
+        // TODO: what to do if we cant instanciate express server
         await server()
         console.log('after server started')
 

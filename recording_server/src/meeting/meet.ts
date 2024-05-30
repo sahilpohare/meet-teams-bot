@@ -14,11 +14,6 @@ import { sleep } from '../utils'
 export class MeetProvider implements MeetingProviderInterface {
     constructor() {}
     async parseMeetingUrl(browser: puppeteer.Browser, meeting_url: string) {
-        // try parsing this liinks
-        // To join the video meeting, click this link: https://meet.google.com/zdg-teai-fhz
-        // Otherwise, to join by phone, dial +33 1 87 40 48 44 and enter this PIN: 983 713 164#
-        // To view more phone numbers, click this link: https://tel.meet/zdg-teai-fhz?hs=5
-
         if (meeting_url.startsWith('meet')) {
             meeting_url = `https://${meeting_url}`
         }
