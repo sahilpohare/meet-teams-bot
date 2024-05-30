@@ -8,6 +8,7 @@ import {
 } from '../types'
 
 import { Page } from 'puppeteer'
+import { JoinError } from '../meeting'
 import { screenshot } from '../puppeteer'
 import { sleep } from '../utils'
 
@@ -185,7 +186,7 @@ export class MeetProvider implements MeetingProviderInterface {
             i += 1
         }
         if (!askToJoinClicked) {
-            throw "Error bot can't join"
+            throw JoinError.CannotJoinMeeting
         }
 
         await findShowEveryOne(page, false, cancelCheck)
@@ -292,11 +293,10 @@ async function findShowEveryOne(
         await screenshot(page, `findShowEveryone`)
         console.log({ showEveryOneFound })
         if (cancelCheck()) {
-            throw 'timeout waiting for meeting to start'
+            throw JoinError.TimeoutWaitingToStart
         }
         if (await notAcceptedInMeeting(page)) {
-            console.log('notAcceptedInMeeting')
-            throw 'bot not accepted in meeting'
+            throw JoinError.BotNotAccepted
         }
         if (showEveryOneFound === false) {
             await sleep(1000)

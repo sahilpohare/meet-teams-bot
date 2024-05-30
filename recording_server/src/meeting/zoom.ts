@@ -1,6 +1,7 @@
 import * as puppeteer from 'puppeteer'
 import { Page } from 'puppeteer'
 import { URL } from 'url'
+import { JoinError } from '../meeting'
 import { screenshot } from '../puppeteer'
 import {
     CancellationToken,
@@ -91,7 +92,7 @@ export class ZoomProvider implements MeetingProviderInterface {
 
         while (true) {
             if (cancelCheck()) {
-                throw 'timeout waiting for meeting to stat'
+                throw JoinError.TimeoutWaitingToStart
             }
             // meeting didnt start
             await bypass_modal(page)

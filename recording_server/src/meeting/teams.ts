@@ -8,6 +8,7 @@ import {
 } from '../types'
 
 import { Page } from 'puppeteer'
+import { JoinError } from '../meeting'
 import { screenshot } from '../puppeteer'
 import { sleep } from '../utils'
 
@@ -93,7 +94,7 @@ export class TeamsProvider implements MeetingProviderInterface {
         while (true) {
             const botNotAccepted = await isBotNotAccepted(page)
             if (botNotAccepted) {
-                throw 'bot not accepteeeed'
+                throw JoinError.BotNotAccepted
             }
             const clickSuccess = await clickWithInnerText(
                 page,
@@ -103,7 +104,7 @@ export class TeamsProvider implements MeetingProviderInterface {
                 false,
             )
             if (cancelCheck?.()) {
-                throw 'Timeout entering meeting'
+                throw JoinError.TimeoutWaitingToStart
             }
             if (clickSuccess) {
                 break

@@ -80,7 +80,9 @@ const months = [
 export async function uploadLog(
     user_id: number,
     email: string,
+    bot_id?: string,
     project_id?: number,
+    share_link?: string,
 ) {
     const date = new Date()
         .toLocaleDateString('en-US', {
@@ -111,7 +113,7 @@ export async function uploadLog(
         await reqInstance.get(
             `https://spoke.app.n8n.cloud/webhook/failed_bot?email=${email}&s3_log=${encodeURIComponent(
                 s3File,
-            )}&user_id=${user_id}&project_id=${project_id}&screenshots=${encodeURIComponent(
+            )}&bot_id=${bot_id}&user_id=${user_id}&share_link=${share_link}&project_id=${project_id}&screenshots=${encodeURIComponent(
                 allScreenshotFiles.join(', '),
             )}`,
         )

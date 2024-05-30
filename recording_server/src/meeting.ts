@@ -26,10 +26,17 @@ import { TeamsProvider } from './meeting/teams'
 import { ZoomProvider } from './meeting/zoom'
 import { sleep } from './utils'
 
+export enum JoinError {
+    CannotJoinMeeting = 'CannotJoinMeeting',
+    BotNotAccepted = 'BotNotAccepted',
+    TimeoutWaitingToStart = 'TimeoutWaitingToStart',
+    Internal = 'Internal',
+}
+
 export class Status {
     state: MeetingStatus
     error: any | null
-    project: { id: number } | null
+    project: { id: number; share_link?: string } | null
     constructor() {
         this.state = 'Recording'
         this.error = null
@@ -192,7 +199,7 @@ export class MeetingHandle {
             await Events.inCallRecording()
 
             if (project == null) {
-                throw 'failed creating project'
+                throw JoinError.Internal
             }
 
             MeetingHandle.status.project = project
@@ -212,7 +219,9 @@ export class MeetingHandle {
             await uploadLog(
                 this.param.user_id,
                 this.param.email,
+                this.param.bot_id,
                 MeetingHandle.status.project?.id,
+                MeetingHandle.status.project?.share_link,
             )
         } catch (e) {
             this.logger.error(`failed to upload logs: ${e}`)
@@ -394,7 +403,9 @@ export class MeetingHandle {
                 await uploadLog(
                     this.param.user_id,
                     this.param.email,
+                    this.param.bot_id,
                     MeetingHandle.status.project?.id,
+                    MeetingHandle.status.project?.share_link,
                 )
             } catch (e) {
                 console.error(e)
