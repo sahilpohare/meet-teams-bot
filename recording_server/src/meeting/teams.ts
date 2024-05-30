@@ -164,7 +164,7 @@ function parseMeetingUrlFromJoinInfos(joinInfo: string) {
         : null
 
     if (meetingUrl == null) {
-        throw 'failed to parse meeting url from join info'
+        throw JoinError.InvalidMeetingUrl
     }
     return meetingUrl
 }

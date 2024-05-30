@@ -31,6 +31,7 @@ export enum JoinError {
     BotNotAccepted = 'BotNotAccepted',
     TimeoutWaitingToStart = 'TimeoutWaitingToStart',
     Internal = 'Internal',
+    InvalidMeetingUrl = 'InvalidMeetingUrl',
 }
 
 export class Status {

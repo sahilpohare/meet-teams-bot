@@ -24,14 +24,14 @@ export class ZoomProvider implements MeetingProviderInterface {
                 return { meetingId, password }
             } catch (e) {
                 console.error('[parseMeetingUrl] parse meeting url', e)
-                throw 'invalid meeting url'
+                throw JoinError.InvalidMeetingUrl
             }
         }
         try {
             try {
                 const { meetingId, password } = parse(meeting_url)
                 if (!(/^\d+$/.test(meetingId) || meetingId === '')) {
-                    throw 'invalid meetingId'
+                    throw JoinError.InvalidMeetingUrl
                 }
                 return { meetingId, password }
             } catch (e) {
@@ -51,12 +51,12 @@ export class ZoomProvider implements MeetingProviderInterface {
                     // https://ghlsuccess.com/zoom
                 } catch (e) {
                     console.error('error goto page: ', e)
-                    throw 'invalid meeting url'
+                    throw JoinError.InvalidMeetingUrl
                 }
             }
         } catch (e) {
             console.error('[parseMeetingUrl] invalid meeting url', e)
-            throw 'invalid meeting url'
+            throw JoinError.InvalidMeetingUrl
         }
     }
     getMeetingLink(
@@ -286,7 +286,7 @@ async function joinAudio(page: puppeteer.Page) {
         }
     }
     if (audioButtonClicked) {
-        throw 'cant join audio'
+        throw JoinError.CannotJoinMeeting
     } else {
         return false
     }

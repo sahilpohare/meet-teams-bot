@@ -21,7 +21,7 @@ export class MeetProvider implements MeetingProviderInterface {
         const urlSplitted = meeting_url.split(/\s+/)
         const url = R.find((s) => s.startsWith('https://meet'), urlSplitted)
         if (url == null) {
-            throw 'bad meeting url'
+            throw JoinError.InvalidMeetingUrl
         }
         return { meetingId: url, password: '' }
     }
