@@ -26,11 +26,18 @@ import { TeamsProvider } from './meeting/teams'
 import { ZoomProvider } from './meeting/zoom'
 import { sleep } from './utils'
 
-export enum JoinError {
+export class JoinError extends Error {
+    constructor(code: JoinErrorCode) {
+        super(code)
+        this.name = 'JoinError'
+    }
+}
+
+export enum JoinErrorCode {
     CannotJoinMeeting = 'CannotJoinMeeting',
     BotNotAccepted = 'BotNotAccepted',
     TimeoutWaitingToStart = 'TimeoutWaitingToStart',
-    Internal = 'Internal',
+    Internal = 'InternalError',
     InvalidMeetingUrl = 'InvalidMeetingUrl',
 }
 
@@ -200,18 +207,15 @@ export class MeetingHandle {
             await Events.inCallRecording()
 
             if (project == null) {
-                throw JoinError.Internal
+                throw new JoinError(JoinErrorCode.Internal)
             }
 
             MeetingHandle.status.project = project
             return project
-        } catch (e) {
-            console.error('an error occured while starting recording', e)
-            console.error('setting current_meeting error')
-            MeetingHandle.status.error = e
-            console.error('after set current meeting error')
+        } catch (error) {
             await this.cleanEverything(true)
-            throw JoinError.Internal
+            MeetingHandle.status.error = error
+            throw error
         }
     }
 

@@ -8,7 +8,7 @@ import {
 } from '../types'
 
 import { Page } from 'puppeteer'
-import { JoinError } from '../meeting'
+import { JoinError, JoinErrorCode } from '../meeting'
 import { screenshot } from '../puppeteer'
 import { sleep } from '../utils'
 
@@ -21,7 +21,7 @@ export class MeetProvider implements MeetingProviderInterface {
         const urlSplitted = meeting_url.split(/\s+/)
         const url = R.find((s) => s.startsWith('https://meet'), urlSplitted)
         if (url == null) {
-            throw JoinError.InvalidMeetingUrl
+            throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
         }
         return { meetingId: url, password: '' }
     }
@@ -186,7 +186,7 @@ export class MeetProvider implements MeetingProviderInterface {
             i += 1
         }
         if (!askToJoinClicked) {
-            throw JoinError.CannotJoinMeeting
+            throw new JoinError(JoinErrorCode.CannotJoinMeeting)
         }
 
         await findShowEveryOne(page, false, cancelCheck)
@@ -293,10 +293,10 @@ async function findShowEveryOne(
         await screenshot(page, `findShowEveryone`)
         console.log({ showEveryOneFound })
         if (cancelCheck()) {
-            throw JoinError.TimeoutWaitingToStart
+            throw new JoinError(JoinErrorCode.TimeoutWaitingToStart)
         }
         if (await notAcceptedInMeeting(page)) {
-            throw JoinError.BotNotAccepted
+            throw new JoinError(JoinErrorCode.BotNotAccepted)
         }
         if (showEveryOneFound === false) {
             await sleep(1000)

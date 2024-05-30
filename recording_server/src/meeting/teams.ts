@@ -8,7 +8,7 @@ import {
 } from '../types'
 
 import { Page } from 'puppeteer'
-import { JoinError } from '../meeting'
+import { JoinError, JoinErrorCode } from '../meeting'
 import { screenshot } from '../puppeteer'
 import { sleep } from '../utils'
 
@@ -94,7 +94,7 @@ export class TeamsProvider implements MeetingProviderInterface {
         while (true) {
             const botNotAccepted = await isBotNotAccepted(page)
             if (botNotAccepted) {
-                throw JoinError.BotNotAccepted
+                throw new JoinError(JoinErrorCode.BotNotAccepted)
             }
             const clickSuccess = await clickWithInnerText(
                 page,
@@ -104,7 +104,7 @@ export class TeamsProvider implements MeetingProviderInterface {
                 false,
             )
             if (cancelCheck?.()) {
-                throw JoinError.TimeoutWaitingToStart
+                throw new JoinError(JoinErrorCode.TimeoutWaitingToStart)
             }
             if (clickSuccess) {
                 break
@@ -164,7 +164,7 @@ function parseMeetingUrlFromJoinInfos(joinInfo: string) {
         : null
 
     if (meetingUrl == null) {
-        throw JoinError.InvalidMeetingUrl
+        throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
     }
     return meetingUrl
 }
