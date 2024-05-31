@@ -13,7 +13,6 @@ import { parameters } from './state'
 
 export async function uploadEditorsTask(speakers: Speaker[]) {
     let intervals = timestampToInterval(speakers)
-    intervals.pop()
     const spokeSession = SESSION as SpokeSession
     if (intervals.length > spokeSession.completeEditors.length) {
         let interval = intervals[intervals.length - 1]
@@ -145,6 +144,7 @@ function timestampToInterval(speakers: Speaker[]): SpeakerInterval[] {
             speaker: speaker.name,
         }
     })
+    intervals.pop()
 
     return intervals
 }

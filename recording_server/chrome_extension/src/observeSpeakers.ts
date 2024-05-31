@@ -93,18 +93,16 @@ async function observeSpeakers() {
     }
     function refreshSpeaker(index: number) {
         console.log('timeout refresh speaker')
-        if (index < SPEAKERS.length) {
-            let lastSpeaker = SPEAKERS[index]
-            const now = Date.now() - PROVIDER.SPEAKER_LATENCY
-            const speakerDuration = now - lastSpeaker.timestamp
-            if (speakerDuration > 2000) {
-                chrome.runtime.sendMessage({
-                    type: 'REFRESH_SPEAKERS',
-                    payload: SPEAKERS.slice(0, index + 1),
-                })
-            } else {
-                console.log('speaker changed in the last 2 secs')
-            }
+        let lastSpeaker = index < SPEAKERS.length ? SPEAKERS[index] : undefined
+        const now = Date.now() - PROVIDER.SPEAKER_LATENCY
+        const speakerDuration = now - (lastSpeaker?.timestamp ?? 0)
+        if (speakerDuration > 2000) {
+            chrome.runtime.sendMessage({
+                type: 'REFRESH_SPEAKERS',
+                payload: SPEAKERS.slice(0, index + 1),
+            })
+        } else {
+            console.log('speaker changed in the last 2 secs')
         }
     }
 
@@ -121,66 +119,70 @@ async function observeSpeakers() {
                     mutation,
                 )
 
-                if (speakers.length > 0) {
-                    const previousSpeaker = SPEAKERS[SPEAKERS.length - 1]
-                    const speakersFiltered = R.filter(
-                        (u) =>
-                            u.name !== BOT_NAME &&
-                            u.name !== previousSpeaker.name,
-                        speakers,
-                    )
-                    const speaker = speakersFiltered[0]
+                const previousSpeaker =
+                    SPEAKERS.length > 0
+                        ? SPEAKERS[SPEAKERS.length - 1]
+                        : undefined
+                const speakersFiltered = R.filter(
+                    (u) =>
+                        u.name !== BOT_NAME && u.name !== previousSpeaker?.name,
+                    speakers,
+                )
+                const speaker = speakersFiltered[0]
 
-                    if (speaker) {
-                        const newSpeaker = {
-                            name: speaker.name,
-                            timestamp:
-                                speaker.timestamp - PROVIDER.SPEAKER_LATENCY,
-                        }
-                        const speakerDuration =
-                            newSpeaker.timestamp - previousSpeaker.timestamp
+                if (speaker) {
+                    const newSpeaker = {
+                        name: speaker.name,
+                        timestamp: speaker.timestamp - PROVIDER.SPEAKER_LATENCY,
+                    }
+                    const speakerDuration =
+                        newSpeaker.timestamp - (previousSpeaker?.timestamp ?? 0)
+                    if (
+                        MEETING_PROVIDER === 'Zoom' &&
+                        speakerDuration < PROVIDER.MIN_SPEAKER_DURATION
+                    ) {
+                        SPEAKERS[SPEAKERS.length - 1] = newSpeaker
                         if (
-                            MEETING_PROVIDER === 'Zoom' &&
-                            speakerDuration < PROVIDER.MIN_SPEAKER_DURATION
+                            SPEAKERS.length > 2 &&
+                            SPEAKERS[SPEAKERS.length - 2].name ===
+                                newSpeaker.name
                         ) {
-                            SPEAKERS[SPEAKERS.length - 1] = newSpeaker
-                            if (
-                                SPEAKERS.length > 2 &&
-                                SPEAKERS[SPEAKERS.length - 2].name ===
-                                    newSpeaker.name
-                            ) {
-                                SPEAKERS.pop()
-                            }
-                            setTimeout(
-                                () => refreshSpeaker(SPEAKERS.length - 1),
-                                PROVIDER.MIN_SPEAKER_DURATION + 500,
-                            )
-                        } else {
-                            if (MEETING_PROVIDER === 'Zoom') {
+                            SPEAKERS.pop()
+                        }
+                        setTimeout(
+                            () => refreshSpeaker(SPEAKERS.length - 1),
+                            PROVIDER.MIN_SPEAKER_DURATION + 500,
+                        )
+                    } else {
+                        if (MEETING_PROVIDER === 'Zoom') {
+                            chrome.runtime.sendMessage({
+                                type: 'REFRESH_SPEAKERS',
+                                payload: SPEAKERS,
+                            })
+
+                            SPEAKERS.push(newSpeaker)
+                            if (SPEAKERS.length === 1) {
                                 chrome.runtime.sendMessage({
                                     type: 'REFRESH_SPEAKERS',
                                     payload: SPEAKERS,
                                 })
-
-                                SPEAKERS.push(newSpeaker)
+                            } else {
                                 setTimeout(
                                     () => refreshSpeaker(SPEAKERS.length - 1),
                                     PROVIDER.MIN_SPEAKER_DURATION + 500,
                                 )
-                            } else {
-                                SPEAKERS.push(newSpeaker)
-                                chrome.runtime.sendMessage({
-                                    type: 'REFRESH_SPEAKERS',
-                                    payload: SPEAKERS,
-                                })
                             }
-                            console.log('speaker changed to: ', speaker)
+                        } else {
+                            SPEAKERS.push(newSpeaker)
+                            chrome.runtime.sendMessage({
+                                type: 'REFRESH_SPEAKERS',
+                                payload: SPEAKERS,
+                            })
                         }
-                    } else {
-                        console.log('no speaker change')
+                        console.log('speaker changed to: ', speaker)
                     }
                 } else {
-                    // console.log('bad ', { mutation })
+                    console.log('no speaker change')
                 }
             } catch (e) {
                 console.error('an exception occured in observeSpeaker', e)
@@ -189,58 +191,8 @@ async function observeSpeakers() {
         })
     })
     try {
-        // speaker-bar-container__video-frame speaker-bar-container__video-frame--active
-        // Starts listening for changes in the root HTML element of the page.
-        const speakers = R.filter(
-            (u) => u.name !== BOT_NAME,
-            PROVIDER.getSpeakerFromDocument(null, null),
-        )
-
-        const speaker = speakers[0]
-        if (speaker) {
-            SPEAKERS.push(speaker)
-            console.log(
-                '[ObserveSpeaker] inital speakers',
-                SPEAKERS[SPEAKERS.length - 1],
-            )
-            chrome.runtime.sendMessage({
-                type: 'REFRESH_SPEAKERS',
-                payload: SPEAKERS,
-            })
-        } else {
-            console.error('NO INITIAL SPEAKER, forcing to empty speaker')
-            SPEAKERS.push({ timestamp: Date.now(), name: `` })
-            chrome.runtime.sendMessage({
-                type: 'REFRESH_SPEAKERS',
-                payload: SPEAKERS,
-            })
-        }
-
         await PROVIDER.getSpeakerRootToObserve(mutationObserver)
-
-        // else {
-        //     console.error('no inital speaker', initialSpeaker)
-        //     SPEAKERS.push({ timestamp: Date.now(), name: `speaker 0` })
-        //     console.log('[ObserveSpeaker]', chrome.runtime)
-        //     chrome.runtime.sendMessage({ type: "REFRESH_SPEAKERS", payload: SPEAKERS });
-        // }
     } catch (e) {
         console.error('an exception occured startion observeSpeaker')
     }
 }
-
-// function getAllClasses() {
-//     var allClasses: string[] = [];
-
-//     var allElements = document.querySelectorAll('*');
-
-//     for (var i = 0; i < allElements.length; i++) {
-//         var classes = allElements[i].className.toString().split(/\s+/);
-//         for (var j = 0; j < classes.length; j++) {
-//             var cls = classes[j];
-//             if (cls && allClasses.indexOf(cls) === -1)
-//                 allClasses.push(cls);
-//         }
-//     }
-//     return allClasses
-// }
