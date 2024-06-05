@@ -47,144 +47,29 @@ export class MeetProvider implements MeetingProviderInterface {
         await page.goto(link, { waitUntil: 'networkidle2' })
         return page
     }
+
     async joinMeeting(
         page: puppeteer.Page,
         cancelCheck: () => boolean,
         meetingParams: MeetingParams,
     ): Promise<void> {
-        console.log('joining meeting')
-
-        try {
-            await page.$$eval('div[role=button]', (elems) => {
-                for (const e of elems) {
-                    let elem = e as any
-                    if (elem.innerText === 'Dismiss') {
-                        elem.click()
-                    }
-                }
-            })
-        } catch (e) {
-            console.error('[joinMeeting] meet find dismiss', e)
-        }
-        console.log('after click dismiss:')
+        await clickDismiss(page)
         await sleep(300)
 
-        let i = 0
-        let useWithoutAccountClicked = false
-        while (!useWithoutAccountClicked && i < 5) {
-            try {
-                useWithoutAccountClicked = await page.$$eval(
-                    'span',
-                    (elems) => {
-                        for (const e of elems) {
-                            let elem = e as any
-                            if (elem.innerText === 'Use without an account') {
-                                elem.click()
-                                return true
-                            }
-                        }
-                        return false
-                    },
-                )
-            } catch (e) {
-                console.error('exeption in use without an account')
-            }
-            await sleep(100)
-            console.log('Use without an account:', { useWithoutAccountClicked })
-            i += 1
-        }
-        const MuteMicrophone = async () => {
-            try {
-                await page.evaluate(() => {
-                    const tryClickMicrophone = () => {
-                        const microphoneButtons = Array.from(
-                            document.querySelectorAll('div'),
-                        ).filter(
-                            (el) =>
-                                el.getAttribute('aria-label') &&
-                                el
-                                    .getAttribute('aria-label')
-                                    .includes('Turn off microphone'),
-                        )
-
-                        if (microphoneButtons.length > 0) {
-                            microphoneButtons.forEach((button) =>
-                                button.click(),
-                            )
-                            console.log(
-                                `${microphoneButtons.length} microphone button(s) turned off.`,
-                            )
-                        } else {
-                            console.log(
-                                'No microphone button found. Retrying...',
-                            )
-                            setTimeout(tryClickMicrophone, 1000)
-                        }
-                    }
-
-                    tryClickMicrophone()
-                })
-            } catch (e) {
-                console.error(
-                    'Error when trying to turn off the microphone:',
-                    e,
-                )
-            }
-        }
-
-        const typeBotName = async () => {
-            const INPUT = 'input[type=text]'
-            const GOT_IT = 'button[aria-label="Got it"]'
-
-            // This triggers:
-            // - The "Ask to join" button (good, must be non empty to be clickable)
-            // - the "Sign in with your Google Account" popup (bad, defocuses the input while typing)
-            await page.focus(INPUT)
-            await page.keyboard.type(meetingParams.bot_name || 'Bot')
-
-            // Wait for the "Got it" button to appear (probably appeared when typing)
-            const foundGotIt = await (async () => {
-                try {
-                    await page.waitForSelector(GOT_IT, { timeout: 1000 })
-                    return true
-                } catch (e) {
-                    return false
-                }
-            })()
-            console.log('Found "Got it" button?', foundGotIt)
-
-            // Now it is safe to type the bot name, resetting the input first (it's garbage)
-            await page.$$eval(INPUT, (elems) => {
-                for (const elem of elems) {
-                    ;(elem as any).value = ''
-                }
-            })
-            await page.focus(INPUT)
-            await page.keyboard.type(meetingParams.bot_name)
-        }
-
+        console.log(
+            'useWithoutAccountClicked:',
+            await clickWithInnerText(page, 'span', 'Use without an account', 5),
+        )
         await screenshot(page, `before_typing_bot_name`)
-        await typeBotName()
+        await typeBotName(page, meetingParams.bot_name)
         await screenshot(page, `after_typing_bot_name`)
-        await MuteMicrophone()
-        let askToJoinClicked = false
-        i = 0
-        while (!askToJoinClicked && i < 10) {
-            askToJoinClicked = await page.$$eval('span', (elems) => {
-                for (const e of elems) {
-                    let elem = e as any
-                    if (elem.innerText === 'Ask to join') {
-                        elem.click()
-                        return true
-                    }
-                }
-                return false
-            })
-
-            await sleep(100)
-            console.log('ask to join clicked:', { askToJoinClicked })
-            i += 1
-        }
+        await MuteMicrophone(page)
+        const askToJoinClicked = await clickWithInnerText(
+            page,
+            'span',
+            'Ask to join',
+            10,
+        )
         if (!askToJoinClicked) {
             throw new JoinError(JoinErrorCode.CannotJoinMeeting)
         }
@@ -199,55 +84,12 @@ export class MeetProvider implements MeetingProviderInterface {
                 await sendEntryMessage(page, meetingParams.enter_message),
             )
             await sleep(100)
-        } else {
-            console.log('No entry message provided.')
         }
 
-        try {
-            await page.$$eval('i', (elems) => {
-                for (const e of elems) {
-                    let elem = e as any
-                    if (elem.innerText === 'more_vert') {
-                        elem.click()
-                    }
-                }
-            })
-            await sleep(100)
-            console.log('found more vert')
-            await page.$$eval('span', (elems) => {
-                for (const e of elems) {
-                    let elem = e as any
-                    if (elem.innerText === 'Change layout') {
-                        elem.click()
-                    }
-                }
-            })
-            await sleep(500)
-            console.log('found change layout')
-            const spotlightFound = await page.$$eval('span', (elems) => {
-                for (const e of elems) {
-                    let elem = e as any
-                    console.log(elem.innerText)
-                    if (elem.innerText === 'Spotlight') {
-                        elem.parentElement.click()
-                        return true
-                    }
-                }
-                return false
-            })
-            await sleep(500)
-            console.log('found spotlight', { spotlightFound })
-            await page.mouse.click(10, 10)
-            await sleep(10)
-            await page.mouse.click(10, 10)
-            await sleep(10)
-            await page.mouse.click(10, 10)
-        } catch (e) {}
-        await sleep(500)
+        await changeLayout(page)
         await findShowEveryOne(page, true, cancelCheck)
-
-        console.log('after join meeting')
     }
+
     async findEndMeeting(
         _meetingParams: MeetingParams,
         page: Page,
@@ -475,4 +317,150 @@ async function findEndMeeting(
         console.error('error happened in count partiicpants', e)
     }
     return false
+}
+
+async function clickDismiss(page: Page): Promise<boolean> {
+    try {
+        return await page.$$eval('div[role=button]', (elems) => {
+            for (const e of elems) {
+                let elem = e as any
+                if (elem.innerText === 'Dismiss') {
+                    elem.click()
+                    return true
+                }
+            }
+            return false
+        })
+    } catch (e) {
+        console.error('[joinMeeting] meet find dismiss', e)
+        return false
+    }
+}
+
+export async function clickWithInnerText(
+    page: puppeteer.Page,
+    htmlType: string,
+    innerText: string,
+    iterations: number,
+    clickParent: boolean = false,
+): Promise<boolean> {
+    let i = 0
+    let buttonClicked = false
+
+    while (!buttonClicked && i < iterations) {
+        try {
+            buttonClicked = await page.$$eval(
+                htmlType,
+                (elems, innerText, clickParent) => {
+                    let buttonClicked = false
+                    for (const e of elems) {
+                        let elem = e as any
+                        if (elem.innerText === innerText) {
+                            buttonClicked = true
+                            if (clickParent) {
+                                elem.parentElement.click()
+                            } else {
+                                elem.click()
+                            }
+                        }
+                    }
+                    return buttonClicked
+                },
+                innerText,
+                clickParent,
+            )
+        } catch (e) {
+            console.error('exeption in use without an account')
+        }
+        await sleep(100)
+        i += 1
+    }
+    return buttonClicked
+}
+
+async function changeLayout(page: Page) {
+    try {
+        console.log(
+            'more vert clicked: ',
+            await clickWithInnerText(page, 'i', 'more_vert', 10),
+        )
+        console.log(
+            'span change layout clicked: ',
+            await clickWithInnerText(page, 'span', 'Change layout', 10),
+        )
+        console.log(
+            'spotlight clicked: ',
+            await clickWithInnerText(page, 'span', 'Spotlight', 10, true),
+        )
+        // click outside the modal to close it
+        await sleep(500)
+        await page.mouse.click(10, 10)
+        await sleep(10)
+        await page.mouse.click(10, 10)
+        await sleep(10)
+        await page.mouse.click(10, 10)
+    } catch (e) {}
+}
+
+async function typeBotName(page: Page, botName: string) {
+    const INPUT = 'input[type=text]'
+    const GOT_IT = 'button[aria-label="Got it"]'
+
+    // This triggers:
+    // - The "Ask to join" button (good, must be non empty to be clickable)
+    // - the "Sign in with your Google Account" popup (bad, defocuses the input while typing)
+    await page.focus(INPUT)
+    await page.keyboard.type(botName || 'Bot')
+
+    // Wait for the "Got it" button to appear (probably appeared when typing)
+    const foundGotIt = await (async () => {
+        try {
+            await page.waitForSelector(GOT_IT, { timeout: 1000 })
+            return true
+        } catch (e) {
+            return false
+        }
+    })()
+    console.log('Found "Got it" button?', foundGotIt)
+
+    // Now it is safe to type the bot name, resetting the input first (it's garbage)
+    await page.$$eval(INPUT, (elems) => {
+        for (const elem of elems) {
+            ;(elem as any).value = ''
+        }
+    })
+    await page.focus(INPUT)
+    await page.keyboard.type(botName)
+}
+
+async function MuteMicrophone(page: Page) {
+    try {
+        await page.evaluate(() => {
+            const tryClickMicrophone = () => {
+                const microphoneButtons = Array.from(
+                    document.querySelectorAll('div'),
+                ).filter(
+                    (el) =>
+                        el.getAttribute('aria-label') &&
+                        el
+                            .getAttribute('aria-label')
+                            .includes('Turn off microphone'),
+                )
+
+                if (microphoneButtons.length > 0) {
+                    microphoneButtons.forEach((button) => button.click())
+                    console.log(
+                        `${microphoneButtons.length} microphone button(s) turned off.`,
+                    )
+                } else {
+                    console.log('No microphone button found. Retrying...')
+                    setTimeout(tryClickMicrophone, 1000)
+                }
+            }
+
+            tryClickMicrophone()
+        })
+    } catch (e) {
+        console.error('Error when trying to turn off the microphone:', e)
+    }
 }
