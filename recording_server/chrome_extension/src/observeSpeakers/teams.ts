@@ -58,31 +58,39 @@ export async function getSpeakerRootToObserve(
 
 export function getSpeakerFromDocument(
     currentSpeaker: string | null,
-    mutation,
+    mutation: MutationRecord | null,
 ): Speaker[] {
+    let targetElements
     if (
         mutation != null &&
         mutation.type === 'attributes' &&
         mutation.attributeName === 'class'
     ) {
-        const targetElement = mutation.target
-        const parentDiv = targetElement.parentElement
-        const beforeElementStyles = window.getComputedStyle(
-            targetElement as Element,
-            '::before',
+        targetElements = [mutation.target]
+    } else {
+        var documentInIframe = getDocumentRoot()!
+        targetElements = Array.from(
+            documentInIframe.querySelectorAll(
+                '[data-tid="voice-level-stream-outline"]',
+            ),
         )
-        const currentBorderColor =
-            beforeElementStyles.getPropertyValue('border-color')
-        const spans: any = Array.from(parentDiv?.querySelectorAll('span'))
-        // console.log('spans', spans)
-        const span = spans.find((span) => span.textContent.length > 1)
-        // console.log('span', span)
-        const speaker = span?.textContent
-        // Vérifier si la couleur de la bordure est rgb(127, 133, 245)
+    }
+    for (const targetElement of targetElements) {
         if (
             (targetElement as Element).getAttribute('data-tid') ===
             'voice-level-stream-outline'
         ) {
+            const beforeElementStyles = window.getComputedStyle(
+                targetElement as Element,
+                '::before',
+            )
+            const parentDiv = targetElement.parentElement
+            const currentBorderColor =
+                beforeElementStyles.getPropertyValue('border-color')
+            const spans: any = Array.from(parentDiv?.querySelectorAll('span'))
+            const span = spans.find((span) => span.textContent.length > 1)
+            const speaker = span?.textContent
+            // Vérifier si la couleur de la bordure est rgb(127, 133, 245)
             if (
                 currentBorderColor.trim() === 'rgb(127, 133, 245)' ||
                 currentBorderColor.trim() === 'rgb(91, 95, 199)'
@@ -97,7 +105,7 @@ export function getSpeakerFromDocument(
                 if (span != null && speaker != null && speaker.trim() !== '') {
                     span.parentElement.style.opacity = '0'
                     removeShityHtml()
-                    return []
+                    continue
                 }
             }
         }

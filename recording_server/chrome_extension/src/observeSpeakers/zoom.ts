@@ -66,7 +66,7 @@ export async function getSpeakerRootToObserve(
 
 export function getSpeakerFromDocument(
     currentSpeaker: string | null,
-    mutation,
+    mutation: MutationRecord | null,
 ): Speaker[] {
     const speaker =
         getAvatarAndSpeaker(

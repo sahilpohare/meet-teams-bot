@@ -185,7 +185,7 @@ let speakerCounts = new Map()
 
 export function getSpeakerFromDocument(
     currentSpeaker: string | null,
-    mutation,
+    mutation: MutationRecord | null,
 ): Speaker[] {
     const speaker = getSpeakerFromMutation(mutation)
     // chrome.runtime.sendMessage({
@@ -232,12 +232,14 @@ export function getSpeakerFromDocument(
     return []
 }
 
-export function getSpeakerFromMutation(mutation): string | null {
+export function getSpeakerFromMutation(
+    mutation: MutationRecord | null,
+): string | null {
     if (mutation == null) {
         return null
     }
     try {
-        const target = mutation.target
+        const target = mutation.target as Element
         let color = getComputedStyle(target).backgroundColor
         if (color !== 'rgba(26, 115, 232, 0.9)') {
             return null
@@ -252,18 +254,18 @@ export function getSpeakerFromMutation(mutation): string | null {
             return null
         }
         let speakers: string[] = []
-        const divButton = target.parentElement.parentElement.parentElement
+        const divButton = target.parentElement!.parentElement!.parentElement
         // console.log({ divButton })
         if (divButton && divButton.nodeName === 'BUTTON') {
             const divSpeaker =
-                divButton.parentElement.parentElement.parentElement
-                    .parentElement.parentElement.parentElement
+                divButton!.parentElement!.parentElement!.parentElement!
+                    .parentElement!.parentElement!.parentElement
             const speakerName = divSpeaker && findSpeakerName(divSpeaker)
             if (speakerName) {
                 return speakerName
             } else {
                 const divSpeaker =
-                    divButton.parentElement.parentElement.parentElement
+                    divButton!.parentElement!.parentElement!.parentElement!
                         .parentElement
                 const speakerName = divSpeaker && findSpeakerName(divSpeaker)
                 if (speakerName) {
@@ -281,7 +283,7 @@ export function getSpeakerFromMutation(mutation): string | null {
             }
         } else {
             const divSpeaker =
-                mutation.target.parentElement.parentElement.parentElement
+                target!.parentElement!.parentElement!.parentElement!
                     .parentElement
             if (divSpeaker) {
                 const speakerName = findSpeakerName(divSpeaker)

@@ -1,12 +1,12 @@
-import * as State from './state'
 import * as record from './record'
+import * as State from './state'
 
 import { Project, api, setConfig } from './spoke_api_js'
 
-import { Transcriber } from './Transcribe/Transcriber'
 import axios from 'axios'
-import { sleep } from './utils'
+import { Transcriber } from './Transcribe/Transcriber'
 import { uploadEditorsTask } from './uploadEditors'
+import { sleep } from './utils'
 
 type Speaker = {
     name: string
@@ -81,6 +81,7 @@ function addListener() {
             }
             case 'LOG': {
                 console.log(request.payload)
+                break
             }
             case 'OBSERVE_SPEAKERS': {
                 observeSpeakers()

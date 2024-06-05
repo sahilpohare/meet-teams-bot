@@ -191,6 +191,39 @@ async function observeSpeakers() {
         })
     })
     try {
+        const speakers = R.filter(
+            (u) => u.name !== BOT_NAME,
+            PROVIDER.getSpeakerFromDocument(null, null),
+        )
+
+        const speaker = speakers[0]
+        if (speaker) {
+            SPEAKERS.push(speaker)
+
+            chrome.runtime.sendMessage({
+                type: 'LOG',
+                payload: `[ObserveSpeaker] inital speakers ${
+                    SPEAKERS[SPEAKERS.length - 1].name
+                }
+                ${SPEAKERS[SPEAKERS.length - 1].timestamp}
+                `,
+            })
+            chrome.runtime.sendMessage({
+                type: 'REFRESH_SPEAKERS',
+                payload: SPEAKERS,
+            })
+        } else {
+            // chrome.runtime.sendMessage({
+            //     type: 'LOG',
+            //     payload: 'NO INITIAL SPEAKER, forcing to empty speaker',
+            // })
+            // SPEAKERS.push({ timestamp: Date.now(), name: `-` })
+            // chrome.runtime.sendMessage({
+            //     type: 'REFRESH_SPEAKERS',
+            //     payload: SPEAKERS,
+            // })
+        }
+
         await PROVIDER.getSpeakerRootToObserve(mutationObserver)
     } catch (e) {
         console.error('an exception occured startion observeSpeaker')
