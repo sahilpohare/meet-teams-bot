@@ -533,11 +533,13 @@ async function checkPageForText(
 }
 
 async function isRemovedFromTheMeeting(page: Page): Promise<boolean> {
-    return checkPageForText(
-        page,
-        "You've been removed from this meeting",
-        'Bot removed:',
-    )
+    // if no leave button, then the bot has been removed from the meeting
+    if (!(await clickWithInnerText(page, 'button', 'Leave', 4, false))) {
+        console.log('no leave button found, Bot removed from the meeting')
+        return true
+    } else {
+        return false
+    }
 }
 
 async function isBotNotAccepted(page: Page): Promise<boolean> {
