@@ -8,7 +8,7 @@ import {
     delSessionInRedis,
     terminateInstance,
 } from './instance'
-import { MeetingHandle } from './meeting'
+import { JoinError, JoinErrorCode, MeetingHandle } from './meeting'
 import { getCachedExtensionId, getExtensionId, openBrowser } from './puppeteer'
 import { Consumer } from './rabbitmq'
 import { LOGGER, clientRedis, server } from './server'
@@ -30,12 +30,14 @@ console.log('version 2.0')
             LOGGER.error(`Failed to trigger cache: ${e}`)
         }
 
+        // TODO: what to do if we cant connect to redis
         try {
             await clientRedis.connect()
         } catch (e) {
             console.error('fail to connect to redis: ', e)
         }
 
+        // TODO: what to do if we cant instanciate express server
         await server()
         console.log('after server started')
 
@@ -80,21 +82,27 @@ console.log('version 2.0')
     }
 })()
 
-async function handleErrorInStartRecording(e: any, data: MeetingParams) {
+async function handleErrorInStartRecording(error: Error, data: MeetingParams) {
+    if (error instanceof JoinError) {
+        console.error('a join error occured while starting recording', error)
+    } else {
+        console.error(
+            'an internal error occured while starting recording',
+            error,
+        )
+    }
     try {
         await notifyApp(
             'Error',
             data,
-            { error: JSON.stringify(e) },
-            { error: JSON.stringify(e) },
+            { error: JSON.stringify(error) },
+            { error: JSON.stringify(error) },
         )
         await meetingBotStartRecordFailed(
             data.meeting_url,
             data.event?.id,
             data.bot_id,
-            MeetingHandle.getError()
-                ? JSON.stringify(MeetingHandle.getError())
-                : 'no error found',
+            error instanceof JoinError ? error.message : JoinErrorCode.Internal,
         )
     } catch (e) {
         console.error(
@@ -102,6 +110,10 @@ async function handleErrorInStartRecording(e: any, data: MeetingParams) {
             e,
         )
     }
+}
+
+function isString(value) {
+    return typeof value === 'string' || value instanceof String
 }
 
 export async function meetingBotStartRecordFailed(

@@ -26,10 +26,25 @@ import { TeamsProvider } from './meeting/teams'
 import { ZoomProvider } from './meeting/zoom'
 import { sleep } from './utils'
 
+export class JoinError extends Error {
+    constructor(code: JoinErrorCode) {
+        super(code)
+        this.name = 'JoinError'
+    }
+}
+
+export enum JoinErrorCode {
+    CannotJoinMeeting = 'CannotJoinMeeting',
+    BotNotAccepted = 'BotNotAccepted',
+    TimeoutWaitingToStart = 'TimeoutWaitingToStart',
+    Internal = 'InternalError',
+    InvalidMeetingUrl = 'InvalidMeetingUrl',
+}
+
 export class Status {
     state: MeetingStatus
     error: any | null
-    project: { id: number } | null
+    project: { id: number; share_link?: string } | null
     constructor() {
         this.state = 'Recording'
         this.error = null
@@ -192,18 +207,15 @@ export class MeetingHandle {
             await Events.inCallRecording()
 
             if (project == null) {
-                throw 'failed creating project'
+                throw new JoinError(JoinErrorCode.Internal)
             }
 
             MeetingHandle.status.project = project
             return project
-        } catch (e) {
-            console.error('an error occured while starting recording', e)
-            console.error('setting current_meeting error')
-            MeetingHandle.status.error = e
-            console.error('after set current meeting error')
+        } catch (error) {
             await this.cleanEverything(true)
-            throw e
+            MeetingHandle.status.error = error
+            throw error
         }
     }
 
@@ -212,7 +224,9 @@ export class MeetingHandle {
             await uploadLog(
                 this.param.user_id,
                 this.param.email,
+                this.param.bot_id,
                 MeetingHandle.status.project?.id,
+                MeetingHandle.status.project?.share_link,
             )
         } catch (e) {
             this.logger.error(`failed to upload logs: ${e}`)
@@ -394,7 +408,9 @@ export class MeetingHandle {
                 await uploadLog(
                     this.param.user_id,
                     this.param.email,
+                    this.param.bot_id,
                     MeetingHandle.status.project?.id,
+                    MeetingHandle.status.project?.share_link,
                 )
             } catch (e) {
                 console.error(e)

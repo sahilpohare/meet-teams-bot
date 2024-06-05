@@ -8,24 +8,20 @@ import {
 } from '../types'
 
 import { Page } from 'puppeteer'
+import { JoinError, JoinErrorCode } from '../meeting'
 import { screenshot } from '../puppeteer'
 import { sleep } from '../utils'
 
 export class MeetProvider implements MeetingProviderInterface {
     constructor() {}
     async parseMeetingUrl(browser: puppeteer.Browser, meeting_url: string) {
-        // try parsing this liinks
-        // To join the video meeting, click this link: https://meet.google.com/zdg-teai-fhz
-        // Otherwise, to join by phone, dial +33 1 87 40 48 44 and enter this PIN: 983 713 164#
-        // To view more phone numbers, click this link: https://tel.meet/zdg-teai-fhz?hs=5
-
         if (meeting_url.startsWith('meet')) {
             meeting_url = `https://${meeting_url}`
         }
         const urlSplitted = meeting_url.split(/\s+/)
         const url = R.find((s) => s.startsWith('https://meet'), urlSplitted)
         if (url == null) {
-            throw 'bad meeting url'
+            throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
         }
         return { meetingId: url, password: '' }
     }
@@ -190,7 +186,7 @@ export class MeetProvider implements MeetingProviderInterface {
             i += 1
         }
         if (!askToJoinClicked) {
-            throw "Error bot can't join"
+            throw new JoinError(JoinErrorCode.CannotJoinMeeting)
         }
 
         await findShowEveryOne(page, false, cancelCheck)
@@ -297,11 +293,10 @@ async function findShowEveryOne(
         await screenshot(page, `findShowEveryone`)
         console.log({ showEveryOneFound })
         if (cancelCheck()) {
-            throw 'timeout waiting for meeting to start'
+            throw new JoinError(JoinErrorCode.TimeoutWaitingToStart)
         }
         if (await notAcceptedInMeeting(page)) {
-            console.log('notAcceptedInMeeting')
-            throw 'bot not accepted in meeting'
+            throw new JoinError(JoinErrorCode.BotNotAccepted)
         }
         if (showEveryOneFound === false) {
             await sleep(1000)

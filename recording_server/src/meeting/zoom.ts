@@ -1,6 +1,7 @@
 import * as puppeteer from 'puppeteer'
 import { Page } from 'puppeteer'
 import { URL } from 'url'
+import { JoinError, JoinErrorCode } from '../meeting'
 import { screenshot } from '../puppeteer'
 import {
     CancellationToken,
@@ -23,14 +24,14 @@ export class ZoomProvider implements MeetingProviderInterface {
                 return { meetingId, password }
             } catch (e) {
                 console.error('[parseMeetingUrl] parse meeting url', e)
-                throw 'invalid meeting url'
+                throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
             }
         }
         try {
             try {
                 const { meetingId, password } = parse(meeting_url)
                 if (!(/^\d+$/.test(meetingId) || meetingId === '')) {
-                    throw 'invalid meetingId'
+                    throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
                 }
                 return { meetingId, password }
             } catch (e) {
@@ -50,12 +51,12 @@ export class ZoomProvider implements MeetingProviderInterface {
                     // https://ghlsuccess.com/zoom
                 } catch (e) {
                     console.error('error goto page: ', e)
-                    throw 'invalid meeting url'
+                    throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
                 }
             }
         } catch (e) {
             console.error('[parseMeetingUrl] invalid meeting url', e)
-            throw 'invalid meeting url'
+            throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
         }
     }
     getMeetingLink(
@@ -91,7 +92,7 @@ export class ZoomProvider implements MeetingProviderInterface {
 
         while (true) {
             if (cancelCheck()) {
-                throw 'timeout waiting for meeting to stat'
+                throw new JoinError(JoinErrorCode.TimeoutWaitingToStart)
             }
             // meeting didnt start
             await bypass_modal(page)
@@ -285,7 +286,7 @@ async function joinAudio(page: puppeteer.Page) {
         }
     }
     if (audioButtonClicked) {
-        throw 'cant join audio'
+        throw new JoinError(JoinErrorCode.CannotJoinMeeting)
     } else {
         return false
     }

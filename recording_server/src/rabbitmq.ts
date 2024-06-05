@@ -57,6 +57,7 @@ export class Consumer {
             this.channel
                 .consume(Consumer.QUEUE_NAME, async (message) => {
                     if (message !== null) {
+                        // configure rabbit increase timeout or timeout max < rabbitmq message timeout
                         await this.channel.cancel(message.fields.consumerTag)
 
                         const meetingParams = JSON.parse(
@@ -108,7 +109,11 @@ export class Consumer {
         let logger = LOGGER.new({})
 
         // Prevent instance for beeing scaled down
-        await setProtection(true)
+        try {
+            await setProtection(true)
+        } catch (e) {
+            console.error('fail to set protection', e)
+        }
         if (LOCK_INSTANCE_AT_STARTUP) {
             try {
                 await notifyApp('PrepareRecording', data, {}, {})
