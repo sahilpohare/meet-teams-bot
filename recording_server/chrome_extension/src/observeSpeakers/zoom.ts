@@ -1,58 +1,12 @@
-import { Speaker } from '../observeSpeakers'
+import { RecordingMode, Speaker } from '../observeSpeakers'
 
 export const MIN_SPEAKER_DURATION = 1000
 export const SPEAKER_LATENCY = 500
 
 export async function getSpeakerRootToObserve(
     mutationObserver: MutationObserver,
+    recordingMode: RecordingMode,
 ): Promise<void> {
-    try {
-        const div = document.getElementsByClassName(
-            'speaker-bar-container__horizontal-view-wrap',
-        )[0] as any
-        div.style.opacity = 0
-    } catch (e) {}
-    // try {
-    //     const divView0 = (document.getElementsByClassName('multi-view')[0].children[0] as any).style.height = '126vh'
-    // } catch (e) {
-    // }
-    // try {
-    //     const divView1 = (document.getElementsByClassName('multi-view')[0].children[0] as any).style.width = '146vw'
-    // } catch (e) {
-    // }
-    // try {
-    //     const divView2 = (document.getElementsByClassName('multi-view')[0].children[0] as any).style.left = '-23vw'
-    // } catch (e) {
-    // }
-    // try {
-    //     const divView3 = (document.getElementsByClassName('multi-view')[0].children[0] as any).style.top = '-26vh'
-    // } catch (e) {
-    // }
-    try {
-        const divView4 = ((
-            document.getElementsByClassName('multi-view')[0].children[0] as any
-        ).style.zIndex = '21')
-    } catch (e) {}
-    try {
-        let meetingInfo = document.getElementsByClassName(
-            'meeting-info-container',
-        )
-        meetingInfo[0].remove()
-    } catch (e) {}
-    try {
-        let notif = document.getElementsByClassName(
-            'notification-message-feature-wrap',
-        )
-        notif[0].remove()
-    } catch (e) {}
-    try {
-        let footerInner = document.getElementsByClassName('footer__inner')
-        footerInner[0].remove()
-    } catch (e) {}
-    try {
-        let fullScreenIcon = document.getElementsByClassName('full-screen-icon')
-        fullScreenIcon[0].remove()
-    } catch (e) {}
     const root = document.querySelector('body')!
     mutationObserver.observe(root, {
         attributes: true,
@@ -67,6 +21,7 @@ export async function getSpeakerRootToObserve(
 export function getSpeakerFromDocument(
     currentSpeaker: string | null,
     mutation: MutationRecord | null,
+    recordingMode: RecordingMode,
 ): Speaker[] {
     const speaker =
         getAvatarAndSpeaker(
@@ -172,7 +127,7 @@ function getSpakerNameFromAvatarDiv(target): string | undefined {
 //     return undefined
 // }
 
-export function removeShityHtml() {
+export function removeShityHtml(mode: RecordingMode) {
     try {
         let notif = document.getElementsByClassName(
             'notification-message-feature-wrap',
@@ -265,4 +220,54 @@ export function removeShityHtml() {
 
 export function findAllAttendees(): string[] {
     return []
+}
+
+export async function removeInitialShityHtml(mode: RecordingMode) {
+    try {
+        const div = document.getElementsByClassName(
+            'speaker-bar-container__horizontal-view-wrap',
+        )[0] as any
+        div.style.opacity = 0
+    } catch (e) {}
+    // try {
+    //     const divView0 = (document.getElementsByClassName('multi-view')[0].children[0] as any).style.height = '126vh'
+    // } catch (e) {
+    // }
+    // try {
+    //     const divView1 = (document.getElementsByClassName('multi-view')[0].children[0] as any).style.width = '146vw'
+    // } catch (e) {
+    // }
+    // try {
+    //     const divView2 = (document.getElementsByClassName('multi-view')[0].children[0] as any).style.left = '-23vw'
+    // } catch (e) {
+    // }
+    // try {
+    //     const divView3 = (document.getElementsByClassName('multi-view')[0].children[0] as any).style.top = '-26vh'
+    // } catch (e) {
+    // }
+    try {
+        const divView4 = ((
+            document.getElementsByClassName('multi-view')[0].children[0] as any
+        ).style.zIndex = '21')
+    } catch (e) {}
+    try {
+        let meetingInfo = document.getElementsByClassName(
+            'meeting-info-container',
+        )
+        meetingInfo[0].remove()
+    } catch (e) {}
+    try {
+        let notif = document.getElementsByClassName(
+            'notification-message-feature-wrap',
+        )
+        notif[0].remove()
+    } catch (e) {}
+    try {
+        let footerInner = document.getElementsByClassName('footer__inner')
+        footerInner[0].remove()
+    } catch (e) {}
+    try {
+        let fullScreenIcon = document.getElementsByClassName('full-screen-icon')
+        fullScreenIcon[0].remove()
+    } catch (e) {}
 }

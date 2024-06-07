@@ -1,4 +1,4 @@
-import { Speaker } from '../observeSpeakers'
+import { RecordingMode, Speaker } from '../observeSpeakers'
 import { sleep } from '../utils'
 
 export const MIN_SPEAKER_DURATION = 0
@@ -6,39 +6,8 @@ export const SPEAKER_LATENCY = 900
 
 export async function getSpeakerRootToObserve(
     mutationObserver: MutationObserver,
+    recordingMode: RecordingMode,
 ): Promise<void> {
-    await sleep(1000)
-    try {
-        var documentInIframe = getDocumentRoot()!
-        let meetingControls = documentInIframe!.querySelectorAll(
-            `div[data-tid="app-layout-area--header"]`,
-        )
-
-        if (meetingControls[0] && meetingControls[0] instanceof HTMLElement) {
-            meetingControls[0].style.opacity = '0'
-        }
-    } catch (e) {
-        console.error('fail to remove buttons header', e)
-    }
-    try {
-        var documentInIframe = getDocumentRoot()!
-        const style = documentInIframe.createElement('style')
-        documentInIframe.head.appendChild(style)
-        const sheet = style.sheet
-
-        // Add the CSS rule for the ::before pseudo-element
-        sheet?.insertRule(
-            `
-              [data-tid="voice-level-stream-outline"]::before {
-                border: 0px solid rgb(127, 133, 245);
-              }
-            `,
-            sheet.cssRules.length,
-        )
-    } catch (e) {
-        console.error('error in insert before style', e)
-    }
-
     try {
         var documentInIframe = getDocumentRoot()!
         const config = {
@@ -59,6 +28,7 @@ export async function getSpeakerRootToObserve(
 export function getSpeakerFromDocument(
     currentSpeaker: string | null,
     mutation: MutationRecord | null,
+    recordingMode: RecordingMode,
 ): Speaker[] {
     let targetElements
     if (
@@ -98,13 +68,13 @@ export function getSpeakerFromDocument(
                 console.log('[teams observe speaker]', targetElement)
                 if (span != null && speaker != null && speaker.trim() !== '') {
                     span.parentElement.style.opacity = '0'
-                    removeShityHtml()
+                    removeShityHtml(recordingMode)
                     return [{ name: speaker, timestamp: Date.now() }]
                 }
             } else {
                 if (span != null && speaker != null && speaker.trim() !== '') {
                     span.parentElement.style.opacity = '0'
-                    removeShityHtml()
+                    removeShityHtml(recordingMode)
                     continue
                 }
             }
@@ -121,7 +91,7 @@ function getDocumentRoot() {
         : document
 }
 
-export function removeShityHtml() {
+export function removeShityHtml(mode: RecordingMode) {
     try {
         var documentInIframe = getDocumentRoot()!
         var menus = documentInIframe.querySelectorAll('[role="menu"]')
@@ -143,4 +113,38 @@ export function removeShityHtml() {
 
 export function findAllAttendees(): string[] {
     return []
+}
+
+export async function removeInitialShityHtml(mode: RecordingMode) {
+    await sleep(1000)
+    try {
+        var documentInIframe = getDocumentRoot()!
+        let meetingControls = documentInIframe!.querySelectorAll(
+            `div[data-tid="app-layout-area--header"]`,
+        )
+
+        if (meetingControls[0] && meetingControls[0] instanceof HTMLElement) {
+            meetingControls[0].style.opacity = '0'
+        }
+    } catch (e) {
+        console.error('fail to remove buttons header', e)
+    }
+    try {
+        var documentInIframe = getDocumentRoot()!
+        const style = documentInIframe.createElement('style')
+        documentInIframe.head.appendChild(style)
+        const sheet = style.sheet
+
+        // Add the CSS rule for the ::before pseudo-element
+        sheet?.insertRule(
+            `
+              [data-tid="voice-level-stream-outline"]::before {
+                border: 0px solid rgb(127, 133, 245);
+              }
+            `,
+            sheet.cssRules.length,
+        )
+    } catch (e) {
+        console.error('error in insert before style', e)
+    }
 }

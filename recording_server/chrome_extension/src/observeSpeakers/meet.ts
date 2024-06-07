@@ -1,140 +1,92 @@
-import { Speaker } from '../observeSpeakers'
+import { RecordingMode, Speaker } from '../observeSpeakers'
 import { sleep } from '../utils'
 export const MIN_SPEAKER_DURATION = 200
 export const SPEAKER_LATENCY = 500
 
 export async function getSpeakerRootToObserve(
     mutationObserver: MutationObserver,
+    recordingMode: RecordingMode,
 ) {
     let root: any = null
 
-    let div
-    try {
-        for (div of document.getElementsByTagName('div')) {
-            div.clientHeight === 132 && (div.clientWidth === 235 || 234)
-                ? (div.style.display = 'none')
-                : console.error('fail')
-        }
-    } catch (e) {}
-    try {
-        for (div of document.getElementsByTagName('div')) {
-            div.clientWidth === 360 && div.clientHeight === 326
-                ? (div.style.display = 'none')
-                : console.log('')
-        }
-    } catch (e) {}
-    try {
-        const video = document.getElementsByTagName(
-            'video',
-        )[0] as HTMLVideoElement
-        if (video) {
-            video.style.position = 'fixed'
-            video.style.display = 'block'
-            video.style.left = '0'
-            video.style.top = '0'
-            video.style.zIndex = '900000'
-            if (video?.parentElement?.style) {
-                video.parentElement.style.background = '#000'
-                video.parentElement.style.top = '0'
-                video.parentElement.style.left = '0'
-                video.parentElement.style.width = '100vw'
-                video.parentElement.style.height = '100vh'
-                video.parentElement.style.position = 'fixed'
-                video.parentElement.style.display = 'flex'
-                video.parentElement.style.alignItems = 'center'
-                video.parentElement.style.justifyContent = 'center'
-            }
-        }
-    } catch (e) {}
-    try {
-        for (div of document.getElementsByTagName('div')) {
-            if (div.clientHeight === 26) {
-                div.style.display = 'none'
-            }
-        }
-    } catch (e) {}
-    try {
-        for (div of document.getElementsByTagName('div')) {
-            if (div.clientHeight === 20) {
-                div.style.display = 'none'
-            }
-        }
-    } catch (e) {}
-    try {
-        let span
-        for (span of document.getElementsByTagName('span')) {
-            if (span.innerText.includes(':')) {
-                span.parentElement.parentElement.style.display = 'none'
-            }
-        }
-    } catch (e) {}
-    while (root == null) {
-        root = (Array as any)
-            .from(document.querySelectorAll('div'))
-            .find((d) => d.innerText === 'People')?.parentElement?.parentElement
-        if (root != null) {
-            try {
-                root.parentElement.style.opacity = 0
-                root.parentElement.parentElement.style.opacity = 0
-                const rootLeft = (Array as any)
-                    .from(document.querySelectorAll('div'))
-                    .find((d) => d.innerText === 'You')
-                rootLeft.parentElement.parentElement.parentElement.parentElement.style.width =
-                    '97vw'
-            } catch (e) {
-                console.error(
-                    '[getSpeakerRootToObserve] on meet error finding You',
-                    e,
-                )
-            }
-
-            try {
-                // Find all div elements
-                const allDivs = document.querySelectorAll('div')
-
-                // Filter divs to include padding in their size (assuming border-box sizing)
-                const filteredDivs = Array.from(allDivs).filter((div) => {
-                    // Use offsetWidth and offsetHeight to include padding (and border)
-                    const width = div.offsetWidth
-                    const height = div.offsetHeight
-
-                    return (
-                        width === 360 &&
-                        (height === 64 ||
-                            height === 63 ||
-                            height === 50.99 ||
-                            height === 51 ||
-                            height === 66.63)
+    // Set interval to log and reset speaker counts every 100 ms
+    setInterval(calcSpeaker, 100)
+    if (recordingMode === 'galery_view') {
+        mutationObserver.observe(document, {
+            attributes: true,
+            characterData: true,
+            childList: true,
+            subtree: true,
+            attributeFilter: ['class'],
+        })
+    } else {
+        while (root == null) {
+            root = (Array as any)
+                .from(document.querySelectorAll('div'))
+                .find((d) => d.innerText === 'People')
+                ?.parentElement?.parentElement
+            if (root != null) {
+                try {
+                    root.parentElement.style.opacity = 0
+                    root.parentElement.parentElement.style.opacity = 0
+                    const rootLeft = (Array as any)
+                        .from(document.querySelectorAll('div'))
+                        .find((d) => d.innerText === 'You')
+                    rootLeft.parentElement.parentElement.parentElement.parentElement.style.width =
+                        '97vw'
+                } catch (e) {
+                    console.error(
+                        '[getSpeakerRootToObserve] on meet error finding You',
+                        e,
                     )
-                })
+                }
 
-                // Log the filtered divs
-                console.log(filteredDivs)
+                try {
+                    // Find all div elements
+                    const allDivs = document.querySelectorAll('div')
 
-                // Example action: outline the filtered divs
-                filteredDivs.forEach((div) => {
-                    div.remove()
+                    // Filter divs to include padding in their size (assuming border-box sizing)
+                    const filteredDivs = Array.from(allDivs).filter((div) => {
+                        // Use offsetWidth and offsetHeight to include padding (and border)
+                        const width = div.offsetWidth
+                        const height = div.offsetHeight
+
+                        return (
+                            width === 360 &&
+                            (height === 64 ||
+                                height === 63 ||
+                                height === 50.99 ||
+                                height === 51 ||
+                                height === 66.63)
+                        )
+                    })
+
+                    // Log the filtered divs
+                    console.log(filteredDivs)
+
+                    // Example action: outline the filtered divs
+                    filteredDivs.forEach((div) => {
+                        div.remove()
+                    })
+                } catch (e) {
+                    console.error(
+                        '[getSpeakerRootToObserve] on meet error removing useless divs',
+                        e,
+                    )
+                }
+
+                mutationObserver.observe(root, {
+                    attributes: true,
+                    characterData: true,
+                    childList: true,
+                    subtree: true,
+                    attributeFilter: ['class'],
                 })
-            } catch (e) {
-                console.error(
-                    '[getSpeakerRootToObserve] on meet error removing useless divs',
-                    e,
-                )
+            } else {
+                console.error('could not find root speaker to observe')
             }
-
-            mutationObserver.observe(root, {
-                attributes: true,
-                characterData: true,
-                childList: true,
-                subtree: true,
-                attributeFilter: ['class'],
-            })
-            // Set interval to log and reset speaker counts every 100 ms
-            setInterval(calcSpeaker, 100)
-        } else {
-            console.error('could not find root speaker to observe')
+            await sleep(1000)
         }
-        await sleep(1000)
     }
 }
 
@@ -186,15 +138,9 @@ let speakerCounts = new Map()
 export function getSpeakerFromDocument(
     currentSpeaker: string | null,
     mutation: MutationRecord | null,
+    recordingMode: RecordingMode,
 ): Speaker[] {
-    const speaker = getSpeakerFromMutation(mutation)
-    // chrome.runtime.sendMessage({
-    //     type: 'LOG_FROM_SCRIPT',
-    //     payload: {
-    //         log: `mutation speaker found: ${speaker}`,
-    //         timestamp: Date.now(),
-    //     },
-    // })
+    const speaker = getSpeakerFromMutation(mutation, recordingMode)
     if (speaker != null) {
         speakerCounts.set(speaker, (speakerCounts.get(speaker) || 0) + 1)
     }
@@ -234,6 +180,7 @@ export function getSpeakerFromDocument(
 
 export function getSpeakerFromMutation(
     mutation: MutationRecord | null,
+    recordingMode: RecordingMode,
 ): string | null {
     if (mutation == null) {
         return null
@@ -241,6 +188,7 @@ export function getSpeakerFromMutation(
     try {
         const target = mutation.target as Element
         let color = getComputedStyle(target).backgroundColor
+
         if (color !== 'rgba(26, 115, 232, 0.9)') {
             return null
         }
@@ -253,66 +201,52 @@ export function getSpeakerFromMutation(
         if (height == '4px') {
             return null
         }
-        let speakers: string[] = []
-        const divButton = target.parentElement!.parentElement!.parentElement
-        // console.log({ divButton })
-        if (divButton && divButton.nodeName === 'BUTTON') {
-            const divSpeaker =
-                divButton!.parentElement!.parentElement!.parentElement!
-                    .parentElement!.parentElement!.parentElement
-            const speakerName = divSpeaker && findSpeakerName(divSpeaker)
-            if (speakerName) {
-                return speakerName
-            } else {
+
+        if (recordingMode === 'galery_view') {
+            const foundElement = findSelfNameRecursive(target)
+            return extractTooltipText(foundElement!)
+        } else {
+            let speakers: string[] = []
+            const divButton = target.parentElement!.parentElement!.parentElement
+            if (divButton && divButton.nodeName === 'BUTTON') {
                 const divSpeaker =
                     divButton!.parentElement!.parentElement!.parentElement!
-                        .parentElement
+                        .parentElement!.parentElement!.parentElement
                 const speakerName = divSpeaker && findSpeakerName(divSpeaker)
                 if (speakerName) {
                     return speakerName
                 } else {
-                    console.error('no div speaker button', { mutation })
-                    // chrome.runtime.sendMessage({
-                    //     type: 'LOG_FROM_SCRIPT',
-                    //     payload: {
-                    //         log: 'no div speaker button',
-                    //         timestamp: Date.now(),
-                    //     },
-                    // })
-                }
-            }
-        } else {
-            const divSpeaker =
-                target!.parentElement!.parentElement!.parentElement!
-                    .parentElement
-            if (divSpeaker) {
-                const speakerName = findSpeakerName(divSpeaker)
-                if (speakerName) {
-                    return speakerName
-                } else {
-                    // chrome.runtime.sendMessage({
-                    //     type: 'LOG_FROM_SCRIPT',
-                    //     payload: {
-                    //         log: 'no div speaker',
-                    //         timestamp: Date.now(),
-                    //     },
-                    // })
-                    console.error('no div speaker', { mutation })
+                    const divSpeaker =
+                        divButton!.parentElement!.parentElement!.parentElement!
+                            .parentElement
+                    const speakerName =
+                        divSpeaker && findSpeakerName(divSpeaker)
+                    if (speakerName) {
+                        return speakerName
+                    } else {
+                        console.error('no div speaker button', { mutation })
+                    }
                 }
             } else {
-                // chrome.runtime.sendMessage({
-                //     type: 'LOG_FROM_SCRIPT',
-                //     payload: {
-                //         log: 'no div speaker',
-                //         timestamp: Date.now(),
-                //     },
-                // })
-                console.error('no div speaker', { mutation })
+                const divSpeaker =
+                    target!.parentElement!.parentElement!.parentElement!
+                        .parentElement
+                if (divSpeaker) {
+                    const speakerName = findSpeakerName(divSpeaker)
+                    if (speakerName) {
+                        return speakerName
+                    } else {
+                        console.error('no div speaker', { mutation })
+                    }
+                } else {
+                    console.error('no div speaker', { mutation })
+                }
             }
         }
         // })
         return null
     } catch (e) {
+        console.error('error in getSpeakerFromMutation', e)
         return null
     }
 }
@@ -345,39 +279,122 @@ function findSpeakerName(divSpeaker: any) {
     return null
 }
 
-export function removeShityHtml() {
+export async function removeInitialShityHtml(mode: RecordingMode) {
+    let div
     try {
-        const video = document.getElementsByTagName(
-            'video',
-        )[0] as HTMLVideoElement
-        if (video) {
-            video.style.position = 'fixed'
-            video.style.display = 'block'
-            video.style.left = '0'
-            video.style.top = '0'
-            video.style.zIndex = '1'
-            if (video?.parentElement?.style) {
-                video.parentElement.style.background = '#000'
-                video.parentElement.style.top = '0'
-                video.parentElement.style.left = '0'
-                video.parentElement.style.width = '100vw'
-                video.parentElement.style.height = '100vh'
-                video.parentElement.style.position = 'fixed'
-                video.parentElement.style.display = 'flex'
-                video.parentElement.style.alignItems = 'center'
-                video.parentElement.style.justifyContent = 'center'
+        for (div of document.getElementsByTagName('div')) {
+            div.clientHeight === 132 &&
+            (div.clientWidth === 235 || div.clientWidth === 234)
+                ? (div.style.display = 'none')
+                : console.error('fail')
+        }
+    } catch (e) {}
+    try {
+        for (div of document.getElementsByTagName('div')) {
+            div.clientWidth === 360 && div.clientHeight === 326
+                ? (div.style.display = 'none')
+                : console.log('')
+        }
+    } catch (e) {}
+    try {
+        for (div of document.getElementsByTagName('div')) {
+            if (div.clientHeight === 26) {
+                div.style.display = 'none'
             }
         }
-    } catch (e) {
-        console.error('Error with video setup:', e)
+    } catch (e) {}
+    try {
+        for (div of document.getElementsByTagName('div')) {
+            if (div.clientHeight === 20) {
+                div.style.display = 'none'
+            }
+        }
+    } catch (e) {}
+    try {
+        let span
+        for (span of document.getElementsByTagName('span')) {
+            if (span.innerText.includes(':')) {
+                span.parentElement.parentElement.style.display = 'none'
+            }
+        }
+    } catch (e) {}
+    if (mode !== 'galery_view') {
+        try {
+            const video = document.getElementsByTagName(
+                'video',
+            )[0] as HTMLVideoElement
+            if (video) {
+                video.style.position = 'fixed'
+                video.style.display = 'block'
+                video.style.left = '0'
+                video.style.top = '0'
+                video.style.zIndex = '900000'
+                if (video?.parentElement?.style) {
+                    video.parentElement.style.background = '#000'
+                    video.parentElement.style.top = '0'
+                    video.parentElement.style.left = '0'
+                    video.parentElement.style.width = '100vw'
+                    video.parentElement.style.height = '100vh'
+                    video.parentElement.style.position = 'fixed'
+                    video.parentElement.style.display = 'flex'
+                    video.parentElement.style.alignItems = 'center'
+                    video.parentElement.style.justifyContent = 'center'
+                }
+            }
+        } catch (e) {}
+    }
+}
+
+export function removeShityHtml(mode: RecordingMode) {
+    // '#a8c7fa'
+    if (mode !== 'galery_view') {
+        try {
+            const video = document.getElementsByTagName(
+                'video',
+            )[0] as HTMLVideoElement
+            if (video) {
+                video.style.position = 'fixed'
+                video.style.display = 'block'
+                video.style.left = '0'
+                video.style.top = '0'
+                video.style.zIndex = '1'
+                if (video?.parentElement?.style) {
+                    video.parentElement.style.background = '#000'
+                    video.parentElement.style.top = '0'
+                    video.parentElement.style.left = '0'
+                    video.parentElement.style.width = '100vw'
+                    video.parentElement.style.height = '100vh'
+                    video.parentElement.style.position = 'fixed'
+                    video.parentElement.style.display = 'flex'
+                    video.parentElement.style.alignItems = 'center'
+                    video.parentElement.style.justifyContent = 'center'
+                }
+            }
+        } catch (e) {
+            console.error('Error with video setup:', e)
+        }
+
+        try {
+            document.getElementsByTagName('video')[1].style.position = 'fixed'
+        } catch (e) {
+            console.error('Error with second video:', e)
+        }
     }
 
     try {
-        document.getElementsByTagName('video')[1].style.position = 'fixed'
-    } catch (e) {
-        console.error('Error with second video:', e)
-    }
-
+        for (const div of document.getElementsByTagName('div')) {
+            div.clientHeight === 164 && div.clientWidth === 322
+                ? (div.style.display = 'none')
+                : console.error('fail')
+        }
+    } catch (e) {}
+    try {
+        for (const div of document.getElementsByTagName('div')) {
+            div.clientHeight === 40
+                ? (div.style.opacity = '0')
+                : console.error('fail')
+        }
+    } catch (e) {}
     try {
         var icons = Array.from(
             document.querySelectorAll('i.google-material-icons'),
@@ -442,4 +459,42 @@ export function findAllAttendees(): string[] {
         }
     }
     return names
+}
+
+function findSelfNameInSiblings(element: Element) {
+    const siblings = Array.from(element.parentElement?.children!)
+    for (const sibling of siblings) {
+        if (sibling !== element) {
+            const found = sibling.querySelector('[data-self-name]')
+            if (found) {
+                return found
+            }
+        }
+    }
+    return null
+}
+
+// Fonction pour explorer l'arbre DOM de manière ascendante et descendante
+function findSelfNameRecursive(element: Element): Element | null {
+    let currentElement = element
+
+    while (currentElement) {
+        // Cherche dans les frères de l'élément courant
+        const foundInSiblings = findSelfNameInSiblings(currentElement)
+        if (foundInSiblings) {
+            return foundInSiblings
+        }
+
+        // Passe à l'élément parent
+        currentElement = currentElement.parentElement!
+    }
+
+    return null
+}
+
+// Fonction pour extraire le texte de la div avec role="tooltip"
+function extractTooltipText(element: Element) {
+    const tooltipDiv = element.querySelector('[role="tooltip"]')
+    const textContent = tooltipDiv != null ? tooltipDiv.textContent : null
+    return textContent
 }

@@ -102,7 +102,9 @@ function addListener() {
 function observeSpeakers() {
     chrome.tabs.executeScript(
         {
-            code: `var BOT_NAME = ${JSON.stringify(
+            code: `var RECORDING_MODE = ${JSON.stringify(
+                State.parameters.recording_mode,
+            )}; var BOT_NAME = ${JSON.stringify(
                 State.parameters.bot_name,
             )}; var MEETING_PROVIDER=${JSON.stringify(
                 State.parameters.meetingProvider,

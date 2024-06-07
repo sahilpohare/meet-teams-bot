@@ -22,7 +22,10 @@ export type MeetingParams = {
     speech_to_text?: SpeechToTextProvider
     bot_id?: string
     s3_bucket: string
+    recording_mode: RecordingMode
 }
+
+export type RecordingMode = 'speaker_view' | 'galery_view' | 'audio_only'
 
 export const parameters: MeetingParams & { detected_lang?: string } =
     {} as MeetingParams

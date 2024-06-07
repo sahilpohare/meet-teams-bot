@@ -18,6 +18,8 @@ export type StatusParams = {
     user_id: number
 }
 
+export type RecordingMode = 'speaker_view' | 'galery_view' | 'audio_only'
+
 export interface MeetingProviderInterface {
     openMeetingPage(browser: Browser, link: string): Promise<Page>
 
@@ -69,6 +71,7 @@ export type MeetingParams = {
     enter_message?: string
     bots_api_key?: string
     bots_webhook_url?: string
+    recording_mode: RecordingMode
     automatic_leave: {
         // The number of seconds after which the bot will automatically leave the call, if it has not been let in from the waiting room.
         waiting_room_timeout: number

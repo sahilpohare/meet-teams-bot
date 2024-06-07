@@ -11,6 +11,8 @@ export type Speaker = {
 
 declare var BOT_NAME: string
 declare var MEETING_PROVIDER: string
+declare var RECORDING_MODE: RecordingMode
+export type RecordingMode = 'speaker_view' | 'galery_view' | 'audio_only'
 
 const SPEAKERS: Speaker[] = []
 
@@ -21,6 +23,7 @@ let PROVIDER = {
     SPEAKER_LATENCY: ZoomProvider.SPEAKER_LATENCY,
     getSpeakerRootToObserve: ZoomProvider.getSpeakerRootToObserve,
     findAllAttendees: ZoomProvider.findAllAttendees,
+    removeInitialShityHtml: ZoomProvider.removeInitialShityHtml,
 }
 
 setMeetingProvider()
@@ -35,6 +38,7 @@ function setMeetingProvider() {
             SPEAKER_LATENCY: TeamsProvider.SPEAKER_LATENCY,
             getSpeakerRootToObserve: TeamsProvider.getSpeakerRootToObserve,
             findAllAttendees: TeamsProvider.findAllAttendees,
+            removeInitialShityHtml: ZoomProvider.removeInitialShityHtml,
         }
     } else if (MEETING_PROVIDER === 'Meet') {
         PROVIDER = {
@@ -44,6 +48,7 @@ function setMeetingProvider() {
             SPEAKER_LATENCY: MeetProvider.SPEAKER_LATENCY,
             getSpeakerRootToObserve: MeetProvider.getSpeakerRootToObserve,
             findAllAttendees: MeetProvider.findAllAttendees,
+            removeInitialShityHtml: ZoomProvider.removeInitialShityHtml,
         }
     } else {
         PROVIDER = {
@@ -53,13 +58,14 @@ function setMeetingProvider() {
             SPEAKER_LATENCY: ZoomProvider.SPEAKER_LATENCY,
             getSpeakerRootToObserve: ZoomProvider.getSpeakerRootToObserve,
             findAllAttendees: ZoomProvider.findAllAttendees,
+            removeInitialShityHtml: ZoomProvider.removeInitialShityHtml,
         }
     }
 }
 
-async function removeShityHtmlLoop() {
+async function removeShityHtmlLoop(mode: RecordingMode) {
     while (true) {
-        PROVIDER.removeShityHtml()
+        PROVIDER.removeShityHtml(mode)
         await sleep(1000)
     }
 }
@@ -85,8 +91,9 @@ async function refreshAttendeesLoop() {
     }
 }
 async function observeSpeakers() {
+    console.log('start observe speakers', RECORDING_MODE)
     try {
-        removeShityHtmlLoop()
+        removeShityHtmlLoop(RECORDING_MODE)
         refreshAttendeesLoop()
     } catch (e) {
         console.log('an exception occured in remove shity html', e)
@@ -109,7 +116,7 @@ async function observeSpeakers() {
     var mutationObserver = new MutationObserver(function (mutations) {
         mutations.forEach(function (mutation) {
             if (parameters.meetingProvider === 'Teams') {
-                PROVIDER.removeShityHtml()
+                PROVIDER.removeShityHtml(RECORDING_MODE)
             }
             try {
                 const speakers = PROVIDER.getSpeakerFromDocument(
@@ -117,6 +124,7 @@ async function observeSpeakers() {
                         ? SPEAKERS[SPEAKERS.length - 1].name
                         : null,
                     mutation,
+                    RECORDING_MODE,
                 )
 
                 const previousSpeaker =
@@ -182,7 +190,7 @@ async function observeSpeakers() {
                         console.log('speaker changed to: ', speaker)
                     }
                 } else {
-                    console.log('no speaker change')
+                    console.log('no speaker change', speaker)
                 }
             } catch (e) {
                 console.error('an exception occured in observeSpeaker', e)
@@ -193,7 +201,7 @@ async function observeSpeakers() {
     try {
         const speakers = R.filter(
             (u) => u.name !== BOT_NAME,
-            PROVIDER.getSpeakerFromDocument(null, null),
+            PROVIDER.getSpeakerFromDocument(null, null, RECORDING_MODE),
         )
 
         const speaker = speakers[0]
@@ -213,19 +221,27 @@ async function observeSpeakers() {
                 payload: SPEAKERS,
             })
         } else {
-            // chrome.runtime.sendMessage({
-            //     type: 'LOG',
-            //     payload: 'NO INITIAL SPEAKER, forcing to empty speaker',
-            // })
-            // SPEAKERS.push({ timestamp: Date.now(), name: `-` })
-            // chrome.runtime.sendMessage({
-            //     type: 'REFRESH_SPEAKERS',
-            //     payload: SPEAKERS,
-            // })
+            SPEAKERS.push({ name: '-', timestamp: Date.now() })
+            chrome.runtime.sendMessage({
+                type: 'REFRESH_SPEAKERS',
+                payload: SPEAKERS,
+            })
+            chrome.runtime.sendMessage({
+                type: 'LOG',
+                payload: `[ObserveSpeaker] no inital speakers ${
+                    SPEAKERS[SPEAKERS.length - 1].name
+                }
+                ${SPEAKERS[SPEAKERS.length - 1].timestamp}
+                `,
+            })
         }
-
-        await PROVIDER.getSpeakerRootToObserve(mutationObserver)
     } catch (e) {
         console.error('an exception occured startion observeSpeaker')
+    }
+    try {
+        await PROVIDER.removeInitialShityHtml(RECORDING_MODE)
+        await PROVIDER.getSpeakerRootToObserve(mutationObserver, RECORDING_MODE)
+    } catch (e) {
+        console.error('an exception occured starting observeSpeaker')
     }
 }

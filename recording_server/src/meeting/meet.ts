@@ -5,6 +5,7 @@ import {
     CancellationToken,
     MeetingParams,
     MeetingProviderInterface,
+    RecordingMode,
 } from '../types'
 
 import { Page } from 'puppeteer'
@@ -86,17 +87,19 @@ export class MeetProvider implements MeetingProviderInterface {
             await sleep(100)
         }
 
-        await changeLayout(page)
-        await findShowEveryOne(page, true, cancelCheck)
+        await changeLayout(page, meetingParams.recording_mode)
+        if (meetingParams.recording_mode !== 'galery_view') {
+            await findShowEveryOne(page, true, cancelCheck)
+        }
     }
 
     async findEndMeeting(
-        _meetingParams: MeetingParams,
+        meetingParams: MeetingParams,
         page: Page,
         cancellationToken: CancellationToken,
     ): Promise<boolean> {
         try {
-            if (await findEndMeeting(page, cancellationToken)) {
+            if (await findEndMeeting(meetingParams, page, cancellationToken)) {
                 return true
             }
             //console.log('[findendmeeting]  false')
@@ -231,7 +234,25 @@ async function sendEntryMessage(
 //     console.error('Unable to send enter message in chat', e)
 // }
 
-async function countParticipants(page: Page): Promise<number> {
+async function countParticipantsGaleryView(page: Page): Promise<number> {
+    let i = 0
+
+    const iterations = 10
+    while (i < iterations) {
+        try {
+            return await page.$$eval('div[data-self-name]', (elems) => {
+                return elems.length
+            })
+        } catch (e) {
+            console.error('exeption in use without an account')
+        }
+        await sleep(100)
+        i += 1
+    }
+    return 1
+}
+
+async function countParticipantsSpeakerView(page: Page): Promise<number> {
     const count = await page.evaluate(() => {
         const images = Array.from(document.querySelectorAll('img'))
         return images.filter(
@@ -241,30 +262,6 @@ async function countParticipants(page: Page): Promise<number> {
 
     console.log('found', count, 'participants')
     return count
-}
-
-async function clickFirst(
-    page: Page,
-    selector: string,
-    retry: number = 5,
-): Promise<boolean> {
-    console.log(`clickFirst(${selector})`)
-    for (let i = 0; i < retry; i++) {
-        if (
-            await page.$$eval(selector, (elems) => {
-                for (const elem of elems) {
-                    ;(elem as any).click()
-                    return true
-                }
-                return false
-            })
-        ) {
-            return true
-        } else {
-            await sleep(500)
-        }
-    }
-    return false
 }
 async function notAcceptedInMeeting(page: Page): Promise<boolean> {
     return await page.$$eval('*', (elems) => {
@@ -295,6 +292,7 @@ async function removedFromMeeting(page: Page): Promise<boolean> {
 }
 
 async function findEndMeeting(
+    meetingParams: MeetingParams,
     page: Page,
     cancellationToken: CancellationToken,
 ): Promise<boolean> {
@@ -307,7 +305,13 @@ async function findEndMeeting(
         console.error(e)
     }
     try {
-        if ((await countParticipants(page)) === 1) {
+        const participant = await (meetingParams.recording_mode ===
+        'galery_view'
+            ? countParticipantsGaleryView(page)
+            : countParticipantsSpeakerView(page))
+        console.log('participant', participant)
+
+        if (participant === 1) {
             return true
         } else {
             cancellationToken.reset()
@@ -378,7 +382,7 @@ export async function clickWithInnerText(
     return buttonClicked
 }
 
-async function changeLayout(page: Page) {
+async function changeLayout(page: Page, recordingMode: RecordingMode) {
     try {
         console.log(
             'more vert clicked: ',
@@ -388,10 +392,17 @@ async function changeLayout(page: Page) {
             'span change layout clicked: ',
             await clickWithInnerText(page, 'span', 'Change layout', 10),
         )
-        console.log(
-            'spotlight clicked: ',
-            await clickWithInnerText(page, 'span', 'Spotlight', 10, true),
-        )
+        if (recordingMode === 'galery_view') {
+            console.log(
+                'galery view clicked: ',
+                await clickWithInnerText(page, 'span', 'Tiled', 10, true),
+            )
+        } else {
+            console.log(
+                'spotlight clicked: ',
+                await clickWithInnerText(page, 'span', 'Spotlight', 10, true),
+            )
+        }
         // click outside the modal to close it
         await sleep(500)
         await page.mouse.click(10, 10)
