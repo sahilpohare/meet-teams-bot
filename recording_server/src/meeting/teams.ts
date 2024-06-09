@@ -111,7 +111,7 @@ export class TeamsProvider implements MeetingProviderInterface {
             }
             await sleep(2000)
         }
-        if (meetingParams.recording_mode !== 'galery_view') {
+        if (meetingParams.recording_mode !== 'gallery_view') {
             await clickWithInnerText(page, 'button', 'View', 10)
             await clickWithInnerText(page, 'div', 'Speaker', 20)
         }

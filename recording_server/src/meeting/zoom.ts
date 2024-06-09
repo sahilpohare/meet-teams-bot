@@ -112,7 +112,7 @@ export class ZoomProvider implements MeetingProviderInterface {
         try {
             await joinCamera(page)
         } catch (e) {}
-        if (meetingParams.recording_mode === 'galery_view') {
+        if (meetingParams.recording_mode === 'gallery_view') {
             try {
                 console.log('gallery clicked', clickGalleryView(page))
             } catch (e) {}

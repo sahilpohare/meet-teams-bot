@@ -136,7 +136,7 @@ export function removeShityHtml(mode: RecordingMode) {
         notif[0].remove()
     } catch (e) {}
 
-    if (mode !== 'galery_view') {
+    if (mode !== 'gallery_view') {
         const sharedScreen =
             document.getElementsByClassName('Pane vertical Pane1  ').length > 0
 

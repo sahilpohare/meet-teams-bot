@@ -18,7 +18,7 @@ export type StatusParams = {
     user_id: number
 }
 
-export type RecordingMode = 'speaker_view' | 'galery_view' | 'audio_only'
+export type RecordingMode = 'speaker_view' | 'gallery_view' | 'audio_only'
 
 export interface MeetingProviderInterface {
     openMeetingPage(browser: Browser, link: string): Promise<Page>

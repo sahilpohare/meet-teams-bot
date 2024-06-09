@@ -12,7 +12,7 @@ export type Speaker = {
 declare var BOT_NAME: string
 declare var MEETING_PROVIDER: string
 declare var RECORDING_MODE: RecordingMode
-export type RecordingMode = 'speaker_view' | 'galery_view' | 'audio_only'
+export type RecordingMode = 'speaker_view' | 'gallery_view' | 'audio_only'
 
 const SPEAKERS: Speaker[] = []
 

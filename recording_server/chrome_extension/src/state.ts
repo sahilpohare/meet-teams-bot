@@ -25,7 +25,7 @@ export type MeetingParams = {
     recording_mode: RecordingMode
 }
 
-export type RecordingMode = 'speaker_view' | 'galery_view' | 'audio_only'
+export type RecordingMode = 'speaker_view' | 'gallery_view' | 'audio_only'
 
 export const parameters: MeetingParams & { detected_lang?: string } =
     {} as MeetingParams

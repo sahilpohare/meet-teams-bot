@@ -11,7 +11,7 @@ export async function getSpeakerRootToObserve(
 
     // Set interval to log and reset speaker counts every 100 ms
     setInterval(calcSpeaker, 100)
-    if (recordingMode === 'galery_view') {
+    if (recordingMode === 'gallery_view') {
         mutationObserver.observe(document, {
             attributes: true,
             characterData: true,
@@ -202,7 +202,7 @@ export function getSpeakerFromMutation(
             return null
         }
 
-        if (recordingMode === 'galery_view') {
+        if (recordingMode === 'gallery_view') {
             const foundElement = findSelfNameRecursive(target)
             return extractTooltipText(foundElement!)
         } else {
@@ -318,7 +318,7 @@ export async function removeInitialShityHtml(mode: RecordingMode) {
             }
         }
     } catch (e) {}
-    if (mode !== 'galery_view') {
+    if (mode !== 'gallery_view') {
         try {
             const video = document.getElementsByTagName(
                 'video',
@@ -347,7 +347,7 @@ export async function removeInitialShityHtml(mode: RecordingMode) {
 
 export function removeShityHtml(mode: RecordingMode) {
     // '#a8c7fa'
-    if (mode !== 'galery_view') {
+    if (mode !== 'gallery_view') {
         try {
             const video = document.getElementsByTagName(
                 'video',

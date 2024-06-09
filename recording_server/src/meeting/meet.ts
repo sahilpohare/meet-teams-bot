@@ -88,7 +88,7 @@ export class MeetProvider implements MeetingProviderInterface {
         }
 
         await changeLayout(page, meetingParams.recording_mode)
-        if (meetingParams.recording_mode !== 'galery_view') {
+        if (meetingParams.recording_mode !== 'gallery_view') {
             await findShowEveryOne(page, true, cancelCheck)
         }
     }
@@ -306,7 +306,7 @@ async function findEndMeeting(
     }
     try {
         const participant = await (meetingParams.recording_mode ===
-        'galery_view'
+        'gallery_view'
             ? countParticipantsGaleryView(page)
             : countParticipantsSpeakerView(page))
         console.log('participant', participant)
@@ -392,7 +392,7 @@ async function changeLayout(page: Page, recordingMode: RecordingMode) {
             'span change layout clicked: ',
             await clickWithInnerText(page, 'span', 'Change layout', 10),
         )
-        if (recordingMode === 'galery_view') {
+        if (recordingMode === 'gallery_view') {
             console.log(
                 'galery view clicked: ',
                 await clickWithInnerText(page, 'span', 'Tiled', 10, true),
