@@ -111,8 +111,10 @@ export class TeamsProvider implements MeetingProviderInterface {
             }
             await sleep(2000)
         }
-        await clickWithInnerText(page, 'button', 'View', 10)
-        await clickWithInnerText(page, 'div', 'Speaker', 20)
+        if (meetingParams.recording_mode !== 'galery_view') {
+            await clickWithInnerText(page, 'button', 'View', 10)
+            await clickWithInnerText(page, 'div', 'Speaker', 20)
+        }
     }
 
     async findEndMeeting(

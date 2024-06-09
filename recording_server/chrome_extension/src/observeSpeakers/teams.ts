@@ -65,7 +65,6 @@ export function getSpeakerFromDocument(
                 currentBorderColor.trim() === 'rgb(127, 133, 245)' ||
                 currentBorderColor.trim() === 'rgb(91, 95, 199)'
             ) {
-                console.log('[teams observe speaker]', targetElement)
                 if (span != null && speaker != null && speaker.trim() !== '') {
                     span.parentElement.style.opacity = '0'
                     removeShityHtml(recordingMode)
@@ -109,6 +108,14 @@ export function removeShityHtml(mode: RecordingMode) {
     } catch (e) {
         console.error('error in remove shitty html', e)
     }
+
+    try {
+        for (const div of document.getElementsByTagName('div')) {
+            div.clientHeight === 137 && div.clientWidth === 245
+                ? (div.style.opacity = '0')
+                : console.error('fail')
+        }
+    } catch (e) {}
 }
 
 export function findAllAttendees(): string[] {

@@ -112,7 +112,11 @@ export class ZoomProvider implements MeetingProviderInterface {
         try {
             await joinCamera(page)
         } catch (e) {}
-        console.log('wait for camera done')
+        if (meetingParams.recording_mode === 'galery_view') {
+            try {
+                console.log('gallery clicked', clickGalleryView(page))
+            } catch (e) {}
+        }
     }
 
     async findEndMeeting(
@@ -261,6 +265,32 @@ async function clickJoinAudio(page: puppeteer.Page) {
             console.log(`in wait for audio timeout: ${e}`)
         } else {
             console.log(`error in wait button join audio ${e}`)
+        }
+    }
+    return false
+}
+async function clickGalleryView(page: Page) {
+    for (const i of Array(10).keys()) {
+        const clicked = await page.evaluate(() => {
+            try {
+                // Trouver l'élément en utilisant l'attribut aria-label
+                var element = document.querySelector(
+                    'a[aria-label="Gallery View"]',
+                )
+
+                // Vérifier si l'élément existe
+                if (element) {
+                    // Cliquer sur l'élément
+                    ;(element as any).click()
+                    return true
+                } else {
+                    console.log('Element not found.')
+                }
+            } catch (e) {}
+            return false
+        })
+        if (clicked) {
+            return true
         }
     }
     return false

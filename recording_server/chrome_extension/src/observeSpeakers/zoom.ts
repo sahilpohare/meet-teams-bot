@@ -18,6 +18,7 @@ export async function getSpeakerRootToObserve(
     })
 }
 
+//class="gallery-video-container__video-frame gallery-video-container__video-frame--active react-draggable"
 export function getSpeakerFromDocument(
     currentSpeaker: string | null,
     mutation: MutationRecord | null,
@@ -36,12 +37,12 @@ export function getSpeakerFromDocument(
         ) ||
         getAvatarAndSpeaker(
             document.getElementsByClassName(
-                'gallery-video-container__video-frame',
+                'suspension-video-container__video-frame',
             ),
         ) ||
         getAvatarAndSpeaker(
             document.getElementsByClassName(
-                'suspension-video-container__video-frame',
+                'gallery-video-container__video-frame--active',
             ),
         )
     if (speaker) {
@@ -63,25 +64,25 @@ export function getSpeakerFromDocument(
 }
 
 function getAvatarAndSpeaker(target) {
-    if (target && target[0]) {
-        const speakerActiveDiv = target[0]
-        const avatarDivs = speakerActiveDiv.getElementsByClassName(
-            'video-avatar__avatar',
-        )
-        if (avatarDivs && avatarDivs[0]) {
-            // console.log('[ObserveSpeaker]', { avatarDivs })
-            const avatarDiv = avatarDivs[0]
-            // console.log('[ObserveSpeaker]', { avatarDiv })
-            const initialSpeaker = getSpakerNameFromAvatarDiv(avatarDiv)
-            // console.log(initialSpeaker)
-            return initialSpeaker
+    try {
+        if (target && target[0]) {
+            const speakerActiveDiv = target[0]
+            const avatarDivs = speakerActiveDiv.getElementsByClassName(
+                'video-avatar__avatar',
+            )
+            if (avatarDivs && avatarDivs[0]) {
+                const avatarDiv = avatarDivs[0]
+                const initialSpeaker = getSpakerNameFromAvatarDiv(avatarDiv)
+                return initialSpeaker
+            }
         }
+    } catch (e) {
+        return null
     }
 }
 
 function getSpakerNameFromAvatarDiv(target): string | undefined {
     const span = target.getElementsByTagName('span')[0]
-    // console.log({ span })
     const name = span.innerText
     // console.log(name)
     //     let name: string | undefined = undefined
@@ -135,72 +136,74 @@ export function removeShityHtml(mode: RecordingMode) {
         notif[0].remove()
     } catch (e) {}
 
-    const sharedScreen =
-        document.getElementsByClassName('Pane vertical Pane1  ').length > 0
-    console.log({ sharedScreen })
+    if (mode !== 'galery_view') {
+        const sharedScreen =
+            document.getElementsByClassName('Pane vertical Pane1  ').length > 0
 
-    if (!sharedScreen) {
+        if (!sharedScreen) {
+            try {
+                ;(
+                    document.getElementsByClassName('multi-view')[0]
+                        .children[0] as any
+                ).style.height = '126vh'
+            } catch (e) {}
+            try {
+                ;(
+                    document.getElementsByClassName('multi-view')[0]
+                        .children[0] as any
+                ).style.width = '146vw'
+            } catch (e) {}
+            try {
+                ;(
+                    document.getElementsByClassName('multi-view')[0]
+                        .children[0] as any
+                ).style.left = '-23vw'
+            } catch (e) {}
+            try {
+                ;(
+                    document.getElementsByClassName('multi-view')[0]
+                        .children[0] as any
+                ).style.top = '-26vh'
+            } catch (e) {}
+        } else {
+            try {
+                ;(
+                    document.getElementsByClassName('multi-view')[0]
+                        .children[0] as any
+                ).style.height = 'auto'
+            } catch (e) {}
+            try {
+                ;(
+                    document.getElementsByClassName('multi-view')[0]
+                        .children[0] as any
+                ).style.width = 'auto'
+            } catch (e) {}
+            try {
+                ;(
+                    document.getElementsByClassName('multi-view')[0]
+                        .children[0] as any
+                ).style.left = 'auto'
+            } catch (e) {}
+            try {
+                ;(
+                    document.getElementsByClassName('multi-view')[0]
+                        .children[0] as any
+                ).style.top = 'auto'
+            } catch (e) {}
+        }
         try {
-            const divView0 = ((
+            const divView4 = ((
                 document.getElementsByClassName('multi-view')[0]
                     .children[0] as any
-            ).style.height = '126vh')
+            ).style.zIndex = '21')
         } catch (e) {}
         try {
-            const divView1 = ((
-                document.getElementsByClassName('multi-view')[0]
-                    .children[0] as any
-            ).style.width = '146vw')
-        } catch (e) {}
-        try {
-            const divView2 = ((
-                document.getElementsByClassName('multi-view')[0]
-                    .children[0] as any
-            ).style.left = '-23vw')
-        } catch (e) {}
-        try {
-            const divView3 = ((
-                document.getElementsByClassName('multi-view')[0]
-                    .children[0] as any
-            ).style.top = '-26vh')
-        } catch (e) {}
-    } else {
-        try {
-            const divView0 = ((
-                document.getElementsByClassName('multi-view')[0]
-                    .children[0] as any
-            ).style.height = 'auto')
-        } catch (e) {}
-        try {
-            const divView1 = ((
-                document.getElementsByClassName('multi-view')[0]
-                    .children[0] as any
-            ).style.width = 'auto')
-        } catch (e) {}
-        try {
-            const divView2 = ((
-                document.getElementsByClassName('multi-view')[0]
-                    .children[0] as any
-            ).style.left = 'auto')
-        } catch (e) {}
-        try {
-            const divView3 = ((
-                document.getElementsByClassName('multi-view')[0]
-                    .children[0] as any
-            ).style.top = 'auto')
+            let meetingInfo = document.getElementsByClassName(
+                'meeting-info-container',
+            )
+            meetingInfo[0].remove()
         } catch (e) {}
     }
-    try {
-        const divView4 = ((
-            document.getElementsByClassName('multi-view')[0].children[0] as any
-        ).style.zIndex = '21')
-    } catch (e) {}
-    try {
-        let meetingInfo = document.getElementsByClassName(
-            'meeting-info-container',
-        )
-        meetingInfo[0].remove()
-    } catch (e) {}
     try {
         let notif = document.getElementsByClassName(
             'notification-message-feature-wrap',
@@ -246,9 +249,9 @@ export async function removeInitialShityHtml(mode: RecordingMode) {
     // } catch (e) {
     // }
     try {
-        const divView4 = ((
+        ;(
             document.getElementsByClassName('multi-view')[0].children[0] as any
-        ).style.zIndex = '21')
+        ).style.zIndex = '21'
     } catch (e) {}
     try {
         let meetingInfo = document.getElementsByClassName(
