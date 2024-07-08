@@ -65,13 +65,26 @@ export function getSpeakerFromDocument(
                 currentBorderColor.trim() === 'rgb(127, 133, 245)' ||
                 currentBorderColor.trim() === 'rgb(91, 95, 199)'
             ) {
-                if (span != null && speaker != null && speaker.trim() !== '') {
+                if (speaker.includes('Leaving')) {
+                    console.log('OMG WE NEED TO CATCH LEAVING ⚠️ ‼️')
+                }
+                if (
+                    span != null &&
+                    speaker != null &&
+                    speaker.trim() !== '' &&
+                    !speaker.includes('Leaving...')
+                ) {
                     span.parentElement.style.opacity = '0'
                     removeShityHtml(recordingMode)
                     return [{ name: speaker, timestamp: Date.now() }]
                 }
             } else {
-                if (span != null && speaker != null && speaker.trim() !== '') {
+                if (
+                    span != null &&
+                    speaker != null &&
+                    speaker.trim() !== '' &&
+                    !speaker.includes('Leaving...')
+                ) {
                     span.parentElement.style.opacity = '0'
                     removeShityHtml(recordingMode)
                     continue
