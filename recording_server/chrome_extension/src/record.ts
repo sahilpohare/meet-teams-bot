@@ -1,16 +1,16 @@
 import * as asyncLib from 'async'
-import { Transcriber } from './Transcribe/Transcriber'
 import { parameters } from './background'
 import { newSerialQueue } from './queue'
 import {
     Agenda,
+    api,
     Asset,
     EditorWrapper,
     Project,
     RecognizerWord,
-    api,
 } from './spoke_api_js'
-import { sleep } from './utils'
+import { Transcriber } from './Transcribe/Transcriber'
+import { logger, sleep } from './utils'
 
 const STREAM: MediaStream | null = null
 let RECORDED_CHUNKS: BlobEvent[] = []
@@ -107,9 +107,12 @@ export async function startRecording(
     agenda?: Agenda,
 ): Promise<Project> {
     const newSessionId = await api.startRecordingSession()
-    console.log(`[startRecording]`, { newSessionId })
+    logger(
+        '[startRecording]: '.concat(newSessionId.toLocaleString()),
+        'LOG_DEBUG',
+    )
 
-    console.log(`[startRecording] before post project`)
+    logger(`[startRecording] before post project`, 'LOG_DEBUG')
     let agendaRefreshed = agenda
     if (agendaRefreshed != null) {
         try {
@@ -129,7 +132,7 @@ export async function startRecording(
         original_agenda_id: agendaRefreshed.id,
         meeting_provider: parameters.meetingProvider,
     })
-    console.log(`[startRecording] after post project`)
+    logger(`[startRecording] after post project`, 'LOG_DEBUG')
     const asset = await api.postAsset(
         {
             name: projectName,
@@ -140,7 +143,7 @@ export async function startRecording(
         true,
     )
 
-    console.log(`[startRecording] after post asset`)
+    logger(`[startRecording] after post asset`, 'LOG_DEBUG')
     const date = new Date()
     const now = date.getTime()
     const newSession = {
@@ -166,7 +169,7 @@ export async function startRecording(
     }
     START_RECORD_OFFSET = CONTEXT.currentTime
     START_RECORD_TIMESTAMP = now
-    console.log(`after media recorder start`)
+    logger(`after media recorder start`, 'LOG_DEBUG')
 
     return project
 }
@@ -174,7 +177,7 @@ export async function startRecording(
 let HANDLE_STOP_DONE = false
 
 async function handleStop(this: MediaRecorder, _e: Event) {
-    console.log('[handle stop]')
+    logger('[handle stop]', 'LOG_DEBUG')
     const spokeSession = SESSION!
     if (spokeSession) {
         await handleChunk(true)
@@ -184,9 +187,9 @@ async function handleStop(this: MediaRecorder, _e: Event) {
 }
 
 export async function stop() {
-    console.log('media recorder stop')
+    logger('media recorder stop', 'LOG_DEBUG')
     MEDIA_RECORDER.stop()
-    console.log('unset all stream')
+    logger('unset all stream', 'LOG_DEBUG')
     unsetAllStream()
 
     while (!HANDLE_STOP_DONE) {
@@ -207,10 +210,10 @@ export async function waitUntilComplete(kill = false) {
             console.error('error patching project', e)
         }
     }
-    console.log('[waitForUpload]', 'after patch moment pending')
+    logger('[waitForUpload]'.concat('after patch moment pending'), 'LOG_DEBUG')
 
     if (kill) {
-        console.log('[waitForUpload] killing')
+        logger('[waitForUpload] killing', 'LOG_DEBUG')
         spokeSession.upload_queue.kill()
     } else {
         console.log(
@@ -221,7 +224,7 @@ export async function waitUntilComplete(kill = false) {
             return
         })
         await spokeSession.upload_queue.drain()
-        console.log('[waitForUpload]', 'after transcribe queue drain')
+        logger('[waitForUpload] after transcribe queue drain', 'LOG_DEBUG')
     }
 }
 
@@ -296,15 +299,15 @@ export async function sendDataChunks(
                 (e as any)?.response?.data ??
                     'An error occured while uploading the video',
             )
-            console.log('Error in upload chunk killing')
+            logger('Error in upload chunk killing', 'LOG_DEBUG')
             spokeSession.upload_queue.kill()
             return
         }
     } catch (e) {
         if ((e as any).response && (e as any).response.data) {
-            console.log((e as any).response.data)
+            logger((e as any).response.data, 'LOG_DEBUG')
         } else {
-            console.log(e)
+            logger(e as any, 'LOG_DEBUG')
         }
     }
 }

@@ -1,9 +1,12 @@
 import * as fs from 'fs'
+
 import { dirname, join } from 'path'
 import { Browser, ConsoleMessage, Page } from 'puppeteer'
+
 import puppeteer from 'puppeteer-extra'
 import { MeetingHandle } from './meeting'
 import { s3cp } from './s3'
+
 // add stealth plugin and use defaults (all evasion techniques)
 const StealthPlugin = require('puppeteer-extra-plugin-stealth')
 
@@ -84,8 +87,12 @@ export async function screenshot(page: Page, name: string) {
         // try { await unlink(link) } catch (e) { }
         await fs.promises.mkdir(dirname(link), { recursive: true })
         await page.screenshot({ path: link })
-
         await s3cp(link, link.substring(2))
+        // TODO: remove hard-coded link
+        console.log(
+            'SCREENSHOT: ',
+            'https://spoke-log-bot.s3.amazonaws.com/'.concat(link.substring(2)),
+        )
     } catch (e) {
         console.error(`Failed to take screenshot ${e}`)
     }
@@ -199,13 +206,54 @@ export async function tryGetExtensionId() {
     return extensionId
 }
 
-export async function openBrowser(extensionId: string): Promise<Browser> {
+export async function openBrowser(
+    extensionId: string,
+    messageHandler: (message: any) => void,
+): Promise<{ browser: Browser; backgroundPage: Page }> {
     let error = null
     const NUMBER_TRY_OPEN_BROWSER = 5
     for (let i = 0; i < NUMBER_TRY_OPEN_BROWSER; i++) {
         try {
+            // Attempt to open the browser with the specified extension
             const browser = await tryOpenBrowser(extensionId)
-            return browser
+            // Find the background page of the extension within the browser
+            const backgroundPage = await findBackgroundPage(
+                browser,
+                extensionId,
+            )
+
+            // Inject a function into the background page that allows messages to be sent to a server
+            await backgroundPage.evaluate(() => {
+                ;(window as any).sendToRecordingServer = (message: string) => {
+                    window.postMessage(
+                        {
+                            type: 'FROM_EXTENSION',
+                            message: JSON.parse(message),
+                        },
+                        '*',
+                    )
+                }
+            })
+
+            // Expose a function to handle messages from the extension within the background page
+            await backgroundPage.exposeFunction(
+                'handleMessageFromExtension',
+                messageHandler,
+            )
+
+            // Add an event listener to handle messages from the extension
+            await backgroundPage.evaluate(() => {
+                window.addEventListener('message', (event) => {
+                    if (event.data.type === 'FROM_EXTENSION') {
+                        ;(window as any).handleMessageFromExtension(
+                            event.data.message,
+                        )
+                    }
+                })
+            })
+
+            // Return the browser and the fully configured background page
+            return { browser, backgroundPage }
         } catch (e) {
             console.error(`Failed to open browser: ${e}`, {
                 retry: i,
@@ -214,8 +262,10 @@ export async function openBrowser(extensionId: string): Promise<Browser> {
             continue
         }
     }
+    // If all retries fail, throw the last encountered error
     throw error
 }
+
 export async function tryOpenBrowser(extensionId: string): Promise<Browser> {
     const pathToExtension =
         process.env.PROFILE !== 'DEV'

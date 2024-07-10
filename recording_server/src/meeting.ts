@@ -1,7 +1,6 @@
 import { BrandingHandle, generateBranding, playBranding } from './branding'
 import { Logger, uploadLog } from './logger'
 import {
-    findBackgroundPage,
     getCachedExtensionId,
     listenPage,
     openBrowser,
@@ -36,6 +35,7 @@ export class JoinError extends Error {
 export enum JoinErrorCode {
     CannotJoinMeeting = 'CannotJoinMeeting',
     BotNotAccepted = 'BotNotAccepted',
+    BotRemoved = 'BotRemoved',
     TimeoutWaitingToStart = 'TimeoutWaitingToStart',
     Internal = 'InternalError',
     InvalidMeetingUrl = 'InvalidMeetingUrl',
@@ -81,7 +81,7 @@ export class MeetingHandle {
     }
 
     constructor(meetingParams: MeetingParams, logger: Logger) {
-        function detectMeetingProvider(url: string) {
+        function detectMeetingProvider(url: string): MeetingProvider {
             if (url.includes('https://teams')) {
                 return 'Teams'
             } else if (url.includes('https://meet')) {
@@ -91,7 +91,9 @@ export class MeetingHandle {
             }
         }
 
-        function newMeetingProvider(meetingProvider: MeetingProvider) {
+        function newMeetingProvider(
+            meetingProvider: MeetingProvider,
+        ): MeetingProviderInterface {
             if (meetingProvider === 'Teams') {
                 return new TeamsProvider()
             } else if (meetingProvider === 'Meet') {
@@ -116,6 +118,22 @@ export class MeetingHandle {
         this.param.bot_name += ' meuuuuh'
     }
 
+    // those are messages from the chrome extension itself
+    // that we print, so we can "save them"
+    private handleMessageFromExtension = (message: any) => {
+        console.log('Message received from extension:', message)
+        if (message.messageType === 'STOP_MEETING') {
+            this.stopRecording(message.data.reason)
+        }
+        if (message.messageType === 'LOG_INFO') {
+            console.log(message.data.reason)
+        }
+        // TODO handle DEBUG log according to env variable
+        if (message.messageType === 'LOG_DEBUG') {
+            console.info(message.data.reason)
+        }
+    }
+
     public async startRecordMeeting() {
         try {
             if (this.param.bot_branding) {
@@ -128,11 +146,12 @@ export class MeetingHandle {
             }
 
             const extensionId = await getCachedExtensionId()
-            this.meeting.browser = await openBrowser(extensionId)
-            this.meeting.backgroundPage = await findBackgroundPage(
-                this.meeting.browser,
+            const { browser, backgroundPage } = await openBrowser(
                 extensionId,
+                this.handleMessageFromExtension,
             )
+            this.meeting.browser = browser
+            this.meeting.backgroundPage = backgroundPage
             this.logger.info('Extension found', { extensionId })
 
             const { meetingId, password } = await this.provider.parseMeetingUrl(
@@ -192,9 +211,9 @@ export class MeetingHandle {
             await Events.inCallNotRecording()
 
             const project = await this.meeting.backgroundPage.evaluate(
-                async (meetingParams) => {
+                async (meuh) => {
                     const w = window as any
-                    return await w.startRecording(meetingParams)
+                    return await w.startRecording(meuh)
                 },
                 {
                     ...this.param,
@@ -245,25 +264,25 @@ export class MeetingHandle {
             this.logger.error(`failed to del session in redis: ${e}`)
         }
     }
+
     private async cleanMeeting() {
-        // try { removeListenPage(meeting.backgroundPage) } catch (e) { console.error(e) }
         try {
-            await this.meeting.page.close()
+            await this.meeting.page?.close()
         } catch (e) {
             console.error(e)
         }
         try {
-            await this.meeting.backgroundPage.close()
+            await this.meeting.backgroundPage?.close()
         } catch (e) {
             console.error(e)
         }
         try {
-            await this.meeting.browser.close()
+            await this.meeting.browser?.close()
         } catch (e) {
             console.error(e)
         }
         try {
-            clearTimeout(this.meeting.meetingTimeoutInterval)
+            clearTimeout(this.meeting.meetingTimeoutInterval!)
         } catch (e) {
             console.error(e)
         }
@@ -294,7 +313,7 @@ export class MeetingHandle {
             if (
                 await this.provider.findEndMeeting(
                     this.param,
-                    this.meeting.page,
+                    this.meeting.page!,
                     cancelationToken,
                 )
             ) {
@@ -307,7 +326,7 @@ export class MeetingHandle {
     }
 
     public async getAgenda(): Promise<any | undefined> {
-        const agenda = await this.meeting.backgroundPage.evaluate(async () => {
+        const agenda = await this.meeting.backgroundPage!.evaluate(async () => {
             const w = window as any
             return await w.getAgenda()
         })
@@ -318,25 +337,26 @@ export class MeetingHandle {
         this.logger.info('Changing agenda', {
             new_agenda: data.agenda_id,
         })
-        await this.meeting.backgroundPage.evaluate(async (data) => {
+        await this.meeting.backgroundPage!.evaluate(async (data) => {
             const w = window as any
             await w.changeAgenda(data)
         }, data)
     }
+
     public async changeLanguage(data: ChangeLanguage) {
         this.logger.info('Changing language', {
             new_language: data.language,
         })
-        // this.logger.error('Can\'t change language, the feature is desactivated')
-        await this.meeting.backgroundPage.evaluate(async (data) => {
+        await this.meeting.backgroundPage!.evaluate(async (data) => {
             const w = window as any
             await w.changeLanguage(data)
         }, data)
     }
+
     public async stopRecording(reason: string) {
         if (MeetingHandle.status.state !== 'Recording') {
             this.logger.error(
-                `Can't exit metting, the meeting is not in recording state`,
+                `Can't exit meeting, the meeting is not in recording state`,
                 { status: MeetingHandle.status.state, exit_reason: reason },
             )
             return
@@ -358,46 +378,46 @@ export class MeetingHandle {
         } catch (e) {}
         let { page, meetingTimeoutInterval, browser, backgroundPage } =
             this.meeting
-        await backgroundPage.evaluate(async () => {
+        await backgroundPage!.evaluate(async () => {
             const w = window as any
             await w.stopMediaRecorder()
         })
         try {
-            await page.goto('about:blank')
+            await page!.goto('about:blank')
         } catch (e) {
             console.error(e)
         }
 
         try {
-            clearTimeout(meetingTimeoutInterval)
+            clearTimeout(meetingTimeoutInterval!)
         } catch (e) {
             console.error(e)
         }
         try {
-            await page.close()
+            await page!.close()
         } catch (e) {
             this.logger.error(`Failed to close page: ${e}`)
         }
 
         this.logger.info('Waiting for all chunks to be uploaded')
-        await backgroundPage.evaluate(async () => {
+        await backgroundPage!.evaluate(async () => {
             const w = window as any
             await w.waitForUpload()
         })
         this.logger.info('All chunks uploaded')
-        // browser.disconnect()
         try {
-            removeListenPage(backgroundPage)
-            await backgroundPage.close()
+            removeListenPage(backgroundPage!)
+            await backgroundPage!.close()
             await sleep(1)
-            await browser.close()
+            await browser!.close()
         } catch (e) {
             console.error(`Failed to close browser: ${e}`)
         }
         this.logger.info('Meeting successfully terminated')
     }
+
     private meetingTimeout() {
-        this.logger.info('stoping meeting tiemout reason')
+        this.logger.info('stopping meeting timeout reason')
         try {
             this.stopRecording('timeout')
         } catch (e) {

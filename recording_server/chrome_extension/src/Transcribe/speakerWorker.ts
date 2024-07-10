@@ -1,8 +1,8 @@
-import { SPEAKERS } from '../background'
 import { SESSION } from '../record'
-import { uploadEditorsTask } from '../uploadEditors'
-import { sleep } from '../utils'
+import { SPEAKERS } from '../background'
 import { Transcriber } from './Transcriber'
+import { sleep } from '../utils'
+import { uploadEditorsTask } from '../uploadEditors'
 
 export async function speakerWorker() {
     async function routine() {
@@ -16,7 +16,11 @@ export async function speakerWorker() {
                 console.log(
                     'wordPosterWorker: no speaker in the last minute, forcing same speaker',
                 )
-                SPEAKERS.push({ name: lastSpeaker.name, timestamp: now })
+                SPEAKERS.push({
+                    name: lastSpeaker.name,
+                    timestamp: now,
+                    isSpeaking: false,
+                })
                 await uploadEditorsTask(SPEAKERS)
             }
         } catch (e) {

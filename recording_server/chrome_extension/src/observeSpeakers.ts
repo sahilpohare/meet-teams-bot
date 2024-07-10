@@ -2,9 +2,12 @@ import * as R from 'ramda'
 import * as MeetProvider from './observeSpeakers/meet'
 import * as TeamsProvider from './observeSpeakers/teams'
 import * as ZoomProvider from './observeSpeakers/zoom'
+
 import { parameters } from './state'
 import { sleep } from './utils'
+
 export type Speaker = {
+    isSpeaking: boolean
     name: string
     timestamp: number
 }
@@ -13,6 +16,10 @@ declare var BOT_NAME: string
 declare var MEETING_PROVIDER: string
 declare var RECORDING_MODE: RecordingMode
 export type RecordingMode = 'speaker_view' | 'gallery_view' | 'audio_only'
+
+let lastSpeechTimestamp = Date.now()
+const INACTIVITY_THRESHOLD = 60 * 1000 * 15 //ms
+let inactivityCheckInterval: NodeJS.Timeout | null = null
 
 const SPEAKERS: Speaker[] = []
 
@@ -38,7 +45,7 @@ function setMeetingProvider() {
             SPEAKER_LATENCY: TeamsProvider.SPEAKER_LATENCY,
             getSpeakerRootToObserve: TeamsProvider.getSpeakerRootToObserve,
             findAllAttendees: TeamsProvider.findAllAttendees,
-            removeInitialShityHtml: ZoomProvider.removeInitialShityHtml,
+            removeInitialShityHtml: TeamsProvider.removeInitialShityHtml,
         }
     } else if (MEETING_PROVIDER === 'Meet') {
         PROVIDER = {
@@ -48,7 +55,7 @@ function setMeetingProvider() {
             SPEAKER_LATENCY: MeetProvider.SPEAKER_LATENCY,
             getSpeakerRootToObserve: MeetProvider.getSpeakerRootToObserve,
             findAllAttendees: MeetProvider.findAllAttendees,
-            removeInitialShityHtml: ZoomProvider.removeInitialShityHtml,
+            removeInitialShityHtml: MeetProvider.removeInitialShityHtml,
         }
     } else {
         PROVIDER = {
@@ -85,19 +92,22 @@ async function refreshAttendeesLoop() {
                 payload: allAttendees,
             })
         } catch (e) {
-            console.error('an exception occured in refresh attendees', e)
+            console.error('an exception occurred in refresh attendees', e)
         }
         await sleep(10000)
     }
 }
+
 async function observeSpeakers() {
     console.log('start observe speakers', RECORDING_MODE)
     try {
         removeShityHtmlLoop(RECORDING_MODE)
         refreshAttendeesLoop()
+        checkInactivity()
     } catch (e) {
-        console.log('an exception occured in remove shity html', e)
+        console.log('an exception occurred in remove shitty html', e)
     }
+
     function refreshSpeaker(index: number) {
         console.log('timeout refresh speaker')
         let lastSpeaker = index < SPEAKERS.length ? SPEAKERS[index] : undefined
@@ -127,42 +137,44 @@ async function observeSpeakers() {
                     RECORDING_MODE,
                 )
 
-                const previousSpeaker =
-                    SPEAKERS.length > 0
-                        ? SPEAKERS[SPEAKERS.length - 1]
-                        : undefined
-                const speakersFiltered = R.filter(
-                    (u) =>
-                        u.name !== BOT_NAME && u.name !== previousSpeaker?.name,
-                    speakers,
-                )
-                const speaker = speakersFiltered[0]
+                if (MEETING_PROVIDER === 'Zoom') {
+                    // Existing Zoom logic
+                    const previousSpeaker =
+                        SPEAKERS.length > 0
+                            ? SPEAKERS[SPEAKERS.length - 1]
+                            : undefined
+                    const speakersFiltered = R.filter(
+                        (u) =>
+                            u.name !== BOT_NAME &&
+                            u.name !== previousSpeaker?.name,
+                        speakers,
+                    )
+                    const speaker = speakersFiltered[0]
 
-                if (speaker) {
-                    const newSpeaker = {
-                        name: speaker.name,
-                        timestamp: speaker.timestamp - PROVIDER.SPEAKER_LATENCY,
-                    }
-                    const speakerDuration =
-                        newSpeaker.timestamp - (previousSpeaker?.timestamp ?? 0)
-                    if (
-                        MEETING_PROVIDER === 'Zoom' &&
-                        speakerDuration < PROVIDER.MIN_SPEAKER_DURATION
-                    ) {
-                        SPEAKERS[SPEAKERS.length - 1] = newSpeaker
-                        if (
-                            SPEAKERS.length > 2 &&
-                            SPEAKERS[SPEAKERS.length - 2].name ===
-                                newSpeaker.name
-                        ) {
-                            SPEAKERS.pop()
+                    if (speaker) {
+                        const newSpeaker = {
+                            name: speaker.name,
+                            timestamp:
+                                speaker.timestamp - PROVIDER.SPEAKER_LATENCY,
+                            isSpeaking: speaker.isSpeaking,
                         }
-                        setTimeout(
-                            () => refreshSpeaker(SPEAKERS.length - 1),
-                            PROVIDER.MIN_SPEAKER_DURATION + 500,
-                        )
-                    } else {
-                        if (MEETING_PROVIDER === 'Zoom') {
+                        const speakerDuration =
+                            newSpeaker.timestamp -
+                            (previousSpeaker?.timestamp ?? 0)
+                        if (speakerDuration < PROVIDER.MIN_SPEAKER_DURATION) {
+                            SPEAKERS[SPEAKERS.length - 1] = newSpeaker
+                            if (
+                                SPEAKERS.length > 2 &&
+                                SPEAKERS[SPEAKERS.length - 2].name ===
+                                    newSpeaker.name
+                            ) {
+                                SPEAKERS.pop()
+                            }
+                            setTimeout(
+                                () => refreshSpeaker(SPEAKERS.length - 1),
+                                PROVIDER.MIN_SPEAKER_DURATION + 500,
+                            )
+                        } else {
                             chrome.runtime.sendMessage({
                                 type: 'REFRESH_SPEAKERS',
                                 payload: SPEAKERS,
@@ -180,24 +192,54 @@ async function observeSpeakers() {
                                     PROVIDER.MIN_SPEAKER_DURATION + 500,
                                 )
                             }
-                        } else {
-                            SPEAKERS.push(newSpeaker)
-                            chrome.runtime.sendMessage({
-                                type: 'REFRESH_SPEAKERS',
-                                payload: SPEAKERS,
-                            })
                         }
                         console.log('speaker changed to: ', speaker)
                     }
                 } else {
-                    console.log('no speaker change', speaker)
+                    // New logic for Meet and Teams
+                    const activeSpeakers = speakers.filter((s) => s.isSpeaking)
+                    // si lazare parle,  si Philippe se met a parler en meme temps
+                    // philippe prend forcement la precedence
+                    const newActiveSpeakers = activeSpeakers.filter(
+                        (s) =>
+                            s.name !== BOT_NAME &&
+                            (SPEAKERS.length === 0 ||
+                                s.name !== SPEAKERS[SPEAKERS.length - 1].name),
+                    )
+                    // essayer de gerer MIN DURATION ICI ?
+                    //  && Date.now() - s.timestamp >
+                    //     PROVIDER.MIN_SPEAKER_DURATION)),
+
+                    if (newActiveSpeakers.length > 0) {
+                        // TODO: not handling multiple speakers in the same time
+                        const newSpeaker = newActiveSpeakers[0]
+                        SPEAKERS.push(newSpeaker)
+                        console.log('speaker changed to: ', newSpeaker)
+                        chrome.runtime.sendMessage({
+                            type: 'REFRESH_SPEAKERS',
+                            payload: SPEAKERS,
+                        })
+                        chrome.runtime.sendMessage({
+                            type: 'SEND_TO_SERVER',
+                            payload: {
+                                messageType: 'LOG',
+                                data: { reason: 'gros test sa mere' },
+                            },
+                        })
+                    }
+                }
+
+                // Update last speech timestamp
+                if (speakers.some((s) => s.isSpeaking)) {
+                    lastSpeechTimestamp = Date.now()
                 }
             } catch (e) {
-                console.error('an exception occured in observeSpeaker', e)
-                console.log('an exception occured in observeSpeaker', e)
+                console.error('an exception occurred in observeSpeaker', e)
+                console.log('an exception occurred in observeSpeaker', e)
             }
         })
     })
+
     try {
         const speakers = R.filter(
             (u) => u.name !== BOT_NAME,
@@ -207,10 +249,10 @@ async function observeSpeakers() {
         const speaker = speakers[0]
         if (speaker) {
             SPEAKERS.push(speaker)
-
+            lastSpeechTimestamp = Date.now()
             chrome.runtime.sendMessage({
                 type: 'LOG',
-                payload: `[ObserveSpeaker] inital speakers ${
+                payload: `[ObserveSpeaker] initial speakers ${
                     SPEAKERS[SPEAKERS.length - 1].name
                 }
                 ${SPEAKERS[SPEAKERS.length - 1].timestamp}
@@ -221,14 +263,18 @@ async function observeSpeakers() {
                 payload: SPEAKERS,
             })
         } else {
-            SPEAKERS.push({ name: '-', timestamp: Date.now() })
+            SPEAKERS.push({
+                name: '-',
+                timestamp: Date.now(),
+                isSpeaking: false,
+            })
             chrome.runtime.sendMessage({
                 type: 'REFRESH_SPEAKERS',
                 payload: SPEAKERS,
             })
             chrome.runtime.sendMessage({
                 type: 'LOG',
-                payload: `[ObserveSpeaker] no inital speakers ${
+                payload: `[ObserveSpeaker] no initial speakers ${
                     SPEAKERS[SPEAKERS.length - 1].name
                 }
                 ${SPEAKERS[SPEAKERS.length - 1].timestamp}
@@ -236,12 +282,44 @@ async function observeSpeakers() {
             })
         }
     } catch (e) {
-        console.error('an exception occured startion observeSpeaker')
+        console.error('an exception occurred starting observeSpeaker')
     }
+
     try {
         await PROVIDER.removeInitialShityHtml(RECORDING_MODE)
         await PROVIDER.getSpeakerRootToObserve(mutationObserver, RECORDING_MODE)
     } catch (e) {
-        console.error('an exception occured starting observeSpeaker')
+        console.error('an exception occurred starting observeSpeaker')
+    }
+}
+
+async function checkInactivity() {
+    while (true) {
+        const speakers = PROVIDER.getSpeakerFromDocument(
+            null,
+            null,
+            RECORDING_MODE,
+        )
+        console.log('checking inactivity', speakers.length, lastSpeechTimestamp)
+        if (speakers.length === 0) {
+            if (Date.now() - lastSpeechTimestamp > INACTIVITY_THRESHOLD) {
+                console.error('Only bot in meeting for more than a minute')
+                console.error('[wordPosterWorker] Meuh y a que des bots!!!')
+                chrome.runtime.sendMessage({
+                    type: 'SEND_TO_SERVER',
+                    payload: {
+                        messageType: 'STOP_MEETING',
+                        data: { reason: 'Only bot in meeting' },
+                    },
+                })
+                if (inactivityCheckInterval) {
+                    clearInterval(inactivityCheckInterval)
+                }
+                break
+            }
+        } else {
+            lastSpeechTimestamp = Date.now()
+        }
+        await sleep(1000)
     }
 }

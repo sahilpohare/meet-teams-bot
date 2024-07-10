@@ -4,16 +4,11 @@ import * as State from './state'
 import { Project, api, setConfig } from './spoke_api_js'
 
 import axios from 'axios'
+import { Speaker } from './observeSpeakers'
 import { Transcriber } from './Transcribe/Transcriber'
 import { uploadEditorsTask } from './uploadEditors'
 import { sleep } from './utils'
 
-type Speaker = {
-    name: string
-    timestamp: number
-}
-
-addListener()
 export let SPEAKERS: Speaker[] = []
 export let ATTENDEES: string[] = []
 
@@ -23,11 +18,13 @@ export function addDefaultHeader(name: string, value: string) {
     axios.defaults.headers.common[name] = value
 }
 
-function setUserAgent(window, userAgent) {
+function setUserAgent(window: Window, userAgent: string) {
     // Works on Firefox, Chrome, Opera and IE9+
     if ((navigator as any).__defineGetter__) {
-        ;(navigator as any).__defineGetter__('userAgent', function () {
-            return userAgent
+        Object.defineProperty(navigator, 'userAgent', {
+            get: function () {
+                return userAgent
+            },
         })
     } else if (Object.defineProperty) {
         Object.defineProperty(navigator, 'userAgent', {
@@ -46,31 +43,38 @@ function setUserAgent(window, userAgent) {
         try {
             Object.defineProperty(window.navigator, 'userAgent', userAgentProp)
         } catch (e) {
-            window.navigator = Object.create(navigator, {
-                userAgent: userAgentProp,
-            })
+            console.warn('Failed to set userAgent', e)
         }
     }
 }
+
 setUserAgent(
     window,
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36',
 )
 
+function sendMessageToRecordingServer(message: any) {
+    if ((window as any).sendToRecordingServer) {
+        ;(window as any).sendToRecordingServer(JSON.stringify(message))
+    }
+}
+
 function addListener() {
     chrome.runtime.onMessage.addListener(function (
-        request,
-        _sender,
-        _sendResponse,
+        request: any,
+        _sender: chrome.runtime.MessageSender,
+        _sendResponse: (response?: any) => void,
     ) {
         switch (request.type) {
-            case 'REFRESH_ATTENDEES': {
+            case 'SEND_TO_SERVER':
+                sendMessageToRecordingServer(request.payload)
+                break
+            case 'REFRESH_ATTENDEES':
                 if (request.payload.length > ATTENDEES.length) {
                     ATTENDEES = request.payload
                 }
                 break
-            }
-            case 'REFRESH_SPEAKERS': {
+            case 'REFRESH_SPEAKERS':
                 const prevSpeakers = SPEAKERS
                 SPEAKERS = request.payload
                 if (SPEAKERS.length > prevSpeakers.length) {
@@ -78,23 +82,21 @@ function addListener() {
                     uploadEditorsTask(SPEAKERS)
                 }
                 break
-            }
-            case 'LOG': {
+            case 'LOG':
                 console.log(request.payload)
                 break
-            }
-            case 'OBSERVE_SPEAKERS': {
+            case 'OBSERVE_SPEAKERS':
                 observeSpeakers()
                 break
-            }
-            case 'RECORD': {
+            case 'RECORD':
                 record.initMediaRecorder()
                 break
-            }
-            default: {
+            case 'STOP':
+                stopMediaRecorder()
+                break
+            default:
                 console.log('UNKNOWN_REQUEST', request)
                 break
-            }
         }
     })
 }
@@ -150,10 +152,10 @@ export async function stopMediaRecorder() {
     await record.stop()
     const timestamp = new Date().getTime()
     // add a last fake speaker to trigger the upload of the last editor ( generates an interval )
-    SPEAKERS.push({ name: 'END', timestamp })
+    //TODOP: check isSpeaking is false
+    SPEAKERS.push({ name: 'END', timestamp, isSpeaking: false })
     await uploadEditorsTask(SPEAKERS)
-
-    console.log('stoping transcriber')
+    console.log('stopping transcriber')
 }
 
 export async function waitForUpload() {
@@ -170,7 +172,7 @@ export async function waitForUpload() {
     if (record.SESSION?.project.id != null) {
         try {
             await api.endMeetingTrampoline(
-                record.SESSION?.project.id,
+                record.SESSION.project.id,
                 State.parameters.bot_id,
             )
         } catch (e) {
@@ -184,17 +186,15 @@ export type ChangeLanguage = {
     use_my_vocabulary: boolean
     language: string
 }
+
 export type ChangeAgenda = {
     agenda_id: number
 }
 
 export async function getAgenda() {
-    if (State.parameters.agenda != null) {
-        return State.parameters.agenda
-    } else {
-        return undefined
-    }
+    return State.parameters.agenda ?? undefined
 }
+
 export async function changeAgenda(data: ChangeAgenda) {
     if (State.parameters.agenda?.id !== data.agenda_id) {
         try {
@@ -205,9 +205,12 @@ export async function changeAgenda(data: ChangeAgenda) {
         }
     }
 }
+
 const w = window as any
 w.startRecording = startRecording
 w.stopMediaRecorder = stopMediaRecorder
 w.waitForUpload = waitForUpload
 w.changeAgenda = changeAgenda
 w.getAgenda = getAgenda
+
+addListener()

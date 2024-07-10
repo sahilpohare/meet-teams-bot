@@ -46,7 +46,14 @@ export function getSpeakerFromDocument(
             ),
         )
     if (speaker) {
-        return [{ name: speaker, timestamp: Date.now() }]
+        //TODO: check if speaker is the same as currentSpeaker
+        return [
+            {
+                name: speaker,
+                timestamp: Date.now(),
+                isSpeaking: false,
+            },
+        ]
     } else {
         return []
     }

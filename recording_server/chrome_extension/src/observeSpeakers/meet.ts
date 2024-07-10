@@ -1,6 +1,7 @@
 import { RecordingMode, Speaker } from '../observeSpeakers'
 
 import { sleep } from '../utils'
+
 export const MIN_SPEAKER_DURATION = 200
 export const SPEAKER_LATENCY = 500
 
@@ -155,10 +156,12 @@ export function getSpeakerFromDocument(
                 if (maxOccurrences[j].speaker === differentSpeaker.speaker) {
                     if (differentSpeakerCount >= 4) {
                         maxOccurrences = maxOccurrences.slice(j)
+                        //TODO Adapt is Speaking State
                         return [
                             {
                                 name: differentSpeaker.speaker,
                                 timestamp: differentSpeaker.timestamp,
+                                isSpeaking: true, 
                             },
                         ]
                     }
@@ -251,6 +254,7 @@ export function getSpeakerFromMutation(
         return null
     }
 }
+
 function findSpeakerName(divSpeaker: any) {
     // Array.from(divSpeaker.querySelectorAll('span')).forEach(s => console.log(s.innerText))
     // console.log({ mutation })

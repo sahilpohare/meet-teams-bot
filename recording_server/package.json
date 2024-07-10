@@ -3,7 +3,7 @@
     "version": "0.0.0",
     "description": "Minimalistic boilerplate to quick-start Node.js development in TypeScript.",
     "engines": {
-        "node": ">= 14.16 <=16"
+        "node": ">= 14.16 <=18"
     },
     "dependencies": {
         "amqplib": "^0.10.3",

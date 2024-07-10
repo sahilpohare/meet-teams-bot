@@ -1,170 +1,326 @@
 import { RecordingMode, Speaker } from '../observeSpeakers'
+
 import { sleep } from '../utils'
 
-export const MIN_SPEAKER_DURATION = 0
-export const SPEAKER_LATENCY = 900
+export const MIN_SPEAKER_DURATION = 400
+export const SPEAKER_LATENCY = 0
+
+class SpeakerState {
+    constructor(
+        public name: string,
+        public isCurrentlySpeaking: boolean = false,
+        public lastActiveTimestamp: number = 0,
+    ) {}
+}
 
 export async function getSpeakerRootToObserve(
     mutationObserver: MutationObserver,
     recordingMode: RecordingMode,
 ): Promise<void> {
+    // console.log('[Teams] Starting getSpeakerRootToObserve')
     try {
-        var documentInIframe = getDocumentRoot()!
+        const documentRoot = getDocumentRoot()
+        // console.log('[Teams] Document root obtained')
+        chrome.runtime.sendMessage({
+            type: 'SEND_TO_SERVER',
+            payload: {
+                messageType: 'LOG',
+                data: { reason: 'gros test sa mere' },
+            },
+        })
         const config = {
             attributes: true,
             childList: true,
             subtree: true,
-            attributeFilter: ['class'],
+            attributeFilter: ['style', 'class'],
         }
 
-        mutationObserver.observe(documentInIframe, config)
+        mutationObserver.observe(documentRoot, config)
+        // console.log('[Teams] MutationObserver set up successfully')
     } catch (e) {
-        console.error('fail to observe voice-level-stream-outline', e)
+        // console.error('[Teams] Failed to observe Teams meeting', e)
     }
 }
 
-// Création d'un dictionnaire pour garder la trace de l'état de chaque speaker
+function getDocumentRoot(): Document {
+    // console.log('[Teams] Getting document root')
+    for (let iframe of document.querySelectorAll('iframe')) {
+        try {
+            const doc = iframe.contentDocument || iframe.contentWindow?.document
+            if (doc) {
+                // console.log('[Teams] Document root found in iframe')
+                return doc
+            }
+        } catch (e) {
+            // console.warn('[Teams] Error accessing iframe content', e)
+        }
+    }
+    // console.log('[Teams] Using main document as root')
+    return document
+}
 
 export function getSpeakerFromDocument(
     currentSpeaker: string | null,
     mutation: MutationRecord | null,
     recordingMode: RecordingMode,
 ): Speaker[] {
-    let targetElements
-    if (
-        mutation != null &&
-        mutation.type === 'attributes' &&
-        mutation.attributeName === 'class'
-    ) {
-        targetElements = [mutation.target]
-    } else {
-        var documentInIframe = getDocumentRoot()!
-        targetElements = Array.from(
-            documentInIframe.querySelectorAll(
-                '[data-tid="voice-level-stream-outline"]',
-            ),
-        )
-    }
-    for (const targetElement of targetElements) {
-        if (
-            (targetElement as Element).getAttribute('data-tid') ===
-            'voice-level-stream-outline'
-        ) {
-            const beforeElementStyles = window.getComputedStyle(
-                targetElement as Element,
-                '::before',
-            )
-            const parentDiv = targetElement.parentElement
-            const currentBorderColor =
-                beforeElementStyles.getPropertyValue('border-color')
-            const spans: any = Array.from(parentDiv?.querySelectorAll('span'))
-            const span = spans.find((span) => span.textContent.length > 1)
-            const speaker = span?.textContent
-            // Vérifier si la couleur de la bordure est rgb(127, 133, 245)
-            if (
-                currentBorderColor.trim() === 'rgb(127, 133, 245)' ||
-                currentBorderColor.trim() === 'rgb(91, 95, 199)'
-            ) {
-                if (speaker.includes('Leaving')) {
-                    console.log('OMG WE NEED TO CATCH LEAVING ⚠️ ‼️')
-                }
-                if (
-                    span != null &&
-                    speaker != null &&
-                    speaker.trim() !== '' &&
-                    !speaker.includes('Leaving...')
-                ) {
-                    span.parentElement.style.opacity = '0'
-                    removeShityHtml(recordingMode)
-                    return [{ name: speaker, timestamp: Date.now() }]
-                }
-            } else {
-                if (
-                    span != null &&
-                    speaker != null &&
-                    speaker.trim() !== '' &&
-                    !speaker.includes('Leaving...')
-                ) {
-                    span.parentElement.style.opacity = '0'
-                    removeShityHtml(recordingMode)
-                    continue
-                }
+    // console.log('[Teams] Starting getSpeakerFromDocument', {
+    //     currentSpeaker,
+    //     recordingMode,
+    // })
+    const documentRoot = getDocumentRoot()
+    const speakerElements = documentRoot.querySelectorAll(
+        '[data-cid="calling-participant-stream"]',
+    )
+    // console.log('[Teams] Found speaker elements:', speakerElements.length)
+    const speakerStates = new Map<string, SpeakerState>()
+
+    speakerElements.forEach((element) => {
+        // can create errors if speaker has a "," in his name
+        const speaker = getParticipantName(element)
+        if (speaker !== '') {
+            if (!speakerStates.has(speaker)) {
+                speakerStates.set(speaker, new SpeakerState(speaker))
             }
+            const isSpeaking = checkIfSpeaking(element as HTMLElement)
+            if (element.getAttribute('aria-label')?.includes(', muted,')) {
+                // muted speakers can not be speaking, this is a security
+                updateSpeakerState(speakerStates, speaker, false)
+            } else {
+                updateSpeakerState(speakerStates, speaker, isSpeaking)
+            }
+            // console.log(
+            //     `[Teams] Speaker state updated: ${speaker}, isSpeaking: ${isSpeaking}`,
+            // )
+        }
+    })
+
+    removeShityHtml(recordingMode)
+
+    // const activeSpeakers = Array.from(speakerStates.values())
+    //     .filter((state) => state.isCurrentlySpeaking)
+    //     .map((state) => ({
+    //         name: state.name,
+    //         timestamp: state.lastActiveTimestamp,
+    //         isSpeaking: true,
+    //     }))
+
+    const Speakers = Array.from(speakerStates.values()).map((state) => ({
+        name: state.name,
+        timestamp: state.lastActiveTimestamp,
+        isSpeaking: state.isCurrentlySpeaking,
+    }))
+
+    // console.log('[Teams] Active speakers:', activeSpeakers)
+    console.table(Speakers)
+    return Speakers
+}
+
+function checkIfSpeaking(element: HTMLElement): boolean {
+    let isSpeaking = checkElementAndPseudo(element)
+    if (!isSpeaking) {
+        element.querySelectorAll('*').forEach((child) => {
+            if (checkElementAndPseudo(child as HTMLElement)) {
+                isSpeaking = true
+            }
+        })
+    }
+    return isSpeaking
+}
+
+function checkElementAndPseudo(el: HTMLElement): boolean {
+    const style = window.getComputedStyle(el)
+    const beforeStyle = window.getComputedStyle(el, '::before')
+    const afterStyle = window.getComputedStyle(el, '::after')
+
+    if (el.getAttribute('data-tid') === 'participant-speaker-ring') {
+        console.log('participant-speaker-ring', parseFloat(style.opacity) === 1)
+        return parseFloat(style.opacity) === 1
+    }
+    console.log(
+        'isBlueish(style.borderColor)',
+        isBlueish(style.borderColor) ||
+            isBlueish(beforeStyle.borderColor) ||
+            isBlueish(afterStyle.borderColor),
+        'style :',
+        style.borderColor,
+        'beforeStyle :',
+        beforeStyle.borderColor,
+        'afterStyle :',
+        afterStyle.borderColor,
+    )
+    return (
+        (isBlueish(style.borderColor) && parseFloat(style.opacity) === 1) ||
+        (isBlueish(beforeStyle.borderColor) &&
+            parseFloat(beforeStyle.opacity) === 1) ||
+        (isBlueish(afterStyle.borderColor) &&
+            parseFloat(afterStyle.opacity) === 1)
+    )
+}
+
+function isBlueish(color: string): boolean {
+    // Normalize the color string
+    color = color.toLowerCase().trim()
+
+    let rgb: number[] | null = null // Initialize to null
+
+    // Check and extract RGB values from hex format
+    if (color.startsWith('#')) {
+        // Handle short hex format (e.g., #fff)
+        if (color.length === 4) {
+            const r = parseInt(color[1] + color[1], 16)
+            const g = parseInt(color[2] + color[2], 16)
+            const b = parseInt(color[3] + color[3], 16)
+            rgb = [r, g, b]
+        }
+        // Handle long hex format (e.g., #ffffff)
+        else if (color.length === 7) {
+            const r = parseInt(color.slice(1, 3), 16)
+            const g = parseInt(color.slice(3, 5), 16)
+            const b = parseInt(color.slice(5, 7), 16)
+            rgb = [r, g, b]
+        }
+    } else {
+        // Try to extract RGB values from "rgb" or "rgba" format
+        const match = color.match(/\d+/g)
+        if (match && match.length >= 3) {
+            rgb = match.map(Number).slice(0, 3) // Ensure only the first three numbers are used
         }
     }
 
-    return []
-}
-function getDocumentRoot() {
-    var iframes = document.querySelectorAll('iframe')
-    var firstIframe = iframes[0]
-    return firstIframe
-        ? firstIframe.contentDocument || firstIframe.contentWindow?.document
-        : document
+    // Check if rgb is assigned and validate the blue dominance with stricter criteria
+    if (rgb && rgb.length === 3) {
+        const [r, g, b] = rgb
+        return b > 180 && b > r + 40 && b > g + 40 && r < 150 && g < 150
+    }
+    return false
 }
 
-export function removeShityHtml(mode: RecordingMode) {
-    try {
-        var documentInIframe = getDocumentRoot()!
-        var menus = documentInIframe.querySelectorAll('[role="menu"]')
-            ? documentInIframe.querySelectorAll('[role="menu"]')
-            : documentInIframe.querySelector('[role="menu"]')
-        // sélectionnez la div en question
-        var menu = menus![0] ? menus![0] : menus
-        menu.style.position = 'fixed'
-        menu.style.top = '0'
-        menu.style.left = '0'
-        menu.style.width = '100vw'
-        menu.style.height = '100vh'
-        menu.style.zIndex = '9999'
-        menu.style.backgroundColor = 'black'
-    } catch (e) {
-        console.error('error in remove shitty html', e)
+function updateSpeakerState(
+    speakerStates: Map<string, SpeakerState>,
+    speaker: string,
+    isSpeaking: boolean,
+): void {
+    let state = speakerStates.get(speaker)
+    if (state && state.isCurrentlySpeaking !== isSpeaking) {
+        state.isCurrentlySpeaking = isSpeaking
+        if (isSpeaking) {
+            state.lastActiveTimestamp = Date.now()
+        }
+        speakerStates.set(speaker, state)
+        // console.log(
+        //     `[Teams] Speaker state changed: ${speaker}, isSpeaking: ${isSpeaking}`,
+        // )
+    }
+}
+
+function getParticipantName(name: Element): string {
+    const nameBlackList: string[] = ['Content shared by']
+    const toSplitOn: string[] = [
+        ', video is on,',
+        ', muted,',
+        ', Context menu is available',
+        '(Unverified)',
+    ]
+
+    const ariaLabel = name.getAttribute('aria-label') || ''
+    let result: string = ariaLabel
+
+    // Vérifie si le label contient des éléments de la blacklist
+    for (const blackListed of nameBlackList) {
+        if (ariaLabel.includes(blackListed)) {
+            return '' // Retourne une chaîne vide si un élément blacklisté est trouvé
+        }
     }
 
-    try {
-        for (const div of document.getElementsByTagName('div')) {
-            div.clientHeight === 137 && div.clientWidth === 245
-                ? (div.style.opacity = '0')
-                : console.error('fail')
-        }
-    } catch (e) {}
+    // Divise le label basé sur les motifs spécifiés et garde la première partie
+    for (const splitTerm of toSplitOn) {
+        result = result.split(splitTerm)[0]
+    }
+
+    return result // Retourne le résultat final après toutes les divisions
 }
 
 export function findAllAttendees(): string[] {
-    return []
+    // console.log('[Teams] Starting findAllAttendees')
+    const documentRoot = getDocumentRoot()
+    const attendeeElements = documentRoot.querySelectorAll(
+        '[data-cid="calling-participant-stream"]',
+    )
+    // get attendees, do not take into account empty attendees
+    const attendees = Array.from(attendeeElements)
+        .map((el) => getParticipantName(el))
+        .filter(Boolean)
+    // console.log('[Teams] Found attendees:', attendees)
+    return attendees
 }
 
 export async function removeInitialShityHtml(mode: RecordingMode) {
+    // console.log('[Teams] Starting removeInitialShityHtml', { mode })
     await sleep(1000)
+    const documentRoot = getDocumentRoot()
     try {
-        var documentInIframe = getDocumentRoot()!
-        let meetingControls = documentInIframe!.querySelectorAll(
+        const meetingControls = documentRoot.querySelectorAll(
             `div[data-tid="app-layout-area--header"]`,
         )
 
-        if (meetingControls[0] && meetingControls[0] instanceof HTMLElement) {
+        if (meetingControls[0] instanceof HTMLElement) {
             meetingControls[0].style.opacity = '0'
+            // console.log('[Teams] Meeting controls hidden')
         }
     } catch (e) {
-        console.error('fail to remove buttons header', e)
+        // console.error('[Teams] Failed to remove buttons header', e)
     }
+
     try {
-        var documentInIframe = getDocumentRoot()!
-        const style = documentInIframe.createElement('style')
-        documentInIframe.head.appendChild(style)
+        const style = documentRoot.createElement('style')
+        documentRoot.head.appendChild(style)
         const sheet = style.sheet
 
-        // Add the CSS rule for the ::before pseudo-element
         sheet?.insertRule(
             `
-              [data-tid="voice-level-stream-outline"]::before {
-                border: 0px solid rgb(127, 133, 245);
-              }
-            `,
+        [data-tid="voice-level-stream-outline"]::before {
+          border: 0px solid rgb(127, 133, 245);
+        }
+      `,
             sheet.cssRules.length,
         )
+        // console.log('[Teams] Voice level stream outline style added')
     } catch (e) {
-        console.error('error in insert before style', e)
+        // console.error('[Teams] Error in insert before style', e)
+    }
+}
+
+export function removeShityHtml(mode: RecordingMode) {
+    // console.log('[Teams] Starting removeShityHtml', { mode })
+    const documentRoot = getDocumentRoot()
+    try {
+        const menus = documentRoot.querySelectorAll('[role="menu"]')
+        const menu = menus[0] || menus
+        if (menu instanceof HTMLElement) {
+            menu.style.position = 'fixed'
+            menu.style.top = '0'
+            menu.style.left = '0'
+            menu.style.width = '100vw'
+            menu.style.height = '100vh'
+            menu.style.zIndex = '9999'
+            menu.style.backgroundColor = 'black'
+            console.log('[Teams] Menu element hidden')
+        }
+    } catch (e) {
+        // console.error('[Teams] Error in remove shitty html', e)
+    }
+
+    try {
+        let hiddenDivs = 0
+        documentRoot.querySelectorAll('div').forEach((div) => {
+            if (div.clientHeight === 137 && div.clientWidth === 245) {
+                div.style.opacity = '0'
+                hiddenDivs++
+            }
+        })
+        // console.log(`[Teams] Hidden ${hiddenDivs} additional elements`)
+    } catch (e) {
+        // console.error('[Teams] Error in remove additional elements', e)
     }
 }

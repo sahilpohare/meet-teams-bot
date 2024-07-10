@@ -1,5 +1,5 @@
-import * as puppeteer from 'puppeteer'
 import * as R from 'ramda'
+import * as puppeteer from 'puppeteer'
 
 import {
     CancellationToken,
@@ -7,9 +7,9 @@ import {
     MeetingProviderInterface,
     RecordingMode,
 } from '../types'
+import { JoinError, JoinErrorCode } from '../meeting'
 
 import { Page } from 'puppeteer'
-import { JoinError, JoinErrorCode } from '../meeting'
 import { screenshot } from '../puppeteer'
 import { sleep } from '../utils'
 
@@ -140,9 +140,25 @@ async function findShowEveryOne(
         if (cancelCheck()) {
             throw new JoinError(JoinErrorCode.TimeoutWaitingToStart)
         }
-        if (await notAcceptedInMeeting(page)) {
-            throw new JoinError(JoinErrorCode.BotNotAccepted)
+        // if (await notAcceptedInMeeting(page)) {
+        //     throw new JoinError(JoinErrorCode.BotNotAccepted)
+        // }
+        try {
+            if (await notAcceptedInMeeting(page)) {
+                console.log('Bot not accepted, exiting meeting')
+                throw new JoinError(JoinErrorCode.BotNotAccepted)
+            }
+        } catch (error) {
+            if (error instanceof JoinError) {
+                console.log('Caught JoinError, exiting meeting')
+                throw error // This will propagate the error up
+            }
+            console.error('Unexpected error:', error)
         }
+        //TODO: check if bot is removed from meeting
+        // if (await removedFromMeeting(page)) {
+        //     throw new JoinError(JoinErrorCode.BotRemoved)
+        // }
         if (showEveryOneFound === false) {
             await sleep(1000)
         }
@@ -212,28 +228,6 @@ async function sendEntryMessage(
     }
 }
 
-// try {
-//     const CHAT_BUTTON_SELECTOR = 'button[aria-label="Chat with everyone"]'
-//     const CHAT_SEND_SELECTOR = 'button[aria-label="Send a message"]'
-//     // await clickFirst(CHAT_BUTTON_SELECTOR)
-//     console.log(
-//         'Click First CHAT_BUTTON_SELECTOR',
-//         await clickFirst(page, CHAT_BUTTON_SELECTOR),
-//     )
-//     await sleep(1000)
-//     await page.keyboard.type(enter_message)
-//     console.log(
-//         'Click First CHAT_SEND_SELECTOR',
-//         await clickFirst(page, CHAT_SEND_SELECTOR),
-//     )
-//     console.log(
-//         'Click First CHAT_BUTTON_SELECTOR',
-//         await clickFirst(page, CHAT_BUTTON_SELECTOR),
-//     )
-// } catch (e) {
-//     console.error('Unable to send enter message in chat', e)
-// }
-
 async function countParticipantsGaleryView(page: Page): Promise<number> {
     let i = 0
 
@@ -263,18 +257,37 @@ async function countParticipantsSpeakerView(page: Page): Promise<number> {
     console.log('found', count, 'participants')
     return count
 }
+
 async function notAcceptedInMeeting(page: Page): Promise<boolean> {
-    return await page.$$eval('*', (elems) => {
-        for (const e of elems) {
-            let elem = e as any
-            // console.log(elem.innerText)
-            if (elem.innerText === "You can't join this call") {
-                return true
+    try {
+        const denied = await page.$$eval('*', (elems) => {
+            for (const e of elems) {
+                let elem = e as HTMLElement
+                if (elem.innerText && typeof elem.innerText === 'string') {
+                    if (elem.innerText.includes('denied')) {
+                        console.log('XXXXXXXXXXXXXXXXXX User has denied entry')
+                        return true
+                    }
+                }
             }
+            return false
+        })
+
+        if (denied) {
+            console.log('Access denied, throwing JoinError')
+            throw new JoinError(JoinErrorCode.BotNotAccepted)
         }
+
         return false
-    })
+    } catch (error) {
+        if (error instanceof JoinError) {
+            throw error
+        }
+        console.error('Error in notAcceptedInMeeting:', error)
+        return false
+    }
 }
+
 async function removedFromMeeting(page: Page): Promise<boolean> {
     return await page.$$eval('*', (elems) => {
         for (const e of elems) {
