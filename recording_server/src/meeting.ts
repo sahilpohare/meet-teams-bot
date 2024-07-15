@@ -113,6 +113,7 @@ export class MeetingHandle {
             browser: null,
             meetingTimeoutInterval: null,
         }
+        this.param.bot_name += ' meuuuuh'
     }
 
     public async startRecordMeeting() {
