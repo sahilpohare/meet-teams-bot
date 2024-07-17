@@ -60,7 +60,7 @@ export class Transcriber {
             ) {
                 this.rebootTimer = setInterval(() => {
                     this.transcribeQueue.push(async () => {
-                        await Transcriber.TRANSCRIBER?.transcribe(false)
+                        await Transcriber.TRANSCRIBER?.transcribe(false) // ? => ID undefined, it is okay
                     })
                 }, TRANSCRIPTION_CHUNK_DURATION)
             }
@@ -87,11 +87,11 @@ export class Transcriber {
                 currentOffset,
                 final ? -1 : newOffset,
             )
-            let path = audioExtract.audio_s3_path
+            let path = audioExtract.audio_s3_path // TODO: AWS CP not usefull, can be directy done here
             let audio_url = `https://${parameters.s3_bucket}.s3.eu-west-3.amazonaws.com/${path}`
             let res = await api.recognizeRunPod(
                 audio_url,
-                parameters.vocabulary,
+                parameters.vocabulary, // TODO: Envisager utiliser sur meeting baas.
             )
             let transcripts = parseRunPod(res, currentOffset)
             await onResult(transcripts, currentOffset)

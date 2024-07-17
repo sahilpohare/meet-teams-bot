@@ -15,7 +15,13 @@ import { LOGGER, clientRedis, server } from './server'
 import { MeetingParams } from './types'
 import { sleep } from './utils'
 
-console.log('version 2.0')
+// ENTRY POINT
+// syntax convention
+// minus => Library
+// CONST => Const
+// camelCase => Fn
+// CamelCase => Classes
+console.log('version 0.0.1')
 ;(async () => {
     if (process.argv[2]?.includes('get_extension_id')) {
         getExtensionId().then((x) => console.log(x))
@@ -144,3 +150,24 @@ async function triggerCache() {
     ])
     await browser.close()
 }
+
+// Fonction pour gérer l'arrêt propre du serveur
+const gracefulShutdown = () => {
+    if (process.env.PROFILE !== "DEV") {
+        return;
+    }
+    console.log('Received kill signal, shutting down gracefully...');
+    // server.close(() => {
+    //   console.log('Closed out remaining connections.');
+    //   process.exit(0);
+    // });
+
+    // // Force close server after 10 seconds
+    // setTimeout(() => {
+    //   console.error('Could not close connections in time, forcefully shutting down');
+    //   process.exit(1);
+    // }, 10000);
+    process.exit(-1);
+  };
+
+  process.on('SIGTERM', gracefulShutdown);

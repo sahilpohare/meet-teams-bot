@@ -66,6 +66,7 @@ export async function server() {
         next()
     })
 
+    // Only spoke for the moment
     app.post('/status', jsonParser, async (req, res) => {
         function statusReady() {
             return (
@@ -120,6 +121,7 @@ export async function server() {
         }
     })
 
+    // Used by Spoke / Maybe useless : Template Choose
     app.post('/change_agenda', jsonParser, async (req, res) => {
         const data: ChangeAgendaRequest = req.body
         console.log('change agenda request', data)
@@ -132,6 +134,7 @@ export async function server() {
         }
     })
 
+    // Maybe unused now
     app.post('/change_language', jsonParser, async (req, res) => {
         const data: ChangeLanguage = req.body
         try {
@@ -142,6 +145,7 @@ export async function server() {
         }
     })
 
+    // Leave bot request from server
     app.post('/stop_record', jsonParser, async (req, res) => {
         const data: StopRecordParams = req.body
         console.log('stop record request: ', data)
@@ -151,6 +155,7 @@ export async function server() {
         res.send('ok')
     })
 
+    // Unused
     app.get('/shutdown', async (_req, res) => {
         LOGGER.warn('Shutdown requested')
         res.send('ok')

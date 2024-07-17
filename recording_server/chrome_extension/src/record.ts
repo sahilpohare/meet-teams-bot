@@ -181,7 +181,6 @@ async function handleStop(this: MediaRecorder, _e: Event) {
     }
 
     HANDLE_STOP_DONE = true
-    // saveDataChunksToFile(RECORDED_CHUNKS)
 }
 
 export async function stop() {
@@ -239,11 +238,11 @@ function handleDataAvailable() {
 }
 
 async function handleChunk(isFinal: boolean) {
-    const spokeSession = SESSION!
+    const spokeSession = SESSION!  // ! is the equivalent of unwrap() - throw exception
     const recordedChunks = RECORDED_CHUNKS
     RECORDED_CHUNKS = []
     const index = spokeSession.uploadChunkCounter
-    spokeSession.uploadChunkCounter = spokeSession.uploadChunkCounter + 1
+    spokeSession.uploadChunkCounter += 1; //spokeSession.uploadChunkCounter + 1
 
     const recordedDataChunk = recordedChunks.map((c) => c.data)
     const blob = new Blob(recordedDataChunk, {

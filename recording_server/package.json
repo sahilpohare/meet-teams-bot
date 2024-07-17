@@ -27,6 +27,7 @@
         "@types/ramda": "0.29.1",
         "@types/redis": "^4.0.10",
         "rimraf": "~3.0.2",
+        "ts-node-dev": "^2.0.0",
         "typescript": "^5.4"
     },
     "scripts": {
@@ -34,7 +35,8 @@
         "start_extension_id": "node build/src/main.js get_extension_id",
         "clean": "rimraf coverage build tmp",
         "build": "./node_modules/typescript/bin/tsc --skipLibCheck -p tsconfig.release.json",
-        "watch": "./node_modules/typescript/bin/tsc -w -p tsconfig.release.json"
+        "watch": "./node_modules/typescript/bin/tsc --skipLibCheck -w -p tsconfig.release.json",
+        "watch-dev" : "source ../../.env && PROFILE=DEV ts-node-dev --respawn --transpile-only src/main.ts -p tsconfig.release.json"
     },
     "author": "Jakub Synowiec <github@jakubsynowiec.info>",
     "license": "Apache-2.0",

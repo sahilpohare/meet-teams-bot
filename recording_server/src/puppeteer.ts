@@ -15,9 +15,9 @@ const GOOGLE_CHROME_EXECTUTABLE_PATH =
 
 puppeteer.use(StealthPlugin())
 
-const HEIGHT_INTERFACE_CHROME=120
-const HEIGHT_FRAMEBUFFER=720
-const WIDTH_FRAMEBUFFER=1280
+const HEIGHT_INTERFACE_CHROME = 120
+const HEIGHT_FRAMEBUFFER = 720
+const WIDTH_FRAMEBUFFER = 1280
 
 export function listenPage(page: Page) {
     const describe = (jsHandle) => {
@@ -217,13 +217,12 @@ export async function openBrowser(extensionId: string): Promise<Browser> {
     throw error
 }
 export async function tryOpenBrowser(extensionId: string): Promise<Browser> {
-    const pathToExtension = join(
-        __dirname,
-        '..',
-        '..',
-        'chrome_extension',
-        'dist',
-    )
+    const pathToExtension =
+        process.env.PROFILE !== 'DEV'
+            ? join(__dirname, '..', '..', 'chrome_extension', 'dist')
+            : join(__dirname, '..', 'chrome_extension', 'dist')
+
+    console.log("Path to Extension : ", pathToExtension)
     const width = WIDTH_FRAMEBUFFER
     const height = HEIGHT_FRAMEBUFFER + HEIGHT_INTERFACE_CHROME
     const browser = await puppeteer.launch({
