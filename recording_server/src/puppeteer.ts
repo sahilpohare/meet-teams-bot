@@ -1,12 +1,9 @@
 import * as fs from 'fs'
-
 import { dirname, join } from 'path'
 import { Browser, ConsoleMessage, Page } from 'puppeteer'
-
 import puppeteer from 'puppeteer-extra'
 import { MeetingHandle } from './meeting'
 import { s3cp } from './s3'
-
 // add stealth plugin and use defaults (all evasion techniques)
 const StealthPlugin = require('puppeteer-extra-plugin-stealth')
 
@@ -87,8 +84,9 @@ export async function screenshot(page: Page, name: string) {
         // try { await unlink(link) } catch (e) { }
         await fs.promises.mkdir(dirname(link), { recursive: true })
         await page.screenshot({ path: link })
+
         await s3cp(link, link.substring(2))
-        // TODO: remove hard-coded link
+        // TODO WTF : remove hard-coded link
         console.log(
             'SCREENSHOT: ',
             'https://spoke-log-bot.s3.amazonaws.com/'.concat(link.substring(2)),
@@ -208,7 +206,6 @@ export async function tryGetExtensionId() {
 
 export async function openBrowser(
     extensionId: string,
-    messageHandler: (message: any) => void,
 ): Promise<{ browser: Browser; backgroundPage: Page }> {
     let error = null
     const NUMBER_TRY_OPEN_BROWSER = 5
@@ -221,36 +218,6 @@ export async function openBrowser(
                 browser,
                 extensionId,
             )
-
-            // Inject a function into the background page that allows messages to be sent to a server
-            await backgroundPage.evaluate(() => {
-                ;(window as any).sendToRecordingServer = (message: string) => {
-                    window.postMessage(
-                        {
-                            type: 'FROM_EXTENSION',
-                            message: JSON.parse(message),
-                        },
-                        '*',
-                    )
-                }
-            })
-
-            // Expose a function to handle messages from the extension within the background page
-            await backgroundPage.exposeFunction(
-                'handleMessageFromExtension',
-                messageHandler,
-            )
-
-            // Add an event listener to handle messages from the extension
-            await backgroundPage.evaluate(() => {
-                window.addEventListener('message', (event) => {
-                    if (event.data.type === 'FROM_EXTENSION') {
-                        ;(window as any).handleMessageFromExtension(
-                            event.data.message,
-                        )
-                    }
-                })
-            })
 
             // Return the browser and the fully configured background page
             return { browser, backgroundPage }
@@ -272,7 +239,7 @@ export async function tryOpenBrowser(extensionId: string): Promise<Browser> {
             ? join(__dirname, '..', '..', 'chrome_extension', 'dist')
             : join(__dirname, '..', 'chrome_extension', 'dist')
 
-    console.log("Path to Extension : ", pathToExtension)
+    console.log('Path to Extension : ', pathToExtension)
     const width = WIDTH_FRAMEBUFFER
     const height = HEIGHT_FRAMEBUFFER + HEIGHT_INTERFACE_CHROME
     const browser = await puppeteer.launch({

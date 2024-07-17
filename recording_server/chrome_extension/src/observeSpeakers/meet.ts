@@ -1,5 +1,4 @@
 import { RecordingMode, Speaker } from '../observeSpeakers'
-
 import { sleep } from '../utils'
 
 export const MIN_SPEAKER_DURATION = 200
@@ -156,12 +155,12 @@ export function getSpeakerFromDocument(
                 if (maxOccurrences[j].speaker === differentSpeaker.speaker) {
                     if (differentSpeakerCount >= 4) {
                         maxOccurrences = maxOccurrences.slice(j)
-                        //TODO Adapt is Speaking State
+                        // TODO WTF : Adapt is Speaking State - Ask to Vincent
                         return [
                             {
                                 name: differentSpeaker.speaker,
                                 timestamp: differentSpeaker.timestamp,
-                                isSpeaking: true, 
+                                isSpeaking: true,
                             },
                         ]
                     }

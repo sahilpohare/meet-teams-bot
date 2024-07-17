@@ -118,21 +118,23 @@ export class MeetingHandle {
         this.param.bot_name += ' meuuuuh'
     }
 
-    // those are messages from the chrome extension itself
-    // that we print, so we can "save them"
-    private handleMessageFromExtension = (message: any) => {
-        console.log('Message received from extension:', message)
-        if (message.messageType === 'STOP_MEETING') {
-            this.stopRecording(message.data.reason)
-        }
-        if (message.messageType === 'LOG_INFO') {
-            console.log(message.data.reason)
-        }
-        // TODO handle DEBUG log according to env variable
-        if (message.messageType === 'LOG_DEBUG') {
-            console.info(message.data.reason)
-        }
-    }
+    // // those are messages from the chrome extension itself
+    // // that we print, so we can "save them"
+    // private handleMessageFromExtension = (message: any) => {
+    //     console.log('Message received from extension:', message)
+    //     if (message.messageType === 'STOP_MEETING') {
+    //         console.log("_______________MEUUUUUUUH______________________")
+    //         this.stopRecording(message.data.reason)
+    //     }
+    //     if (message.messageType === 'LOG_INFO') {
+    //         console.log("_______________MEUUUUUUUH______________________")
+    //         console.log(message.data.reason)
+    //     }
+    //     // TODO handle DEBUG log according to env variable
+    //     if (message.messageType === 'LOG_DEBUG') {
+    //         console.info(message.data.reason)
+    //     }
+    // }
 
     public async startRecordMeeting() {
         try {
@@ -146,10 +148,7 @@ export class MeetingHandle {
             }
 
             const extensionId = await getCachedExtensionId()
-            const { browser, backgroundPage } = await openBrowser(
-                extensionId,
-                this.handleMessageFromExtension,
-            )
+            const { browser, backgroundPage } = await openBrowser(extensionId)
             this.meeting.browser = browser
             this.meeting.backgroundPage = backgroundPage
             this.logger.info('Extension found', { extensionId })

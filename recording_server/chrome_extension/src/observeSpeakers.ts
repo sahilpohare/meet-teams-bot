@@ -18,7 +18,8 @@ declare var RECORDING_MODE: RecordingMode
 export type RecordingMode = 'speaker_view' | 'gallery_view' | 'audio_only'
 
 let lastSpeechTimestamp = Date.now()
-const INACTIVITY_THRESHOLD = 60 * 1000 * 15 //ms
+// TODO : Modify it to 15 minutes
+const INACTIVITY_THRESHOLD = 60 * 1000 * 1 //ms
 let inactivityCheckInterval: NodeJS.Timeout | null = null
 
 const SPEAKERS: Speaker[] = []
@@ -219,10 +220,11 @@ async function observeSpeakers() {
                             type: 'REFRESH_SPEAKERS',
                             payload: SPEAKERS,
                         })
+                        // TODO : Remove it when it is done
                         chrome.runtime.sendMessage({
                             type: 'SEND_TO_SERVER',
                             payload: {
-                                messageType: 'LOG',
+                                messageType: 'LOG_INFO',
                                 data: { reason: 'gros test sa mere' },
                             },
                         })
@@ -303,7 +305,6 @@ async function checkInactivity() {
         console.log('checking inactivity', speakers.length, lastSpeechTimestamp)
         if (speakers.length === 0) {
             if (Date.now() - lastSpeechTimestamp > INACTIVITY_THRESHOLD) {
-                console.error('Only bot in meeting for more than a minute')
                 console.error('[wordPosterWorker] Meuh y a que des bots!!!')
                 chrome.runtime.sendMessage({
                     type: 'SEND_TO_SERVER',

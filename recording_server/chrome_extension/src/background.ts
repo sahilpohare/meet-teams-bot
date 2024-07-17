@@ -53,12 +53,6 @@ setUserAgent(
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36',
 )
 
-function sendMessageToRecordingServer(message: any) {
-    if ((window as any).sendToRecordingServer) {
-        ;(window as any).sendToRecordingServer(JSON.stringify(message))
-    }
-}
-
 function addListener() {
     chrome.runtime.onMessage.addListener(function (
         request: any,
@@ -67,7 +61,7 @@ function addListener() {
     ) {
         switch (request.type) {
             case 'SEND_TO_SERVER':
-                sendMessageToRecordingServer(request.payload)
+                sendLogToRecordingServer(request.payload)
                 break
             case 'REFRESH_ATTENDEES':
                 if (request.payload.length > ATTENDEES.length) {
@@ -204,6 +198,12 @@ export async function changeAgenda(data: ChangeAgenda) {
             console.error('error getting agenda', e)
         }
     }
+}
+
+// Log messages into recording server output
+// In Pupeteer, console on background page is listened so we can display them easily :)
+async function sendLogToRecordingServer(message: any) {
+    console.log(message)
 }
 
 const w = window as any
