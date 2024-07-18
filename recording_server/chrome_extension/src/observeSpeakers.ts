@@ -306,11 +306,12 @@ async function checkInactivity() {
         if (speakers.length === 0) {
             if (Date.now() - lastSpeechTimestamp > INACTIVITY_THRESHOLD) {
                 console.error('[wordPosterWorker] Meuh y a que des bots!!!')
+                console.warn('Unusual Inactivity Detected')
                 chrome.runtime.sendMessage({
                     type: 'SEND_TO_SERVER',
                     payload: {
-                        messageType: 'STOP_MEETING',
-                        data: { reason: 'Only bot in meeting' },
+                        message_type: 'STOP_MEETING',
+                        data: { reason: 'Unusual Inactivity Detected' },
                     },
                 })
                 if (inactivityCheckInterval) {

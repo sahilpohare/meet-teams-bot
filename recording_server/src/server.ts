@@ -171,16 +171,14 @@ export async function server() {
             console.log(message.data)
             res.status(200).send('ok')
             return
+        } else  if (message.message_type === 'STOP_MEETING') {
+            MeetingHandle.instance.stopRecording('extension request').catch((e) => {
+                LOGGER.error(`Stop recording error ${e}`)
+            })
+            res.status(200).send('ok')
+            return
         }
-        // if (data.messageType === 'STOP_MEETING') {
-        //     console.log("_______________MEUUUUUUUH______________________")
-        //     this.stopRecording(message.data.reason)
-        // }
-        // // TODO handle DEBUG log according to env variable
-        // if (data.messageType === 'LOG_DEBUG') {
-        //     console.info(message.data.reason)
-        // }
-        res.status(400).send('fail')
+        res.status(400).send('Unknown messahe type')
     })
 
     try {

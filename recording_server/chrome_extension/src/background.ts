@@ -61,7 +61,15 @@ function addListener() {
     ) {
         switch (request.type) {
             case 'SEND_TO_SERVER':
-                sendLogToRecordingServer(request.payload)
+                axios.post(State.parameters.local_recording_server_location + 'broadcast_message',
+                    request.payload
+                )
+                .then(function (response) {
+                    console.warn('SEND_TO_SERVER - SUCESS:', response);
+                })
+                .catch(function (error) {
+                    console.error('SEND_TO_SERVER - ERROR:', error);
+                });
                 break
             case 'REFRESH_ATTENDEES':
                 if (request.payload.length > ATTENDEES.length) {
@@ -117,7 +125,8 @@ function observeSpeakers() {
 export async function startRecording(
     meetingParams: State.MeetingParams,
 ): Promise<Project | undefined> {
-    //axios.get(meetingParams.local_recording_server_location + 'broadcast_message') // GET example
+    // axios.get(meetingParams.local_recording_server_location + 'broadcast_message') // GET example
+    // TODO : Reove when it becomes unecessary
     axios.post(meetingParams.local_recording_server_location + 'broadcast_message', {
         message_type: 'LOG',
         data: {
@@ -212,12 +221,6 @@ export async function changeAgenda(data: ChangeAgenda) {
             console.error('error getting agenda', e)
         }
     }
-}
-
-// Log messages into recording server output
-// In Pupeteer, console on background page is listened so we can display them easily :)
-async function sendLogToRecordingServer(message: any) {
-    console.log(message)
 }
 
 const w = window as any
