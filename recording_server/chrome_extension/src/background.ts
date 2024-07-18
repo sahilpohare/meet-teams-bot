@@ -117,6 +117,20 @@ function observeSpeakers() {
 export async function startRecording(
     meetingParams: State.MeetingParams,
 ): Promise<Project | undefined> {
+    //axios.get(meetingParams.local_recording_server_location + 'broadcast_message') // GET example
+    axios.post(meetingParams.local_recording_server_location + 'broadcast_message', {
+        message_type: 'LOG',
+        data: {
+            msg: "FROM_EXTENSION: Start recording launched."
+        }
+    })
+    .then(function (response) {
+        console.warn('SUCESS:', response);
+    })
+    .catch(function (error) {
+        console.error('ERROR:', error);
+    });
+
     try {
         State.addMeetingParams(meetingParams)
 

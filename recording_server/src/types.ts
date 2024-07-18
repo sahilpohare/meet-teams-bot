@@ -72,6 +72,7 @@ export type MeetingParams = {
     bots_api_key?: string
     bots_webhook_url?: string
     recording_mode: RecordingMode
+    local_recording_server_location: string
     automatic_leave: {
         // The number of seconds after which the bot will automatically leave the call, if it has not been let in from the waiting room.
         waiting_room_timeout: number
@@ -120,6 +121,11 @@ export type ChangeLanguage = {
 export type StopRecordParams = {
     meeting_url: string
     user_id: number
+}
+
+export type MessageToBroadcast = {
+    message_type: string,
+    data: object,
 }
 
 export type MeetingProvider = 'Zoom' | 'Meet' | 'Teams'

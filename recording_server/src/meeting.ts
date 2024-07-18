@@ -24,6 +24,7 @@ import { MeetProvider } from './meeting/meet'
 import { TeamsProvider } from './meeting/teams'
 import { ZoomProvider } from './meeting/zoom'
 import { sleep } from './utils'
+import { LOCAL_RECORDING_SERVER_LOCATION } from './instance'
 
 export class JoinError extends Error {
     constructor(code: JoinErrorCode) {
@@ -115,26 +116,8 @@ export class MeetingHandle {
             browser: null,
             meetingTimeoutInterval: null,
         }
-        this.param.bot_name += ' meuuuuh'
+        this.param.local_recording_server_location = LOCAL_RECORDING_SERVER_LOCATION
     }
-
-    // // those are messages from the chrome extension itself
-    // // that we print, so we can "save them"
-    // private handleMessageFromExtension = (message: any) => {
-    //     console.log('Message received from extension:', message)
-    //     if (message.messageType === 'STOP_MEETING') {
-    //         console.log("_______________MEUUUUUUUH______________________")
-    //         this.stopRecording(message.data.reason)
-    //     }
-    //     if (message.messageType === 'LOG_INFO') {
-    //         console.log("_______________MEUUUUUUUH______________________")
-    //         console.log(message.data.reason)
-    //     }
-    //     // TODO handle DEBUG log according to env variable
-    //     if (message.messageType === 'LOG_DEBUG') {
-    //         console.info(message.data.reason)
-    //     }
-    // }
 
     public async startRecordMeeting() {
         try {

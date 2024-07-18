@@ -8,6 +8,7 @@ export const LOCK_INSTANCE_AT_STARTUP =
     process.env.LOCK_INSTANCE_AT_STARTUP === 'true'
 export const API_SERVER_BASEURL = process.env.API_SERVER_BASEURL
 export const POD_IP = `${process.env.POD_IP}:${PORT}`
+export const LOCAL_RECORDING_SERVER_LOCATION = `http://localhost:${PORT}/`
 
 export type MeetingBotSession = {
     user_id: number

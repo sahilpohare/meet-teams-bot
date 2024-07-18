@@ -9,6 +9,7 @@ import {
     ChangeLanguage,
     StatusParams,
     StopRecordParams,
+    MessageToBroadcast,
 } from './types'
 import { sleep } from './utils'
 
@@ -160,6 +161,26 @@ export async function server() {
         LOGGER.warn('Shutdown requested')
         res.send('ok')
         process.exit(0)
+    })
+
+    // Testing axios channel from extension
+    app.post('/broadcast_message', jsonParser, async (req, res) => {
+        const message: MessageToBroadcast = req.body;
+        console.log('Message received from extension: ', message);
+        if (message.message_type === 'LOG') {
+            console.log(message.data)
+            res.status(200).send('ok')
+            return
+        }
+        // if (data.messageType === 'STOP_MEETING') {
+        //     console.log("_______________MEUUUUUUUH______________________")
+        //     this.stopRecording(message.data.reason)
+        // }
+        // // TODO handle DEBUG log according to env variable
+        // if (data.messageType === 'LOG_DEBUG') {
+        //     console.info(message.data.reason)
+        // }
+        res.status(400).send('fail')
     })
 
     try {

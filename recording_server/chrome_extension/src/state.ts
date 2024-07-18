@@ -23,6 +23,7 @@ export type MeetingParams = {
     bot_id?: string
     s3_bucket: string
     recording_mode: RecordingMode
+    local_recording_server_location: string
 }
 
 export type RecordingMode = 'speaker_view' | 'gallery_view' | 'audio_only'
