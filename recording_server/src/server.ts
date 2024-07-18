@@ -178,7 +178,7 @@ export async function server() {
             res.status(200).send('ok')
             return
         }
-        res.status(400).send('Unknown messahe type')
+        res.status(400).send('Unknown message type')
     })
 
     try {
