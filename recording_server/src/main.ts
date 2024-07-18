@@ -148,7 +148,7 @@ function messageHandler(message: any): void {
 async function triggerCache() {
     const extensionId = await getCachedExtensionId()
     const [browser] = await Promise.all([
-        openBrowser(extensionId, messageHandler),
+        openBrowser(extensionId),
         generateBranding('cache').wait,
     ])
     await browser.browser.close()
