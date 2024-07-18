@@ -1,4 +1,5 @@
 import { RecordingMode, Speaker } from '../observeSpeakers'
+
 import { sleep } from '../utils'
 export const MIN_SPEAKER_DURATION = 200
 export const SPEAKER_LATENCY = 500
@@ -283,17 +284,19 @@ export async function removeInitialShityHtml(mode: RecordingMode) {
     let div
     try {
         for (div of document.getElementsByTagName('div')) {
-            div.clientHeight === 132 &&
-            (div.clientWidth === 235 || div.clientWidth === 234)
-                ? (div.style.display = 'none')
-                : console.error('fail')
+            if (
+                div.clientHeight === 132 &&
+                (div.clientWidth === 235 || div.clientWidth === 234)
+            ) {
+                div.style.display = 'none'
+            }
         }
     } catch (e) {}
     try {
         for (div of document.getElementsByTagName('div')) {
-            div.clientWidth === 360 && div.clientHeight === 326
-                ? (div.style.display = 'none')
-                : console.log('')
+            if (div.clientWidth === 360 && div.clientHeight === 326) {
+                div.style.display = 'none'
+            }
         }
     } catch (e) {}
     try {
@@ -383,16 +386,16 @@ export function removeShityHtml(mode: RecordingMode) {
 
     try {
         for (const div of document.getElementsByTagName('div')) {
-            div.clientHeight === 164 && div.clientWidth === 322
-                ? (div.style.display = 'none')
-                : console.error('fail')
+            if (div.clientHeight === 164 && div.clientWidth === 322) {
+                div.style.display = 'none'
+            }
         }
     } catch (e) {}
     try {
         for (const div of document.getElementsByTagName('div')) {
-            div.clientHeight === 40
-                ? (div.style.opacity = '0')
-                : console.error('fail')
+            if (div.clientHeight === 40) {
+                div.style.opacity = '0'
+            }
         }
     } catch (e) {}
     try {
