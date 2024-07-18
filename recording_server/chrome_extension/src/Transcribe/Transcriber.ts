@@ -87,11 +87,11 @@ export class Transcriber {
                 currentOffset,
                 final ? -1 : newOffset,
             )
-            let path = audioExtract.audio_s3_path // TODO: AWS CP not usefull, can be directy done here
+            let path = audioExtract.audio_s3_path // TODO : AWS CP not usefull, can be directy done here
             let audio_url = `https://${parameters.s3_bucket}.s3.eu-west-3.amazonaws.com/${path}`
             let res = await api.recognizeRunPod(
                 audio_url,
-                parameters.vocabulary, // TODO: Envisager utiliser sur meeting baas.
+                parameters.vocabulary, // TODO : Envisager utiliser sur meeting baas.
             )
             let transcripts = parseRunPod(res, currentOffset)
             await onResult(transcripts, currentOffset)
@@ -171,7 +171,7 @@ let MAX_NO_TRANSCRIPT_DURATION = 60_000 * 6
 /** Gets and handles recognizer results. */
 async function onResult(transcripts: RecognizerTranscript[], offset: number) {
     console.log('[onResult] ')
-    //TODO REPORT
+    // TODO REPORT. Maybe dead code ?
     if (R.all((x) => x.words.length === 0, transcripts)) {
         NO_TRANSCRIPT_DURATION += TRANSCRIPTION_CHUNK_DURATION
 

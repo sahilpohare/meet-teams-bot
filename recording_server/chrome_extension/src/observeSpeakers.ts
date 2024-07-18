@@ -18,9 +18,8 @@ declare var RECORDING_MODE: RecordingMode
 export type RecordingMode = 'speaker_view' | 'gallery_view' | 'audio_only'
 
 let lastSpeechTimestamp = Date.now()
-// TODO : Modify it to 15 minutes
-const INACTIVITY_THRESHOLD = 60 * 1000 * 1 //ms
-let inactivityCheckInterval: NodeJS.Timeout | null = null
+const INACTIVITY_THRESHOLD = 60 * 1000 * 15 //ms
+// let inactivityCheckInterval: NodeJS.Timeout | null = null
 
 const SPEAKERS: Speaker[] = []
 
@@ -220,14 +219,6 @@ async function observeSpeakers() {
                             type: 'REFRESH_SPEAKERS',
                             payload: SPEAKERS,
                         })
-                        // TODO : Remove it when it is done
-                        chrome.runtime.sendMessage({
-                            type: 'SEND_TO_SERVER',
-                            payload: {
-                                messageType: 'LOG_INFO',
-                                data: { reason: 'gros test sa mere' },
-                            },
-                        })
                     }
                 }
 
@@ -297,31 +288,26 @@ async function observeSpeakers() {
 
 async function checkInactivity() {
     while (true) {
-        const speakers = PROVIDER.getSpeakerFromDocument(
-            null,
-            null,
-            RECORDING_MODE,
-        )
-        console.log('checking inactivity', speakers.length, lastSpeechTimestamp)
-        if (speakers.length === 0) {
-            if (Date.now() - lastSpeechTimestamp > INACTIVITY_THRESHOLD) {
-                console.error('[wordPosterWorker] Meuh y a que des bots!!!')
-                console.warn('Unusual Inactivity Detected')
-                chrome.runtime.sendMessage({
-                    type: 'SEND_TO_SERVER',
-                    payload: {
-                        message_type: 'STOP_MEETING',
-                        data: { reason: 'Unusual Inactivity Detected' },
-                    },
-                })
-                if (inactivityCheckInterval) {
-                    clearInterval(inactivityCheckInterval)
-                }
-                break
-            }
-        } else {
-            lastSpeechTimestamp = Date.now()
-        }
         await sleep(1000)
+        if (SPEAKERS.length === 0) {
+            console.error("Cannot happen : SPEAKERS.length must be almost 1");
+            continue;
+        }
+        let speaker = SPEAKERS[SPEAKERS.length - 1];
+        let last_timestamp = speaker.timestamp;
+
+        console.log('checking inactivity', last_timestamp);
+
+        if (Date.now() - last_timestamp > INACTIVITY_THRESHOLD) {
+            console.error('[wordPosterWorker] Meuh y a que des bots!!!')
+            console.warn('Unusual Inactivity Detected')
+            chrome.runtime.sendMessage({
+                type: 'SEND_TO_SERVER',
+                payload: {
+                    message_type: 'STOP_MEETING',
+                    data: { reason: 'Unusual Inactivity Detected' },
+                },
+            })
+        }
     }
 }

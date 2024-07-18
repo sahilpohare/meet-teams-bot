@@ -155,7 +155,6 @@ export function getSpeakerFromDocument(
                 if (maxOccurrences[j].speaker === differentSpeaker.speaker) {
                     if (differentSpeakerCount >= 4) {
                         maxOccurrences = maxOccurrences.slice(j)
-                        // TODO WTF : Adapt is Speaking State - Ask to Vincent
                         return [
                             {
                                 name: differentSpeaker.speaker,

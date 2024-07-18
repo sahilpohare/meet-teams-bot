@@ -126,7 +126,7 @@ export async function startRecording(
     meetingParams: State.MeetingParams,
 ): Promise<Project | undefined> {
     // axios.get(meetingParams.local_recording_server_location + 'broadcast_message') // GET example
-    // TODO : Reove when it becomes unecessary
+    // TODO : Remove when it becomes unecessary
     axios.post(meetingParams.local_recording_server_location + 'broadcast_message', {
         message_type: 'LOG',
         data: {
@@ -169,7 +169,6 @@ export async function stopMediaRecorder() {
     await record.stop()
     const timestamp = new Date().getTime()
     // add a last fake speaker to trigger the upload of the last editor ( generates an interval )
-    //TODOP: check isSpeaking is false
     SPEAKERS.push({ name: 'END', timestamp, isSpeaking: false })
     await uploadEditorsTask(SPEAKERS)
     console.log('stopping transcriber')
