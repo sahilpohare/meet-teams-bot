@@ -324,7 +324,10 @@ async function findEndMeeting(
             : countParticipantsSpeakerView(page))
         console.log('participant', participant)
 
-        if (participant === 1) {
+        if (participant == 1) {
+            return true
+        } else if (participant <= 0)  {
+            console.error("NO COHERENT PARTICPANT COUNT : ", participant);
             return true
         } else {
             cancellationToken.reset()
