@@ -259,7 +259,7 @@ async function observeSpeakers() {
             SPEAKERS.push({
                 name: '-',
                 timestamp: Date.now(),
-                isSpeaking: false,
+                isSpeaking: true,
             })
             chrome.runtime.sendMessage({
                 type: 'REFRESH_SPEAKERS',

@@ -2,8 +2,8 @@ import { RecordingMode, Speaker } from '../observeSpeakers'
 
 import { sleep } from '../utils'
 
-export const MIN_SPEAKER_DURATION = 400
-export const SPEAKER_LATENCY = 0
+export const MIN_SPEAKER_DURATION = 400 // TODO : Adjust and regactoring
+export const SPEAKER_LATENCY = 500 // TODO : Same
 
 class SpeakerState {
     constructor(
@@ -21,13 +21,6 @@ export async function getSpeakerRootToObserve(
     try {
         const documentRoot = getDocumentRoot()
         // console.log('[Teams] Document root obtained')
-        chrome.runtime.sendMessage({
-            type: 'SEND_TO_SERVER',
-            payload: {
-                messageType: 'LOG',
-                data: { reason: 'gros test sa mere' },
-            },
-        })
         const config = {
             attributes: true,
             childList: true,
@@ -215,12 +208,13 @@ function updateSpeakerState(
 }
 
 function getParticipantName(name: Element): string {
-    const nameBlackList: string[] = ['Content shared by']
+    const nameBlackList: string[] = ['Content shared by', 'Leaving...']
     const toSplitOn: string[] = [
         ', video is on,',
         ', muted,',
         ', Context menu is available',
         '(Unverified)',
+        'Leaving...'
     ]
 
     const ariaLabel = name.getAttribute('aria-label') || ''

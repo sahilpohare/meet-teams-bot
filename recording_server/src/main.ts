@@ -141,9 +141,7 @@ export async function meetingBotStartRecordFailed(
         params: { bot_id },
     })
 }
-function messageHandler(message: any): void {
-    console.log('Message received from extension:', message)
-}
+
 /// open the browser a first time to speed up the next openings
 async function triggerCache() {
     const extensionId = await getCachedExtensionId()

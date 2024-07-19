@@ -19,7 +19,7 @@ export async function speakerWorker() {
                 SPEAKERS.push({
                     name: lastSpeaker.name,
                     timestamp: now,
-                    isSpeaking: false,
+                    isSpeaking: true,
                 })
                 await uploadEditorsTask(SPEAKERS)
             }

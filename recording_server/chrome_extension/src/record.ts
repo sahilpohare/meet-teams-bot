@@ -10,7 +10,7 @@ import {
     RecognizerWord,
 } from './spoke_api_js'
 import { Transcriber } from './Transcribe/Transcriber'
-import { logger, sleep } from './utils'
+import { sleep } from './utils'
 
 const STREAM: MediaStream | null = null
 let RECORDED_CHUNKS: BlobEvent[] = []
@@ -107,12 +107,9 @@ export async function startRecording(
     agenda?: Agenda,
 ): Promise<Project> {
     const newSessionId = await api.startRecordingSession()
-    logger(
-        '[startRecording]: '.concat(newSessionId.toLocaleString()),
-        'LOG_DEBUG',
-    )
+    console.log('[startRecording]: '.concat(newSessionId.toLocaleString()));
 
-    logger(`[startRecording] before post project`, 'LOG_DEBUG')
+    console.log(`[startRecording] before post project`)
     let agendaRefreshed = agenda
     if (agendaRefreshed != null) {
         try {
@@ -132,7 +129,7 @@ export async function startRecording(
         original_agenda_id: agendaRefreshed.id,
         meeting_provider: parameters.meetingProvider,
     })
-    logger(`[startRecording] after post project`, 'LOG_DEBUG')
+    console.log(`[startRecording] after post project`)
     const asset = await api.postAsset(
         {
             name: projectName,
@@ -143,7 +140,7 @@ export async function startRecording(
         true,
     )
 
-    logger(`[startRecording] after post asset`, 'LOG_DEBUG')
+    console.log(`[startRecording] after post asset`)
     const date = new Date()
     const now = date.getTime()
     const newSession = {
@@ -169,7 +166,7 @@ export async function startRecording(
     }
     START_RECORD_OFFSET = CONTEXT.currentTime
     START_RECORD_TIMESTAMP = now
-    logger(`after media recorder start`, 'LOG_DEBUG')
+    console.log(`after media recorder start`)
 
     return project
 }
@@ -177,7 +174,7 @@ export async function startRecording(
 let HANDLE_STOP_DONE = false
 
 async function handleStop(this: MediaRecorder, _e: Event) {
-    logger('[handle stop]', 'LOG_DEBUG')
+    console.log('[handle stop]')
     const spokeSession = SESSION!
     if (spokeSession) {
         await handleChunk(true)
@@ -187,9 +184,9 @@ async function handleStop(this: MediaRecorder, _e: Event) {
 }
 
 export async function stop() {
-    logger('media recorder stop', 'LOG_DEBUG')
+    console.log('media recorder stop')
     MEDIA_RECORDER.stop()
-    logger('unset all stream', 'LOG_DEBUG')
+    console.log('unset all stream')
     unsetAllStream()
 
     while (!HANDLE_STOP_DONE) {
@@ -210,10 +207,10 @@ export async function waitUntilComplete(kill = false) {
             console.error('error patching project', e)
         }
     }
-    logger('[waitForUpload]'.concat('after patch moment pending'), 'LOG_DEBUG')
+    console.log('[waitForUpload]'.concat('after patch moment pending'))
 
     if (kill) {
-        logger('[waitForUpload] killing', 'LOG_DEBUG')
+        console.log('[waitForUpload] killing')
         spokeSession.upload_queue.kill()
     } else {
         console.log(
@@ -224,7 +221,7 @@ export async function waitUntilComplete(kill = false) {
             return
         })
         await spokeSession.upload_queue.drain()
-        logger('[waitForUpload] after transcribe queue drain', 'LOG_DEBUG')
+        console.log('[waitForUpload] after transcribe queue drain')
     }
 }
 
@@ -299,15 +296,15 @@ export async function sendDataChunks(
                 (e as any)?.response?.data ??
                     'An error occured while uploading the video',
             )
-            logger('Error in upload chunk killing', 'LOG_DEBUG')
+            console.log('Error in upload chunk killing')
             spokeSession.upload_queue.kill()
             return
         }
     } catch (e) {
         if ((e as any).response && (e as any).response.data) {
-            logger((e as any).response.data, 'LOG_DEBUG')
+            console.log((e as any).response.data)
         } else {
-            logger(e as any, 'LOG_DEBUG')
+            console.log(e as any)
         }
     }
 }
