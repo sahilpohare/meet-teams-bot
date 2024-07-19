@@ -16,7 +16,7 @@ export type MeetingBotSession = {
     meeting_url: string
 }
 
-export const REDIS_SESSION_EXPIRATION = 60 * 60 * 4
+export const REDIS_SESSION_EXPIRATION = 3600 * 5
 
 export async function setSessionInRedis(
     session_id: string,

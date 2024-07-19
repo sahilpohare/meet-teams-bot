@@ -326,7 +326,7 @@ async function findEndMeeting(
 
         if (participant == 1) {
             return true
-        } else if (participant <= 0)  {
+        } else if (participant <= 0) {
             console.error("NO COHERENT PARTICPANT COUNT : ", participant);
             return true
         } else {

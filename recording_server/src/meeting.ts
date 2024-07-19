@@ -26,6 +26,11 @@ import { ZoomProvider } from './meeting/zoom'
 import { sleep } from './utils'
 import { LOCAL_RECORDING_SERVER_LOCATION } from './instance'
 
+const RECORDING_TIMEOUT = 3600 * 4 // 4 hours
+// const RECORDING_TIMEOUT = 120 // 2 minutes for tests
+const MAX_TIME_TO_LIVE_AFTER_TIMEOUT = 3600 * 2 // 2 hours
+
+
 export class JoinError extends Error {
     constructor(code: JoinErrorCode) {
         super(code)
@@ -160,7 +165,7 @@ export class MeetingHandle {
                 () => {
                     MeetingHandle.instance?.meetingTimeout()
                 },
-                4 * 60 * 60 * 1000, // 4 hours
+                RECORDING_TIMEOUT * 1000, // 4 hours in ms
             )
 
             await Events.inWaitingRoom()
@@ -419,6 +424,6 @@ export class MeetingHandle {
                 console.error(e)
             }
             process.exit(0)
-        }, 5 * 60 * 1000)
+        }, MAX_TIME_TO_LIVE_AFTER_TIMEOUT * 1000)
     }
 }
