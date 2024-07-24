@@ -214,7 +214,8 @@ function getParticipantName(name: Element): string {
         ', muted,',
         ', Context menu is available',
         '(Unverified)',
-        'Leaving...'
+        'left the meeting',
+        'Leaving...',
     ]
 
     const ariaLabel = name.getAttribute('aria-label') || ''
