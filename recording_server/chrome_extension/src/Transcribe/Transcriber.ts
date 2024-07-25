@@ -3,41 +3,45 @@ import * as R from 'ramda'
 import { parameters } from '../background'
 import { newTranscribeQueue } from '../queue'
 import { SESSION, START_RECORD_TIMESTAMP } from '../record'
-import { api } from '../spoke_api_js'
-import { sleep } from '../utils'
+import { api } from '../api'
+import { sleep } from '../api'
 import { RecognizerTranscript, parseRunPod } from './parseTranscript'
 import { speakerWorker } from './speakerWorker'
 import { summarizeWorker } from './summarizeWorker'
 import { wordPosterWorker } from './wordPosterWorker'
 
 // milisseconds transcription chunk duration
-const TRANSCRIPTION_CHUNK_DURATION = 60_000 * 3
+const TRANSCRIPTION_CHUNK_DURATION = 60 * 1000 * 3
 
 /**
  * Transcribes an audio stream using the recognizer of the underlying Node server.
+ * TODO : 'underlying Node server' ??? I think this comment is bullshit
  */
 export class Transcriber {
     static TRANSCRIBER: Transcriber | undefined
-    public stopped = false
+
+    private stopped = false
     private rebootTimer: NodeJS.Timer
     private summarizeWorker: Promise<void>
     private speakerWorker: Promise<void>
-    public transcribeQueue: asyncLib.QueueObject<() => void>
+    private transcribeQueue: asyncLib.QueueObject<() => void>
     private wordPosterWorker: Promise<void>
-    // in seconds
-    private transcriptionOffset: number = 0
-    /** Inits the transcriber. */
+    private transcriptionOffset: number = 0 // is seconds
 
     /** Returns a new `Transcriber`. */
     private constructor() {
-        this.rebootTimer = setInterval(() => {}, 60000)
+        this.rebootTimer = setInterval(() => {}, 60 * 1000)
         this.transcribeQueue = newTranscribeQueue()
         // Simply not to have undefined properties
         this.summarizeWorker = new Promise((resolve) => resolve())
         this.speakerWorker = new Promise((resolve) => resolve())
         this.wordPosterWorker = new Promise((resolve) => resolve())
     }
-    static async init(): Promise<void> {
+
+    /**
+     * Initialize and start the transcriber.
+     */
+    public static async init(): Promise<void> {
         try {
             Transcriber.TRANSCRIBER = new Transcriber()
         } catch (e) {
@@ -46,7 +50,65 @@ export class Transcriber {
         }
         await Transcriber.TRANSCRIBER.start()
     }
-    async start(): Promise<void> {
+
+    /**
+     * Request the latest transcription and stop the transcriber for good.
+     */
+    public async stop(): Promise<void> {
+        this.rebootTimer = setInterval(() => {})
+        this.transcribeQueue.push(async () => {
+            await Transcriber.TRANSCRIBER?.transcribe(true)
+        })
+    }
+
+    /**
+     * Ends the transcribing, and destroys resources.
+     * Waits for the workers to finish, and destroys the transcbriber.
+     */
+    public async waitUntilComplete(): Promise<void> {
+        console.log('before transcribe queue drain')
+        this.transcribeQueue.push(async () => {
+            return
+        })
+        await this.transcribeQueue.drain()
+        console.log('after transcribe queue drain')
+
+        this.stopped = true
+
+        if (
+            SESSION?.project.id &&
+            R.all(
+                (e) => e.video.transcripts[0]?.words.length === 0,
+                SESSION.completeEditors,
+            )
+        ) {
+            try {
+                await api.patchProject({
+                    id: SESSION?.project.id,
+                    no_transcript: true,
+                })
+            } catch (e) {
+                console.error('[waitUntilComplete]', 'error patching project')
+            }
+        }
+        await this.speakerWorker
+        await this.wordPosterWorker
+
+        try {
+            await this.summarizeWorker
+        } catch (e) {
+            console.error('error in summarizeWorker', e)
+        }
+    }
+
+    /**
+     * Check if the transcriber is still active.
+     */
+    public is_running(): boolean {
+        return !this.stopped
+    }
+
+    private async start(): Promise<void> {
         try {
             this.launchWorkers()
         } catch (e) {
@@ -70,7 +132,7 @@ export class Transcriber {
         }
     }
 
-    async transcribe(final: boolean): Promise<void> {
+    private async transcribe(final: boolean): Promise<void> {
         let currentOffset = this.transcriptionOffset
         let newOffset = (Date.now() - START_RECORD_TIMESTAMP) / 1000
         this.transcriptionOffset = newOffset
@@ -106,50 +168,6 @@ export class Transcriber {
             } catch (e) {
                 console.error('an error occured deleting audio, ', e)
             }
-        }
-    }
-
-    async stop(): Promise<void> {
-        this.rebootTimer = setInterval(() => {})
-        this.transcribeQueue.push(async () => {
-            await Transcriber.TRANSCRIBER?.transcribe(true)
-        })
-    }
-    /**  Ends the transcribing, and destroys resources. */
-    /** Waits for the workers to finish, and destroys the transcbriber. */
-    async waitUntilComplete(): Promise<void> {
-        console.log('before transcribe queue drain')
-        this.transcribeQueue.push(async () => {
-            return
-        })
-        await this.transcribeQueue.drain()
-        console.log('after transcribe queue drain')
-
-        this.stopped = true
-
-        if (
-            SESSION?.project.id &&
-            R.all(
-                (e) => e.video.transcripts[0]?.words.length === 0,
-                SESSION.completeEditors,
-            )
-        ) {
-            try {
-                await api.patchProject({
-                    id: SESSION?.project.id,
-                    no_transcript: true,
-                })
-            } catch (e) {
-                console.error('[waitUntilComplete]', 'error patching project')
-            }
-        }
-        await this.speakerWorker
-        await this.wordPosterWorker
-
-        try {
-            await this.summarizeWorker
-        } catch (e) {
-            console.error('error in summarizeWorker', e)
         }
     }
 

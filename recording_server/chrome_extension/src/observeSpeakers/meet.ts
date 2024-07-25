@@ -1,6 +1,5 @@
-import { RecordingMode, Speaker } from '../observeSpeakers'
-
-import { sleep } from '../utils'
+import { RecordingMode, SpeakerData } from '../observeSpeakers'
+import { sleep } from '../api'
 
 export const MIN_SPEAKER_DURATION = 200
 export const SPEAKER_LATENCY = 500
@@ -141,7 +140,7 @@ export function getSpeakerFromDocument(
     currentSpeaker: string | null,
     mutation: MutationRecord | null,
     recordingMode: RecordingMode,
-): Speaker[] {
+): SpeakerData[] {
     const speaker = getSpeakerFromMutation(mutation, recordingMode)
     if (speaker != null) {
         speakerCounts.set(speaker, (speakerCounts.get(speaker) || 0) + 1)
@@ -159,6 +158,7 @@ export function getSpeakerFromDocument(
                         return [
                             {
                                 name: differentSpeaker.speaker,
+                                id: 0,
                                 timestamp: differentSpeaker.timestamp,
                                 isSpeaking: true,
                             },

@@ -1,17 +1,18 @@
-import * as R from 'ramda'
+// import * as R from 'ramda'
 import { ATTENDEES, parameters } from '../background'
 import { SESSION } from '../record'
+// TODO : View unused imports (actually on comment)
 import {
-    Agenda,
+    // Agenda,
     DetectClientResponse,
-    LABEL_COLORS,
-    Label,
+    // LABEL_COLORS,
+    // Label,
     Sentence,
     SummaryParam,
     Workspace,
     api,
-} from '../spoke_api_js'
-import { sleep } from '../utils'
+} from '../api'
+import { sleep } from '../api'
 import { Transcriber } from './Transcriber'
 
 const MIN_TOKEN_GPT4 = 1000
@@ -20,7 +21,7 @@ export async function summarizeWorker(): Promise<void> {
     let i = 1
     let isFirst = true
 
-    while (!Transcriber.TRANSCRIBER?.stopped && isFirst) {
+    while (Transcriber.TRANSCRIBER?.is_running() && isFirst) {
         if (SESSION) {
             if (i % 10 === 0) {
                 try {
@@ -122,13 +123,16 @@ async function collectSentenceToAutoHighlight(
 ): Promise<Sentence[] | undefined> {
     const res: SummaryParam = {
         sentences: [],
-        lang: parameters.detected_lang,
+        // TODO : language_code - 99% sure it is trash code
+        // lang: parameters.detected_lang,
+        lang: undefined,
     }
     let withNextIsMaxToken = false
 
     if (SESSION) {
         const editors = SESSION.completeEditors
-        let next_index_to_summarise = 0
+        // TODO : Unexpected dead code
+        // let next_index_to_summarise = 0
         for (let i = 0; i < editors.length; i++) {
             const editor = editors[i]
             if (
@@ -188,35 +192,37 @@ async function autoHighlightCountToken(sentences: Sentence[]): Promise<number> {
     return count
 }
 
-export function findLabel(agenda: Agenda, label: string): Label | undefined {
-    return (
-        R.find(
-            (b: any) =>
-                b.type === 'talkingpoint' &&
-                b.data.name !== '' &&
-                b.data.name === label,
-            agenda.json.blocks,
-        )?.data as any
-    )?.label
-}
+// TODO : UNDERSTAND WHY THAT CODE IS DEAD.
+//
+// export function findLabel(agenda: Agenda, label: string): Label | undefined {
+//     return (
+//         R.find(
+//             (b: any) =>
+//                 b.type === 'talkingpoint' &&
+//                 b.data.name !== '' &&
+//                 b.data.name === label,
+//             agenda.json.blocks,
+//         )?.data as any
+//     )?.label
+// }
 
-export function getTemplateLabels(agenda: Agenda): Label[] {
-    return R.flatten(
-        agenda?.json.blocks?.map((b) => {
-            if (b.type === 'talkingpoint') {
-                return b.data.label
-            } else {
-                return undefined
-            }
-        }),
-    ).filter((l) => l != null) as Label[]
-}
+// export function getTemplateLabels(agenda: Agenda): Label[] {
+//     return R.flatten(
+//         agenda?.json.blocks?.map((b) => {
+//             if (b.type === 'talkingpoint') {
+//                 return b.data.label
+//             } else {
+//                 return undefined
+//             }
+//         }),
+//     ).filter((l) => l != null) as Label[]
+// }
 
-export async function createLabel(name?: string) {
-    return await api.postLabel({
-        name: name ?? '',
-        color: LABEL_COLORS[
-            Math.floor(Math.random() * 100) % LABEL_COLORS.length
-        ],
-    })
-}
+// export async function createLabel(name?: string) {
+//     return await api.postLabel({
+//         name: name ?? '',
+//         color: LABEL_COLORS[
+//             Math.floor(Math.random() * 100) % LABEL_COLORS.length
+//         ],
+//     })
+// }

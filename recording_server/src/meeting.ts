@@ -10,13 +10,14 @@ import {
 import {
     CancellationToken,
     ChangeAgendaRequest,
-    ChangeLanguage,
+    // TODO : language_code - 99% sure it is trash code
+    // ChangeLanguage,
     Meeting,
     MeetingParams,
     MeetingProvider,
     MeetingProviderInterface,
     MeetingStatus,
-    Speaker
+    SpeakerData
 } from './types'
 
 import { notifyApp } from './calendar'
@@ -91,7 +92,7 @@ export class MeetingHandle {
     static getBotId(): string {
         return MeetingHandle.instance.param.bot_id
     }
-    static addSpeaker(speaker: Speaker) {
+    static addSpeaker(speaker: SpeakerData) {
         MeetingHandle.instance.meeting.backgroundPage!.evaluate((x) => {
             const w = window as any
             return w.addSpeaker(x)
@@ -346,15 +347,16 @@ export class MeetingHandle {
         }, data)
     }
 
-    public async changeLanguage(data: ChangeLanguage) {
-        this.logger.info('Changing language', {
-            new_language: data.language,
-        })
-        await this.meeting.backgroundPage!.evaluate(async (data) => {
-            const w = window as any
-            await w.changeLanguage(data)
-        }, data)
-    }
+    // TODO : language_code - 99% sure it is trash code
+    // public async changeLanguage(data: ChangeLanguage) {
+    //     this.logger.info('Changing language', {
+    //         new_language: data.language,
+    //     })
+    //     await this.meeting.backgroundPage!.evaluate(async (data) => {
+    //         const w = window as any
+    //         await w.changeLanguage(data)
+    //     }, data)
+    // }
 
     public async stopRecording(reason: string) {
         if (MeetingHandle.status.state !== 'Recording') {
@@ -428,6 +430,7 @@ export class MeetingHandle {
         }
         setTimeout(async () => {
             this.logger.info('killing process')
+            //TODO : appeler clean everything
             try {
                 await uploadLog(
                     this.param.user_id,

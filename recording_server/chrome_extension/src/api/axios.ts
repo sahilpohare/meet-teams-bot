@@ -3,7 +3,10 @@ import * as rax from 'retry-axios'
 
 export let API_BOT_BASEURL: string = ''
 
-type SpokeApiConfig = {
+/**
+ * Configuration of MeetingBaas/Spoke environment
+ */
+export type SpokeApiConfig = {
     authorizationToken?: string
     api_server_internal_url?: string
     api_bot_internal_url?: string
@@ -11,6 +14,10 @@ type SpokeApiConfig = {
     logError: any
 }
 
+/**
+ * Set default configuration for Axios
+ * @param config
+ */
 export function setConfig(config: SpokeApiConfig) {
     if (config.authorizationToken) {
         setDefaultHeader('Authorization', config.authorizationToken)
@@ -27,11 +34,11 @@ export function setConfig(config: SpokeApiConfig) {
     }
 }
 
-export function setDefaultHeader(name: string, value: string) {
+function setDefaultHeader(name: string, value: string) {
     axios.defaults.headers.common[name] = value
 }
 
-export function setDefaultAxios(baseUrl: string, logError: any) {
+function setDefaultAxios(baseUrl: string, logError: any) {
     axios.defaults.baseURL = baseUrl
     // This file set the default config of axios
     axios.defaults.withCredentials = true

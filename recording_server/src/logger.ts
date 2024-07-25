@@ -1,10 +1,12 @@
 import { BUCKET_NAME, s3cp } from './s3'
 
+import { LOGGER } from './server'
 import axios from 'axios'
 import { exec } from 'child_process'
-import { rmdir } from 'fs/promises'
-import { LOGGER } from './server'
+import * as fs from 'fs/promises'
+
 import { getFiles } from './utils'
+import * as path from 'path'
 
 let PROJECT_ID: number | undefined = undefined
 
@@ -97,9 +99,23 @@ export async function uploadLog(
     const link = project_id
         ? `logs/${date}/${user_id}/${project_id}/${d.getHours()}h${d.getMinutes()}`
         : `logs/${date}/${user_id}/${bot_id}/${d.getHours()}h${d.getMinutes()}`
+
+
+    const linkSpeakerSeparationFile = `logs/${date}/${user_id}/${project_id}/${d.getHours()}h-speaker_file`
     try {
+        // Téléverser le fichier de log principal
         await s3cp(process.env.LOG_FILE, link)
+
+        // Téléverser le fichier SeparationSpeakerLog
+        const separationLogPath = path.join(
+            __dirname,
+            'SeparationSpeakerLog.txt',
+        )
+        await s3cp(separationLogPath, linkSpeakerSeparationFile)
+
         const s3File = `https://${BUCKET_NAME}.s3.amazonaws.com/${link}`
+        const s3SeparationFile = `https://${BUCKET_NAME}.s3.amazonaws.com/${linkSpeakerSeparationFile}`
+
         const allScreenshotFiles = []
         console.log('get screenshot files')
         for await (const f of getFiles('./screenshot')) {
@@ -113,14 +129,21 @@ export async function uploadLog(
                 Authorization: `Basic YWRtaW46U3Bva2VyMTIzNTgxMzIx`,
             },
         })
+
         await reqInstance.get(
             `https://spoke.app.n8n.cloud/webhook/failed_bot?email=${email}&s3_log=${encodeURIComponent(
                 s3File,
+            )}&s3_separation_log=${encodeURIComponent(
+                s3SeparationFile,
             )}&bot_id=${bot_id}&user_id=${user_id}&share_link=${share_link}&project_id=${project_id}&screenshots=${encodeURIComponent(
                 allScreenshotFiles.join(', '),
             )}`,
         )
-        await rmdir('./screenshot', { recursive: true })
+
+        await fs.rm('./screenshot', { recursive: true, force: true })
+
+        // Supprimer le fichier local de séparation des speakers
+        // await fs.unlink(separationLogPath);
     } catch (e) {
         console.error('failed to upload log', e)
     }

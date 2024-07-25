@@ -1,7 +1,7 @@
 import { SESSION } from '../record'
 import { SPEAKERS } from '../background'
 import { Transcriber } from './Transcriber'
-import { sleep } from '../utils'
+import { sleep } from '../api'
 import { uploadEditorsTask } from '../uploadEditors'
 
 export async function speakerWorker() {
@@ -18,6 +18,7 @@ export async function speakerWorker() {
                 )
                 SPEAKERS.push({
                     name: lastSpeaker.name,
+                    id: 0,
                     timestamp: now,
                     isSpeaking: true,
                 })
@@ -28,7 +29,7 @@ export async function speakerWorker() {
         }
     }
 
-    while (!Transcriber.TRANSCRIBER?.stopped) {
+    while (Transcriber.TRANSCRIBER?.is_running()) {
         await routine()
         await sleep(5_000)
     }

@@ -1,6 +1,6 @@
-import { RecordingMode, Speaker } from '../observeSpeakers'
+import { RecordingMode, SpeakerData } from '../observeSpeakers'
 
-import { sleep } from '../utils'
+import { sleep } from '../api'
 
 export const MIN_SPEAKER_DURATION = 400 // TODO : Adjust and regactoring
 export const SPEAKER_LATENCY = 500 // TODO : Same
@@ -56,7 +56,7 @@ export function getSpeakerFromDocument(
     currentSpeaker: string | null,
     mutation: MutationRecord | null,
     recordingMode: RecordingMode,
-): Speaker[] {
+): SpeakerData[] {
     // console.log('[Teams] Starting getSpeakerFromDocument', {
     //     currentSpeaker,
     //     recordingMode,
@@ -98,11 +98,14 @@ export function getSpeakerFromDocument(
     //         isSpeaking: true,
     //     }))
 
-    const Speakers = Array.from(speakerStates.values()).map((state) => ({
-        name: state.name,
-        timestamp: state.lastActiveTimestamp,
-        isSpeaking: state.isCurrentlySpeaking,
-    }))
+    const Speakers: SpeakerData[] = Array.from(speakerStates.values()).map(
+        (state) => ({
+            name: state.name,
+            id: 0,
+            timestamp: state.lastActiveTimestamp,
+            isSpeaking: state.isCurrentlySpeaking,
+        }),
+    )
 
     // console.log('[Teams] Active speakers:', activeSpeakers)
     console.table(Speakers)

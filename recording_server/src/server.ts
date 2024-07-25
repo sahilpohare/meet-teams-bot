@@ -1,20 +1,23 @@
-import * as bodyParser from 'body-parser'
 import * as express from 'express'
+import * as fs from 'fs/promises'
+import * as path from 'path'
 import * as redis from 'redis'
 
 import {
     ChangeAgendaRequest,
     ChangeLanguage,
     MessageToBroadcast,
+    SpeakerData,
     StatusParams,
     StopRecordParams,
-    Speaker
 } from './types'
 
 import { Logger } from './logger'
 import { MeetingHandle } from './meeting'
 import { PORT } from './instance'
+
 import { sleep } from './utils'
+import bodyParser from 'body-parser'
 
 export let PROJECT_ID: number | undefined = undefined
 export const LOGGER = new Logger({})
@@ -26,18 +29,60 @@ export const clientRedis = redis.createClient({
 clientRedis.on('error', (err) => {
     console.error('Redis error:', err)
 })
-
 const HOST = '0.0.0.0'
+
 const ALLOWED_ORIGINS = [process.env.ALLOWED_ORIGIN, 'http://localhost:3005']
+const SPEAKER_LOG_PATHNAME = path.join(__dirname, 'SeparationSpeakerLog.txt')
+console.log(`Speaker log pathname : ${SPEAKER_LOG_PATHNAME}`)
+
+// TODO : CHECK is it is necessary
+// const MEET_ORIGINS = [
+//     'https://meet.google.com',
+//     'https://meet.googleapis.com',
+//     'https://meetings.googleapis.com',
+//     'https://teams.microsoft.com',
+// ]
+// async function getAllowedOrigins(): Promise<string[]> {
+//     // const extensionId = await getExtensionId()
+//     return [
+//         process.env.ALLOWED_ORIGIN,
+//         'http://localhost:3005',
+//         ...MEET_ORIGINS,
+//         // `chrome-extension://${extensionId}`,
+//     ]
+// }
 
 export async function server() {
     const app = express()
+    // const allowedOrigins = await getAllowedOrigins()
+    const allowedOrigins = ALLOWED_ORIGINS
 
+    // TODO : CHECK is it is necessary
     const jsonParser = bodyParser.json({ limit: '50mb' })
+
+    // TODO : CHECK is it is necessary
+    // app.use(express.urlencoded({ extended: true }))
+    // app.use(express.json({ limit: '50mb' })) // To parse the incoming requests with JSON payloads
+    // app.options('*', (req, res) => {
+    //     const origin = req.headers.origin
+    //     if (allowedOrigins.includes(origin)) {
+    //         res.header('Access-Control-Allow-Origin', origin)
+    //     }
+    //     res.header('Access-Control-Allow-Credentials', 'true')
+    //     res.header(
+    //         'Access-Control-Allow-Methods',
+    //         'OPTIONS, GET, PUT, POST, DELETE',
+    //     )
+    //     res.header(
+    //         'Access-Control-Allow-Headers',
+    //         'Authorization2, Content-Type',
+    //     )
+    //     res.sendStatus(204)
+    // })
 
     app.use((req, res, next) => {
         const origin = req.headers.origin
-        if (ALLOWED_ORIGINS.includes(origin)) {
+        if (allowedOrigins.includes(origin)) {
             res.header('Access-Control-Allow-Origin', origin)
         }
         res.header('Access-Control-Allow-Credentials', 'true')
@@ -76,7 +121,7 @@ export async function server() {
     })
 
     // Only spoke for the moment
-    app.post('/status', jsonParser, async (req, res) => {
+    app.post('/status', async (req, res) => {
         function statusReady() {
             return (
                 MeetingHandle.getProject() != null ||
@@ -131,7 +176,7 @@ export async function server() {
     })
 
     // Used by Spoke / Maybe useless : Template Choose
-    app.post('/change_agenda', jsonParser, async (req, res) => {
+    app.post('/change_agenda', async (req, res) => {
         const data: ChangeAgendaRequest = req.body
         console.log('change agenda request', data)
         try {
@@ -143,19 +188,19 @@ export async function server() {
         }
     })
 
-    // Maybe unused now
-    app.post('/change_language', jsonParser, async (req, res) => {
-        const data: ChangeLanguage = req.body
-        try {
-            await MeetingHandle.instance.changeLanguage(data)
-            res.send('ok')
-        } catch (e) {
-            res.status(500).send(JSON.stringify(e))
-        }
-    })
+    // TODO : language_code - 99% sure it is trash code
+    // app.post('/change_language', async (req, res) => {
+    //     const data: ChangeLanguage = req.body
+    //     try {
+    //         await MeetingHandle.instance.changeLanguage(data)
+    //         res.send('ok')
+    //     } catch (e) {
+    //         res.status(500).send(JSON.stringify(e))
+    //     }
+    // })
 
     // Leave bot request from server
-    app.post('/stop_record', jsonParser, async (req, res) => {
+    app.post('/stop_record', async (req, res) => {
         const data: StopRecordParams = req.body
         console.log('stop record request: ', data)
         MeetingHandle.instance.stopRecording('api request').catch((e) => {
@@ -172,6 +217,7 @@ export async function server() {
     })
 
     // Testing axios channel from extension
+
     app.post('/broadcast_message', jsonParser, async (req, res) => {
         const message: MessageToBroadcast = req.body
         console.log('Message received from extension: ', message)
@@ -188,11 +234,86 @@ export async function server() {
             res.status(200).send('ok')
             return
         }
-        res.status(400).send('Unknown message type')
+        // if (message.length == 0) {
+        //     LOGGER.warn(`Unexpected len : Must be greater than 0.`)
+        //     res.status(400).json({
+        //         error: 'Unusuable data',
+        //     })
+        //     return
+        // }
+        let input = JSON.stringify(message)
+        LOGGER.info(`Writing to speaker log file : ${input}`)
+        await fs.appendFile(SPEAKER_LOG_PATHNAME, `${input}\n`).catch((e) => {
+            LOGGER.error(`Cannot append speaker log file ! : ${e}`)
+        })
+        res.status(200).json({})
+    })
+
+    // app.post('/broadcast_message', async (req, res) => {
+    //     const message: MessageToBroadcast = req.body
+    //     console.log('Message received from extension :', message)
+    //     res.status(200).json({})
+    // })
+
+    // Stop meeting request from extension
+    app.post('/stop_meeting', async (_req, res) => {
+        MeetingHandle.instance
+            .stopRecording('extension request')
+            .then(() => {
+                res.status(200).json({})
+            })
+            .catch((e) => {
+                LOGGER.error(`Stop recording error ${e}`)
+                res.status(400).json({
+                    error: e,
+                })
+            })
+    })
+
+    // Ideally called when a speaker mutation is detected
+    app.post('/observe_speaker', async (req, res) => {
+        LOGGER.info(`POST : observe_speaker. received : ${req.body}`)
+        console.log(req.body)
+        const message: SpeakerData[] = req.body
+
+        function is_speaker_data(obj: any): obj is SpeakerData {
+            return (
+                typeof obj === 'object' &&
+                typeof obj.name === 'string' &&
+                typeof obj.id === 'number' &&
+                typeof obj.timestamp === 'number' &&
+                typeof obj.isSpeaking === 'boolean'
+            )
+        }
+        if (
+            !(
+                Array.isArray(message) &&
+                message.every((item) => is_speaker_data(item))
+            )
+        ) {
+            LOGGER.warn(`Unexpected object type : Must be SpeakerData[].`)
+            res.status(400).json({
+                error: 'Unusuable data',
+            })
+            return
+        }
+        if (message.length == 0) {
+            LOGGER.warn(`Unexpected len : Must be greater than 0.`)
+            res.status(400).json({
+                error: 'Unusuable data',
+            })
+            return
+        }
+        let input = JSON.stringify(message)
+        LOGGER.info(`Writing to speaker log file : ${input}`)
+        await fs.appendFile(SPEAKER_LOG_PATHNAME, `${input}\n`).catch((e) => {
+            LOGGER.error(`Cannot append speaker log file ! : ${e}`)
+        })
+        res.status(200).json({})
     })
 
     app.post('/add_speaker', jsonParser, async (req, res) => {
-        const speakers: Speaker[] = req.body
+        const speakers: SpeakerData[] = req.body
         console.log('Speaker update received:', speakers)
         speakers.forEach((speaker) => {
             if (speaker.isSpeaking) {

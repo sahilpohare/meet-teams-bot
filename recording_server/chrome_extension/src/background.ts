@@ -1,15 +1,15 @@
-import * as record from './record'
 import * as State from './state'
+import * as record from './record'
 
-import { Project, api, setConfig } from './spoke_api_js'
+import { Project, api, SpokeApiConfig, setConfig, sleep } from './api'
 
-import axios from 'axios'
-import { Speaker } from './observeSpeakers'
+import { ApiService } from './recordingServerApi'
+import { SpeakerData } from './observeSpeakers'
 import { Transcriber } from './Transcribe/Transcriber'
+import axios from 'axios'
 import { uploadEditorsTask } from './uploadEditors'
-import { sleep } from './utils'
 
-export let SPEAKERS: Speaker[] = []
+export let SPEAKERS: SpeakerData[] = []
 export let ATTENDEES: string[] = []
 
 export * from './state'
@@ -48,7 +48,7 @@ function setUserAgent(window: Window, userAgent: string) {
     }
 }
 
-function addSpeaker(speaker: Speaker) {
+function addSpeaker(speaker: SpeakerData) {
     console.log(`EXTENSION BACKGROUND PAGE - ADD SPEAKER : ${speaker}`)
     SPEAKERS.push(speaker)
     uploadEditorsTask(SPEAKERS)
@@ -66,20 +66,6 @@ function addListener() {
         _sendResponse: (response?: any) => void,
     ) {
         switch (request.type) {
-            case 'SEND_TO_SERVER':
-                axios
-                    .post(
-                        State.parameters.local_recording_server_location +
-                            'broadcast_message',
-                        request.payload,
-                    )
-                    .then(function (response) {
-                        console.warn('SEND_TO_SERVER - SUCESS:', response)
-                    })
-                    .catch(function (error) {
-                        console.error('SEND_TO_SERVER - ERROR:', error)
-                    })
-                break
             case 'REFRESH_ATTENDEES':
                 if (request.payload.length > ATTENDEES.length) {
                     ATTENDEES = request.payload
@@ -134,36 +120,22 @@ function observeSpeakers() {
 export async function startRecording(
     meetingParams: State.MeetingParams,
 ): Promise<Project | undefined> {
-    // axios.get(meetingParams.local_recording_server_location + 'broadcast_message') // GET example
-    // TODO : Remove when it becomes unecessary
-    axios
-        .post(
-            meetingParams.local_recording_server_location + 'broadcast_message',
-            {
-                message_type: 'LOG',
-                data: {
-                    msg: 'FROM_EXTENSION: Start recording launched.',
-                },
-            },
-        )
-        .then(function (response) {
-            console.warn('SUCESS:', response)
-        })
-        .catch(function (error) {
-            console.error('ERROR:', error)
-        })
-
     try {
         State.addMeetingParams(meetingParams)
 
         addDefaultHeader('Authorization', State.parameters.user_token)
-        setConfig({
+        let axios_config: SpokeApiConfig = {
             api_server_internal_url: State.parameters.api_server_baseurl,
             api_bot_internal_url: State.parameters.api_bot_baseurl,
             authorizationToken: State.parameters.user_token,
             logError: () => {},
-        })
-
+        }
+        setConfig(axios_config)
+        ApiService.init(meetingParams.local_recording_server_location)
+        await ApiService.sendMessageToRecordingServer(
+            'LOG',
+            'FROM_EXTENSION: Xxxxxxxxxxxxxxxxxxxxxxxx ************ Start recording launched. **********************************',
+        )
         observeSpeakers()
         await sleep(1000)
         await record.initMediaRecorder()
@@ -175,14 +147,13 @@ export async function startRecording(
     } catch (e) {
         console.log('ERROR while start recording', JSON.stringify(e))
     }
-    // setTimeout(() => { record.stopRecording() }, 60000)
 }
 
 export async function stopMediaRecorder() {
     await record.stop()
     const timestamp = new Date().getTime()
     // add a last fake speaker to trigger the upload of the last editor ( generates an interval )
-    SPEAKERS.push({ name: 'END', timestamp, isSpeaking: false })
+    SPEAKERS.push({ name: 'END', id: 0, timestamp, isSpeaking: false })
     await uploadEditorsTask(SPEAKERS)
     console.log('stopping transcriber')
 }

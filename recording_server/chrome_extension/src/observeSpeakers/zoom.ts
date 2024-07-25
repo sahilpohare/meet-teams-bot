@@ -1,7 +1,9 @@
-import { RecordingMode } from '../observeSpeakers'
-
 //TODO: interpreter les erreurs de zoom pour les renvoyer au recording_server
 //TODO: passer le message du bot en parametre =>done
+import { RecordingMode, SpeakerData } from '../observeSpeakers'
+
+//TODO: interpreter les erreurs de zoom pour les renvoyer au recording_server
+//TODO: passer le message du bot en parametre
 
 // TODO: question pour Micka:
 // Comment je communique avec zoom? Axios dans zoom?
@@ -34,7 +36,7 @@ export function getSpeakerFromDocument(
     currentSpeaker: string | null,
     mutation: MutationRecord | null,
     recordingMode: RecordingMode,
-): any[] {
+): SpeakerData[] {
     return []
 }
 

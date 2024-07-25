@@ -1,7 +1,7 @@
 import * as R from 'ramda'
 import { SESSION } from '../record'
-import { api, RecognizerWord } from '../spoke_api_js'
-import { sleep } from '../utils'
+import { api, RecognizerWord } from '../api'
+import { sleep } from '../api'
 import { Transcriber } from './Transcriber'
 
 export async function wordPosterWorker() {
@@ -49,7 +49,7 @@ export async function wordPosterWorker() {
         }
     }
 
-    while (!Transcriber.TRANSCRIBER?.stopped) {
+    while (Transcriber.TRANSCRIBER?.is_running()) {
         await routine()
         await sleep(5_000)
         console.log('[wordPosterWorker] end while loop')

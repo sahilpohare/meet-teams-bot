@@ -8,18 +8,25 @@ import {
     EditorWrapper,
     Project,
     RecognizerWord,
-} from './spoke_api_js'
+} from './api'
+import { sleep } from './api'
 import { Transcriber } from './Transcribe/Transcriber'
-import { sleep } from './utils'
 
 const STREAM: MediaStream | null = null
 let RECORDED_CHUNKS: BlobEvent[] = []
 let MEDIA_RECORDER: MediaRecorder // MediaRecorder instance to capture footage
 let THIS_STREAM: MediaStreamAudioSourceNode
+let HANDLE_STOP_DONE = false
+let CONTEXT: AudioContext
 
-export let CONTEXT: AudioContext
-export let START_RECORD_OFFSET = 0
+// TODO : Dead code ?
+// let START_RECORD_OFFSET = 0
+// TODO : Dead code ?
+// export const MIN_DURATION_MOMENT = 2100
+
+// INFO : START_RECORD_TIMESTAMP is shared with Transcriber & UploadEditors(speaker changes)
 export let START_RECORD_TIMESTAMP = 0
+// INFO : SESSION is shared with Transcriber & UploadEditors(speaker changes)
 export let SESSION: SpokeSession | null = null
 
 export type SpokeSession = {
@@ -39,10 +46,11 @@ export type SpokeSession = {
     transcribedUntil: number
 }
 
-type VideoSize = {
-    width: number | undefined
-    height: number | undefined
-}
+// TODO : Dead code ? Why this type is never used ?
+// type VideoSize = {
+//     width: number | undefined
+//     height: number | undefined
+// }
 
 export async function initMediaRecorder(): Promise<void> {
     const fps = 30
@@ -107,7 +115,7 @@ export async function startRecording(
     agenda?: Agenda,
 ): Promise<Project> {
     const newSessionId = await api.startRecordingSession()
-    console.log('[startRecording]: '.concat(newSessionId.toLocaleString()));
+    console.log('[startRecording]: '.concat(newSessionId.toLocaleString()))
 
     console.log(`[startRecording] before post project`)
     let agendaRefreshed = agenda
@@ -164,25 +172,13 @@ export async function startRecording(
     MEDIA_RECORDER.onerror = function (e) {
         console.error('media recorder error', e)
     }
-    START_RECORD_OFFSET = CONTEXT.currentTime
+    // TODO : Dead code ? START_RECORD_OFFSET is only SET here but never read
+    // START_RECORD_OFFSET = CONTEXT.currentTime
     START_RECORD_TIMESTAMP = now
     console.log(`after media recorder start`)
 
     return project
 }
-
-let HANDLE_STOP_DONE = false
-
-async function handleStop(this: MediaRecorder, _e: Event) {
-    console.log('[handle stop]')
-    const spokeSession = SESSION!
-    if (spokeSession) {
-        await handleChunk(true)
-    }
-
-    HANDLE_STOP_DONE = true
-}
-
 export async function stop() {
     console.log('media recorder stop')
     MEDIA_RECORDER.stop()
@@ -225,38 +221,6 @@ export async function waitUntilComplete(kill = false) {
     }
 }
 
-async function unsetAllStream(): Promise<void> {
-    STREAM?.getTracks().forEach((track) => track.stop())
-    await CONTEXT?.close()
-}
-
-function handleDataAvailable() {
-    return (e: BlobEvent) => {
-        RECORDED_CHUNKS.push(e)
-        handleChunk(false)
-    }
-}
-
-async function handleChunk(isFinal: boolean) {
-    const spokeSession = SESSION!  // ! is the equivalent of unwrap() - throw exception
-    const recordedChunks = RECORDED_CHUNKS
-    RECORDED_CHUNKS = []
-    const index = spokeSession.uploadChunkCounter
-    spokeSession.uploadChunkCounter += 1; //spokeSession.uploadChunkCounter + 1
-
-    const recordedDataChunk = recordedChunks.map((c) => c.data)
-    const blob = new Blob(recordedDataChunk, {
-        type: 'video/webm; codecs=pcm',
-    })
-    const file = new File([blob], 'record.webm', {
-        type: 'video/webm',
-    })
-    spokeSession.upload_queue.push(async () => {
-        await sendDataChunks(spokeSession, file, index, isFinal)
-    })
-}
-
-export const MIN_DURATION_MOMENT = 2100
 export async function stopRecordServer(
     spokeSession: SpokeSession | null = null,
 ) {
@@ -274,7 +238,48 @@ export async function stopRecordServer(
     }
 }
 
-export async function sendDataChunks(
+async function handleStop(this: MediaRecorder, _e: Event) {
+    console.log('[handle stop]')
+    const spokeSession = SESSION!
+    if (spokeSession) {
+        await handleChunk(true)
+    }
+
+    HANDLE_STOP_DONE = true
+}
+
+async function unsetAllStream(): Promise<void> {
+    STREAM?.getTracks().forEach((track) => track.stop())
+    await CONTEXT?.close()
+}
+
+function handleDataAvailable() {
+    return (e: BlobEvent) => {
+        RECORDED_CHUNKS.push(e)
+        handleChunk(false)
+    }
+}
+
+async function handleChunk(isFinal: boolean) {
+    const spokeSession = SESSION! // ! is the equivalent of unwrap() - throw exception
+    const recordedChunks = RECORDED_CHUNKS
+    RECORDED_CHUNKS = []
+    const index = spokeSession.uploadChunkCounter
+    spokeSession.uploadChunkCounter += 1
+
+    const recordedDataChunk = recordedChunks.map((c) => c.data)
+    const blob = new Blob(recordedDataChunk, {
+        type: 'video/webm; codecs=pcm',
+    })
+    const file = new File([blob], 'record.webm', {
+        type: 'video/webm',
+    })
+    spokeSession.upload_queue.push(async () => {
+        await sendDataChunks(spokeSession, file, index, isFinal)
+    })
+}
+
+async function sendDataChunks(
     spokeSession: SpokeSession,
     file: File,
     index: number,

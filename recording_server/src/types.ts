@@ -129,10 +129,14 @@ export type MessageToBroadcast = {
     data: object
 }
 
-export type MeetingProvider = 'Zoom' | 'Meet' | 'Teams'
-
-export type Speaker = {
-    isSpeaking: boolean
+export type SpeakerData = {
     name: string
+    id: number
     timestamp: number
+    isSpeaking: boolean
 }
+
+export interface MessageData {
+    msg: SpeakerData[]
+}
+export type MeetingProvider = 'Zoom' | 'Meet' | 'Teams'

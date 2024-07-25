@@ -1,8 +1,3 @@
-import * as apiImport from './api'
-export const api = { ...apiImport }
-
-export * from './axios'
-
 export type Project = {
     id: number
     creator_id: number

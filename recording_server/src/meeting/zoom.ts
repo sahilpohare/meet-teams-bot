@@ -126,6 +126,7 @@ function parse(meeting_url: string) {
 
 const MEETINGJS_BASEURL = `http://localhost:3005`
 
+// async function sendEnterMessage(page: puppeteer.Page, message: string) {}
 export async function clickWithInnerText(
     page: puppeteer.Page,
     htmlType: string,

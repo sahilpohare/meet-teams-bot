@@ -1,5 +1,7 @@
-import { ChangeLanguage } from './background'
-import { Agenda, MeetingProvider } from './spoke_api_js'
+// TODO : language_code - 99% sure it is trash code
+// import { ChangeLanguage } from './background'
+import { Agenda, MeetingProvider } from './api'
+import { ApiService } from './recordingServerApi'
 
 export type SpeechToTextProvider = 'Gladia'
 
@@ -28,22 +30,28 @@ export type MeetingParams = {
 
 export type RecordingMode = 'speaker_view' | 'gallery_view' | 'audio_only'
 
-export const parameters: MeetingParams & { detected_lang?: string } =
-    {} as MeetingParams
+// TODO : language_code - 99% sure it is trash code
+// export const parameters: MeetingParams & { detected_lang?: string } =
+//     {} as MeetingParams
+
+export const parameters: MeetingParams = {} as MeetingParams
 
 export function addMeetingParams(meetingParams: MeetingParams) {
-    console.log({ meetingParams })
+    ApiService.sendMessageToRecordingServer('LOG', meetingParams).catch((e) => {
+        console.error('error LOG FROM EXTENSION in observeSpeaker', e)
+    })
+    // Copy all keys from meetingParams input TO parameters globale variable
     Object.keys(meetingParams).forEach((key) => {
         parameters[key] = meetingParams[key]
     })
-    console.log({ parameters })
 }
 
 export function changeAgenda(agenda: Agenda) {
     parameters.agenda = agenda
 }
 
-export function changeLanguage(changeLanguage: ChangeLanguage) {
-    parameters.language = changeLanguage.language
-    console.log('setting language to: ', changeLanguage.language)
-}
+// TODO : language_code - 99% sure it is trash code
+// export function changeLanguage(changeLanguage: ChangeLanguage) {
+//     parameters.language = changeLanguage.language
+//     console.log('setting language to: ', changeLanguage.language)
+// }

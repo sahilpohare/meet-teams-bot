@@ -1,17 +1,18 @@
 import * as R from 'ramda'
-import { Speaker } from './observeSpeakers'
-import { SESSION, START_RECORD_TIMESTAMP, SpokeSession } from './record'
-import {
-    Asset,
-    Editor,
-    EditorWrapper,
-    Transcript,
-    Video,
-    api,
-} from './spoke_api_js'
-import { parameters } from './state'
 
-export async function uploadEditorsTask(speakers: Speaker[]) {
+import { SpeakerData } from './observeSpeakers'
+import { SESSION, START_RECORD_TIMESTAMP, SpokeSession } from './record'
+import { Asset, Editor, EditorWrapper, Transcript, Video, api } from './api'
+// TODO : language_code - 99% sure it is trash code
+// import { parameters } from './state'
+
+type SpeakerInterval = {
+    start_time: number
+    end_time: number
+    speaker: string
+}
+
+export async function uploadEditorsTask(speakers: SpeakerData[]) {
     let intervals = timestampToInterval(speakers)
     const spokeSession = SESSION as SpokeSession
     if (intervals.length > spokeSession.completeEditors.length) {
@@ -117,19 +118,15 @@ function createTranscripts(speaker: SpeakerInterval): Partial<Transcript>[] {
         {
             speaker: speaker.speaker ?? '',
             words: [],
-            google_lang: parameters.detected_lang ?? parameters.language,
+            // TODO : language_code - 99% sure it is trash code
+            // google_lang: parameters.detected_lang ?? parameters.language,
+            google_lang: undefined,
         },
     ]
     return transcripts
 }
 
-type SpeakerInterval = {
-    start_time: number
-    end_time: number
-    speaker: string
-}
-
-function timestampToInterval(speakers: Speaker[]): SpeakerInterval[] {
+function timestampToInterval(speakers: SpeakerData[]): SpeakerInterval[] {
     const intervals = speakers.map((speaker, index) => {
         // For the last speaker, we might want to set a specific end timestamp.
         // Here, we're simply using the next hour as an example.

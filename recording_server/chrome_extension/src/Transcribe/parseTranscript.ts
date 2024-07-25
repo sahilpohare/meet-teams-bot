@@ -1,4 +1,4 @@
-import { RecognizerWord, RunPodResult } from '../spoke_api_js'
+import { RecognizerWord, RunPodResult } from '../api'
 
 export type RecognizerTranscript = {
     speaker: number

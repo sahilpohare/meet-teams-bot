@@ -3,13 +3,15 @@ import * as MeetProvider from './observeSpeakers/meet'
 import * as TeamsProvider from './observeSpeakers/teams'
 import * as ZoomProvider from './observeSpeakers/zoom'
 
+import { sleep } from './api'
+import { ApiService } from './recordingServerApi'
 import { parameters } from './state'
-import { sleep } from './utils'
 
-export type Speaker = {
-    isSpeaking: boolean
+export type SpeakerData = {
     name: string
+    id: number
     timestamp: number
+    isSpeaking: boolean
 }
 
 declare var BOT_NAME: string
@@ -20,7 +22,7 @@ export type RecordingMode = 'speaker_view' | 'gallery_view' | 'audio_only'
 const INACTIVITY_THRESHOLD = 60 * 1000 * 30 //ms
 // let inactivityCheckInterval: NodeJS.Timeout | null = null
 
-const SPEAKERS: Speaker[] = []
+const SPEAKERS: SpeakerData[] = []
 
 let PROVIDER = {
     getSpeakerFromDocument: TeamsProvider.getSpeakerFromDocument,
@@ -107,20 +109,21 @@ async function observeSpeakers() {
         console.log('an exception occurred in remove shitty html', e)
     }
 
-    function refreshSpeaker(index: number) {
-        console.log('timeout refresh speaker')
-        let lastSpeaker = index < SPEAKERS.length ? SPEAKERS[index] : undefined
-        const now = Date.now() - PROVIDER.SPEAKER_LATENCY
-        const speakerDuration = now - (lastSpeaker?.timestamp ?? 0)
-        if (speakerDuration > 2000) {
-            chrome.runtime.sendMessage({
-                type: 'REFRESH_SPEAKERS',
-                payload: SPEAKERS.slice(0, index + 1),
-            })
-        } else {
-            console.log('speaker changed in the last 2 secs')
-        }
-    }
+    // TODO : This function is linked to ZOOM - Must ne remove in the future
+    // function refreshSpeaker(index: number) {
+    //     console.log('timeout refresh speaker')
+    //     let lastSpeaker = index < SPEAKERS.length ? SPEAKERS[index] : undefined
+    //     const now = Date.now() - PROVIDER.SPEAKER_LATENCY
+    //     const speakerDuration = now - (lastSpeaker?.timestamp ?? 0)
+    //     if (speakerDuration > 2000) {
+    //         chrome.runtime.sendMessage({
+    //             type: 'REFRESH_SPEAKERS',
+    //             payload: SPEAKERS.slice(0, index + 1),
+    //         })
+    //     } else {
+    //         console.log('speaker changed in the last 2 secs')
+    //     }
+    // }
 
     var mutationObserver = new MutationObserver(function (mutations) {
         mutations.forEach(function (mutation) {
@@ -135,65 +138,76 @@ async function observeSpeakers() {
                     mutation,
                     RECORDING_MODE,
                 )
+                if (currentSpeakersList.length > 0) {
+                    ApiService.sendMessageToRecordingServer(
+                        'LOG_SPEAKER',
+                        currentSpeakersList,
+                    ).catch((e) => {
+                        console.error(
+                            'error LOG_SPEAKER FROM EXTENSION in observeSpeaker',
+                            e,
+                        )
+                    })
+                }
 
                 if (MEETING_PROVIDER === 'Zoom') {
-                    // Existing Zoom logic
-                    const previousSpeaker =
-                        SPEAKERS.length > 0
-                            ? SPEAKERS[SPEAKERS.length - 1]
-                            : undefined
-                    const speakersFiltered = R.filter(
-                        (u) =>
-                            u.name !== BOT_NAME &&
-                            u.name !== previousSpeaker?.name,
-                        currentSpeakersList,
-                    )
-                    const speaker = speakersFiltered[0]
-
-                    if (speaker) {
-                        const newSpeaker = {
-                            name: speaker.name,
-                            timestamp:
-                                speaker.timestamp - PROVIDER.SPEAKER_LATENCY,
-                            isSpeaking: speaker.isSpeaking,
-                        }
-                        const speakerDuration =
-                            newSpeaker.timestamp -
-                            (previousSpeaker?.timestamp ?? 0)
-                        if (speakerDuration < PROVIDER.MIN_SPEAKER_DURATION) {
-                            SPEAKERS[SPEAKERS.length - 1] = newSpeaker
-                            if (
-                                SPEAKERS.length > 2 &&
-                                SPEAKERS[SPEAKERS.length - 2].name ===
-                                    newSpeaker.name
-                            ) {
-                                SPEAKERS.pop()
-                            }
-                            setTimeout(
-                                () => refreshSpeaker(SPEAKERS.length - 1),
-                                PROVIDER.MIN_SPEAKER_DURATION + 500,
-                            )
-                        } else {
-                            chrome.runtime.sendMessage({
-                                type: 'REFRESH_SPEAKERS',
-                                payload: SPEAKERS,
-                            })
-
-                            SPEAKERS.push(newSpeaker)
-                            if (SPEAKERS.length === 1) {
-                                chrome.runtime.sendMessage({
-                                    type: 'REFRESH_SPEAKERS',
-                                    payload: SPEAKERS,
-                                })
-                            } else {
-                                setTimeout(
-                                    () => refreshSpeaker(SPEAKERS.length - 1),
-                                    PROVIDER.MIN_SPEAKER_DURATION + 500,
-                                )
-                            }
-                        }
-                        console.log('speaker changed to: ', speaker)
-                    }
+                    // TODO : That code must not be user in the future since we use Zoom SDK
+                    // // Existing Zoom logic
+                    // const previousSpeaker =
+                    //     SPEAKERS.length > 0
+                    //         ? SPEAKERS[SPEAKERS.length - 1]
+                    //         : undefined
+                    // const speakersFiltered = R.filter(
+                    //     (u) =>
+                    //         u.name !== BOT_NAME &&
+                    //         u.name !== previousSpeaker?.name,
+                    //     currentSpeakersList,
+                    // )
+                    // const speaker = speakersFiltered[0]
+                    // if (speaker) {
+                    //     const newSpeaker: SpeakerData = {
+                    //         name: speaker.name,
+                    //         id: 0,
+                    //         timestamp:
+                    //             speaker.timestamp - PROVIDER.SPEAKER_LATENCY,
+                    //         isSpeaking: speaker.isSpeaking,
+                    //     }
+                    //     const speakerDuration =
+                    //         newSpeaker.timestamp -
+                    //         (previousSpeaker?.timestamp ?? 0)
+                    //     if (speakerDuration < PROVIDER.MIN_SPEAKER_DURATION) {
+                    //         SPEAKERS[SPEAKERS.length - 1] = newSpeaker
+                    //         if (
+                    //             SPEAKERS.length > 2 &&
+                    //             SPEAKERS[SPEAKERS.length - 2].name ===
+                    //                 newSpeaker.name
+                    //         ) {
+                    //             SPEAKERS.pop()
+                    //         }
+                    //         setTimeout(
+                    //             () => refreshSpeaker(SPEAKERS.length - 1),
+                    //             PROVIDER.MIN_SPEAKER_DURATION + 500,
+                    //         )
+                    //     } else {
+                    //         chrome.runtime.sendMessage({
+                    //             type: 'REFRESH_SPEAKERS',
+                    //             payload: SPEAKERS,
+                    //         })
+                    //         SPEAKERS.push(newSpeaker)
+                    //         if (SPEAKERS.length === 1) {
+                    //             chrome.runtime.sendMessage({
+                    //                 type: 'REFRESH_SPEAKERS',
+                    //                 payload: SPEAKERS,
+                    //             })
+                    //         } else {
+                    //             setTimeout(
+                    //                 () => refreshSpeaker(SPEAKERS.length - 1),
+                    //                 PROVIDER.MIN_SPEAKER_DURATION + 500,
+                    //             )
+                    //         }
+                    //     }
+                    //     console.log('speaker changed to: ', speaker)
+                    // }
                 } else {
                     // New logic for Meet and Teams
                     const activeSpeakers = currentSpeakersList.filter(
@@ -238,14 +252,24 @@ async function observeSpeakers() {
         const speaker = currentSpeakersList[0]
         if (speaker) {
             SPEAKERS.push(speaker)
-
-            chrome.runtime.sendMessage({
-                type: 'LOG',
-                payload: `[ObserveSpeaker] initial speakers ${
+            ApiService.sendMessageToRecordingServer(
+                'LOG',
+                `[ObserveSpeaker] initial speakers ${
                     SPEAKERS[SPEAKERS.length - 1]
-                }
-                `,
+                }`,
+            ).catch((e) => {
+                console.error('error LOG FROM EXTENSION in observeSpeaker', e)
             })
+            ApiService.sendMessageToRecordingServer(
+                'LOG_SPEAKER',
+                currentSpeakersList,
+            ).catch((e) => {
+                console.error(
+                    'error LOG_SPEAKER FROM EXTENSION in observeSpeaker',
+                    e,
+                )
+            })
+
             chrome.runtime.sendMessage({
                 type: 'REFRESH_SPEAKERS',
                 payload: SPEAKERS,
@@ -253,6 +277,7 @@ async function observeSpeakers() {
         } else {
             SPEAKERS.push({
                 name: '-',
+                id: 0,
                 timestamp: Date.now(),
                 isSpeaking: true,
             })
@@ -260,12 +285,22 @@ async function observeSpeakers() {
                 type: 'REFRESH_SPEAKERS',
                 payload: SPEAKERS,
             })
-            chrome.runtime.sendMessage({
-                type: 'LOG',
-                payload: `[ObserveSpeaker] no initial speakers ${
+            ApiService.sendMessageToRecordingServer(
+                'LOG',
+                `[ObserveSpeaker] no initial speakers ${
                     SPEAKERS[SPEAKERS.length - 1]
-                }
-                `,
+                }`,
+            ).catch((e) => {
+                console.error('error LOG FROM EXTENSION in observeSpeaker', e)
+            })
+            ApiService.sendMessageToRecordingServer(
+                'LOG_SPEAKER',
+                SPEAKERS,
+            ).catch((e) => {
+                console.error(
+                    'error LOG_SPEAKER FROM EXTENSION in observeSpeaker',
+                    e,
+                )
             })
         }
     } catch (e) {
@@ -295,12 +330,13 @@ async function checkInactivity() {
         if (Date.now() - last_timestamp > INACTIVITY_THRESHOLD) {
             console.error('[wordPosterWorker] Meuh y a que des bots!!!')
             console.warn('Unusual Inactivity Detected')
-            chrome.runtime.sendMessage({
-                type: 'SEND_TO_SERVER',
-                payload: {
-                    message_type: 'STOP_MEETING',
-                    data: { reason: 'Unusual Inactivity Detected' },
-                },
+            ApiService.sendMessageToRecordingServer('STOP_MEETING', {
+                reason: 'Unusual Inactivity Detected',
+            }).catch((e) => {
+                console.error(
+                    'error STOP_MEETING FROM EXTENSION in observeSpeaker',
+                    e,
+                )
             })
         }
     }

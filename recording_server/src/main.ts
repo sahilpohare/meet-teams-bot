@@ -154,10 +154,10 @@ async function triggerCache() {
 
 // Fonction pour gérer l'arrêt propre du serveur
 const gracefulShutdown = () => {
-    if (process.env.PROFILE !== "DEV") {
-        return;
+    if (process.env.PROFILE !== 'DEV') {
+        return
     }
-    console.log('Received kill signal, shutting down gracefully...');
+    console.log('Received kill signal, shutting down gracefully...')
     // server.close(() => {
     //   console.log('Closed out remaining connections.');
     //   process.exit(0);
@@ -168,7 +168,7 @@ const gracefulShutdown = () => {
     //   console.error('Could not close connections in time, forcefully shutting down');
     //   process.exit(1);
     // }, 10000);
-    process.exit(-1);
-  };
+    process.exit(-1)
+}
 
-  process.on('SIGTERM', gracefulShutdown);
+process.on('SIGTERM', gracefulShutdown)
