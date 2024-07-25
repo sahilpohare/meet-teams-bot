@@ -1,5 +1,5 @@
-import * as R from 'ramda'
 import * as MeetProvider from './observeSpeakers/meet'
+import * as R from 'ramda'
 import * as TeamsProvider from './observeSpeakers/teams'
 import * as ZoomProvider from './observeSpeakers/zoom'
 
@@ -17,7 +17,6 @@ declare var MEETING_PROVIDER: string
 declare var RECORDING_MODE: RecordingMode
 export type RecordingMode = 'speaker_view' | 'gallery_view' | 'audio_only'
 
-let lastSpeechTimestamp = Date.now()
 const INACTIVITY_THRESHOLD = 60 * 1000 * 15 //ms
 // let inactivityCheckInterval: NodeJS.Timeout | null = null
 
@@ -129,7 +128,7 @@ async function observeSpeakers() {
                 PROVIDER.removeShityHtml(RECORDING_MODE)
             }
             try {
-                const speakers = PROVIDER.getSpeakerFromDocument(
+                const currentSpeakersList = PROVIDER.getSpeakerFromDocument(
                     SPEAKERS.length > 0
                         ? SPEAKERS[SPEAKERS.length - 1].name
                         : null,
@@ -147,7 +146,7 @@ async function observeSpeakers() {
                         (u) =>
                             u.name !== BOT_NAME &&
                             u.name !== previousSpeaker?.name,
-                        speakers,
+                        currentSpeakersList,
                     )
                     const speaker = speakersFiltered[0]
 
@@ -197,7 +196,9 @@ async function observeSpeakers() {
                     }
                 } else {
                     // New logic for Meet and Teams
-                    const activeSpeakers = speakers.filter((s) => s.isSpeaking)
+                    const activeSpeakers = currentSpeakersList.filter(
+                        (s) => s.isSpeaking,
+                    )
                     // si lazare parle,  si Philippe se met a parler en meme temps
                     // philippe prend forcement la precedence
                     const newActiveSpeakers = activeSpeakers.filter(
@@ -221,11 +222,6 @@ async function observeSpeakers() {
                         })
                     }
                 }
-
-                // Update last speech timestamp
-                if (speakers.some((s) => s.isSpeaking)) {
-                    lastSpeechTimestamp = Date.now()
-                }
             } catch (e) {
                 console.error('an exception occurred in observeSpeaker', e)
                 console.log('an exception occurred in observeSpeaker', e)
@@ -234,21 +230,20 @@ async function observeSpeakers() {
     })
 
     try {
-        const speakers = R.filter(
-            (u) => u.name !== BOT_NAME,
+        const currentSpeakersList = R.filter(
+            (u) => u.name !== BOT_NAME && u.isSpeaking == true,
             PROVIDER.getSpeakerFromDocument(null, null, RECORDING_MODE),
         )
 
-        const speaker = speakers[0]
+        const speaker = currentSpeakersList[0]
         if (speaker) {
             SPEAKERS.push(speaker)
-            lastSpeechTimestamp = Date.now()
+
             chrome.runtime.sendMessage({
                 type: 'LOG',
                 payload: `[ObserveSpeaker] initial speakers ${
-                    SPEAKERS[SPEAKERS.length - 1].name
+                    SPEAKERS[SPEAKERS.length - 1]
                 }
-                ${SPEAKERS[SPEAKERS.length - 1].timestamp}
                 `,
             })
             chrome.runtime.sendMessage({
@@ -268,9 +263,8 @@ async function observeSpeakers() {
             chrome.runtime.sendMessage({
                 type: 'LOG',
                 payload: `[ObserveSpeaker] no initial speakers ${
-                    SPEAKERS[SPEAKERS.length - 1].name
+                    SPEAKERS[SPEAKERS.length - 1]
                 }
-                ${SPEAKERS[SPEAKERS.length - 1].timestamp}
                 `,
             })
         }
@@ -290,13 +284,13 @@ async function checkInactivity() {
     while (true) {
         await sleep(1000)
         if (SPEAKERS.length === 0) {
-            console.error("Cannot happen : SPEAKERS.length must be almost 1");
-            continue;
+            console.error('Cannot happen : SPEAKERS.length must be almost 1')
+            continue
         }
-        let speaker = SPEAKERS[SPEAKERS.length - 1];
-        let last_timestamp = speaker.timestamp;
+        let speaker = SPEAKERS[SPEAKERS.length - 1]
+        let last_timestamp = speaker.timestamp
 
-        console.log('checking inactivity', last_timestamp);
+        console.log('checking inactivity', last_timestamp)
 
         if (Date.now() - last_timestamp > INACTIVITY_THRESHOLD) {
             console.error('[wordPosterWorker] Meuh y a que des bots!!!')
