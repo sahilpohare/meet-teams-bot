@@ -1,4 +1,5 @@
 import { BrandingHandle, generateBranding, playBranding } from './branding'
+
 import {
     CancellationToken,
     ChangeAgendaRequest,
@@ -69,6 +70,10 @@ export class MeetingHandle {
     static init(meetingParams: MeetingParams, logger: Logger) {
         if (MeetingHandle.instance == null) {
             this.instance = new MeetingHandle(meetingParams, logger)
+            console.log(
+                '*** INIT MeetingHandle.instance',
+                meetingParams.meeting_url,
+            )
         }
     }
     static getUserId(): number | null {
@@ -108,7 +113,10 @@ export class MeetingHandle {
                 return new ZoomProvider()
             }
         }
-
+        console.log(
+            '************ meetingParams meeting_url!!!',
+            meetingParams.meeting_url,
+        )
         meetingParams.meetingProvider = detectMeetingProvider(
             meetingParams.meeting_url,
         )

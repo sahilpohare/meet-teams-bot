@@ -1,13 +1,15 @@
 import * as puppeteer from 'puppeteer'
-import { Page } from 'puppeteer'
-import { URL } from 'url'
-import { JoinError, JoinErrorCode } from '../meeting'
-import { screenshot } from '../puppeteer'
+
 import {
     CancellationToken,
     MeetingParams,
     MeetingProviderInterface,
 } from '../types'
+import { JoinError, JoinErrorCode } from '../meeting'
+
+import { Page } from 'puppeteer'
+import { URL } from 'url'
+import { screenshot } from '../puppeteer'
 import { sleep } from '../utils'
 
 export class ZoomProvider implements MeetingProviderInterface {
@@ -194,9 +196,11 @@ function parse(meeting_url: string) {
             password = array[0][1]
         } catch (e) {}
     }
+
     if (meetingId == null) {
         throw 'invalid meeting url'
     }
+    console.log('ZOOM PARSING MeetingId and password', { meetingId, password })
     return { meetingId, password }
 }
 

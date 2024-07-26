@@ -1,13 +1,14 @@
 import { Channel, connect } from 'amqplib'
-import axios from 'axios'
 import { notify, notifyApp } from './calendar'
-import { Events } from './events'
 import {
     LOCK_INSTANCE_AT_STARTUP,
     POD_IP,
     setProtection,
     setSessionInRedis,
 } from './instance'
+
+import axios from 'axios'
+import { Events } from './events'
 import { setLoggerProjectId } from './logger'
 import { MeetingHandle } from './meeting'
 import { LOGGER } from './server'
@@ -107,7 +108,7 @@ export class Consumer {
     // throw error if start recoridng fail
     static async handleStartRecord(data: MeetingParams) {
         let logger = LOGGER.new({})
-
+        console.log('####### DATA #######', data)
         // Prevent instance for beeing scaled down
         try {
             await setProtection(true)
