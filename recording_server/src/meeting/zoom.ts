@@ -90,35 +90,35 @@ export class ZoomProvider implements MeetingProviderInterface {
     ): Promise<void> {
         await sleep(1000)
 
-        await clickJoinMeetingButton(page)
+        // await clickJoinMeetingButton(page)
 
-        while (true) {
-            if (cancelCheck()) {
-                throw new JoinError(JoinErrorCode.TimeoutWaitingToStart)
-            }
-            // meeting didnt start
-            await bypass_modal(page)
+        // while (true) {
+        //     if (cancelCheck()) {
+        //         throw new JoinError(JoinErrorCode.TimeoutWaitingToStart)
+        //     }
+        //     // meeting didnt start
+        //     await bypass_modal(page)
 
-            if (await joinAudio(page)) {
-                break
-            }
-            await sleep(1000)
-            //await joining()
-        }
+        //     if (await joinAudio(page)) {
+        //         break
+        //     }
+        //     await sleep(1000)
+        //     //await joining()
+        // }
 
         // Send enter message in chat
         if (meetingParams.enter_message) {
             await sendEnterMessage(page, meetingParams.enter_message)
         }
 
-        try {
-            await joinCamera(page)
-        } catch (e) {}
-        if (meetingParams.recording_mode === 'gallery_view') {
-            try {
-                console.log('gallery clicked', clickGalleryView(page))
-            } catch (e) {}
-        }
+        // try {
+        //     await joinCamera(page)
+        // } catch (e) {}
+        // if (meetingParams.recording_mode === 'gallery_view') {
+        //     try {
+        //         console.log('gallery clicked', clickGalleryView(page))
+        //     } catch (e) {}
+        // }
     }
 
     async findEndMeeting(
@@ -207,18 +207,20 @@ function parse(meeting_url: string) {
 const MEETINGJS_BASEURL = `http://localhost:3005`
 
 async function clickJoinMeetingButton(page: puppeteer.Page) {
-    const buttonJoinClicked = await page.$$eval('button', (elems) => {
-        for (const e of elems) {
-            let elem = e as any
-            console.log({ elem })
-            if (elem.innerText === 'Join') {
-                elem.click()
-                return true
-            }
-        }
-        return false
-    })
-    console.log({ buttonJoinClicked })
+    // const buttonJoinClicked = await page.$$eval('button', (elems) => {
+    //     for (const e of elems) {
+    //         let elem = e as any
+    //         console.log({ elem })
+    //         if (elem.innerText === 'Join') {
+    //             elem.click()
+    //             return true
+    //         }
+    //     }
+    //     return false
+    // })
+    // console.log({ buttonJoinClicked })
+    console.log('clickJoinMeetingButton')
+    return true
 }
 
 async function bypass_modal(page: puppeteer.Page) {

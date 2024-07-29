@@ -1,16 +1,18 @@
 import * as bodyParser from 'body-parser'
 import * as express from 'express'
 import * as redis from 'redis'
-import { PORT } from './instance'
-import { Logger } from './logger'
-import { MeetingHandle } from './meeting'
+
 import {
     ChangeAgendaRequest,
     ChangeLanguage,
+    MessageToBroadcast,
     StatusParams,
     StopRecordParams,
-    MessageToBroadcast,
 } from './types'
+
+import { PORT } from './instance'
+import { Logger } from './logger'
+import { MeetingHandle } from './meeting'
 import { sleep } from './utils'
 
 export let PROJECT_ID: number | undefined = undefined
@@ -25,30 +27,18 @@ clientRedis.on('error', (err) => {
 })
 
 const HOST = '0.0.0.0'
-const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN
+const ALLOWED_ORIGINS = [process.env.ALLOWED_ORIGIN, 'http://localhost:3005']
 
 export async function server() {
     const app = express()
 
     const jsonParser = bodyParser.json({ limit: '50mb' })
-    const allowed_origin = ALLOWED_ORIGIN
-
-    app.options('*', (_req, res) => {
-        res.header('Access-Control-Allow-Origin', allowed_origin)
-        res.header('Access-Control-Allow-Credentials', 'true')
-        res.header(
-            'Access-Control-Allow-Methods',
-            'OPTIONS, GET, PUT, POST, DELETE',
-        )
-        res.header(
-            'Access-Control-Allow-Headers',
-            'Authorization2, Content-Type',
-        )
-        res.sendStatus(204)
-    })
 
     app.use((req, res, next) => {
-        res.header('Access-Control-Allow-Origin', allowed_origin)
+        const origin = req.headers.origin
+        if (ALLOWED_ORIGINS.includes(origin)) {
+            res.header('Access-Control-Allow-Origin', origin)
+        }
         res.header('Access-Control-Allow-Credentials', 'true')
         res.header(
             'Access-Control-Allow-Methods',
@@ -65,6 +55,23 @@ export async function server() {
         }
 
         next()
+    })
+
+    app.options('*', (_req, res) => {
+        const origin = _req.headers.origin
+        if (ALLOWED_ORIGINS.includes(origin)) {
+            res.header('Access-Control-Allow-Origin', origin)
+        }
+        res.header('Access-Control-Allow-Credentials', 'true')
+        res.header(
+            'Access-Control-Allow-Methods',
+            'OPTIONS, GET, PUT, POST, DELETE',
+        )
+        res.header(
+            'Access-Control-Allow-Headers',
+            'Authorization2, Content-Type',
+        )
+        res.sendStatus(204)
     })
 
     // Only spoke for the moment
@@ -165,16 +172,18 @@ export async function server() {
 
     // Testing axios channel from extension
     app.post('/broadcast_message', jsonParser, async (req, res) => {
-        const message: MessageToBroadcast = req.body;
-        console.log('Message received from extension: ', message);
+        const message: MessageToBroadcast = req.body
+        console.log('Message received from extension: ', message)
         if (message.message_type === 'LOG') {
             console.log(message.data)
             res.status(200).send('ok')
             return
-        } else  if (message.message_type === 'STOP_MEETING') {
-            MeetingHandle.instance.stopRecording('extension request').catch((e) => {
-                LOGGER.error(`Stop recording error ${e}`)
-            })
+        } else if (message.message_type === 'STOP_MEETING') {
+            MeetingHandle.instance
+                .stopRecording('extension request')
+                .catch((e) => {
+                    LOGGER.error(`Stop recording error ${e}`)
+                })
             res.status(200).send('ok')
             return
         }
