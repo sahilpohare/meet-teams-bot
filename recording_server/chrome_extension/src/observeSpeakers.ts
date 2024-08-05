@@ -23,13 +23,13 @@ const INACTIVITY_THRESHOLD = 60 * 1000 * 30 //ms
 const SPEAKERS: Speaker[] = []
 
 let PROVIDER = {
-    getSpeakerFromDocument: ZoomProvider.getSpeakerFromDocument,
-    removeShityHtml: ZoomProvider.removeShityHtml,
-    MIN_SPEAKER_DURATION: ZoomProvider.MIN_SPEAKER_DURATION,
-    SPEAKER_LATENCY: ZoomProvider.SPEAKER_LATENCY,
-    getSpeakerRootToObserve: ZoomProvider.getSpeakerRootToObserve,
-    findAllAttendees: ZoomProvider.findAllAttendees,
-    removeInitialShityHtml: ZoomProvider.removeInitialShityHtml,
+    getSpeakerFromDocument: TeamsProvider.getSpeakerFromDocument,
+    removeShityHtml: TeamsProvider.removeShityHtml,
+    MIN_SPEAKER_DURATION: TeamsProvider.MIN_SPEAKER_DURATION,
+    SPEAKER_LATENCY: TeamsProvider.SPEAKER_LATENCY,
+    getSpeakerRootToObserve: TeamsProvider.getSpeakerRootToObserve,
+    findAllAttendees: TeamsProvider.findAllAttendees,
+    removeInitialShityHtml: TeamsProvider.removeInitialShityHtml,
 }
 
 setMeetingProvider()
@@ -59,12 +59,12 @@ function setMeetingProvider() {
     } else {
         PROVIDER = {
             getSpeakerFromDocument: ZoomProvider.getSpeakerFromDocument,
-            removeShityHtml: ZoomProvider.removeShityHtml,
+            removeShityHtml: () => {},
             MIN_SPEAKER_DURATION: ZoomProvider.MIN_SPEAKER_DURATION,
             SPEAKER_LATENCY: ZoomProvider.SPEAKER_LATENCY,
             getSpeakerRootToObserve: ZoomProvider.getSpeakerRootToObserve,
             findAllAttendees: ZoomProvider.findAllAttendees,
-            removeInitialShityHtml: ZoomProvider.removeInitialShityHtml,
+            removeInitialShityHtml: async () => {},
         }
     }
 }
