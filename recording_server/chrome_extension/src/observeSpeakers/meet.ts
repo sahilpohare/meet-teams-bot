@@ -1,8 +1,12 @@
 import { RecordingMode, Speaker } from '../observeSpeakers'
+
 import { sleep } from '../utils'
 
 export const MIN_SPEAKER_DURATION = 200
 export const SPEAKER_LATENCY = 500
+const processedElements = new Set<HTMLElement>()
+let videoElement: HTMLVideoElement | null = null
+let videoContainer: HTMLElement | null = null
 
 export async function getSpeakerRootToObserve(
     mutationObserver: MutationObserver,
@@ -282,160 +286,93 @@ function findSpeakerName(divSpeaker: any) {
     return null
 }
 
-export async function removeInitialShityHtml(mode: RecordingMode) {
-    let div
+export async function removeInitialShityHtml(
+    mode: RecordingMode,
+): Promise<void> {
     try {
-        for (div of document.getElementsByTagName('div')) {
-            if (
-                div.clientHeight === 132 &&
-                (div.clientWidth === 235 || div.clientWidth === 234)
-            ) {
-                div.style.display = 'none'
+        videoElement = document.getElementsByTagName(
+            'video',
+        )[0] as HTMLVideoElement
+        videoContainer = videoElement?.closest('div') as HTMLElement
+
+        function processElement(element: HTMLElement) {
+            if (element === videoContainer || element.contains(videoElement)) {
+                element.style.opacity = '1'
+                element.style.zIndex = '900000'
+                element.style.backgroundColor = 'black'
+            } else if (!processedElements.has(element)) {
+                element.style.opacity = '0'
+                element.style.border = '0 solid transparent'
+                processedElements.add(element)
             }
         }
-    } catch (e) {}
-    try {
-        for (div of document.getElementsByTagName('div')) {
-            if (div.clientWidth === 360 && div.clientHeight === 326) {
-                div.style.display = 'none'
-            }
+
+        await Promise.all(
+            Array.from(document.querySelectorAll('div')).map(
+                (div) =>
+                    new Promise<void>((resolve) => {
+                        processElement(div as HTMLElement)
+                        resolve()
+                    }),
+            ),
+        )
+
+        if (mode !== 'gallery_view' && videoElement && videoContainer) {
+            videoElement.style.position = 'fixed'
+            videoElement.style.display = 'block'
+            videoElement.style.left = '0'
+            videoElement.style.top = '0'
+            videoElement.style.width = '100%'
+            videoElement.style.height = '100%'
+            videoElement.style.objectFit = 'contain'
+            videoElement.style.zIndex = '900001'
+
+            videoContainer.style.background = '#000'
+            videoContainer.style.top = '0'
+            videoContainer.style.left = '0'
+            videoContainer.style.width = '100vw'
+            videoContainer.style.height = '100vh'
+            videoContainer.style.position = 'fixed'
+            videoContainer.style.display = 'flex'
+            videoContainer.style.alignItems = 'center'
+            videoContainer.style.justifyContent = 'center'
+            videoContainer.style.opacity = '1'
+            videoContainer.style.zIndex = '900000'
         }
-    } catch (e) {}
-    try {
-        for (div of document.getElementsByTagName('div')) {
-            if (div.clientHeight === 26) {
-                div.style.display = 'none'
-            }
-        }
-    } catch (e) {}
-    try {
-        for (div of document.getElementsByTagName('div')) {
-            if (div.clientHeight === 20) {
-                div.style.display = 'none'
-            }
-        }
-    } catch (e) {}
-    try {
-        let span
-        for (span of document.getElementsByTagName('span')) {
-            if (span.innerText.includes(':')) {
-                span.parentElement.parentElement.style.display = 'none'
-            }
-        }
-    } catch (e) {}
-    if (mode !== 'gallery_view') {
-        try {
-            const video = document.getElementsByTagName(
-                'video',
-            )[0] as HTMLVideoElement
-            if (video) {
-                video.style.position = 'fixed'
-                video.style.display = 'block'
-                video.style.left = '0'
-                video.style.top = '0'
-                video.style.zIndex = '900000'
-                if (video?.parentElement?.style) {
-                    video.parentElement.style.background = '#000'
-                    video.parentElement.style.top = '0'
-                    video.parentElement.style.left = '0'
-                    video.parentElement.style.width = '100vw'
-                    video.parentElement.style.height = '100vh'
-                    video.parentElement.style.position = 'fixed'
-                    video.parentElement.style.display = 'flex'
-                    video.parentElement.style.alignItems = 'center'
-                    video.parentElement.style.justifyContent = 'center'
-                }
-            }
-        } catch (e) {}
+    } catch (e) {
+        console.error('Error in removeInitialShityHtml:', e)
     }
 }
 
-export function removeShityHtml(mode: RecordingMode) {
-    // '#a8c7fa'
-    if (mode !== 'gallery_view') {
-        try {
-            const video = document.getElementsByTagName(
-                'video',
-            )[0] as HTMLVideoElement
-            if (video) {
-                video.style.position = 'fixed'
-                video.style.display = 'block'
-                video.style.left = '0'
-                video.style.top = '0'
-                video.style.zIndex = '1'
-                if (video?.parentElement?.style) {
-                    video.parentElement.style.background = '#000'
-                    video.parentElement.style.top = '0'
-                    video.parentElement.style.left = '0'
-                    video.parentElement.style.width = '100vw'
-                    video.parentElement.style.height = '100vh'
-                    video.parentElement.style.position = 'fixed'
-                    video.parentElement.style.display = 'flex'
-                    video.parentElement.style.alignItems = 'center'
-                    video.parentElement.style.justifyContent = 'center'
-                }
+export function removeShityHtml(mode: RecordingMode): void {
+    try {
+        function processNewElement(element: HTMLElement) {
+            if (element === videoContainer || element.contains(videoElement)) {
+                element.style.opacity = '1'
+                element.style.zIndex = '900000'
+                element.style.backgroundColor = 'black'
+            } else if (!processedElements.has(element)) {
+                element.style.opacity = '0'
+                element.style.border = '0 solid transparent'
+                processedElements.add(element)
             }
-        } catch (e) {
-            console.error('Error with video setup:', e)
         }
 
-        try {
-            document.getElementsByTagName('video')[1].style.position = 'fixed'
-        } catch (e) {
-            console.error('Error with second video:', e)
-        }
-    }
-
-    try {
-        for (const div of document.getElementsByTagName('div')) {
-            if (div.clientHeight === 164 && div.clientWidth === 322) {
-                div.style.display = 'none'
-            }
-        }
-    } catch (e) {}
-    try {
-        for (const div of document.getElementsByTagName('div')) {
-            if (div.clientHeight === 40) {
-                div.style.opacity = '0'
-            }
-        }
-    } catch (e) {}
-    try {
-        var icons = Array.from(
-            document.querySelectorAll('i.google-material-icons'),
-        ).filter((el) => el.textContent?.trim() === 'devices')
-        icons.forEach((icon) => {
-            // Change the opacity of the parent element to 0
-            if (icon.parentElement) {
-                icon.parentElement.style.opacity = '0'
-            }
+        document.querySelectorAll('div').forEach((div) => {
+            processNewElement(div as HTMLElement)
         })
-    } catch (e) {
-        console.error('Error applying opacity:', e)
-    }
 
-    // Add opacity change for 'mood' icons with specific parent background
-    try {
-        var moodIcons = Array.from(
-            document.querySelectorAll('i.google-material-icons'),
-        ).filter((el) => el.textContent?.trim() === 'mood')
-        if (moodIcons.length > 0) {
-            var icon = moodIcons[0]
-            var currentElement = icon.parentElement
-            while (currentElement != null) {
-                var bgColor =
-                    window.getComputedStyle(currentElement).backgroundColor
-                if (bgColor === 'rgb(32, 33, 36)') {
-                    currentElement.style.opacity = '0'
-                    break
-                }
-                currentElement = currentElement.parentElement
+        if (mode !== 'gallery_view') {
+            const secondVideo = document.getElementsByTagName(
+                'video',
+            )[1] as HTMLVideoElement
+            if (secondVideo) {
+                secondVideo.style.position = 'fixed'
+                secondVideo.style.zIndex = '900002'
             }
-        } else {
-            console.log("No 'mood' icon found.")
         }
     } catch (e) {
-        console.error("Error finding 'mood' icon:", e)
+        console.error('Error in removeShityHtml:', e)
     }
 }
 
