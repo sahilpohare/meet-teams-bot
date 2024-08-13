@@ -1,4 +1,5 @@
 import { RecordingMode, Speaker } from '../observeSpeakers'
+
 import { sleep } from '../utils'
 
 export const MIN_SPEAKER_DURATION = 200
@@ -323,6 +324,11 @@ export async function removeInitialShityHtml(mode: RecordingMode) {
             }
         }
     } catch (e) {}
+    try {
+        removeBlackBox()
+    } catch (e) {
+        console.error('Error with removeBlackBox:', e)
+    }
     if (mode !== 'gallery_view') {
         try {
             const video = document.getElementsByTagName(
@@ -383,6 +389,11 @@ export function removeShityHtml(mode: RecordingMode) {
             document.getElementsByTagName('video')[1].style.position = 'fixed'
         } catch (e) {
             console.error('Error with second video:', e)
+        }
+        try {
+            removeBlackBox()
+        } catch (e) {
+            console.error('Error with removeBlackBox:', e)
         }
     }
 
@@ -502,4 +513,56 @@ function extractTooltipText(element: Element) {
     const tooltipDiv = element.querySelector('[role="tooltip"]')
     const textContent = tooltipDiv != null ? tooltipDiv.textContent : null
     return textContent
+}
+
+function removeBlackBox(): void {
+    // Sélectionner tous les éléments avec l'attribut data-layout='roi-crop'
+    const elements: NodeListOf<HTMLElement> = document.querySelectorAll(
+        '[data-layout="roi-crop"]',
+    )
+
+    if (elements.length === 0) {
+        console.log("Aucun élément trouvé avec data-layout='roi-crop'")
+        return
+    }
+
+    // Trouver l'élément avec la plus grande largeur
+    let maxWidth: number = 0
+    let maxElement: HTMLElement | null = null
+
+    elements.forEach((el: HTMLElement) => {
+        const width: number = el.offsetWidth
+        if (width > maxWidth) {
+            maxWidth = width
+            maxElement = el
+        }
+    })
+
+    // Appliquer les styles aux autres éléments et leurs parents
+    elements.forEach((el: HTMLElement) => {
+        if (el == maxElement) {
+            el.style.opacity = '1'
+            el.style.top = '0'
+            el.style.left = '0'
+            el.style.position = 'fixed'
+            el.style.zIndex = '9000'
+            el.style.backgroundColor = 'black'
+        } else {
+            applyStylesRecursively(el, 4)
+        }
+    })
+
+    console.log('Styles appliqués avec succès')
+}
+
+function applyStylesRecursively(
+    element: HTMLElement | null,
+    depth: number,
+): void {
+    if (depth < 0 || !element) return
+
+    element.style.opacity = '0'
+    element.style.border = 'transparent'
+
+    applyStylesRecursively(element.parentElement, depth - 1)
 }
