@@ -1,5 +1,5 @@
-import * as MeetProvider from './observeSpeakers/meet'
 import * as R from 'ramda'
+import * as MeetProvider from './observeSpeakers/meet'
 import * as TeamsProvider from './observeSpeakers/teams'
 import * as ZoomProvider from './observeSpeakers/zoom'
 
@@ -17,7 +17,7 @@ declare var MEETING_PROVIDER: string
 declare var RECORDING_MODE: RecordingMode
 export type RecordingMode = 'speaker_view' | 'gallery_view' | 'audio_only'
 
-const INACTIVITY_THRESHOLD = 60 * 1000 * 15 //ms
+const INACTIVITY_THRESHOLD = 60 * 1000 * 30 //ms
 // let inactivityCheckInterval: NodeJS.Timeout | null = null
 
 const SPEAKERS: Speaker[] = []
