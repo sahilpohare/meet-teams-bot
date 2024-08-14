@@ -14,8 +14,8 @@
     "noImplicitReturns": true,
     "noImplicitAny": false,
     "noImplicitThis": false,
-	"strictNullChecks": false,
-
+    "resolveJsonModule": true,
+    "strictNullChecks": false
   },
   "include": [
     "src/**/*",

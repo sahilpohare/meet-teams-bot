@@ -181,6 +181,18 @@ export async function server() {
         res.status(400).send('Unknown message type')
     })
 
+    // Get Recording Server Build Version Info
+    app.get('/version', async (_req, res) => {
+        LOGGER.info(`version requested`)
+        await import('./buildInfo.json').then((buildInfo) => {
+            res.status(200).json(buildInfo)
+        }).catch((_error) => {
+            res.status(404).json({
+                error : 'None build has been done'
+            })
+        })
+    })
+
     try {
         app.listen(PORT, HOST)
         LOGGER.info(`Running on http://${HOST}:${PORT}`)

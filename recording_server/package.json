@@ -34,7 +34,7 @@
         "start": "node build/src/main.js",
         "start_extension_id": "node build/src/main.js get_extension_id",
         "clean": "rimraf coverage build tmp",
-        "build": "./node_modules/typescript/bin/tsc --skipLibCheck -p tsconfig.release.json",
+        "build": "echo '{\"buildDate\": \"'$(date -u +'%Y-%m-%dT%H:%M:%SZ')'\"}' > src/buildInfo.json && ./node_modules/typescript/bin/tsc --skipLibCheck -p tsconfig.release.json",
         "watch": "./node_modules/typescript/bin/tsc --skipLibCheck -w -p tsconfig.release.json",
         "watch-dev" : "source ../../.env && PROFILE=DEV ts-node-dev --respawn --transpile-only src/main.ts -p tsconfig.release.json"
     },
