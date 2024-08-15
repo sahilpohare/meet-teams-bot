@@ -1,13 +1,13 @@
-import * as R from 'ramda'
 import * as puppeteer from 'puppeteer'
+import * as R from 'ramda'
 
+import { JoinError, JoinErrorCode } from '../meeting'
 import {
     CancellationToken,
     MeetingParams,
     MeetingProviderInterface,
     RecordingMode,
 } from '../types'
-import { JoinError, JoinErrorCode } from '../meeting'
 
 import { Page } from 'puppeteer'
 import { screenshot } from '../puppeteer'
@@ -86,8 +86,25 @@ export class MeetProvider implements MeetingProviderInterface {
             )
             await sleep(100)
         }
+        let maxAttempts = 5
 
-        await changeLayout(page, meetingParams.recording_mode)
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            if (await changeLayout(page, meetingParams.recording_mode)) {
+                console.log(
+                    `Changement de disposition réussi à la tentative ${attempt}.`,
+                )
+                break
+            }
+
+            console.log(`Tentative ${attempt} échouée.`)
+            await screenshot(page, `layout_change_failed_attempt_${attempt}`)
+            if (attempt < maxAttempts) {
+                await clickOutsideModal(page)
+
+                await page.waitForTimeout(500)
+            }
+        }
+
         if (meetingParams.recording_mode !== 'gallery_view') {
             await findShowEveryOne(page, true, cancelCheck)
         }
@@ -327,7 +344,7 @@ async function findEndMeeting(
         if (participant == 1) {
             return true
         } else if (participant <= 0) {
-            console.error("NO COHERENT PARTICPANT COUNT : ", participant);
+            console.error('NO COHERENT PARTICPANT COUNT : ', participant)
             return true
         } else {
             cancellationToken.reset()
@@ -398,37 +415,71 @@ export async function clickWithInnerText(
     return buttonClicked
 }
 
-async function changeLayout(page: Page, recordingMode: RecordingMode) {
+async function changeLayout(
+    page: Page,
+    recordingMode: RecordingMode,
+): Promise<boolean> {
     try {
-        console.log(
-            'more vert clicked: ',
-            await clickWithInnerText(page, 'i', 'more_vert', 10),
+        const moreVertClicked = await clickWithInnerText(
+            page,
+            'i',
+            'more_vert',
+            10,
         )
-        console.log(
-            'span change layout clicked: ',
-            await clickWithInnerText(page, 'span', 'Change layout', 10),
+        console.log('more vert clicked: ', moreVertClicked)
+        if (!moreVertClicked) return false
+
+        const changeLayoutClicked = await clickWithInnerText(
+            page,
+            'span',
+            'Change layout',
+            10,
         )
+        console.log('span change layout clicked: ', changeLayoutClicked)
+        if (!changeLayoutClicked) return false
+
+        let layoutChangeSuccessful = false
         if (recordingMode === 'gallery_view') {
-            console.log(
-                'galery view clicked: ',
-                await clickWithInnerText(page, 'span', 'Tiled', 10, true),
+            layoutChangeSuccessful = await clickWithInnerText(
+                page,
+                'span',
+                'Tiled',
+                10,
+                true,
             )
+            console.log('gallery view clicked: ', layoutChangeSuccessful)
         } else {
-            console.log(
-                'spotlight clicked: ',
-                await clickWithInnerText(page, 'span', 'Spotlight', 10, true),
+            layoutChangeSuccessful = await clickWithInnerText(
+                page,
+                'span',
+                'Spotlight',
+                10,
+                true,
             )
+            console.log('spotlight clicked: ', layoutChangeSuccessful)
+            //TODO: ajouter une capture d'écran si false
         }
+
+        if (!layoutChangeSuccessful) return false
+
+        await clickOutsideModal(page)
         // click outside the modal to close it
-        await sleep(500)
-        await page.mouse.click(10, 10)
-        await sleep(10)
-        await page.mouse.click(10, 10)
-        await sleep(10)
-        await page.mouse.click(10, 10)
-    } catch (e) {}
+
+        return true
+    } catch (e) {
+        console.error('Error in changeLayout:', e)
+        return false
+    }
 }
 
+async function clickOutsideModal(page: Page) {
+    await sleep(500)
+    await page.mouse.click(10, 10)
+    await sleep(10)
+    await page.mouse.click(10, 10)
+    await sleep(10)
+    await page.mouse.click(10, 10)
+}
 async function typeBotName(page: Page, botName: string) {
     const INPUT = 'input[type=text]'
     const GOT_IT = 'button[aria-label="Got it"]'
