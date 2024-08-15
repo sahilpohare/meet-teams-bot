@@ -98,11 +98,9 @@ export class MeetProvider implements MeetingProviderInterface {
 
             console.log(`Tentative ${attempt} échouée.`)
             await screenshot(page, `layout_change_failed_attempt_${attempt}`)
-            if (attempt < maxAttempts) {
-                await clickOutsideModal(page)
 
-                await page.waitForTimeout(500)
-            }
+            await clickOutsideModal(page)
+            await page.waitForTimeout(500)
         }
 
         if (meetingParams.recording_mode !== 'gallery_view') {
