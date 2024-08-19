@@ -1,7 +1,8 @@
+import { BUCKET_NAME, s3cp } from './s3'
+
 import axios from 'axios'
 import { exec } from 'child_process'
 import { rmdir } from 'fs/promises'
-import { BUCKET_NAME, s3cp } from './s3'
 import { LOGGER } from './server'
 import { getFiles } from './utils'
 
@@ -93,7 +94,9 @@ export async function uploadLog(
         .replace(/\//g, '-')
     const d = new Date()
 
-    const link = `logs/${date}/${user_id}/${project_id}/${d.getHours()}h${d.getMinutes()}`
+    const link = project_id
+        ? `logs/${date}/${user_id}/${project_id}/${d.getHours()}h${d.getMinutes()}`
+        : `logs/${date}/${user_id}/${bot_id}/${d.getHours()}h${d.getMinutes()}`
     try {
         await s3cp(process.env.LOG_FILE, link)
         const s3File = `https://${BUCKET_NAME}.s3.amazonaws.com/${link}`
