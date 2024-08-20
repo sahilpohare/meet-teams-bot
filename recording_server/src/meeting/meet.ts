@@ -20,6 +20,12 @@ export class MeetProvider implements MeetingProviderInterface {
             meeting_url = `https://${meeting_url}`
         }
         const urlSplitted = meeting_url.split(/\s+/)
+        const strictRegex =
+            /^https:\/\/meet\.google\.com\/[a-z]{3}-[a-z]{4}-[a-z]{3}(\?authuser=\d+)?$/
+
+        if (!strictRegex.test(meeting_url)) {
+            throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
+        }
         const url = R.find((s) => s.startsWith('https://meet'), urlSplitted)
         if (url == null) {
             throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
