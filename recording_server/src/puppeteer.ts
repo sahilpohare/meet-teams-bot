@@ -1,9 +1,12 @@
 import * as fs from 'fs'
+
 import { dirname, join } from 'path'
 import { Browser, ConsoleMessage, Page } from 'puppeteer'
+
 import puppeteer from 'puppeteer-extra'
 import { MeetingHandle } from './meeting'
 import { s3cp } from './s3'
+
 // add stealth plugin and use defaults (all evasion techniques)
 const StealthPlugin = require('puppeteer-extra-plugin-stealth')
 
@@ -77,7 +80,7 @@ export async function screenshot(page: Page, name: string) {
                 day: 'numeric',
             })
             .replace(/\//g, '-')
-        const link = `./screenshot/${date}/${MeetingHandle.getUserId()}/${name.replaceAll(
+        const link = `./screenshot/${date}/${MeetingHandle.getUserId()}/${MeetingHandle.getBotId()}/${name.replaceAll(
             '/',
             '',
         )}.jpg`

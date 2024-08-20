@@ -1,11 +1,4 @@
 import { BrandingHandle, generateBranding, playBranding } from './branding'
-import { Logger, uploadLog } from './logger'
-import {
-    getCachedExtensionId,
-    listenPage,
-    openBrowser,
-    removeListenPage,
-} from './puppeteer'
 import {
     CancellationToken,
     ChangeAgendaRequest,
@@ -16,20 +9,25 @@ import {
     MeetingProviderInterface,
     MeetingStatus,
 } from './types'
+import { LOCAL_RECORDING_SERVER_LOCATION, delSessionInRedis } from './instance'
+import { Logger, uploadLog } from './logger'
+import {
+    getCachedExtensionId,
+    listenPage,
+    openBrowser,
+    removeListenPage,
+} from './puppeteer'
 
-import { notifyApp } from './calendar'
 import { Events } from './events'
-import { delSessionInRedis } from './instance'
 import { MeetProvider } from './meeting/meet'
 import { TeamsProvider } from './meeting/teams'
 import { ZoomProvider } from './meeting/zoom'
+import { notifyApp } from './calendar'
 import { sleep } from './utils'
-import { LOCAL_RECORDING_SERVER_LOCATION } from './instance'
 
 const RECORDING_TIMEOUT = 3600 * 4 // 4 hours
 // const RECORDING_TIMEOUT = 120 // 2 minutes for tests
 const MAX_TIME_TO_LIVE_AFTER_TIMEOUT = 3600 * 2 // 2 hours
-
 
 export class JoinError extends Error {
     constructor(code: JoinErrorCode) {
@@ -85,7 +83,9 @@ export class MeetingHandle {
     static getStatus(): MeetingStatus | null {
         return MeetingHandle.status?.state
     }
-
+    static getBotId(): string {
+        return MeetingHandle.instance.param.bot_id
+    }
     constructor(meetingParams: MeetingParams, logger: Logger) {
         function detectMeetingProvider(url: string): MeetingProvider {
             if (url.includes('https://teams')) {
@@ -121,7 +121,8 @@ export class MeetingHandle {
             browser: null,
             meetingTimeoutInterval: null,
         }
-        this.param.local_recording_server_location = LOCAL_RECORDING_SERVER_LOCATION
+        this.param.local_recording_server_location =
+            LOCAL_RECORDING_SERVER_LOCATION
     }
 
     public async startRecordMeeting() {
