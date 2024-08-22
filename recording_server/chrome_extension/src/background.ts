@@ -48,6 +48,11 @@ function setUserAgent(window: Window, userAgent: string) {
     }
 }
 
+function addSpeaker(speaker: Speaker) {
+    SPEAKERS.push(speaker)
+    uploadEditorsTask(SPEAKERS)
+}
+
 setUserAgent(
     window,
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36',
@@ -61,15 +66,18 @@ function addListener() {
     ) {
         switch (request.type) {
             case 'SEND_TO_SERVER':
-                axios.post(State.parameters.local_recording_server_location + 'broadcast_message',
-                    request.payload
-                )
-                .then(function (response) {
-                    console.warn('SEND_TO_SERVER - SUCESS:', response);
-                })
-                .catch(function (error) {
-                    console.error('SEND_TO_SERVER - ERROR:', error);
-                });
+                axios
+                    .post(
+                        State.parameters.local_recording_server_location +
+                            'broadcast_message',
+                        request.payload,
+                    )
+                    .then(function (response) {
+                        console.warn('SEND_TO_SERVER - SUCESS:', response)
+                    })
+                    .catch(function (error) {
+                        console.error('SEND_TO_SERVER - ERROR:', error)
+                    })
                 break
             case 'REFRESH_ATTENDEES':
                 if (request.payload.length > ATTENDEES.length) {
@@ -127,18 +135,22 @@ export async function startRecording(
 ): Promise<Project | undefined> {
     // axios.get(meetingParams.local_recording_server_location + 'broadcast_message') // GET example
     // TODO : Remove when it becomes unecessary
-    axios.post(meetingParams.local_recording_server_location + 'broadcast_message', {
-        message_type: 'LOG',
-        data: {
-            msg: "FROM_EXTENSION: Start recording launched."
-        }
-    })
-    .then(function (response) {
-        console.warn('SUCESS:', response);
-    })
-    .catch(function (error) {
-        console.error('ERROR:', error);
-    });
+    axios
+        .post(
+            meetingParams.local_recording_server_location + 'broadcast_message',
+            {
+                message_type: 'LOG',
+                data: {
+                    msg: 'FROM_EXTENSION: Start recording launched.',
+                },
+            },
+        )
+        .then(function (response) {
+            console.warn('SUCESS:', response)
+        })
+        .catch(function (error) {
+            console.error('ERROR:', error)
+        })
 
     try {
         State.addMeetingParams(meetingParams)
@@ -223,6 +235,7 @@ export async function changeAgenda(data: ChangeAgenda) {
 }
 
 const w = window as any
+w.addSpeaker = addSpeaker
 w.startRecording = startRecording
 w.stopMediaRecorder = stopMediaRecorder
 w.waitForUpload = waitForUpload

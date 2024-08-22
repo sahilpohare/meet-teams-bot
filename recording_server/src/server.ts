@@ -190,16 +190,25 @@ export async function server() {
         res.status(400).send('Unknown message type')
     })
 
+    app.post('/add_speaker', jsonParser, async (req, res) => {
+        const speakers = req.body
+        console.log('Speaker update received:', speakers)
+        MeetingHandle.addSpeaker(speakers)
+        res.status(200).send('ok')
+    })
+
     // Get Recording Server Build Version Info
     app.get('/version', async (_req, res) => {
         LOGGER.info(`version requested`)
-        await import('./buildInfo.json').then((buildInfo) => {
-            res.status(200).json(buildInfo)
-        }).catch((_error) => {
-            res.status(404).json({
-                error : 'None build has been done'
+        await import('./buildInfo.json')
+            .then((buildInfo) => {
+                res.status(200).json(buildInfo)
             })
-        })
+            .catch((_error) => {
+                res.status(404).json({
+                    error: 'None build has been done',
+                })
+            })
     })
 
     try {

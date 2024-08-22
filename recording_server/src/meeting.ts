@@ -1,5 +1,12 @@
 import { BrandingHandle, generateBranding, playBranding } from './branding'
-
+import { LOCAL_RECORDING_SERVER_LOCATION, delSessionInRedis } from './instance'
+import { Logger, uploadLog } from './logger'
+import {
+    getCachedExtensionId,
+    listenPage,
+    openBrowser,
+    removeListenPage,
+} from './puppeteer'
 import {
     CancellationToken,
     ChangeAgendaRequest,
@@ -10,20 +17,12 @@ import {
     MeetingProviderInterface,
     MeetingStatus,
 } from './types'
-import { LOCAL_RECORDING_SERVER_LOCATION, delSessionInRedis } from './instance'
-import { Logger, uploadLog } from './logger'
-import {
-    getCachedExtensionId,
-    listenPage,
-    openBrowser,
-    removeListenPage,
-} from './puppeteer'
 
+import { notifyApp } from './calendar'
 import { Events } from './events'
 import { MeetProvider } from './meeting/meet'
 import { TeamsProvider } from './meeting/teams'
 import { ZoomProvider } from './meeting/zoom'
-import { notifyApp } from './calendar'
 import { sleep } from './utils'
 
 const RECORDING_TIMEOUT = 3600 * 4 // 4 hours
@@ -90,6 +89,12 @@ export class MeetingHandle {
     }
     static getBotId(): string {
         return MeetingHandle.instance.param.bot_id
+    }
+    static addSpeaker(speaker: any) {
+        MeetingHandle.instance.meeting.backgroundPage!.evaluate((x) => {
+            const w = window as any
+            return w.addSpeaker(x)
+        }, speaker)
     }
     constructor(meetingParams: MeetingParams, logger: Logger) {
         function detectMeetingProvider(url: string): MeetingProvider {
