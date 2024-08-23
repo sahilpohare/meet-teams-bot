@@ -10,9 +10,9 @@ import {
     StopRecordParams,
 } from './types'
 
-import { PORT } from './instance'
 import { Logger } from './logger'
 import { MeetingHandle } from './meeting'
+import { PORT } from './instance'
 import { sleep } from './utils'
 
 export let PROJECT_ID: number | undefined = undefined
@@ -194,6 +194,17 @@ export async function server() {
         const speakers = req.body
         console.log('Speaker update received:', speakers)
         MeetingHandle.addSpeaker(speakers)
+        res.status(200).send('ok')
+    })
+
+    app.post('/end_zoom_meeting', jsonParser, async (_req, res) => {
+        console.log('end meeting for zoom notification recieved:')
+        MeetingHandle.instance
+            .stopRecording('zoom meeting ENDED')
+            .catch((e) => {
+                LOGGER.error(`stop recording error ${e}`)
+            })
+
         res.status(200).send('ok')
     })
 
