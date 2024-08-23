@@ -42,6 +42,7 @@ export interface MeetingProviderInterface {
         _password: string,
         _role: number,
         _bot_name: string,
+        _enter_message?: string,
     ): string
 }
 
@@ -124,8 +125,8 @@ export type StopRecordParams = {
 }
 
 export type MessageToBroadcast = {
-    message_type: string,
-    data: object,
+    message_type: string
+    data: object
 }
 
 export type MeetingProvider = 'Zoom' | 'Meet' | 'Teams'

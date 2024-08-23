@@ -1,11 +1,11 @@
 import * as puppeteer from 'puppeteer'
 
+import { JoinError, JoinErrorCode } from '../meeting'
 import {
     CancellationToken,
     MeetingParams,
     MeetingProviderInterface,
 } from '../types'
-import { JoinError, JoinErrorCode } from '../meeting'
 
 import { Page } from 'puppeteer'
 import { URL } from 'url'
@@ -65,8 +65,11 @@ export class ZoomProvider implements MeetingProviderInterface {
         password: string,
         role: number,
         bot_name: string,
+        message?: string,
     ) {
-        return `${MEETINGJS_BASEURL}?meeting_id=${meeting_id}&password=${password}&role=${role}&name=${bot_name}`
+        return `${MEETINGJS_BASEURL}?meeting_id=${meeting_id}&password=${password}&role=${role}&name=${bot_name}&message=${encodeURIComponent(
+            message,
+        )}`
     }
     async openMeetingPage(
         browser: puppeteer.Browser,
@@ -122,8 +125,6 @@ function parse(meeting_url: string) {
 }
 
 const MEETINGJS_BASEURL = `http://localhost:3005`
-
-// async function sendEnterMessage(page: puppeteer.Page, message: string) {}
 
 export async function clickWithInnerText(
     page: puppeteer.Page,

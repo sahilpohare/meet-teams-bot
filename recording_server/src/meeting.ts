@@ -166,6 +166,7 @@ export class MeetingHandle {
                 password,
                 0,
                 this.param.bot_name,
+                this.param.enter_message,
             )
             this.logger.info('Meeting link found', { meetingLink })
 
