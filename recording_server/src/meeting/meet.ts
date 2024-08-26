@@ -145,7 +145,8 @@ async function findShowEveryOne(
             (elems, click) => {
                 for (const e of elems) {
                     let elem = e as any
-                    if (elem.ariaLabel === 'Show everyone') {
+                    // 2024-08-26 : 'People' seems to be the new ariaLabel value and it replaces 'Show everyone'
+                    if (elem.ariaLabel === 'Show everyone' || elem.ariaLabel === 'People') {
                         if (click) {
                             elem.click()
                         }
