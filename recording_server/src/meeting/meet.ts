@@ -21,7 +21,7 @@ export class MeetProvider implements MeetingProviderInterface {
         }
         const urlSplitted = meeting_url.split(/\s+/)
         const strictRegex =
-            /^https:\/\/meet\.google\.com\/[a-z]{3}-[a-z]{4}-[a-z]{3}(\?authuser=\d+)?$/
+            /^https:\/\/meet\.google\.com\/[a-z]{3}-[a-z]{4}-[a-z]{3}(\?.*)?$/
 
         if (!strictRegex.test(meeting_url)) {
             throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
@@ -146,7 +146,10 @@ async function findShowEveryOne(
                 for (const e of elems) {
                     let elem = e as any
                     // 2024-08-26 : 'People' seems to be the new ariaLabel value and it replaces 'Show everyone'
-                    if (elem.ariaLabel === 'Show everyone' || elem.ariaLabel === 'People') {
+                    if (
+                        elem.ariaLabel === 'Show everyone' ||
+                        elem.ariaLabel === 'People'
+                    ) {
                         if (click) {
                             elem.click()
                         }
