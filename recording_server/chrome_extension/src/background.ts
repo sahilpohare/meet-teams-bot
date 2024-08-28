@@ -49,6 +49,7 @@ function setUserAgent(window: Window, userAgent: string) {
 }
 
 function addSpeaker(speaker: Speaker) {
+    console.log(`EXTENSION BACKGROUND PAGE - ADD SPEAKER : ${speaker}`)
     SPEAKERS.push(speaker)
     uploadEditorsTask(SPEAKERS)
 }

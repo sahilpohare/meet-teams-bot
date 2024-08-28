@@ -130,3 +130,9 @@ export type MessageToBroadcast = {
 }
 
 export type MeetingProvider = 'Zoom' | 'Meet' | 'Teams'
+
+export type Speaker = {
+    isSpeaking: boolean
+    name: string
+    timestamp: number
+}

@@ -8,6 +8,7 @@ import {
     MessageToBroadcast,
     StatusParams,
     StopRecordParams,
+    Speaker
 } from './types'
 
 import { Logger } from './logger'
@@ -191,9 +192,13 @@ export async function server() {
     })
 
     app.post('/add_speaker', jsonParser, async (req, res) => {
-        const speakers = req.body
+        const speakers: Speaker[] = req.body
         console.log('Speaker update received:', speakers)
-        MeetingHandle.addSpeaker(speakers)
+        speakers.forEach((speaker) => {
+            if (speaker.isSpeaking) {
+                MeetingHandle.addSpeaker(speaker)
+            }
+        });
         res.status(200).send('ok')
     })
 

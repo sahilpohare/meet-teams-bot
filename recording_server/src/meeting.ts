@@ -16,6 +16,7 @@ import {
     MeetingProvider,
     MeetingProviderInterface,
     MeetingStatus,
+    Speaker
 } from './types'
 
 import { notifyApp } from './calendar'
@@ -90,7 +91,7 @@ export class MeetingHandle {
     static getBotId(): string {
         return MeetingHandle.instance.param.bot_id
     }
-    static addSpeaker(speaker: any) {
+    static addSpeaker(speaker: Speaker) {
         MeetingHandle.instance.meeting.backgroundPage!.evaluate((x) => {
             const w = window as any
             return w.addSpeaker(x)
