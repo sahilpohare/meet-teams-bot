@@ -173,6 +173,7 @@ export async function tryGetExtensionId() {
     const height = HEIGHT_FRAMEBUFFER + HEIGHT_INTERFACE_CHROME
     const browser = await puppeteer.launch({
         args: [
+            '--autoplay-policy=no-user-gesture-required',
             '--remote-debugging-address=0.0.0.0',
             '--remote-debugging-port=9222',
             '--disable-default-apps',
@@ -247,6 +248,7 @@ export async function tryOpenBrowser(extensionId: string): Promise<Browser> {
     const height = HEIGHT_FRAMEBUFFER + HEIGHT_INTERFACE_CHROME
     const browser = await puppeteer.launch({
         args: [
+            '--autoplay-policy=no-user-gesture-required',
             '--remote-debugging-address=0.0.0.0',
             '--remote-debugging-port=9223',
             '--disable-default-apps',
