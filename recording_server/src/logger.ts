@@ -30,7 +30,7 @@ export class Logger {
 
             let date_fmt = `${
                 months[date.getMonth()]
-            } ${date.getDay()} ${iso[1].slice(0, iso[1].length - 1)}`
+            } ${date.getDate()} ${iso[1].slice(0, iso[1].length - 1)}`
 
             let tags_fmt = ``
             for (const [key, value] of Object.entries({
