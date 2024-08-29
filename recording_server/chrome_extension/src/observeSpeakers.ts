@@ -1,7 +1,6 @@
 import * as R from 'ramda'
 import * as MeetProvider from './observeSpeakers/meet'
 import * as TeamsProvider from './observeSpeakers/teams'
-import * as ZoomProvider from './observeSpeakers/zoom'
 
 import { sleep } from './api'
 import { ApiService } from './recordingServerApi'
@@ -24,15 +23,17 @@ const INACTIVITY_THRESHOLD = 60 * 1000 * 30 //ms
 
 const SPEAKERS: SpeakerData[] = []
 
-let PROVIDER = {
-    getSpeakerFromDocument: TeamsProvider.getSpeakerFromDocument,
-    removeShityHtml: TeamsProvider.removeShityHtml,
-    MIN_SPEAKER_DURATION: TeamsProvider.MIN_SPEAKER_DURATION,
-    SPEAKER_LATENCY: TeamsProvider.SPEAKER_LATENCY,
-    getSpeakerRootToObserve: TeamsProvider.getSpeakerRootToObserve,
-    findAllAttendees: TeamsProvider.findAllAttendees,
-    removeInitialShityHtml: TeamsProvider.removeInitialShityHtml,
+type Provider = {
+    getSpeakerFromDocument: any
+    removeShityHtml: any,
+    getSpeakerRootToObserve: any,
+    findAllAttendees: any,
+    removeInitialShityHtml: any,
+    MIN_SPEAKER_DURATION: Number,
+    SPEAKER_LATENCY: Number,
 }
+
+let PROVIDER: Provider | null = null
 
 setMeetingProvider()
 observeSpeakers()
@@ -42,50 +43,40 @@ function setMeetingProvider() {
         PROVIDER = {
             getSpeakerFromDocument: TeamsProvider.getSpeakerFromDocument,
             removeShityHtml: TeamsProvider.removeShityHtml,
-            MIN_SPEAKER_DURATION: TeamsProvider.MIN_SPEAKER_DURATION,
-            SPEAKER_LATENCY: TeamsProvider.SPEAKER_LATENCY,
             getSpeakerRootToObserve: TeamsProvider.getSpeakerRootToObserve,
             findAllAttendees: TeamsProvider.findAllAttendees,
             removeInitialShityHtml: TeamsProvider.removeInitialShityHtml,
+            MIN_SPEAKER_DURATION: TeamsProvider.MIN_SPEAKER_DURATION,
+            SPEAKER_LATENCY: TeamsProvider.SPEAKER_LATENCY,
         }
     } else if (MEETING_PROVIDER === 'Meet') {
         PROVIDER = {
             getSpeakerFromDocument: MeetProvider.getSpeakerFromDocument,
             removeShityHtml: MeetProvider.removeShityHtml,
-            MIN_SPEAKER_DURATION: MeetProvider.MIN_SPEAKER_DURATION,
-            SPEAKER_LATENCY: MeetProvider.SPEAKER_LATENCY,
             getSpeakerRootToObserve: MeetProvider.getSpeakerRootToObserve,
             findAllAttendees: MeetProvider.findAllAttendees,
             removeInitialShityHtml: MeetProvider.removeInitialShityHtml,
+            MIN_SPEAKER_DURATION: MeetProvider.MIN_SPEAKER_DURATION,
+            SPEAKER_LATENCY: MeetProvider.SPEAKER_LATENCY,
         }
     } else {
-        PROVIDER = {
-            getSpeakerFromDocument: ZoomProvider.getSpeakerFromDocument,
-            removeShityHtml: () => {},
-            MIN_SPEAKER_DURATION: ZoomProvider.MIN_SPEAKER_DURATION,
-            SPEAKER_LATENCY: ZoomProvider.SPEAKER_LATENCY,
-            getSpeakerRootToObserve: ZoomProvider.getSpeakerRootToObserve,
-            findAllAttendees: ZoomProvider.findAllAttendees,
-            removeInitialShityHtml: async () => {},
-        }
+        PROVIDER = null
     }
 }
 
-async function removeShityHtmlLoop(mode: RecordingMode) {
-    while (true) {
-        PROVIDER.removeShityHtml(mode)
-        await sleep(1000)
-    }
-}
-
+// Refresh the number of participants
 async function refreshAttendeesLoop() {
+    if (MEETING_PROVIDER === 'Zoom') {
+        console.info('ZOOM refresh Attendees is not handled by the Extension!')
+        return
+    }
     while (true) {
         try {
             const allAttendees = R.filter(
-                (attendee) =>
+                (attendee: string) =>
                     attendee != BOT_NAME &&
                     !attendee.toLowerCase().includes('notetaker'),
-                PROVIDER.findAllAttendees(),
+                PROVIDER?.findAllAttendees(),
             )
             console.log('refresh participants loop', allAttendees)
             chrome.runtime.sendMessage({
@@ -99,8 +90,21 @@ async function refreshAttendeesLoop() {
     }
 }
 
+async function removeShityHtmlLoop(mode: RecordingMode) {
+    while (true) {
+        PROVIDER?.removeShityHtml(mode)
+        await sleep(1000)
+    }
+}
+
+// Observe Speakers mutation
 async function observeSpeakers() {
-    console.log('start observe speakers', RECORDING_MODE)
+    if (MEETING_PROVIDER === 'Zoom') {
+        console.info('ZOOM observation speackers is not handled by the Extension!')
+        return
+    } else {
+        console.log('start observe speakers', RECORDING_MODE)
+    }
     try {
         removeShityHtmlLoop(RECORDING_MODE)
         refreshAttendeesLoop()
@@ -109,29 +113,13 @@ async function observeSpeakers() {
         console.log('an exception occurred in remove shitty html', e)
     }
 
-    // TODO : This function is linked to ZOOM - Must ne remove in the future
-    // function refreshSpeaker(index: number) {
-    //     console.log('timeout refresh speaker')
-    //     let lastSpeaker = index < SPEAKERS.length ? SPEAKERS[index] : undefined
-    //     const now = Date.now() - PROVIDER.SPEAKER_LATENCY
-    //     const speakerDuration = now - (lastSpeaker?.timestamp ?? 0)
-    //     if (speakerDuration > 2000) {
-    //         chrome.runtime.sendMessage({
-    //             type: 'REFRESH_SPEAKERS',
-    //             payload: SPEAKERS.slice(0, index + 1),
-    //         })
-    //     } else {
-    //         console.log('speaker changed in the last 2 secs')
-    //     }
-    // }
-
     var mutationObserver = new MutationObserver(function (mutations) {
         mutations.forEach(function (mutation) {
             if (parameters.meetingProvider === 'Teams') {
-                PROVIDER.removeShityHtml(RECORDING_MODE)
+                PROVIDER?.removeShityHtml(RECORDING_MODE)
             }
             try {
-                const currentSpeakersList = PROVIDER.getSpeakerFromDocument(
+                const currentSpeakersList = PROVIDER?.getSpeakerFromDocument(
                     SPEAKERS.length > 0
                         ? SPEAKERS[SPEAKERS.length - 1].name
                         : null,
@@ -150,91 +138,31 @@ async function observeSpeakers() {
                     })
                 }
 
-                if (MEETING_PROVIDER === 'Zoom') {
-                    // TODO : That code must not be user in the future since we use Zoom SDK
-                    // // Existing Zoom logic
-                    // const previousSpeaker =
-                    //     SPEAKERS.length > 0
-                    //         ? SPEAKERS[SPEAKERS.length - 1]
-                    //         : undefined
-                    // const speakersFiltered = R.filter(
-                    //     (u) =>
-                    //         u.name !== BOT_NAME &&
-                    //         u.name !== previousSpeaker?.name,
-                    //     currentSpeakersList,
-                    // )
-                    // const speaker = speakersFiltered[0]
-                    // if (speaker) {
-                    //     const newSpeaker: SpeakerData = {
-                    //         name: speaker.name,
-                    //         id: 0,
-                    //         timestamp:
-                    //             speaker.timestamp - PROVIDER.SPEAKER_LATENCY,
-                    //         isSpeaking: speaker.isSpeaking,
-                    //     }
-                    //     const speakerDuration =
-                    //         newSpeaker.timestamp -
-                    //         (previousSpeaker?.timestamp ?? 0)
-                    //     if (speakerDuration < PROVIDER.MIN_SPEAKER_DURATION) {
-                    //         SPEAKERS[SPEAKERS.length - 1] = newSpeaker
-                    //         if (
-                    //             SPEAKERS.length > 2 &&
-                    //             SPEAKERS[SPEAKERS.length - 2].name ===
-                    //                 newSpeaker.name
-                    //         ) {
-                    //             SPEAKERS.pop()
-                    //         }
-                    //         setTimeout(
-                    //             () => refreshSpeaker(SPEAKERS.length - 1),
-                    //             PROVIDER.MIN_SPEAKER_DURATION + 500,
-                    //         )
-                    //     } else {
-                    //         chrome.runtime.sendMessage({
-                    //             type: 'REFRESH_SPEAKERS',
-                    //             payload: SPEAKERS,
-                    //         })
-                    //         SPEAKERS.push(newSpeaker)
-                    //         if (SPEAKERS.length === 1) {
-                    //             chrome.runtime.sendMessage({
-                    //                 type: 'REFRESH_SPEAKERS',
-                    //                 payload: SPEAKERS,
-                    //             })
-                    //         } else {
-                    //             setTimeout(
-                    //                 () => refreshSpeaker(SPEAKERS.length - 1),
-                    //                 PROVIDER.MIN_SPEAKER_DURATION + 500,
-                    //             )
-                    //         }
-                    //     }
-                    //     console.log('speaker changed to: ', speaker)
-                    // }
-                } else {
-                    // New logic for Meet and Teams
-                    const activeSpeakers = currentSpeakersList.filter(
-                        (s) => s.isSpeaking,
-                    )
-                    // si lazare parle,  si Philippe se met a parler en meme temps
-                    // philippe prend forcement la precedence
-                    const newActiveSpeakers = activeSpeakers.filter(
-                        (s) =>
-                            s.name !== BOT_NAME &&
-                            (SPEAKERS.length === 0 ||
-                                s.name !== SPEAKERS[SPEAKERS.length - 1].name),
-                    )
-                    // essayer de gerer MIN DURATION ICI ?
-                    //  && Date.now() - s.timestamp >
-                    //     PROVIDER.MIN_SPEAKER_DURATION)),
+                // New logic for Meet and Teams
+                const activeSpeakers = currentSpeakersList.filter(
+                    (s) => s.isSpeaking,
+                )
+                // si lazare parle,  si Philippe se met a parler en meme temps
+                // philippe prend forcement la precedence
+                const newActiveSpeakers = activeSpeakers.filter(
+                    (s) =>
+                        s.name !== BOT_NAME &&
+                        (SPEAKERS.length === 0 ||
+                            s.name !== SPEAKERS[SPEAKERS.length - 1].name),
+                )
+                // essayer de gerer MIN DURATION ICI ?
+                //  && Date.now() - s.timestamp >
+                //     PROVIDER.MIN_SPEAKER_DURATION)),
 
-                    if (newActiveSpeakers.length > 0) {
-                        // TODO: not handling multiple speakers in the same time
-                        const newSpeaker = newActiveSpeakers[0]
-                        SPEAKERS.push(newSpeaker)
-                        console.log('speaker changed to: ', newSpeaker)
-                        chrome.runtime.sendMessage({
-                            type: 'REFRESH_SPEAKERS',
-                            payload: SPEAKERS,
-                        })
-                    }
+                if (newActiveSpeakers.length > 0) {
+                    // TODO: not handling multiple speakers in the same time
+                    const newSpeaker = newActiveSpeakers[0]
+                    SPEAKERS.push(newSpeaker)
+                    console.log('speaker changed to: ', newSpeaker)
+                    chrome.runtime.sendMessage({
+                        type: 'REFRESH_SPEAKERS',
+                        payload: SPEAKERS,
+                    })
                 }
             } catch (e) {
                 console.error('an exception occurred in observeSpeaker', e)
@@ -245,8 +173,8 @@ async function observeSpeakers() {
 
     try {
         const currentSpeakersList = R.filter(
-            (u) => u.name !== BOT_NAME && u.isSpeaking == true,
-            PROVIDER.getSpeakerFromDocument(null, null, RECORDING_MODE),
+            (u: SpeakerData) => u.name !== BOT_NAME && u.isSpeaking == true,
+            PROVIDER?.getSpeakerFromDocument(null, null, RECORDING_MODE),
         )
 
         const speaker = currentSpeakersList[0]
@@ -308,8 +236,8 @@ async function observeSpeakers() {
     }
 
     try {
-        await PROVIDER.removeInitialShityHtml(RECORDING_MODE)
-        await PROVIDER.getSpeakerRootToObserve(mutationObserver, RECORDING_MODE)
+        await PROVIDER?.removeInitialShityHtml(RECORDING_MODE)
+        await PROVIDER?.getSpeakerRootToObserve(mutationObserver, RECORDING_MODE)
     } catch (e) {
         console.error('an exception occurred starting observeSpeaker')
     }

@@ -11,10 +11,13 @@ import { Page } from 'puppeteer'
 import { URL } from 'url'
 import { sleep } from '../utils'
 
+const MEETINGJS_BASEURL = `http://localhost:3005`
+
 export class ZoomProvider implements MeetingProviderInterface {
     constructor() {}
     async parseMeetingUrl(browser: puppeteer.Browser, meeting_url: string) {
         if (meeting_url.startsWith('https://www.google.com')) {
+            console.warn("URL with google.com")
             try {
                 const url = new URL(meeting_url)
                 const params = url.searchParams
@@ -122,51 +125,4 @@ function parse(meeting_url: string) {
     }
     console.log('ZOOM PARSING MeetingId and password', { meetingId, password })
     return { meetingId, password }
-}
-
-const MEETINGJS_BASEURL = `http://localhost:3005`
-
-// async function sendEnterMessage(page: puppeteer.Page, message: string) {}
-export async function clickWithInnerText(
-    page: puppeteer.Page,
-    htmlType: string,
-    innerText: string,
-    iterations?: number,
-    click: boolean = true,
-): Promise<boolean> {
-    let i = 0
-    iterations = iterations ?? 10
-    let continueButton = false
-
-    while (!continueButton && (iterations == null || i < iterations)) {
-        try {
-            continueButton = await page.evaluate(
-                (innerText, htmlType, i, click) => {
-                    const elements = Array.from(
-                        document.querySelectorAll(htmlType),
-                    )
-                    for (const e of elements) {
-                        let elem = e as any
-                        if (elem.innerText === innerText) {
-                            if (click) {
-                                elem.click()
-                            }
-                            return true
-                        }
-                    }
-                    return false
-                },
-                innerText,
-                htmlType,
-                i,
-                click,
-            )
-        } catch (e) {
-            console.error('failed to find button', e)
-        }
-        await sleep(500)
-        console.log(`${innerText} clicked:`, continueButton)
-        i += 1
-    }
-    return continueButton
 }

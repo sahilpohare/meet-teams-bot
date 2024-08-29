@@ -255,11 +255,6 @@ export async function tryOpenBrowser(extensionId: string): Promise<Browser> {
             '--disable-client-side-phishing-detection',
             '--disable-background-timer-throttling',
             `--whitelisted-extension-id=${extensionId}`,
-
-            // '--use-fake-ui-for-media-stream',
-            // '--use-fake-device-for-media-stream',
-            // '--use-file-for-fake-video-capture=/Users/vcombey/Downloads/example.y4m',
-
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
@@ -267,6 +262,7 @@ export async function tryOpenBrowser(extensionId: string): Promise<Browser> {
             `--load-extension=${pathToExtension}`,
             `--window-size=${width},${height}`,
             `--enable-features=SharedArrayBuffer`,
+            // '--use-fake-ui-for-media-stream',
         ],
         executablePath: GOOGLE_CHROME_EXECTUTABLE_PATH,
         headless: false,
