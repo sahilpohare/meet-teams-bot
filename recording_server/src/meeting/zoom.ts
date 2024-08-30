@@ -17,7 +17,7 @@ export class ZoomProvider implements MeetingProviderInterface {
     constructor() {}
     async parseMeetingUrl(browser: puppeteer.Browser, meeting_url: string) {
         if (meeting_url.startsWith('https://www.google.com')) {
-            console.warn("URL with google.com")
+            console.warn('URL with google.com')
             try {
                 const url = new URL(meeting_url)
                 const params = url.searchParams
@@ -82,8 +82,20 @@ export class ZoomProvider implements MeetingProviderInterface {
         console.log({ url })
         const context = browser.defaultBrowserContext()
         await context.clearPermissionOverrides()
-        await context.overridePermissions(url.origin, ['camera'])
+        await context.overridePermissions(url.origin, ['camera', 'microphone'])
         const page = await browser.newPage()
+
+        // Ajoutez ces lignes pour accorder les permissions
+        await page
+            .target()
+            .createCDPSession()
+            .then(async (session) => {
+                await session.send('Browser.grantPermissions', {
+                    origin: url.origin,
+                    permissions: ['audioCapture', 'videoCapture'],
+                })
+            })
+
         await page.goto(link, { waitUntil: 'networkidle2' })
         return page
     }

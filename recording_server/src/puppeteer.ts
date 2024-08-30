@@ -186,7 +186,12 @@ export async function tryGetExtensionId() {
             `--load-extension=${pathToExtension}`,
             `--window-size=${width},${height}`,
             `--enable-features=SharedArrayBuffer`,
-            '--use-fake-ui-for-media-stream',
+            // '--use-fake-ui-for-media-stream',
+            '--ignore-certificate-errors',
+            '--ignore-ssl-errors',
+            '--allow-insecure-localhost',
+            '--unsafely-treat-insecure-origin-as-secure=http://localhost:3005',
+            `--autoplay-policy=no-user-gesture-required`,
         ],
         executablePath: GOOGLE_CHROME_EXECTUTABLE_PATH,
         headless: false,
@@ -247,6 +252,7 @@ export async function tryOpenBrowser(extensionId: string): Promise<Browser> {
     const width = WIDTH_FRAMEBUFFER
     const height = HEIGHT_FRAMEBUFFER + HEIGHT_INTERFACE_CHROME
     const browser = await puppeteer.launch({
+        ignoreDefaultArgs: ['--mute-audio'],
         args: [
             '--autoplay-policy=no-user-gesture-required',
             '--remote-debugging-address=0.0.0.0',
@@ -262,12 +268,45 @@ export async function tryOpenBrowser(extensionId: string): Promise<Browser> {
             `--load-extension=${pathToExtension}`,
             `--window-size=${width},${height}`,
             `--enable-features=SharedArrayBuffer`,
-            // '--use-fake-ui-for-media-stream',
+            '--ignore-certificate-errors',
+            '--ignore-ssl-errors',
+            '--allow-insecure-localhost',
+            '--unsafely-treat-insecure-origin-as-secure=http://localhost:3005',
+            `--autoplay-policy=no-user-gesture-required`,
+            // '--use-fake-ui-for-media-stream', => marche pas
+            // '--use-fake-device-for-media-stream',  => marche pas
+            // '--allow-file-access-from-files',  => marche pas
         ],
         executablePath: GOOGLE_CHROME_EXECTUTABLE_PATH,
         headless: false,
         devtools: false,
         defaultViewport: null,
     })
+
+    const pages = await browser.pages()
+    const page = pages[0]
+
+    // Ajoutez ces lignes pour accorder les permissions
+    await page
+        .target()
+        .createCDPSession()
+        .then(async (session) => {
+            await session.send('Browser.grantPermissions', {
+                origin: 'http://localhost:3005',
+                permissions: ['audioCapture', 'videoCapture'],
+            })
+        })
+
+    await page.evaluateOnNewDocument(() => {
+        Object.defineProperty(navigator, 'mediaDevices', {
+            value: {
+                getUserMedia: async () => ({
+                    audio: true,
+                    video: true,
+                }),
+            },
+        })
+    })
+
     return browser
 }
