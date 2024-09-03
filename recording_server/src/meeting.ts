@@ -17,7 +17,7 @@ import {
     MeetingProvider,
     MeetingProviderInterface,
     MeetingStatus,
-    SpeakerData
+    SpeakerData,
 } from './types'
 
 import { notifyApp } from './calendar'

@@ -233,7 +233,7 @@ export async function server() {
             if (speaker.isSpeaking) {
                 MeetingHandle.addSpeaker(speaker)
             }
-        });
+        })
         res.status(200).send('ok')
     })
 

@@ -137,6 +137,7 @@ export async function getCachedExtensionId() {
     )
     // const trueExtensionId = await getExtensionId()
     // console.log({trueExtensionId}, {data})
+    console.log(`getCachedExtensionId() = ${data.trim()}`)
     return data.trim()
 }
 
@@ -168,38 +169,45 @@ export async function tryGetExtensionId() {
         'chrome_extension',
         'dist',
     )
-    // const pathToExtension = getPathToExtension()
+    console.log(`Path to Extension = ${pathToExtension}`)
     const width = WIDTH_FRAMEBUFFER
     const height = HEIGHT_FRAMEBUFFER + HEIGHT_INTERFACE_CHROME
+
     const browser = await puppeteer.launch({
         args: [
+            `--window-size=${width},${height}`,
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            `--load-extension=${pathToExtension}`,
+
             '--autoplay-policy=no-user-gesture-required',
             '--remote-debugging-address=0.0.0.0',
             '--remote-debugging-port=9222',
             '--disable-default-apps',
             '--disable-client-side-phishing-detection',
             '--disable-background-timer-throttling',
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
             `--disable-extensions-except=${pathToExtension}`,
-            `--load-extension=${pathToExtension}`,
-            `--window-size=${width},${height}`,
             `--enable-features=SharedArrayBuffer`,
+
             // '--use-fake-ui-for-media-stream',
-            '--ignore-certificate-errors',
-            '--ignore-ssl-errors',
-            '--allow-insecure-localhost',
-            '--unsafely-treat-insecure-origin-as-secure=http://localhost:3005',
-            `--autoplay-policy=no-user-gesture-required`,
+            // '--use-fake-device-for-media-stream',
+            // '--use-file-for-fake-video-capture=/Users/vcombey/Downloads/example.y4m',
         ],
-        executablePath: GOOGLE_CHROME_EXECTUTABLE_PATH,
+        // executablePath: '/usr/bin/chromium', // Comment it to use default browser
         headless: false,
         devtools: false,
         defaultViewport: null,
     })
-    const page = await browser.newPage()
+
+    await reload_extension(browser)
+
     const targets = browser.targets()
+    console.log(targets)
+
+    // Hang infinitely
+    // await new Promise(() => {});
+
     const extensionTarget = targets.find((target) => {
         const _targetInfo = (target as any)._targetInfo
         return (
@@ -222,6 +230,8 @@ export async function openBrowser(
         try {
             // Attempt to open the browser with the specified extension
             const browser = await tryOpenBrowser(extensionId)
+            await reload_extension(browser)
+
             // Find the background page of the extension within the browser
             const backgroundPage = await findBackgroundPage(
                 browser,
@@ -254,30 +264,32 @@ export async function tryOpenBrowser(extensionId: string): Promise<Browser> {
     const browser = await puppeteer.launch({
         ignoreDefaultArgs: ['--mute-audio'],
         args: [
+            `--window-size=${width},${height}`,
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            `--load-extension=${pathToExtension}`,
+
             '--autoplay-policy=no-user-gesture-required',
             '--remote-debugging-address=0.0.0.0',
             '--remote-debugging-port=9223',
             '--disable-default-apps',
             '--disable-client-side-phishing-detection',
             '--disable-background-timer-throttling',
-            `--whitelisted-extension-id=${extensionId}`,
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
             `--disable-extensions-except=${pathToExtension}`,
-            `--load-extension=${pathToExtension}`,
-            `--window-size=${width},${height}`,
             `--enable-features=SharedArrayBuffer`,
+
+            `--whitelisted-extension-id=${extensionId}`,
+            // '--use-fake-ui-for-media-stream',
+            // '--use-fake-device-for-media-stream',
+            // '--use-file-for-fake-video-capture=/Users/vcombey/Downloads/example.y4m',
+
             '--ignore-certificate-errors',
             '--ignore-ssl-errors',
             '--allow-insecure-localhost',
             '--unsafely-treat-insecure-origin-as-secure=http://localhost:3005',
-            `--autoplay-policy=no-user-gesture-required`,
-            // '--use-fake-ui-for-media-stream', => marche pas
-            // '--use-fake-device-for-media-stream',  => marche pas
-            // '--allow-file-access-from-files',  => marche pas
         ],
-        executablePath: GOOGLE_CHROME_EXECTUTABLE_PATH,
+        // executablePath: GOOGLE_CHROME_EXECTUTABLE_PATH,
         headless: false,
         devtools: false,
         defaultViewport: null,
@@ -309,4 +321,29 @@ export async function tryOpenBrowser(extensionId: string): Promise<Browser> {
     })
 
     return browser
+}
+
+// This function is a hack because we cannot get extension without reloading it in moderns browsers
+async function reload_extension(browser: Browser) {
+    const page = await browser.newPage()
+    await page.goto('chrome://extensions/')
+
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+    // <cr-icon-button id="dev-reload-button"
+    //     class="icon-refresh no-overlap"
+    //     aria-label="Reload"
+    //     aria-describedby="a11yAssociation"
+    //     aria-disabled="false"
+    //     role="button"
+    //     tabindex="0">
+    // </cr-icon-button>
+    // Traditional methods of clicking on an object don't work here.
+    // So we generate a manual mouse click at specific coordinates.
+    const X_RELOAD_BUTTON = 540
+    const Y_RELOAD_BUTTON = 220
+    await page.mouse.click(X_RELOAD_BUTTON, Y_RELOAD_BUTTON, {
+        button: 'left',
+        clickCount: 1,
+    })
+    await new Promise((resolve) => setTimeout(resolve, 1000))
 }
