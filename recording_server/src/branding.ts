@@ -1,5 +1,7 @@
 import { spawn } from 'child_process'
 
+import { SoundContext, VideoContext } from './media_context'
+
 export type BrandingHandle = {
     wait: Promise<void>
     kill: () => void
@@ -43,24 +45,14 @@ export function generateBranding(
     }
 }
 
-export function playBranding(): BrandingHandle {
+export function playBranding() {
     try {
-        // Don't pipe stderr to console: it never stops printing
-        const command = spawn('../play_branding_on_webcam.sh')
+        new VideoContext(0)
+        VideoContext.instance.default()
 
-        return {
-            wait: new Promise<void>((res, _rej) => {
-                command.on('close', () => {
-                    res()
-                })
-            }),
-            kill: () => {
-                console.log('kill branding')
-                command.kill('SIGKILL')
-            },
-        }
+        // SoundContext.instance.default()
+        // new SoundContext(44100)
     } catch (e) {
-        console.error('fail to generate branding ', e)
-        return null
+        console.error('fail to play branding ', e)
     }
 }

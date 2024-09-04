@@ -26,6 +26,7 @@ import { MeetProvider } from './meeting/meet'
 import { TeamsProvider } from './meeting/teams'
 import { ZoomProvider } from './meeting/zoom'
 import { sleep } from './utils'
+import { VideoContext } from './media_context'
 
 const RECORDING_TIMEOUT = 3600 * 4 // 4 hours
 // const RECORDING_TIMEOUT = 120 // 2 minutes for tests
@@ -65,7 +66,6 @@ export class MeetingHandle {
     private meeting: Meeting
     private param: MeetingParams
     private brandingGenerateProcess: BrandingHandle | null
-    private brandingPlayProcess: BrandingHandle | null
     private provider: MeetingProviderInterface
 
     static init(meetingParams: MeetingParams, logger: Logger) {
@@ -148,7 +148,7 @@ export class MeetingHandle {
                     this.param.custom_branding_bot_path,
                 )
                 await this.brandingGenerateProcess.wait
-                this.brandingPlayProcess = playBranding()
+                playBranding()
             }
 
             const extensionId = await getCachedExtensionId()
@@ -257,7 +257,7 @@ export class MeetingHandle {
         }
         try {
             this.brandingGenerateProcess?.kill()
-            this.brandingPlayProcess?.kill()
+            VideoContext.instance.stop()
         } catch (e) {
             this.logger.error(`failed to kill process: ${e}`)
         }
