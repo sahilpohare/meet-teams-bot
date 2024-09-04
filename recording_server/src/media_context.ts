@@ -1,5 +1,6 @@
 import { spawn, ChildProcess } from 'child_process'
 
+// sudo apt install linux-modules-extra-`uname -r`
 const MICRO_DEVICE: string = 'hw:Loopback,1'
 const CAMERA_DEVICE: string = '/dev/video10'
 
