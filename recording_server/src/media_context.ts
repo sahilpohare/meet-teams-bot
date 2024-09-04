@@ -95,7 +95,7 @@ export class SoundContext extends MediaContext {
     }
 
     public default() {
-        SoundContext.instance.play(`default_audio.mp3`, true)
+        SoundContext.instance.play(`../vache.mp3`, false)
     }
 
     public play(pathname: string, loop: boolean) {

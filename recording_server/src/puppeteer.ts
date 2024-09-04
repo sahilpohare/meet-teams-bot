@@ -194,7 +194,7 @@ export async function tryGetExtensionId() {
             // '--use-fake-device-for-media-stream',
             // '--use-file-for-fake-video-capture=/Users/vcombey/Downloads/example.y4m',
         ],
-        // executablePath: '/usr/bin/chromium', // Comment it to use default browser
+        executablePath: GOOGLE_CHROME_EXECTUTABLE_PATH,
         headless: false,
         devtools: false,
         defaultViewport: null,
@@ -289,7 +289,7 @@ export async function tryOpenBrowser(extensionId: string): Promise<Browser> {
             '--allow-insecure-localhost',
             '--unsafely-treat-insecure-origin-as-secure=http://localhost:3005',
         ],
-        // executablePath: GOOGLE_CHROME_EXECTUTABLE_PATH,
+        executablePath: GOOGLE_CHROME_EXECTUTABLE_PATH,
         headless: false,
         devtools: false,
         defaultViewport: null,

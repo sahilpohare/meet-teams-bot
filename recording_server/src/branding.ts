@@ -49,10 +49,16 @@ export function playBranding() {
     try {
         new VideoContext(0)
         VideoContext.instance.default()
-
-        // SoundContext.instance.default()
-        // new SoundContext(44100)
     } catch (e) {
-        console.error('fail to play branding ', e)
+        console.error('fail to play video branding ', e)
+    }
+}
+
+export function playSound() {
+    try {
+        new SoundContext(44100)
+        SoundContext.instance.default()
+    } catch (e) {
+        console.error('fail to play sound branding ', e)
     }
 }

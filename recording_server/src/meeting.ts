@@ -1,4 +1,4 @@
-import { BrandingHandle, generateBranding, playBranding } from './branding'
+import { BrandingHandle, generateBranding, playBranding, playSound } from './branding'
 import { LOCAL_RECORDING_SERVER_LOCATION, delSessionInRedis } from './instance'
 import { Logger, uploadLog } from './logger'
 import {
@@ -26,7 +26,7 @@ import { MeetProvider } from './meeting/meet'
 import { TeamsProvider } from './meeting/teams'
 import { ZoomProvider } from './meeting/zoom'
 import { sleep } from './utils'
-import { VideoContext } from './media_context'
+import { VideoContext, SoundContext } from './media_context'
 
 const RECORDING_TIMEOUT = 3600 * 4 // 4 hours
 // const RECORDING_TIMEOUT = 120 // 2 minutes for tests
@@ -228,6 +228,7 @@ export class MeetingHandle {
             )
             this.logger.info('startRecording called')
 
+            playSound()
             await Events.inCallRecording()
 
             if (project == null) {
@@ -258,6 +259,7 @@ export class MeetingHandle {
         try {
             this.brandingGenerateProcess?.kill()
             VideoContext.instance.stop()
+            SoundContext.instance.stop()
         } catch (e) {
             this.logger.error(`failed to kill process: ${e}`)
         }

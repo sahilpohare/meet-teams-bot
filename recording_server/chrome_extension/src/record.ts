@@ -81,7 +81,7 @@ export async function initMediaRecorder(): Promise<void> {
 
                 try {
                     MEDIA_RECORDER = new MediaRecorder(stream, {
-                        mimeType: 'video/webm; codecs=vp9,pcm',
+                        mimeType: 'video/webm; codecs=h264,pcm',
                     })
                 } catch (e) {
                     console.error('error creating media recorder', e)
