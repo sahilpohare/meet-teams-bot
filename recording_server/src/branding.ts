@@ -57,7 +57,7 @@ export function playBranding() {
 export function playSound() {
     try {
         new SoundContext(44100)
-        SoundContext.instance.default()
+        SoundContext.instance.play('../vache.mp3', false)
     } catch (e) {
         console.error('fail to play sound branding ', e)
     }

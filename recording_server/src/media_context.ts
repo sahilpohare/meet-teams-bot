@@ -1,7 +1,8 @@
 import { spawn, ChildProcess } from 'child_process'
 
 // sudo apt install linux-modules-extra-`uname -r`
-const MICRO_DEVICE: string = 'hw:Loopback,1'
+// const MICRO_DEVICE: string = 'hw:Loopback,1' // sndloop module
+const MICRO_DEVICE: string = '"pulse:virtual_mic"' // pulseaudio virtual mic
 const CAMERA_DEVICE: string = '/dev/video10'
 
 // This abstract claas contains the current ffmpeg process
@@ -96,11 +97,12 @@ export class SoundContext extends MediaContext {
     }
 
     public default() {
-        SoundContext.instance.play(`../vache.mp3`, false)
+        SoundContext.instance.play(`../default_audio.mp3`, false)
     }
 
     public play(pathname: string, loop: boolean) {
         // ffmpeg -stream_loop -1 -re -i La_bataille_de_Farador.mp4 -f alsa -ac 2 -ar 44100 hw:Loopback,1
+        // ffmpeg -re -i vache.mp3 -f alsa -acodec pcm_s16le "pulse:virtual_mic"
         let args: string[] = []
         if (loop) {
             args.push(`-stream_loop`, `-1`)
@@ -111,10 +113,8 @@ export class SoundContext extends MediaContext {
             pathname,
             `-f`,
             `alsa`,
-            `-ac`,
-            `2`,
-            `-ar`,
-            `${this.sampleRate}`,
+            `-acodec`,
+            `pcm_s16le`,
             MICRO_DEVICE,
         )
         super.execute(args, this.default)
