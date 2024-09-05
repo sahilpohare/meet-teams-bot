@@ -1,4 +1,9 @@
-import { BrandingHandle, generateBranding, playBranding, playSound } from './branding'
+import {
+    BrandingHandle,
+    generateBranding,
+    playBranding,
+    playSound,
+} from './branding'
 import { LOCAL_RECORDING_SERVER_LOCATION, delSessionInRedis } from './instance'
 import { Logger, uploadLog } from './logger'
 import {

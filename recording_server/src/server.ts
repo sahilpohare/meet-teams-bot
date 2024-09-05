@@ -17,6 +17,11 @@ import { PORT } from './instance'
 
 import { sleep } from './utils'
 
+import axios from 'axios'
+import { SoundContext, VideoContext } from './media_context'
+import { execSync } from 'child_process'
+import { unlinkSync } from 'fs'
+
 export let PROJECT_ID: number | undefined = undefined
 export const LOGGER = new Logger({})
 
@@ -276,6 +281,127 @@ export async function server() {
                     error: 'None build has been done',
                 })
             })
+    })
+
+    type Upload = {
+        url: string
+    }
+
+    enum FileExtension {
+        Jpg = '.jpg',
+        Png = '.png',
+        Mp4 = '.mp4',
+        Mp3 = '.mp3',
+    }
+
+    const path = require('path')
+
+    // Upload ressources into the server
+    app.post('/upload', async (request, result) => {
+        const params: Upload = request.body
+        console.log(params)
+
+        const extension = path.extname(params.url)
+        if (!Object.values(FileExtension).includes(extension)) {
+            result.status(400).json({
+                error: 'This extension is not compatible',
+            })
+            return
+        }
+        await axios
+            .get(params.url, { responseType: 'arraybuffer' })
+            .then((file) => {
+                const filename = path.basename(params.url)
+
+                fs.writeFile(filename, file.data)
+                console.log('Ressource downloaded @', filename)
+
+                // In case of image, create a video from it with FFMPEG and delete tmp files
+                if (extension == '.jpg' || extension == '.png') {
+                    try {
+                        const command = `ffmpeg -y -i ${filename} -vf scale=${VideoContext.WIDTH}:${VideoContext.HEIGHT} -y resized_${filename}`
+                        const output = execSync(command)
+                        console.log(output.toString())
+                    } catch (e) {
+                        console.error(
+                            `Unexpected error when scaling image : ${e}`,
+                        )
+                        result.status(400).json({
+                            error: 'Cannot scale image',
+                        })
+                        return
+                    }
+                    try {
+                        const command = `ffmpeg -y -loop 1 -i resized_${filename} -c:v libx264 -r 30 -t 1 -pix_fmt yuv420p ${filename}.mp4`
+                        const output = execSync(command)
+                        console.log(output.toString())
+                    } catch (e) {
+                        console.error(
+                            `Unexpected error when generating video : ${e}`,
+                        )
+                        result.status(400).json({
+                            error: 'Cannot generate video',
+                        })
+                        return
+                    }
+                    try {
+                        unlinkSync(`${filename}`)
+                        unlinkSync(`resized_${filename}`)
+                    } catch (e) {
+                        console.error(`Cannot unlink files : ${e}`)
+                    }
+                }
+                result.status(200).json({
+                    ok: 'New ressource uploaded',
+                })
+            })
+            .catch((e) => {
+                console.log(e)
+                result.status(400).json({
+                    error: e,
+                })
+            })
+    })
+
+    // Play a given ressource into microphone, camera or both
+    app.post('/play', async (request, result) => {
+        const params: Upload = request.body
+        console.log(params)
+
+        const extension = path.extname(params.url)
+        if (!Object.values(FileExtension).includes(extension)) {
+            result.status(400).json({
+                error: 'This extension is not compatible',
+            })
+            return
+        }
+        const filename = path.basename(params.url)
+        switch (extension) {
+            case '.png':
+            case '.jpg':
+                await VideoContext.instance.stop()
+                VideoContext.instance.play(`${filename}.mp4`, true)
+                break
+            case '.mp3':
+                await SoundContext.instance.stop()
+                SoundContext.instance.play(`${filename}`, false)
+                break
+            case '.mp4':
+                await VideoContext.instance.stop()
+                await SoundContext.instance.stop()
+                VideoContext.instance.play(`${filename}`, false)
+                SoundContext.instance.play(`${filename}`, false)
+                break
+            default:
+                console.error('Unexpected Extension :', extension)
+                result.status(400).json({
+                    error: 'Unexpected Extension',
+                })
+                return
+        }
+        result.status(200).json({
+            ok: 'Ressource on playing...',
+        })
     })
 
     try {

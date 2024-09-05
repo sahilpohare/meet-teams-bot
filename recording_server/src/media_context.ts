@@ -25,7 +25,7 @@ abstract class MediaContext {
         this.promise = null
     }
 
-    protected execute(args: string[], after: { (): void; }) {
+    protected execute(args: string[], after: { (): void }) {
         if (this.process) {
             console.warn('Already on execution')
             return
