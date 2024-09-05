@@ -2,7 +2,7 @@ import { spawn, ChildProcess } from 'child_process'
 
 // sudo apt install linux-modules-extra-`uname -r`
 // const MICRO_DEVICE: string = 'hw:Loopback,1' // sndloop module
-const MICRO_DEVICE: string = '"pulse:virtual_mic"' // pulseaudio virtual mic
+const MICRO_DEVICE: string = 'pulse:virtual_mic' // pulseaudio virtual mic
 const CAMERA_DEVICE: string = '/dev/video10'
 
 // This abstract claas contains the current ffmpeg process
