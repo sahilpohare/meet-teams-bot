@@ -14,6 +14,8 @@ export let ATTENDEES: string[] = []
 
 export * from './state'
 
+const INACTIVITY_THRESHOLD = 60 * 1000 * 30 // ms
+
 export function addDefaultHeader(name: string, value: string) {
     axios.defaults.headers.common[name] = value
 }
@@ -54,11 +56,40 @@ function addSpeaker(speaker: SpeakerData) {
     uploadEditorsTask(SPEAKERS)
 }
 
+// Check speakers inactivity
+async function checkInactivity() {
+    while (true) {
+        await sleep(1000)
+        if (SPEAKERS.length === 0) {
+            console.error('Cannot happen : SPEAKERS.length must be almost 1')
+            continue
+        }
+        let speaker = SPEAKERS[SPEAKERS.length - 1]
+        let last_timestamp = speaker.timestamp
+
+        console.log('checking inactivity', last_timestamp)
+
+        if (Date.now() - last_timestamp > INACTIVITY_THRESHOLD) {
+            console.error('[wordPosterWorker] Meuh y a que des bots!!!')
+            console.warn('Unusual Inactivity Detected')
+            ApiService.sendMessageToRecordingServer('STOP_MEETING', {
+                reason: 'Unusual Inactivity Detected',
+            }).catch((e) => {
+                console.error(
+                    'error STOP_MEETING FROM EXTENSION in background.ts',
+                    e,
+                )
+            })
+        }
+    }
+}
+
 setUserAgent(
     window,
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36',
 )
 
+// IMPORTANT : chrome.runtime methods are only used by Spoke. MeetingBaas prefers AXIOS
 function addListener() {
     chrome.runtime.onMessage.addListener(function (
         request: any,
@@ -66,30 +97,11 @@ function addListener() {
         _sendResponse: (response?: any) => void,
     ) {
         switch (request.type) {
+            // IMPORTANT : REFRESH_ATTENDEES -> Necessary to Spoke 'summarizeWorker.ts'
             case 'REFRESH_ATTENDEES':
                 if (request.payload.length > ATTENDEES.length) {
                     ATTENDEES = request.payload
                 }
-                break
-            case 'REFRESH_SPEAKERS':
-                const prevSpeakers = SPEAKERS
-                SPEAKERS = request.payload
-                if (SPEAKERS.length > prevSpeakers.length) {
-                    console.log('new speaker, pushing complete editor')
-                    uploadEditorsTask(SPEAKERS)
-                }
-                break
-            case 'LOG':
-                console.log(request.payload)
-                break
-            case 'OBSERVE_SPEAKERS':
-                observeSpeakers()
-                break
-            case 'RECORD':
-                record.initMediaRecorder()
-                break
-            case 'STOP':
-                stopMediaRecorder()
                 break
             default:
                 console.log('UNKNOWN_REQUEST', request)
@@ -98,6 +110,7 @@ function addListener() {
     })
 }
 
+// Launch observeSpeakers.js() script inside web page DOM (Meet, teams ...)
 function observeSpeakers() {
     chrome.tabs.executeScript(
         {
@@ -134,9 +147,10 @@ export async function startRecording(
         ApiService.init(meetingParams.local_recording_server_location)
         await ApiService.sendMessageToRecordingServer(
             'LOG',
-            'FROM_EXTENSION: Xxxxxxxxxxxxxxxxxxxxxxxx ************ Start recording launched. **********************************',
+            'FROM_EXTENSION: ************ Start recording launched. ************',
         )
         observeSpeakers()
+        checkInactivity()
         await sleep(1000)
         await record.initMediaRecorder()
         const project = await record.startRecording(

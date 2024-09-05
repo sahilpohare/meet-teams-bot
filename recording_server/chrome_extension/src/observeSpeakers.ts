@@ -18,19 +18,14 @@ declare var MEETING_PROVIDER: string
 declare var RECORDING_MODE: RecordingMode
 export type RecordingMode = 'speaker_view' | 'gallery_view' | 'audio_only'
 
-const INACTIVITY_THRESHOLD = 60 * 1000 * 30 //ms
-// let inactivityCheckInterval: NodeJS.Timeout | null = null
-
-const SPEAKERS: SpeakerData[] = []
-
 type Provider = {
     getSpeakerFromDocument: any
-    removeShityHtml: any,
-    getSpeakerRootToObserve: any,
-    findAllAttendees: any,
-    removeInitialShityHtml: any,
-    MIN_SPEAKER_DURATION: Number,
-    SPEAKER_LATENCY: Number,
+    removeShityHtml: any
+    getSpeakerRootToObserve: any
+    findAllAttendees: any
+    removeInitialShityHtml: any
+    MIN_SPEAKER_DURATION: Number
+    SPEAKER_LATENCY: Number
 }
 
 let PROVIDER: Provider | null = null
@@ -66,10 +61,6 @@ function setMeetingProvider() {
 
 // Refresh the number of participants
 async function refreshAttendeesLoop() {
-    if (MEETING_PROVIDER === 'Zoom') {
-        console.info('ZOOM refresh Attendees is not handled by the Extension!')
-        return
-    }
     while (true) {
         try {
             const allAttendees = R.filter(
@@ -78,13 +69,13 @@ async function refreshAttendeesLoop() {
                     !attendee.toLowerCase().includes('notetaker'),
                 PROVIDER?.findAllAttendees(),
             )
-            console.log('refresh participants loop', allAttendees)
+            console.log(`refresh participants loop : ${allAttendees}`)
             chrome.runtime.sendMessage({
                 type: 'REFRESH_ATTENDEES',
                 payload: allAttendees,
             })
         } catch (e) {
-            console.error('an exception occurred in refresh attendees', e)
+            console.error(`Catch on refresh attendees : ${e}`)
         }
         await sleep(10000)
     }
@@ -100,25 +91,31 @@ async function removeShityHtmlLoop(mode: RecordingMode) {
 // Observe Speakers mutation
 async function observeSpeakers() {
     if (MEETING_PROVIDER === 'Zoom') {
-        console.info('ZOOM observation speackers is not handled by the Extension!')
+        console.info(
+            'ZOOM observation speackers is not handled by the Extension!',
+        )
         return
     } else {
-        console.log('start observe speakers', RECORDING_MODE)
+        console.log(`start observe speakers ${RECORDING_MODE}`)
     }
     try {
         removeShityHtmlLoop(RECORDING_MODE)
         refreshAttendeesLoop()
-        checkInactivity()
     } catch (e) {
-        console.log('an exception occurred in remove shitty html', e)
+        console.log(`Catch on Initial step into observeSpeaker failed : ${e}`)
     }
 
+    // ___PERIODIC_SEQUENCE_FOR_EACH_MUTATIONS___
     var mutationObserver = new MutationObserver(function (mutations) {
         mutations.forEach(function (mutation) {
             if (parameters.meetingProvider === 'Teams') {
                 PROVIDER?.removeShityHtml(RECORDING_MODE)
             }
             try {
+                // PHILOU : Je ne m'en sort pas ici. On ne devrait pas avoir a connaitre le speaker actuel,
+                // c'est faux presque !!!
+                // apparement c'est plus simple pour tems que pour meet
+                // Ca ne compile pas ici puisque le tableau SPEAKERS n'a plus rien a faire ici.
                 const currentSpeakersList = PROVIDER?.getSpeakerFromDocument(
                     SPEAKERS.length > 0
                         ? SPEAKERS[SPEAKERS.length - 1].name
@@ -128,144 +125,86 @@ async function observeSpeakers() {
                 )
                 if (currentSpeakersList.length > 0) {
                     ApiService.sendMessageToRecordingServer(
-                        'LOG_SPEAKER',
+                        'SPEAKERS',
                         currentSpeakersList,
                     ).catch((e) => {
                         console.error(
-                            'error LOG_SPEAKER FROM EXTENSION in observeSpeaker',
-                            e,
+                            `Catch on send currentSpeakersList : ${e}`,
                         )
                     })
                 }
+                // PHILOU : C'est une logique interessante, mais ca devrait etre ailleurs, comme sur la background par ex.
+                // // New logic for Meet and Teams
+                // const activeSpeakers = currentSpeakersList.filter(
+                //     (s) => s.isSpeaking,
+                // )
+                // // si lazare parle,  si Philippe se met a parler en meme temps
+                // // philippe prend forcement la precedence
+                // const newActiveSpeakers = activeSpeakers.filter(
+                //     (s) =>
+                //         s.name !== BOT_NAME &&
+                //         (SPEAKERS.length === 0 ||
+                //             s.name !== SPEAKERS[SPEAKERS.length - 1].name),
+                // )
+                // // essayer de gerer MIN DURATION ICI ?
+                // //  && Date.now() - s.timestamp >
+                // //     PROVIDER.MIN_SPEAKER_DURATION)),
 
-                // New logic for Meet and Teams
-                const activeSpeakers = currentSpeakersList.filter(
-                    (s) => s.isSpeaking,
-                )
-                // si lazare parle,  si Philippe se met a parler en meme temps
-                // philippe prend forcement la precedence
-                const newActiveSpeakers = activeSpeakers.filter(
-                    (s) =>
-                        s.name !== BOT_NAME &&
-                        (SPEAKERS.length === 0 ||
-                            s.name !== SPEAKERS[SPEAKERS.length - 1].name),
-                )
-                // essayer de gerer MIN DURATION ICI ?
-                //  && Date.now() - s.timestamp >
-                //     PROVIDER.MIN_SPEAKER_DURATION)),
-
-                if (newActiveSpeakers.length > 0) {
-                    // TODO: not handling multiple speakers in the same time
-                    const newSpeaker = newActiveSpeakers[0]
-                    SPEAKERS.push(newSpeaker)
-                    console.log('speaker changed to: ', newSpeaker)
-                    chrome.runtime.sendMessage({
-                        type: 'REFRESH_SPEAKERS',
-                        payload: SPEAKERS,
-                    })
-                }
+                // if (newActiveSpeakers.length > 0) {
+                //     // TODO: not handling multiple speakers in the same time
+                //     const newSpeaker = newActiveSpeakers[0]
+                //     SPEAKERS.push(newSpeaker)
+                //     console.log('speaker changed to: ', newSpeaker)
+                //     chrome.runtime.sendMessage({
+                //         type: 'REFRESH_SPEAKERS',
+                //         payload: SPEAKERS,
+                //     })
+                // }
             } catch (e) {
-                console.error('an exception occurred in observeSpeaker', e)
-                console.log('an exception occurred in observeSpeaker', e)
+                console.error(`Catch on MutationObserver : ${e}`)
             }
         })
     })
 
+    // ___INITIAL_SEQUENCE___
     try {
-        const currentSpeakersList = R.filter(
+        const currentSpeakersList: SpeakerData[] = R.filter(
             (u: SpeakerData) => u.name !== BOT_NAME && u.isSpeaking == true,
             PROVIDER?.getSpeakerFromDocument(null, null, RECORDING_MODE),
         )
 
-        const speaker = currentSpeakersList[0]
-        if (speaker) {
-            SPEAKERS.push(speaker)
+        if (currentSpeakersList.length > 0) {
+            // Send initial active speakers if present
             ApiService.sendMessageToRecordingServer(
-                'LOG',
-                `[ObserveSpeaker] initial speakers ${
-                    SPEAKERS[SPEAKERS.length - 1]
-                }`,
-            ).catch((e) => {
-                console.error('error LOG FROM EXTENSION in observeSpeaker', e)
-            })
-            ApiService.sendMessageToRecordingServer(
-                'LOG_SPEAKER',
+                'SPEAKERS',
                 currentSpeakersList,
             ).catch((e) => {
-                console.error(
-                    'error LOG_SPEAKER FROM EXTENSION in observeSpeaker',
-                    e,
-                )
-            })
-
-            chrome.runtime.sendMessage({
-                type: 'REFRESH_SPEAKERS',
-                payload: SPEAKERS,
+                console.error(`Catch on send initial speakers list : ${e}`)
             })
         } else {
-            SPEAKERS.push({
-                name: '-',
-                id: 0,
-                timestamp: Date.now(),
-                isSpeaking: true,
-            })
-            chrome.runtime.sendMessage({
-                type: 'REFRESH_SPEAKERS',
-                payload: SPEAKERS,
-            })
-            ApiService.sendMessageToRecordingServer(
-                'LOG',
-                `[ObserveSpeaker] no initial speakers ${
-                    SPEAKERS[SPEAKERS.length - 1]
-                }`,
-            ).catch((e) => {
-                console.error('error LOG FROM EXTENSION in observeSpeaker', e)
-            })
-            ApiService.sendMessageToRecordingServer(
-                'LOG_SPEAKER',
-                SPEAKERS,
-            ).catch((e) => {
-                console.error(
-                    'error LOG_SPEAKER FROM EXTENSION in observeSpeaker',
-                    e,
-                )
+            // El Famoso speaker '-'
+            ApiService.sendMessageToRecordingServer('SPEAKERS', [
+                {
+                    name: '-',
+                    id: 0,
+                    timestamp: Date.now(),
+                    isSpeaking: true, // I am confused !
+                },
+            ] as SpeakerData[]).catch((e) => {
+                console.error(`Catch on send special speaker - : ${e}`)
             })
         }
     } catch (e) {
-        console.error('an exception occurred starting observeSpeaker')
+        console.error(`Catch on initial observe speaker sequence : ${e}`)
     }
 
     try {
         await PROVIDER?.removeInitialShityHtml(RECORDING_MODE)
-        await PROVIDER?.getSpeakerRootToObserve(mutationObserver, RECORDING_MODE)
+        await PROVIDER?.getSpeakerRootToObserve(
+            mutationObserver,
+            RECORDING_MODE,
+        )
     } catch (e) {
-        console.error('an exception occurred starting observeSpeaker')
-    }
-}
-
-async function checkInactivity() {
-    while (true) {
-        await sleep(1000)
-        if (SPEAKERS.length === 0) {
-            console.error('Cannot happen : SPEAKERS.length must be almost 1')
-            continue
-        }
-        let speaker = SPEAKERS[SPEAKERS.length - 1]
-        let last_timestamp = speaker.timestamp
-
-        console.log('checking inactivity', last_timestamp)
-
-        if (Date.now() - last_timestamp > INACTIVITY_THRESHOLD) {
-            console.error('[wordPosterWorker] Meuh y a que des bots!!!')
-            console.warn('Unusual Inactivity Detected')
-            ApiService.sendMessageToRecordingServer('STOP_MEETING', {
-                reason: 'Unusual Inactivity Detected',
-            }).catch((e) => {
-                console.error(
-                    'error STOP_MEETING FROM EXTENSION in observeSpeaker',
-                    e,
-                )
-            })
-        }
+        console.error(`Catch on observe speaker init terminaison : ${e}`)
     }
 }

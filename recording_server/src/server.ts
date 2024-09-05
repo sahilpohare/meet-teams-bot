@@ -98,142 +98,21 @@ export async function server() {
         res.sendStatus(204)
     })
 
-    // Only spoke for the moment
-    app.post('/status', async (req, res) => {
-        function statusReady() {
-            return (
-                MeetingHandle.getProject() != null ||
-                MeetingHandle.getError() != null
-            )
-        }
-        const data: StatusParams = req.body
-        try {
-            let logger = LOGGER.new({
-                user_id: data.user_id,
-                meeting_url: data.meeting_url,
-            })
-            logger.info('status request')
-            for (let i = 0; i < 100; i++) {
-                if (statusReady()) {
-                    const error = MeetingHandle.getError()
-                    const project = MeetingHandle.getProject()
-                    const status = MeetingHandle.getStatus()
-                    if (error != null) {
-                        logger.info('status ready, returning error')
-                        res.status(500).send(JSON.stringify(error))
-                        return
-                    } else if (project != null) {
-                        logger.info('status ready, returning project')
-                        let agenda = null
-                        try {
-                            if (status === 'Recording') {
-                                agenda =
-                                    await MeetingHandle.instance.getAgenda()
-                            }
-                        } catch (e) {
-                            logger.error(
-                                'failed to get agenda in status request',
-                            )
-                        }
-                        res.json({
-                            project: project,
-                            agenda: agenda,
-                            status: status,
-                        })
-                        return
-                    }
-                }
-                await sleep(50)
-            }
-            logger.info('status not ready, returning null')
-            res.json(null)
-            return
-        } catch (e) {
-            res.status(500).send(JSON.stringify(e))
-        }
-    })
-
-    // Used by Spoke / Maybe useless : Template Choose
-    app.post('/change_agenda', async (req, res) => {
-        const data: ChangeAgendaRequest = req.body
-        console.log('change agenda request', data)
-        try {
-            await MeetingHandle.instance.changeAgenda(data)
-            res.send('ok')
-        } catch (e) {
-            LOGGER.error(`changing agenda error ${e}`)
-            res.status(500).send(JSON.stringify(e))
-        }
-    })
-
-    // Leave bot request from server
-    app.post('/stop_record', async (req, res) => {
-        const data: StopRecordParams = req.body
-        console.log('stop record request: ', data)
-        MeetingHandle.instance.stopRecording('api request').catch((e) => {
-            LOGGER.error(`stop recording error ${e}`)
-        })
-        res.send('ok')
-    })
-
-    // Unused
-    app.get('/shutdown', async (_req, res) => {
-        LOGGER.warn('Shutdown requested')
-        res.send('ok')
-        process.exit(0)
-    })
-
+    // Console log message (into logs)
     app.post('/broadcast_message', async (req, res) => {
         const message: MessageToBroadcast = req.body
         console.log('Message received from extension :', message)
         res.status(200).json({})
     })
 
-    // Ideally called when a speaker mutation is detected
-    app.post('/observe_speaker', async (req, res) => {
-        LOGGER.info(`POST : observe_speaker. received : ${req.body}`)
-        console.log(req.body)
-        const message: SpeakerData[] = req.body
-
-        function is_speaker_data(obj: any): obj is SpeakerData {
-            return (
-                typeof obj === 'object' &&
-                typeof obj.name === 'string' &&
-                typeof obj.id === 'number' &&
-                typeof obj.timestamp === 'number' &&
-                typeof obj.isSpeaking === 'boolean'
-            )
-        }
-        if (
-            !(
-                Array.isArray(message) &&
-                message.every((item) => is_speaker_data(item))
-            )
-        ) {
-            LOGGER.warn(`Unexpected object type : Must be SpeakerData[].`)
-            res.status(400).json({
-                error: 'Unusuable data',
-            })
-            return
-        }
-        if (message.length == 0) {
-            LOGGER.warn(`Unexpected len : Must be greater than 0.`)
-            res.status(400).json({
-                error: 'Unusuable data',
-            })
-            return
-        }
-        let input = JSON.stringify(message)
-        LOGGER.info(`Writing to speaker log file : ${input}`)
-        await fs.appendFile(SPEAKER_LOG_PATHNAME, `${input}\n`).catch((e) => {
-            LOGGER.error(`Cannot append speaker log file ! : ${e}`)
-        })
-        res.status(200).json({})
-    })
-
+    // Speakers event from All providers : Write logs and send data to extension
     app.post('/add_speaker', async (req, res) => {
         const speakers: SpeakerData[] = req.body
         console.log('Speaker update received:', speakers)
+        let input = JSON.stringify(speakers)
+        await fs.appendFile(SPEAKER_LOG_PATHNAME, `${input}\n`).catch((e) => {
+            LOGGER.error(`Cannot append speaker log file ! : ${e}`)
+        })
         speakers.forEach((speaker) => {
             if (speaker.isSpeaking) {
                 MeetingHandle.addSpeaker(speaker)
@@ -242,32 +121,38 @@ export async function server() {
         res.status(200).send('ok')
     })
 
-    // TODO : Same function as below
-    app.post('/end_zoom_meeting', async (_req, res) => {
-        console.log('end meeting for zoom notification recieved:')
-        MeetingHandle.instance
-            .stopRecording('zoom meeting ENDED')
-            .catch((e) => {
-                LOGGER.error(`stop recording error ${e}`)
-            })
-
-        res.status(200).send('ok')
+    // Leave bot request from api server
+    app.post('/stop_record', async (req, res) => {
+        const data: StopRecordParams = req.body
+        console.log('end meeting from api server :', data)
+        stop_record(res, 'api request')
     })
 
-    // Stop meeting request from extension
+    // Stop meeting from zoom
+    app.post('/end_zoom_meeting', async (_req, res) => {
+        console.log('end meeting from zoom notification')
+        stop_record(res, 'zoom request')
+    })
+
+    // Stop meeting from extension
     app.post('/stop_meeting', async (_req, res) => {
+        console.log('end meeting from extension notification')
+        stop_record(res, 'extension request')
+    })
+
+    function stop_record(res: any, reason: string) {
         MeetingHandle.instance
-            .stopRecording('extension request')
+            .stopRecording(reason)
             .then(() => {
-                res.status(200).json({})
+                res.status(200)
             })
             .catch((e) => {
-                LOGGER.error(`Stop recording error ${e}`)
+                LOGGER.error(`stop recording error ${e}`)
                 res.status(400).json({
                     error: e,
                 })
             })
-    })
+    }
 
     // Get Recording Server Build Version Info
     app.get('/version', async (_req, res) => {
@@ -402,6 +287,81 @@ export async function server() {
         result.status(200).json({
             ok: 'Ressource on playing...',
         })
+    })
+
+    // Unused ?
+    app.get('/shutdown', async (_req, res) => {
+        LOGGER.warn('Shutdown requested')
+        res.send('ok')
+        process.exit(0)
+    })
+
+    // Only spoke for the moment
+    app.post('/status', async (req, res) => {
+        function statusReady() {
+            return (
+                MeetingHandle.getProject() != null ||
+                MeetingHandle.getError() != null
+            )
+        }
+        const data: StatusParams = req.body
+        try {
+            let logger = LOGGER.new({
+                user_id: data.user_id,
+                meeting_url: data.meeting_url,
+            })
+            logger.info('status request')
+            for (let i = 0; i < 100; i++) {
+                if (statusReady()) {
+                    const error = MeetingHandle.getError()
+                    const project = MeetingHandle.getProject()
+                    const status = MeetingHandle.getStatus()
+                    if (error != null) {
+                        logger.info('status ready, returning error')
+                        res.status(500).send(JSON.stringify(error))
+                        return
+                    } else if (project != null) {
+                        logger.info('status ready, returning project')
+                        let agenda = null
+                        try {
+                            if (status === 'Recording') {
+                                agenda =
+                                    await MeetingHandle.instance.getAgenda()
+                            }
+                        } catch (e) {
+                            logger.error(
+                                'failed to get agenda in status request',
+                            )
+                        }
+                        res.json({
+                            project: project,
+                            agenda: agenda,
+                            status: status,
+                        })
+                        return
+                    }
+                }
+                await sleep(50)
+            }
+            logger.info('status not ready, returning null')
+            res.json(null)
+            return
+        } catch (e) {
+            res.status(500).send(JSON.stringify(e))
+        }
+    })
+
+    // Used by Spoke / Maybe useless : Template Choose
+    app.post('/change_agenda', async (req, res) => {
+        const data: ChangeAgendaRequest = req.body
+        console.log('change agenda request', data)
+        try {
+            await MeetingHandle.instance.changeAgenda(data)
+            res.send('ok')
+        } catch (e) {
+            LOGGER.error(`changing agenda error ${e}`)
+            res.status(500).send(JSON.stringify(e))
+        }
     })
 
     try {

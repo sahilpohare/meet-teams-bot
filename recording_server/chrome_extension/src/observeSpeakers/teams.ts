@@ -2,8 +2,9 @@ import { RecordingMode, SpeakerData } from '../observeSpeakers'
 
 import { sleep } from '../api'
 
-export const MIN_SPEAKER_DURATION = 400 // TODO : Adjust and regactoring
-export const SPEAKER_LATENCY = 500 // TODO : Same
+// TODO : REVIEW SPEAKER_LATENCY && MIN_SPEAKER_DURATION
+export const MIN_SPEAKER_DURATION = 400
+export const SPEAKER_LATENCY = 500
 
 class SpeakerState {
     constructor(
@@ -53,8 +54,8 @@ function getDocumentRoot(): Document {
 }
 
 export function getSpeakerFromDocument(
-    currentSpeaker: string | null,
-    mutation: MutationRecord | null,
+    _currentSpeaker: string | null,
+    _mutation: MutationRecord | null,
     recordingMode: RecordingMode,
 ): SpeakerData[] {
     // console.log('[Teams] Starting getSpeakerFromDocument', {
@@ -89,14 +90,6 @@ export function getSpeakerFromDocument(
     })
 
     removeShityHtml(recordingMode)
-
-    // const activeSpeakers = Array.from(speakerStates.values())
-    //     .filter((state) => state.isCurrentlySpeaking)
-    //     .map((state) => ({
-    //         name: state.name,
-    //         timestamp: state.lastActiveTimestamp,
-    //         isSpeaking: true,
-    //     }))
 
     const Speakers: SpeakerData[] = Array.from(speakerStates.values()).map(
         (state) => ({
@@ -204,9 +197,6 @@ function updateSpeakerState(
             state.lastActiveTimestamp = Date.now()
         }
         speakerStates.set(speaker, state)
-        // console.log(
-        //     `[Teams] Speaker state changed: ${speaker}, isSpeaking: ${isSpeaking}`,
-        // )
     }
 }
 

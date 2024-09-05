@@ -109,16 +109,6 @@ function calcSpeaker() {
         }
     })
 
-    // let stringified = ''
-    // speakerCounts.forEach((count, speaker) => {
-    //     stringified += `${speaker}: ${count}, `
-    // })
-
-    // chrome.runtime.sendMessage({
-    //     type: 'LOG_FROM_SCRIPT',
-    //     payload: { log: stringified, timestamp: Date.now() },
-    // })
-    // Only add to array if a speaker was found
     if (maxSpeaker) {
         const currentDate = Date.now()
         maxOccurrences.push({
@@ -136,6 +126,7 @@ let maxOccurrences: { speaker: string; timestamp: number; count: number }[] = []
 // Array to store current speaker count in this 100 ms interval
 let speakerCounts = new Map()
 
+// PHILOU : Grosses difficultes a cause de currentSpeaker
 export function getSpeakerFromDocument(
     currentSpeaker: string | null,
     mutation: MutationRecord | null,

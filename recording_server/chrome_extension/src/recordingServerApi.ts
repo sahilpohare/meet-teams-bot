@@ -2,15 +2,7 @@
 
 import axios from 'axios'
 
-type MessageType =
-    | 'REFRESH_ATTENDEES'
-    | 'REFRESH_SPEAKERS'
-    | 'LOG'
-    | 'LOG_SPEAKER'
-    | 'OBSERVE_SPEAKERS'
-    | 'RECORD'
-    | 'STOP'
-    | 'STOP_MEETING'
+type MessageType = 'SPEAKERS' | 'LOG' | 'STOP_MEETING'
 
 // Yes, any is funny :cow:
 type MessagePayload = any
@@ -59,9 +51,9 @@ export class ApiService {
             url,
         )
         switch (messageType) {
-            case 'LOG_SPEAKER':
+            case 'SPEAKERS':
                 await axios
-                    .post(`${url}observe_speaker`, payload)
+                    .post(`${url}add_speaker`, payload)
                     .catch((error) => {
                         console.error(
                             'Failed to send LOG_SPEAKER message:',

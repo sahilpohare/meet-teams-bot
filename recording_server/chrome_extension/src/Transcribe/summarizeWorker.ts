@@ -43,6 +43,7 @@ export async function summarizeWorker(): Promise<void> {
 }
 
 // detect who is the client in the meeting and who is the spoker
+// IMPORTANT : ATTENDEES -> Necessary to Spoke 'summarizeWorker.ts'
 async function detectClients(sentences: Sentence[]): Promise<string[]> {
     let clients = ATTENDEES
     if (ATTENDEES.length > 0) {
