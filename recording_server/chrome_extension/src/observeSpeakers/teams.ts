@@ -49,7 +49,7 @@ export function getSpeakerFromDocument(
     )
     // console.log('[Teams] Found speaker elements:', speakerElements.length)
     let timestamp = Date.now() - SPEAKER_LATENCY
-    let speakers: SpeakerData[] = Array.from(speakerElements)
+    let speakers = Array.from(speakerElements)
         .map((element) => {
             // can create errors if speaker has a "," in his name
             const name = getParticipantName(element)
@@ -72,7 +72,7 @@ export function getSpeakerFromDocument(
                 }
             }
         })
-        .filter((value) => value !== undefined)
+        .filter((value) => value !== undefined) as SpeakerData[]
 
     removeShityHtml(recordingMode)
 
