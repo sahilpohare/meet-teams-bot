@@ -3,14 +3,6 @@ import { sleep } from '../api'
 
 const SPEAKER_LATENCY = 0 // ms
 
-class SpeakerState {
-    constructor(
-        public name: string,
-        public isCurrentlySpeaking: boolean = false,
-        public lastActiveTimestamp: number = 0,
-    ) {}
-}
-
 export async function getSpeakerRootToObserve(
     _recordingMode: RecordingMode,
 ): Promise<[Node, MutationObserverInit] | undefined> {
@@ -49,7 +41,6 @@ export function getSpeakerFromDocument(
     recordingMode: RecordingMode,
 ): SpeakerData[] {
     // console.log('[Teams] Starting getSpeakerFromDocument', {
-    //     currentSpeaker,
     //     recordingMode,
     // })
     const documentRoot = getDocumentRoot()
@@ -57,42 +48,36 @@ export function getSpeakerFromDocument(
         '[data-cid="calling-participant-stream"]',
     )
     // console.log('[Teams] Found speaker elements:', speakerElements.length)
-    const speakerStates = new Map<string, SpeakerState>()
-
-    speakerElements.forEach((element) => {
-        // can create errors if speaker has a "," in his name
-        const speaker = getParticipantName(element)
-        if (speaker !== '') {
-            if (!speakerStates.has(speaker)) {
-                speakerStates.set(speaker, new SpeakerState(speaker))
+    let timestamp = Date.now() - SPEAKER_LATENCY
+    let speakers: SpeakerData[] = Array.from(speakerElements)
+        .map((element) => {
+            // can create errors if speaker has a "," in his name
+            const name = getParticipantName(element)
+            if (name !== '') {
+                if (element.getAttribute('aria-label')?.includes(', muted,')) {
+                    // muted speakers can not be speaking, this is a security
+                    return {
+                        name,
+                        id: 0,
+                        timestamp,
+                        isSpeaking: false,
+                    }
+                } else {
+                    return {
+                        name,
+                        id: 0,
+                        timestamp,
+                        isSpeaking: checkIfSpeaking(element as HTMLElement),
+                    }
+                }
             }
-            const isSpeaking = checkIfSpeaking(element as HTMLElement)
-            if (element.getAttribute('aria-label')?.includes(', muted,')) {
-                // muted speakers can not be speaking, this is a security
-                updateSpeakerState(speakerStates, speaker, false)
-            } else {
-                updateSpeakerState(speakerStates, speaker, isSpeaking)
-            }
-            // console.log(
-            //     `[Teams] Speaker state updated: ${speaker}, isSpeaking: ${isSpeaking}`,
-            // )
-        }
-    })
+        })
+        .filter((value) => value !== undefined)
 
     removeShityHtml(recordingMode)
 
-    const Speakers: SpeakerData[] = Array.from(speakerStates.values()).map(
-        (state) => ({
-            name: state.name,
-            id: 0,
-            timestamp: state.lastActiveTimestamp,
-            isSpeaking: state.isCurrentlySpeaking,
-        }),
-    )
-
-    // console.log('[Teams] Active speakers:', activeSpeakers)
-    console.table(Speakers)
-    return Speakers
+    console.table(speakers)
+    return speakers
 }
 
 function checkIfSpeaking(element: HTMLElement): boolean {
@@ -173,21 +158,6 @@ function isBlueish(color: string): boolean {
         return b > 180 && b > r + 40 && b > g + 40 && r < 150 && g < 150
     }
     return false
-}
-
-function updateSpeakerState(
-    speakerStates: Map<string, SpeakerState>,
-    speaker: string,
-    isSpeaking: boolean,
-): void {
-    let state = speakerStates.get(speaker)
-    if (state && state.isCurrentlySpeaking !== isSpeaking) {
-        state.isCurrentlySpeaking = isSpeaking
-        if (isSpeaking) {
-            state.lastActiveTimestamp = Date.now() - SPEAKER_LATENCY
-        }
-        speakerStates.set(speaker, state)
-    }
 }
 
 function getParticipantName(name: Element): string {

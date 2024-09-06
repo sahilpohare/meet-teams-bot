@@ -113,6 +113,7 @@ export function getSpeakerFromDocument(
                 : null
         }
 
+        let timestamp = Date.now() - SPEAKER_LATENCY
         return childs.map((child) => {
             const background_position_x = getComputedStyle(
                 child.children[1],
@@ -120,7 +121,7 @@ export function getSpeakerFromDocument(
             return {
                 name: findParentWithAriaLabel(child).ariaLabel,
                 id: 0,
-                timestamp: Date.now() - SPEAKER_LATENCY,
+                timestamp,
                 isSpeaking: background_position_x !== '0px',
             }
         })
