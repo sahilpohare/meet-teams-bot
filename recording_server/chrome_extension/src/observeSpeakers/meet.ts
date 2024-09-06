@@ -150,7 +150,7 @@ export function getSpeakerFromDocument(
     })
 
     if (speaker != null) {
-        SPEAKERS_COUNT.set(speaker, (SPEAKERS_COUNT.get(speaker) || 0) + 1)
+        SPEAKERS_COUNT.set(speaker.name, (SPEAKERS_COUNT.get(speaker.name) || 0) + 1)
     }
 
     // Check for more than 3 adjacent occurrences of a different speaker
@@ -189,10 +189,14 @@ export function getSpeakerFromDocument(
     return []
 }
 
-export function getSpeakerFromMutation(
+// Get raw speaker events without filtering
+function getSpeakerFromMutation(
     mutation: MutationRecord | null,
     recordingMode: RecordingMode,
-): string | null {
+): {
+    name: string,
+    is_speaking: boolean,
+} | null {
     if (mutation == null) {
         return null
     }
@@ -203,21 +207,17 @@ export function getSpeakerFromMutation(
         if (color !== 'rgba(26, 115, 232, 0.9)') {
             return null
         }
-        // console.log({ color })
         let styleBar = getComputedStyle(target.children[1])
-        const height = styleBar.height
-        // console.log(height)
-
-        // when speaker is not speaking, height is 4px
-        // if (height == '4px') {
-        //     return null
-        // }
+        // If backgroundPositionX egual 0, speaker is not talking
+        const background_position_x = styleBar.backgroundPositionX;
 
         if (recordingMode === 'gallery_view') {
             const foundElement = findSelfNameRecursive(target)
-            return extractTooltipText(foundElement!)
+            return {
+                name : extractTooltipText(foundElement!)!,
+                is_speaking : true
+            }
         } else {
-            let speakers: string[] = []
             const divButton = target.parentElement!.parentElement!.parentElement
             if (divButton && divButton.nodeName === 'BUTTON') {
                 const divSpeaker =
@@ -233,7 +233,10 @@ export function getSpeakerFromMutation(
                     const speakerName =
                         divSpeaker && findSpeakerName(divSpeaker)
                     if (speakerName) {
-                        return speakerName
+                        return {
+                            name : speakerName,
+                            is_speaking : (background_position_x !== '0px')
+                        }
                     } else {
                         console.error('no div speaker button', { mutation })
                     }
@@ -245,7 +248,10 @@ export function getSpeakerFromMutation(
                 if (divSpeaker) {
                     const speakerName = findSpeakerName(divSpeaker)
                     if (speakerName) {
-                        return speakerName
+                        return {
+                            name : speakerName,
+                            is_speaking : (background_position_x !== '0px')
+                        }
                     } else {
                         console.error('no div speaker', { mutation })
                     }
@@ -254,7 +260,6 @@ export function getSpeakerFromMutation(
                 }
             }
         }
-        // })
         return null
     } catch (e) {
         console.error('error in getSpeakerFromMutation', e)
