@@ -122,6 +122,48 @@ var MUTATION_OBSERVER = new MutationObserver(function (mutations) {
                     console.error(`Catch on send currentSpeakersList : ${e}`)
                 })
             }
+
+            // const COUNT_INTERVAL: number = 100
+
+            // // Array to store the maximum occurrences of a speaker in a 100 ms interval
+            // let MAX_OCCURRENCES: { speaker: string; timestamp: number; count: number }[] =
+            //     []
+
+            // // Array to store current speaker count in this 100 ms interval
+            // let SPEAKERS_COUNT = new Map()
+
+            // // Function to reset speaker counts
+            // function resetSpeakerCounts() {
+            //     SPEAKERS_COUNT = new Map()
+            // }
+
+            // // Function to log speaker counts
+            // function calcSpeaker() {
+            //     let maxCount = 0
+            //     let maxSpeaker = ''
+
+            //     // Find the speaker with the maximum occurrences
+            //     SPEAKERS_COUNT.forEach((count, speaker) => {
+            //         if (count > maxCount) {
+            //             maxSpeaker = speaker
+            //             maxCount = count
+            //         }
+            //     })
+
+            //     if (maxSpeaker) {
+            //         const currentDate = Date.now()
+            //         MAX_OCCURRENCES.push({
+            //             speaker: maxSpeaker,
+            //             timestamp: currentDate,
+            //             count: maxCount,
+            //         })
+            //     }
+            //     resetSpeakerCounts()
+            // }
+
+            //     // Set interval to log and reset speaker counts every 100 ms
+            //     setInterval(calcSpeaker, COUNT_INTERVAL)
+
             // if (speakers != null) {
             //     SPEAKERS_COUNT.set(speakers[0].name, (SPEAKERS_COUNT.get(speakers[0].name) || 0) + 1)
             // }

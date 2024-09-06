@@ -1,27 +1,11 @@
 import { RecordingMode, SpeakerData } from '../observeSpeakers'
-import { sleep } from '../api'
-import { ApiService } from '../recordingServerApi'
-import e from 'express'
-import { networkConditions } from 'puppeteer'
 
 export const MIN_SPEAKER_DURATION = 200
 export const SPEAKER_LATENCY = 500
-const COUNT_INTERVAL: number = 100
-
-// Array to store the maximum occurrences of a speaker in a 100 ms interval
-let MAX_OCCURRENCES: { speaker: string; timestamp: number; count: number }[] =
-    []
-
-// Array to store current speaker count in this 100 ms interval
-let SPEAKERS_COUNT = new Map()
 
 export async function getSpeakerRootToObserve(
     recordingMode: RecordingMode,
 ): Promise<[Node, MutationObserverInit] | undefined> {
-    let root: any = null
-
-    // Set interval to log and reset speaker counts every 100 ms
-    setInterval(calcSpeaker, COUNT_INTERVAL)
     if (recordingMode === 'gallery_view') {
         return [
             document,
@@ -35,6 +19,7 @@ export async function getSpeakerRootToObserve(
         ]
     } else {
         // People panel shitty HTML remove
+        let root: any = null
         while (root == null) {
             root = (Array as any)
                 .from(document.querySelectorAll('div'))
@@ -100,35 +85,6 @@ export async function getSpeakerRootToObserve(
             },
         ]
     }
-}
-
-// Function to reset speaker counts
-function resetSpeakerCounts() {
-    SPEAKERS_COUNT = new Map()
-}
-
-// Function to log speaker counts
-function calcSpeaker() {
-    let maxCount = 0
-    let maxSpeaker = ''
-
-    // Find the speaker with the maximum occurrences
-    SPEAKERS_COUNT.forEach((count, speaker) => {
-        if (count > maxCount) {
-            maxSpeaker = speaker
-            maxCount = count
-        }
-    })
-
-    if (maxSpeaker) {
-        const currentDate = Date.now()
-        MAX_OCCURRENCES.push({
-            speaker: maxSpeaker,
-            timestamp: currentDate,
-            count: maxCount,
-        })
-    }
-    resetSpeakerCounts()
 }
 
 export function getSpeakerFromDocument(
@@ -367,44 +323,6 @@ export function findAllAttendees(): string[] {
         }
     }
     return names
-}
-
-function findSelfNameInSiblings(element: Element) {
-    const siblings = Array.from(element.parentElement?.children!)
-    for (const sibling of siblings) {
-        if (sibling !== element) {
-            const found = sibling.querySelector('[data-self-name]')
-            if (found) {
-                return found
-            }
-        }
-    }
-    return null
-}
-
-// Fonction pour explorer l'arbre DOM de manière ascendante et descendante
-function findSelfNameRecursive(element: Element): Element | null {
-    let currentElement = element
-
-    while (currentElement) {
-        // Cherche dans les frères de l'élément courant
-        const foundInSiblings = findSelfNameInSiblings(currentElement)
-        if (foundInSiblings) {
-            return foundInSiblings
-        }
-
-        // Passe à l'élément parent
-        currentElement = currentElement.parentElement!
-    }
-
-    return null
-}
-
-// Fonction pour extraire le texte de la div avec role="tooltip"
-function extractTooltipText(element: Element) {
-    const tooltipDiv = element.querySelector('[role="tooltip"]')
-    const textContent = tooltipDiv != null ? tooltipDiv.textContent : null
-    return textContent
 }
 
 function removeBlackBox(): void {
