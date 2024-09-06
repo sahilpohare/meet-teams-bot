@@ -1,25 +1,36 @@
 import { RecordingMode, SpeakerData } from '../observeSpeakers'
 import { sleep } from '../api'
+import { ApiService } from '../recordingServerApi'
 
 export const MIN_SPEAKER_DURATION = 200
 export const SPEAKER_LATENCY = 500
+const COUNT_INTERVAL: number = 100
+
+// Array to store the maximum occurrences of a speaker in a 100 ms interval
+let MAX_OCCURRENCES: { speaker: string; timestamp: number; count: number }[] =
+    []
+
+// Array to store current speaker count in this 100 ms interval
+let SPEAKERS_COUNT = new Map()
 
 export async function getSpeakerRootToObserve(
-    mutationObserver: MutationObserver,
     recordingMode: RecordingMode,
-) {
+): Promise<[Node, MutationObserverInit] | undefined> {
     let root: any = null
 
     // Set interval to log and reset speaker counts every 100 ms
-    setInterval(calcSpeaker, 100)
+    setInterval(calcSpeaker, COUNT_INTERVAL)
     if (recordingMode === 'gallery_view') {
-        mutationObserver.observe(document, {
-            attributes: true,
-            characterData: true,
-            childList: true,
-            subtree: true,
-            attributeFilter: ['class'],
-        })
+        return [
+            document,
+            {
+                attributes: true,
+                characterData: true,
+                childList: true,
+                subtree: true,
+                attributeFilter: ['class'],
+            },
+        ]
     } else {
         while (root == null) {
             root = (Array as any)
@@ -75,14 +86,16 @@ export async function getSpeakerRootToObserve(
                         e,
                     )
                 }
-
-                mutationObserver.observe(root, {
-                    attributes: true,
-                    characterData: true,
-                    childList: true,
-                    subtree: true,
-                    attributeFilter: ['class'],
-                })
+                return [
+                    root,
+                    {
+                        attributes: true,
+                        characterData: true,
+                        childList: true,
+                        subtree: true,
+                        attributeFilter: ['class'],
+                    },
+                ]
             } else {
                 console.error('could not find root speaker to observe')
             }
@@ -93,7 +106,7 @@ export async function getSpeakerRootToObserve(
 
 // Function to reset speaker counts
 function resetSpeakerCounts() {
-    speakerCounts = new Map()
+    SPEAKERS_COUNT = new Map()
 }
 
 // Function to log speaker counts
@@ -102,7 +115,7 @@ function calcSpeaker() {
     let maxSpeaker = ''
 
     // Find the speaker with the maximum occurrences
-    speakerCounts.forEach((count, speaker) => {
+    SPEAKERS_COUNT.forEach((count, speaker) => {
         if (count > maxCount) {
             maxSpeaker = speaker
             maxCount = count
@@ -111,7 +124,7 @@ function calcSpeaker() {
 
     if (maxSpeaker) {
         const currentDate = Date.now()
-        maxOccurrences.push({
+        MAX_OCCURRENCES.push({
             speaker: maxSpeaker,
             timestamp: currentDate,
             count: maxCount,
@@ -120,12 +133,6 @@ function calcSpeaker() {
     resetSpeakerCounts()
 }
 
-// Array to store the maximum occurrences of a speaker in a 100 ms interval
-let maxOccurrences: { speaker: string; timestamp: number; count: number }[] = []
-
-// Array to store current speaker count in this 100 ms interval
-let speakerCounts = new Map()
-
 // PHILOU : Grosses difficultes a cause de currentSpeaker
 export function getSpeakerFromDocument(
     currentSpeaker: string | null,
@@ -133,19 +140,28 @@ export function getSpeakerFromDocument(
     recordingMode: RecordingMode,
 ): SpeakerData[] {
     const speaker = getSpeakerFromMutation(mutation, recordingMode)
+
+    // TODO : Remove when it is done
+    ApiService.sendMessageToRecordingServer(
+        'LOG',
+        JSON.stringify(speaker),
+    ).catch((e) => {
+        console.error('error LOG FROM EXTENSION in observeSpeaker', e)
+    })
+
     if (speaker != null) {
-        speakerCounts.set(speaker, (speakerCounts.get(speaker) || 0) + 1)
+        SPEAKERS_COUNT.set(speaker, (SPEAKERS_COUNT.get(speaker) || 0) + 1)
     }
 
     // Check for more than 3 adjacent occurrences of a different speaker
-    for (let i = 0; i < maxOccurrences.length; i++) {
-        if (maxOccurrences[i].speaker !== currentSpeaker) {
-            let differentSpeaker = maxOccurrences[i]
+    for (let i = 0; i < MAX_OCCURRENCES.length; i++) {
+        if (MAX_OCCURRENCES[i].speaker !== currentSpeaker) {
+            let differentSpeaker = MAX_OCCURRENCES[i]
             let differentSpeakerCount = 0
-            for (let j = i; j < maxOccurrences.length; j++) {
-                if (maxOccurrences[j].speaker === differentSpeaker.speaker) {
+            for (let j = i; j < MAX_OCCURRENCES.length; j++) {
+                if (MAX_OCCURRENCES[j].speaker === differentSpeaker.speaker) {
                     if (differentSpeakerCount >= 4) {
-                        maxOccurrences = maxOccurrences.slice(j)
+                        MAX_OCCURRENCES = MAX_OCCURRENCES.slice(j)
                         return [
                             {
                                 name: differentSpeaker.speaker,
@@ -162,11 +178,12 @@ export function getSpeakerFromDocument(
             }
         }
     }
-    if (maxOccurrences.length > 0) {
+    if (MAX_OCCURRENCES.length > 0) {
         if (
-            maxOccurrences[maxOccurrences.length - 1].speaker === currentSpeaker
+            MAX_OCCURRENCES[MAX_OCCURRENCES.length - 1].speaker ===
+            currentSpeaker
         ) {
-            maxOccurrences = maxOccurrences.slice(-1)
+            MAX_OCCURRENCES = MAX_OCCURRENCES.slice(-1)
         }
     }
     return []
@@ -192,9 +209,9 @@ export function getSpeakerFromMutation(
         // console.log(height)
 
         // when speaker is not speaking, height is 4px
-        if (height == '4px') {
-            return null
-        }
+        // if (height == '4px') {
+        //     return null
+        // }
 
         if (recordingMode === 'gallery_view') {
             const foundElement = findSelfNameRecursive(target)

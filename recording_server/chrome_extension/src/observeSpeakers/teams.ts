@@ -15,41 +15,36 @@ class SpeakerState {
 }
 
 export async function getSpeakerRootToObserve(
-    mutationObserver: MutationObserver,
-    recordingMode: RecordingMode,
-): Promise<void> {
-    // console.log('[Teams] Starting getSpeakerRootToObserve')
+    _recordingMode: RecordingMode,
+): Promise<[Node, MutationObserverInit] | undefined> {
     try {
-        const documentRoot = getDocumentRoot()
-        // console.log('[Teams] Document root obtained')
-        const config = {
-            attributes: true,
-            childList: true,
-            subtree: true,
-            attributeFilter: ['style', 'class'],
-        }
-
-        mutationObserver.observe(documentRoot, config)
-        // console.log('[Teams] MutationObserver set up successfully')
+        return [
+            getDocumentRoot(),
+            {
+                attributes: true,
+                childList: true,
+                subtree: true,
+                attributeFilter: ['style', 'class'],
+            },
+        ]
     } catch (e) {
-        // console.error('[Teams] Failed to observe Teams meeting', e)
+        console.error('[Teams] Failed to observe Teams meeting', e)
     }
 }
 
 function getDocumentRoot(): Document {
-    // console.log('[Teams] Getting document root')
     for (let iframe of document.querySelectorAll('iframe')) {
         try {
             const doc = iframe.contentDocument || iframe.contentWindow?.document
             if (doc) {
-                // console.log('[Teams] Document root found in iframe')
+                console.log('[Teams] Document root found in iframe')
                 return doc
             }
         } catch (e) {
-            // console.warn('[Teams] Error accessing iframe content', e)
+            console.warn('[Teams] Error accessing iframe content', e)
         }
     }
-    // console.log('[Teams] Using main document as root')
+    console.log('[Teams] Using main document as root')
     return document
 }
 

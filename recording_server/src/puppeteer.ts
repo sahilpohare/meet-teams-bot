@@ -89,11 +89,6 @@ export async function screenshot(page: Page, name: string) {
         await page.screenshot({ path: link })
 
         await s3cp(link, link.substring(2))
-        // TODO WTF : remove hard-coded link
-        // console.log(
-        //     'SCREENSHOT: ',
-        //     'https://spoke-log-bot.s3.amazonaws.com/'.concat(link.substring(2)),
-        // )
     } catch (e) {
         console.error(`Failed to take screenshot ${e}`)
     }
