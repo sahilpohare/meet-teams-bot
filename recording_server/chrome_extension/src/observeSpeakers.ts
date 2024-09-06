@@ -85,7 +85,7 @@ async function refreshAttendeesLoop() {
 
 async function removeShityHtmlLoop(mode: RecordingMode) {
     while (true) {
-        // PROVIDER?.removeShityHtml(mode)
+        PROVIDER?.removeShityHtml(mode)
         await sleep(1000)
     }
 }

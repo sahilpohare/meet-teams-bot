@@ -34,6 +34,61 @@ export async function getSpeakerRootToObserve(
             },
         ]
     } else {
+        // People panel shitty HTML remove
+        while (root == null) {
+            root = (Array as any)
+                .from(document.querySelectorAll('div'))
+                .find((d) => d.innerText === 'People')
+                ?.parentElement?.parentElement
+            if (root != null) {
+                try {
+                    root.parentElement.style.opacity = 0
+                    root.parentElement.parentElement.style.opacity = 0
+                    const rootLeft = (Array as any)
+                        .from(document.querySelectorAll('div'))
+                        .find((d) => d.innerText === 'You')
+                    rootLeft.parentElement.parentElement.parentElement.parentElement.style.width =
+                        '97vw'
+                } catch (e) {
+                    console.error(
+                        '[getSpeakerRootToObserve] on meet error finding You',
+                        e,
+                    )
+                }
+            }
+        }
+        try {
+            // Find all div elements
+            const allDivs = document.querySelectorAll('div')
+
+            // Filter divs to include padding in their size (assuming border-box sizing)
+            const filteredDivs = Array.from(allDivs).filter((div) => {
+                // Use offsetWidth and offsetHeight to include padding (and border)
+                const width = div.offsetWidth
+                const height = div.offsetHeight
+
+                return (
+                    width === 360 &&
+                    (height === 64 ||
+                        height === 63 ||
+                        height === 50.99 ||
+                        height === 51 ||
+                        height === 66.63)
+                )
+            })
+            // Log the filtered divs
+            console.log(filteredDivs)
+
+            // Example action: outline the filtered divs
+            filteredDivs.forEach((div) => {
+                div.remove()
+            })
+        } catch (e) {
+            console.error(
+                '[getSpeakerRootToObserve] on meet error removing useless divs',
+                e,
+            )
+        }
         return [
             document.querySelector("[aria-label='Participants']")!,
             {
@@ -44,75 +99,6 @@ export async function getSpeakerRootToObserve(
                 attributeFilter: ['class'],
             },
         ]
-        // while (root == null) {
-        //     root = (Array as any)
-        //         .from(document.querySelectorAll('div'))
-        //         .find((d) => d.innerText === 'People')
-        //         ?.parentElement?.parentElement
-        //     if (root != null) {
-        //         try {
-        //             root.parentElement.style.opacity = 0
-        //             root.parentElement.parentElement.style.opacity = 0
-        //             const rootLeft = (Array as any)
-        //                 .from(document.querySelectorAll('div'))
-        //                 .find((d) => d.innerText === 'You')
-        //             rootLeft.parentElement.parentElement.parentElement.parentElement.style.width =
-        //                 '97vw'
-        //         } catch (e) {
-        //             console.error(
-        //                 '[getSpeakerRootToObserve] on meet error finding You',
-        //                 e,
-        //             )
-        //         }
-
-        //         try {
-        //             // Find all div elements
-        //             const allDivs = document.querySelectorAll('div')
-
-        //             // Filter divs to include padding in their size (assuming border-box sizing)
-        //             const filteredDivs = Array.from(allDivs).filter((div) => {
-        //                 // Use offsetWidth and offsetHeight to include padding (and border)
-        //                 const width = div.offsetWidth
-        //                 const height = div.offsetHeight
-
-        //                 return (
-        //                     width === 360 &&
-        //                     (height === 64 ||
-        //                         height === 63 ||
-        //                         height === 50.99 ||
-        //                         height === 51 ||
-        //                         height === 66.63)
-        //                 )
-        //             })
-
-        //             // Log the filtered divs
-        //             console.log(filteredDivs)
-
-        //             // Example action: outline the filtered divs
-        //             filteredDivs.forEach((div) => {
-        //                 div.remove()
-        //             })
-        //         } catch (e) {
-        //             console.error(
-        //                 '[getSpeakerRootToObserve] on meet error removing useless divs',
-        //                 e,
-        //             )
-        //         }
-        //         return [
-        //             root,
-        //             {
-        //                 attributes: true,
-        //                 characterData: true,
-        //                 childList: true,
-        //                 subtree: true,
-        //                 attributeFilter: ['class'],
-        //             },
-        //         ]
-        //     } else {
-        //         console.error('could not find root speaker to observe')
-        //     }
-        //     await sleep(1000)
-        // }
     }
 }
 
