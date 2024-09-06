@@ -11,6 +11,7 @@ import { uploadEditorsTask } from './uploadEditors'
 
 export let SPEAKERS: SpeakerData[] = []
 export let ATTENDEES: string[] = []
+let LAST_SPEAKER_ACTIVITY: number = Date.now()
 
 export * from './state'
 
@@ -52,26 +53,22 @@ function setUserAgent(window: Window, userAgent: string) {
 
 function addSpeaker(speaker: SpeakerData) {
     console.log(`EXTENSION BACKGROUND PAGE - ADD SPEAKER : ${speaker}`)
+    LAST_SPEAKER_ACTIVITY = speaker.timestamp
     SPEAKERS.push(speaker)
-    uploadEditorsTask(SPEAKERS)
+    uploadEditorsTask()
+}
+
+function updateLastSpeakerActivity(timestamp: number) {
+    console.log(`EXTENSION BACKGROUND PAGE - UPDATE TS : ${timestamp}`)
+    LAST_SPEAKER_ACTIVITY = timestamp
 }
 
 // Check speakers inactivity
 async function checkInactivity() {
     while (true) {
         await sleep(1000)
-        if (SPEAKERS.length === 0) {
-            console.error('Cannot happen : SPEAKERS.length must be almost 1')
-            continue
-        }
-        let speaker = SPEAKERS[SPEAKERS.length - 1]
-        let last_timestamp = speaker.timestamp
-
-        console.log('checking inactivity', last_timestamp)
-
-        if (Date.now() - last_timestamp > INACTIVITY_THRESHOLD) {
-            console.error('[wordPosterWorker] Meuh y a que des bots!!!')
-            console.warn('Unusual Inactivity Detected')
+        if (Date.now() - LAST_SPEAKER_ACTIVITY > INACTIVITY_THRESHOLD) {
+            console.warn('[wordPosterWorker] Meuh y a que des bots!!!')
             ApiService.sendMessageToRecordingServer('STOP_MEETING', {
                 reason: 'Unusual Inactivity Detected',
             }).catch((e) => {
@@ -165,10 +162,14 @@ export async function startRecording(
 
 export async function stopMediaRecorder() {
     await record.stop()
-    const timestamp = new Date().getTime()
     // add a last fake speaker to trigger the upload of the last editor ( generates an interval )
-    SPEAKERS.push({ name: 'END', id: 0, timestamp, isSpeaking: false })
-    await uploadEditorsTask(SPEAKERS)
+    SPEAKERS.push({
+        name: 'END',
+        id: 0,
+        timestamp: Date.now(),
+        isSpeaking: false,
+    })
+    await uploadEditorsTask()
     console.log('stopping transcriber')
 }
 
@@ -222,6 +223,7 @@ export async function changeAgenda(data: ChangeAgenda) {
 
 const w = window as any
 w.addSpeaker = addSpeaker
+w.updateLastSpeakerActivity = updateLastSpeakerActivity
 w.startRecording = startRecording
 w.stopMediaRecorder = stopMediaRecorder
 w.waitForUpload = waitForUpload

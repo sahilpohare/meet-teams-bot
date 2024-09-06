@@ -3,6 +3,7 @@ import * as R from 'ramda'
 import { SpeakerData } from './observeSpeakers'
 import { SESSION, START_RECORD_TIMESTAMP, SpokeSession } from './record'
 import { Asset, Editor, EditorWrapper, Transcript, Video, api } from './api'
+import { SPEAKERS } from './background'
 // TODO : language_code - 99% sure it is trash code
 // import { parameters } from './state'
 
@@ -12,8 +13,8 @@ type SpeakerInterval = {
     speaker: string
 }
 
-export async function uploadEditorsTask(speakers: SpeakerData[]) {
-    let intervals = timestampToInterval(speakers)
+export async function uploadEditorsTask() {
+    let intervals = timestampToInterval(SPEAKERS)
     const spokeSession = SESSION as SpokeSession
     if (intervals.length > spokeSession.completeEditors.length) {
         let interval = intervals[intervals.length - 1]

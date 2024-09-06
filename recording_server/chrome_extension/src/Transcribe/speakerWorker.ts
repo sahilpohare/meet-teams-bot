@@ -22,7 +22,7 @@ export async function speakerWorker() {
                     timestamp: now,
                     isSpeaking: true,
                 })
-                await uploadEditorsTask(SPEAKERS)
+                await uploadEditorsTask()
             }
         } catch (e) {
             console.error('[wordPosterWorker]', e)
