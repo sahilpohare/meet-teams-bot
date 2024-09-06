@@ -119,6 +119,115 @@ export async function server() {
             }
         })
         res.status(200).send('ok')
+
+        // export const MIN_SPEAKER_DURATION = 200
+        // const COUNT_INTERVAL: number = 100
+
+        // // Array to store the maximum occurrences of a speaker in a 100 ms interval
+        // let MAX_OCCURRENCES: { speaker: string; timestamp: number; count: number }[] =
+        //     []
+
+        // // Array to store current speaker count in this 100 ms interval
+        // let SPEAKERS_COUNT = new Map()
+
+        // // Function to reset speaker counts
+        // function resetSpeakerCounts() {
+        //     SPEAKERS_COUNT = new Map()
+        // }
+
+        // // Function to log speaker counts
+        // function calcSpeaker() {
+        //     let maxCount = 0
+        //     let maxSpeaker = ''
+
+        //     // Find the speaker with the maximum occurrences
+        //     SPEAKERS_COUNT.forEach((count, speaker) => {
+        //         if (count > maxCount) {
+        //             maxSpeaker = speaker
+        //             maxCount = count
+        //         }
+        //     })
+
+        //     if (maxSpeaker) {
+        //         const currentDate = Date.now()
+        //         MAX_OCCURRENCES.push({
+        //             speaker: maxSpeaker,
+        //             timestamp: currentDate,
+        //             count: maxCount,
+        //         })
+        //     }
+        //     resetSpeakerCounts()
+        // }
+
+        //     // Set interval to log and reset speaker counts every 100 ms
+        //     setInterval(calcSpeaker, COUNT_INTERVAL)
+
+        // if (speakers != null) {
+        //     SPEAKERS_COUNT.set(speakers[0].name, (SPEAKERS_COUNT.get(speakers[0].name) || 0) + 1)
+        // }
+
+        // // Check for more than 3 adjacent occurrences of a different speaker
+        // for (let i = 0; i < MAX_OCCURRENCES.length; i++) {
+        //     if (MAX_OCCURRENCES[i].speaker !== currentSpeaker) {
+        //         let differentSpeaker = MAX_OCCURRENCES[i]
+        //         let differentSpeakerCount = 0
+        //         for (let j = i; j < MAX_OCCURRENCES.length; j++) {
+        //             if (MAX_OCCURRENCES[j].speaker === differentSpeaker.speaker) {
+        //                 if (differentSpeakerCount >= 4) {
+        //                     MAX_OCCURRENCES = MAX_OCCURRENCES.slice(j)
+        //                     return [
+        //                         {
+        //                             name: differentSpeaker.speaker,
+        //                             id: 0,
+        //                             timestamp: differentSpeaker.timestamp,
+        //                             isSpeaking: true,
+        //                         },
+        //                     ]
+        //                 }
+        //                 differentSpeakerCount++
+        //             } else {
+        //                 break
+        //             }
+        //         }
+        //     }
+        // }
+        // if (MAX_OCCURRENCES.length > 0) {
+        //     if (
+        //         MAX_OCCURRENCES[MAX_OCCURRENCES.length - 1].speaker ===
+        //         currentSpeaker
+        //     ) {
+        //         MAX_OCCURRENCES = MAX_OCCURRENCES.slice(-1)
+        //     }
+        // }
+        // return []
+
+        // PHILOU : C'est une logique interessante, mais ca devrait etre ailleurs, comme sur la background par ex.
+        // // New logic for Meet and Teams
+        // const activeSpeakers = currentSpeakersList.filter(
+        //     (s) => s.isSpeaking,
+        // )
+        // // si lazare parle,  si Philippe se met a parler en meme temps
+        // // philippe prend forcement la precedence
+        // const newActiveSpeakers = activeSpeakers.filter(
+        //     (s) =>
+        //         s.name !== BOT_NAME &&
+        //         (SPEAKERS.length === 0 ||
+        //             s.name !== SPEAKERS[SPEAKERS.length - 1].name),
+        // )
+        // // essayer de gerer MIN DURATION ICI ?
+        // //  && Date.now() - s.timestamp >
+        // //     PROVIDER.MIN_SPEAKER_DURATION)),
+
+        // if (newActiveSpeakers.length > 0) {
+        //     // TODO: not handling multiple speakers in the same time
+        //     const newSpeaker = newActiveSpeakers[0]
+        //     SPEAKERS.push(newSpeaker)
+        //     console.log('speaker changed to: ', newSpeaker)
+        //     chrome.runtime.sendMessage({
+        //         type: 'REFRESH_SPEAKERS',
+        //         payload: SPEAKERS,
+        //     })
+        // }
     })
 
     // Leave bot request from api server

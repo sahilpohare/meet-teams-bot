@@ -1,10 +1,7 @@
 import { RecordingMode, SpeakerData } from '../observeSpeakers'
-
 import { sleep } from '../api'
 
-// TODO : REVIEW SPEAKER_LATENCY && MIN_SPEAKER_DURATION
-export const MIN_SPEAKER_DURATION = 400
-export const SPEAKER_LATENCY = 500
+const SPEAKER_LATENCY = 0 // ms
 
 class SpeakerState {
     constructor(
@@ -187,7 +184,7 @@ function updateSpeakerState(
     if (state && state.isCurrentlySpeaking !== isSpeaking) {
         state.isCurrentlySpeaking = isSpeaking
         if (isSpeaking) {
-            state.lastActiveTimestamp = Date.now()
+            state.lastActiveTimestamp = Date.now() - SPEAKER_LATENCY
         }
         speakerStates.set(speaker, state)
     }

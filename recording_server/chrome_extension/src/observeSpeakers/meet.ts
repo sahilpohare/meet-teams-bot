@@ -1,7 +1,6 @@
 import { RecordingMode, SpeakerData } from '../observeSpeakers'
 
-export const MIN_SPEAKER_DURATION = 200
-export const SPEAKER_LATENCY = 500
+const SPEAKER_LATENCY = 0 // ms
 
 export async function getSpeakerRootToObserve(
     recordingMode: RecordingMode,
@@ -121,7 +120,7 @@ export function getSpeakerFromDocument(
             return {
                 name: findParentWithAriaLabel(child).ariaLabel,
                 id: 0,
-                timestamp: Date.now(),
+                timestamp: Date.now() - SPEAKER_LATENCY,
                 isSpeaking: background_position_x !== '0px',
             }
         })
