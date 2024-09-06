@@ -122,6 +122,45 @@ var MUTATION_OBSERVER = new MutationObserver(function (mutations) {
                     console.error(`Catch on send currentSpeakersList : ${e}`)
                 })
             }
+            // if (speakers != null) {
+            //     SPEAKERS_COUNT.set(speakers[0].name, (SPEAKERS_COUNT.get(speakers[0].name) || 0) + 1)
+            // }
+
+            // // Check for more than 3 adjacent occurrences of a different speaker
+            // for (let i = 0; i < MAX_OCCURRENCES.length; i++) {
+            //     if (MAX_OCCURRENCES[i].speaker !== currentSpeaker) {
+            //         let differentSpeaker = MAX_OCCURRENCES[i]
+            //         let differentSpeakerCount = 0
+            //         for (let j = i; j < MAX_OCCURRENCES.length; j++) {
+            //             if (MAX_OCCURRENCES[j].speaker === differentSpeaker.speaker) {
+            //                 if (differentSpeakerCount >= 4) {
+            //                     MAX_OCCURRENCES = MAX_OCCURRENCES.slice(j)
+            //                     return [
+            //                         {
+            //                             name: differentSpeaker.speaker,
+            //                             id: 0,
+            //                             timestamp: differentSpeaker.timestamp,
+            //                             isSpeaking: true,
+            //                         },
+            //                     ]
+            //                 }
+            //                 differentSpeakerCount++
+            //             } else {
+            //                 break
+            //             }
+            //         }
+            //     }
+            // }
+            // if (MAX_OCCURRENCES.length > 0) {
+            //     if (
+            //         MAX_OCCURRENCES[MAX_OCCURRENCES.length - 1].speaker ===
+            //         currentSpeaker
+            //     ) {
+            //         MAX_OCCURRENCES = MAX_OCCURRENCES.slice(-1)
+            //     }
+            // }
+            // return []
+
             // PHILOU : C'est une logique interessante, mais ca devrait etre ailleurs, comme sur la background par ex.
             // // New logic for Meet and Teams
             // const activeSpeakers = currentSpeakersList.filter(

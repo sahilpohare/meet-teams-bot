@@ -1,6 +1,8 @@
 import { RecordingMode, SpeakerData } from '../observeSpeakers'
 import { sleep } from '../api'
 import { ApiService } from '../recordingServerApi'
+import e from 'express'
+import { networkConditions } from 'puppeteer'
 
 export const MIN_SPEAKER_DURATION = 200
 export const SPEAKER_LATENCY = 500
@@ -32,75 +34,85 @@ export async function getSpeakerRootToObserve(
             },
         ]
     } else {
-        while (root == null) {
-            root = (Array as any)
-                .from(document.querySelectorAll('div'))
-                .find((d) => d.innerText === 'People')
-                ?.parentElement?.parentElement
-            if (root != null) {
-                try {
-                    root.parentElement.style.opacity = 0
-                    root.parentElement.parentElement.style.opacity = 0
-                    const rootLeft = (Array as any)
-                        .from(document.querySelectorAll('div'))
-                        .find((d) => d.innerText === 'You')
-                    rootLeft.parentElement.parentElement.parentElement.parentElement.style.width =
-                        '97vw'
-                } catch (e) {
-                    console.error(
-                        '[getSpeakerRootToObserve] on meet error finding You',
-                        e,
-                    )
-                }
+        return [
+            document.querySelector("[aria-label='Participants']")!,
+            {
+                attributes: true,
+                characterData: true,
+                childList: true,
+                subtree: true,
+                attributeFilter: ['class'],
+            },
+        ]
+        // while (root == null) {
+        //     root = (Array as any)
+        //         .from(document.querySelectorAll('div'))
+        //         .find((d) => d.innerText === 'People')
+        //         ?.parentElement?.parentElement
+        //     if (root != null) {
+        //         try {
+        //             root.parentElement.style.opacity = 0
+        //             root.parentElement.parentElement.style.opacity = 0
+        //             const rootLeft = (Array as any)
+        //                 .from(document.querySelectorAll('div'))
+        //                 .find((d) => d.innerText === 'You')
+        //             rootLeft.parentElement.parentElement.parentElement.parentElement.style.width =
+        //                 '97vw'
+        //         } catch (e) {
+        //             console.error(
+        //                 '[getSpeakerRootToObserve] on meet error finding You',
+        //                 e,
+        //             )
+        //         }
 
-                try {
-                    // Find all div elements
-                    const allDivs = document.querySelectorAll('div')
+        //         try {
+        //             // Find all div elements
+        //             const allDivs = document.querySelectorAll('div')
 
-                    // Filter divs to include padding in their size (assuming border-box sizing)
-                    const filteredDivs = Array.from(allDivs).filter((div) => {
-                        // Use offsetWidth and offsetHeight to include padding (and border)
-                        const width = div.offsetWidth
-                        const height = div.offsetHeight
+        //             // Filter divs to include padding in their size (assuming border-box sizing)
+        //             const filteredDivs = Array.from(allDivs).filter((div) => {
+        //                 // Use offsetWidth and offsetHeight to include padding (and border)
+        //                 const width = div.offsetWidth
+        //                 const height = div.offsetHeight
 
-                        return (
-                            width === 360 &&
-                            (height === 64 ||
-                                height === 63 ||
-                                height === 50.99 ||
-                                height === 51 ||
-                                height === 66.63)
-                        )
-                    })
+        //                 return (
+        //                     width === 360 &&
+        //                     (height === 64 ||
+        //                         height === 63 ||
+        //                         height === 50.99 ||
+        //                         height === 51 ||
+        //                         height === 66.63)
+        //                 )
+        //             })
 
-                    // Log the filtered divs
-                    console.log(filteredDivs)
+        //             // Log the filtered divs
+        //             console.log(filteredDivs)
 
-                    // Example action: outline the filtered divs
-                    filteredDivs.forEach((div) => {
-                        div.remove()
-                    })
-                } catch (e) {
-                    console.error(
-                        '[getSpeakerRootToObserve] on meet error removing useless divs',
-                        e,
-                    )
-                }
-                return [
-                    root,
-                    {
-                        attributes: true,
-                        characterData: true,
-                        childList: true,
-                        subtree: true,
-                        attributeFilter: ['class'],
-                    },
-                ]
-            } else {
-                console.error('could not find root speaker to observe')
-            }
-            await sleep(1000)
-        }
+        //             // Example action: outline the filtered divs
+        //             filteredDivs.forEach((div) => {
+        //                 div.remove()
+        //             })
+        //         } catch (e) {
+        //             console.error(
+        //                 '[getSpeakerRootToObserve] on meet error removing useless divs',
+        //                 e,
+        //             )
+        //         }
+        //         return [
+        //             root,
+        //             {
+        //                 attributes: true,
+        //                 characterData: true,
+        //                 childList: true,
+        //                 subtree: true,
+        //                 attributeFilter: ['class'],
+        //             },
+        //         ]
+        //     } else {
+        //         console.error('could not find root speaker to observe')
+        //     }
+        //     await sleep(1000)
+        // }
     }
 }
 
@@ -133,167 +145,48 @@ function calcSpeaker() {
     resetSpeakerCounts()
 }
 
-// PHILOU : Grosses difficultes a cause de currentSpeaker
 export function getSpeakerFromDocument(
-    currentSpeaker: string | null,
-    mutation: MutationRecord | null,
-    recordingMode: RecordingMode,
+    _recordingMode: RecordingMode,
 ): SpeakerData[] {
-    const speaker = getSpeakerFromMutation(mutation, recordingMode)
-
-    // TODO : Remove when it is done
-    ApiService.sendMessageToRecordingServer(
-        'LOG',
-        JSON.stringify(speaker),
-    ).catch((e) => {
-        console.error('error LOG FROM EXTENSION in observeSpeaker', e)
-    })
-
-    if (speaker != null) {
-        SPEAKERS_COUNT.set(speaker.name, (SPEAKERS_COUNT.get(speaker.name) || 0) + 1)
-    }
-
-    // Check for more than 3 adjacent occurrences of a different speaker
-    for (let i = 0; i < MAX_OCCURRENCES.length; i++) {
-        if (MAX_OCCURRENCES[i].speaker !== currentSpeaker) {
-            let differentSpeaker = MAX_OCCURRENCES[i]
-            let differentSpeakerCount = 0
-            for (let j = i; j < MAX_OCCURRENCES.length; j++) {
-                if (MAX_OCCURRENCES[j].speaker === differentSpeaker.speaker) {
-                    if (differentSpeakerCount >= 4) {
-                        MAX_OCCURRENCES = MAX_OCCURRENCES.slice(j)
-                        return [
-                            {
-                                name: differentSpeaker.speaker,
-                                id: 0,
-                                timestamp: differentSpeaker.timestamp,
-                                isSpeaking: true,
-                            },
-                        ]
-                    }
-                    differentSpeakerCount++
-                } else {
-                    break
-                }
-            }
-        }
-    }
-    if (MAX_OCCURRENCES.length > 0) {
-        if (
-            MAX_OCCURRENCES[MAX_OCCURRENCES.length - 1].speaker ===
-            currentSpeaker
-        ) {
-            MAX_OCCURRENCES = MAX_OCCURRENCES.slice(-1)
-        }
-    }
-    return []
-}
-
-// Get raw speaker events without filtering
-function getSpeakerFromMutation(
-    mutation: MutationRecord | null,
-    recordingMode: RecordingMode,
-): {
-    name: string,
-    is_speaking: boolean,
-} | null {
-    if (mutation == null) {
-        return null
-    }
     try {
-        const target = mutation.target as Element
-        let color = getComputedStyle(target).backgroundColor
+        let elems = document
+            .querySelector("[aria-label='Participants']")!
+            .querySelectorAll('*')
+        let childs = Array.from(elems).filter((elem) => {
+            let color = getComputedStyle(elem).backgroundColor
+            return (
+                color == 'rgba(26, 115, 232, 0.9)' ||
+                color == 'rgb(26, 115, 232)'
+            )
+        })
 
-        if (color !== 'rgba(26, 115, 232, 0.9)') {
-            return null
+        // Return the speaker name
+        // Find parent recursively with given aria-label (with role as listitem)
+        const findParentWithAriaLabel = (element) => {
+            const hasAriaLabel = (el) => el?.getAttribute('aria-label')?.trim()
+            return hasAriaLabel(element) &&
+                element.getAttribute('role') === 'listitem'
+                ? element
+                : element?.parentElement
+                ? findParentWithAriaLabel(element.parentElement)
+                : null
         }
-        let styleBar = getComputedStyle(target.children[1])
-        // If backgroundPositionX egual 0, speaker is not talking
-        const background_position_x = styleBar.backgroundPositionX;
 
-        if (recordingMode === 'gallery_view') {
-            const foundElement = findSelfNameRecursive(target)
+        return childs.map((child) => {
+            const background_position_x = getComputedStyle(
+                child.children[1],
+            ).backgroundPositionX
             return {
-                name : extractTooltipText(foundElement!)!,
-                is_speaking : true
+                name: findParentWithAriaLabel(child).ariaLabel,
+                id: 0,
+                timestamp: Date.now(),
+                isSpeaking: background_position_x !== '0px',
             }
-        } else {
-            const divButton = target.parentElement!.parentElement!.parentElement
-            if (divButton && divButton.nodeName === 'BUTTON') {
-                const divSpeaker =
-                    divButton!.parentElement!.parentElement!.parentElement!
-                        .parentElement!.parentElement!.parentElement
-                const speakerName = divSpeaker && findSpeakerName(divSpeaker)
-                if (speakerName) {
-                    return speakerName
-                } else {
-                    const divSpeaker =
-                        divButton!.parentElement!.parentElement!.parentElement!
-                            .parentElement
-                    const speakerName =
-                        divSpeaker && findSpeakerName(divSpeaker)
-                    if (speakerName) {
-                        return {
-                            name : speakerName,
-                            is_speaking : (background_position_x !== '0px')
-                        }
-                    } else {
-                        console.error('no div speaker button', { mutation })
-                    }
-                }
-            } else {
-                const divSpeaker =
-                    target!.parentElement!.parentElement!.parentElement!
-                        .parentElement
-                if (divSpeaker) {
-                    const speakerName = findSpeakerName(divSpeaker)
-                    if (speakerName) {
-                        return {
-                            name : speakerName,
-                            is_speaking : (background_position_x !== '0px')
-                        }
-                    } else {
-                        console.error('no div speaker', { mutation })
-                    }
-                } else {
-                    console.error('no div speaker', { mutation })
-                }
-            }
-        }
-        return null
+        })
     } catch (e) {
         console.error('error in getSpeakerFromMutation', e)
-        return null
+        return []
     }
-}
-
-function findSpeakerName(divSpeaker: any) {
-    // Array.from(divSpeaker.querySelectorAll('span')).forEach(s => console.log(s.innerText))
-    // console.log({ mutation })
-    // console.log('BUTTON: ', { divSpeaker })
-    try {
-        // const q = divSpeaker.childNodes[0]
-        // const w = divSpeaker.childNodes[0].childNodes[1]
-        // const e = divSpeaker.childNodes[0].childNodes[1].childNodes[0]
-        const span =
-            divSpeaker.childNodes[0].childNodes[1].childNodes[0].childNodes[0]
-        // console.log(q)
-        // console.log(w)
-        // console.log(e)
-        // console.log(span)
-        if (
-            span &&
-            span.nodeName === 'SPAN' &&
-            span.innerText != null &&
-            span.innerText !== ''
-        ) {
-            return span.innerText
-            // console.log(span.innerText)
-        }
-    } catch (e) {
-        return null
-    }
-    return null
 }
 
 export async function removeInitialShityHtml(mode: RecordingMode) {

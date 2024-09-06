@@ -49,8 +49,6 @@ function getDocumentRoot(): Document {
 }
 
 export function getSpeakerFromDocument(
-    _currentSpeaker: string | null,
-    _mutation: MutationRecord | null,
     recordingMode: RecordingMode,
 ): SpeakerData[] {
     // console.log('[Teams] Starting getSpeakerFromDocument', {
