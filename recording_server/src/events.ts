@@ -43,25 +43,23 @@ export class Events {
     ) {}
 
     private async send(code: string) {
-        try {
-            await axios({
-                method: 'POST',
-                url: this.webhookUrl,
-                headers: {
-                    'x-spoke-api-key': this.apiKey,
-                },
+        axios({
+            method: 'POST',
+            url: this.webhookUrl,
+            headers: {
+                'x-spoke-api-key': this.apiKey,
+            },
+            data: {
+                event: 'bot.status_change',
                 data: {
-                    event: 'bot.status_change',
-                    data: {
-                        bot_id: this.botId,
-                        status: {
-                            code,
-                            created_at: new Date().toISOString(),
-                        },
+                    bot_id: this.botId,
+                    status: {
+                        code,
+                        created_at: new Date().toISOString(),
                     },
                 },
-            })
-        } catch (e) {
+            },
+        }).catch((e) => {
             console.error(
                 'Unable to send event',
                 code,
@@ -69,6 +67,6 @@ export class Events {
                 this.webhookUrl,
                 e,
             )
-        }
+        })
     }
 }

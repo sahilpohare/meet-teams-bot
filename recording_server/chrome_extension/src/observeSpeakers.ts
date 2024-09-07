@@ -19,6 +19,7 @@ declare var RECORDING_MODE: RecordingMode
 export type RecordingMode = 'speaker_view' | 'gallery_view' | 'audio_only'
 
 type Provider = {
+    LATENCY: number
     findAllAttendees: () => string[]
     removeInitialShityHtml: (arg0: RecordingMode) => void
     removeShityHtml: (arg0: RecordingMode) => void
@@ -37,6 +38,7 @@ observeSpeakers()
 function setMeetingProvider() {
     if (MEETING_PROVIDER === 'Teams') {
         PROVIDER = {
+            LATENCY: TeamsProvider.SPEAKER_LATENCY,
             findAllAttendees: TeamsProvider.findAllAttendees,
             removeInitialShityHtml: TeamsProvider.removeInitialShityHtml,
             removeShityHtml: TeamsProvider.removeShityHtml,
@@ -45,6 +47,7 @@ function setMeetingProvider() {
         }
     } else if (MEETING_PROVIDER === 'Meet') {
         PROVIDER = {
+            LATENCY: MeetProvider.SPEAKER_LATENCY,
             findAllAttendees: MeetProvider.findAllAttendees,
             removeInitialShityHtml: MeetProvider.removeInitialShityHtml,
             removeShityHtml: MeetProvider.removeShityHtml,
@@ -166,7 +169,7 @@ async function observeSpeakers() {
                 {
                     name: '-',
                     id: 0,
-                    timestamp: Date.now(),
+                    timestamp: Date.now() - PROVIDER!.LATENCY,
                     isSpeaking: true, // I am confused !
                 },
             ] as SpeakerData[]).catch((e) => {

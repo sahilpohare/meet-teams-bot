@@ -6,7 +6,7 @@ import { SESSION, START_RECORD_TIMESTAMP } from '../record'
 import { api } from '../api'
 import { sleep } from '../api'
 import { RecognizerTranscript, parseRunPod } from './parseTranscript'
-import { speakerWorker } from './speakerWorker'
+// import { speakerWorker } from './speakerWorker'
 import { summarizeWorker } from './summarizeWorker'
 import { wordPosterWorker } from './wordPosterWorker'
 
@@ -45,7 +45,7 @@ export class Transcriber {
         try {
             Transcriber.TRANSCRIBER = new Transcriber()
         } catch (e) {
-            console.error('error creating transcriber', e)
+            console.error('[Transcriber] error creating transcriber', e)
             throw e
         }
         await Transcriber.TRANSCRIBER.start()
@@ -66,12 +66,12 @@ export class Transcriber {
      * Waits for the workers to finish, and destroys the transcbriber.
      */
     public async waitUntilComplete(): Promise<void> {
-        console.log('before transcribe queue drain')
+        console.log('[Transcriber] before transcribe queue drain')
         this.transcribeQueue.push(async () => {
             return
         })
         await this.transcribeQueue.drain()
-        console.log('after transcribe queue drain')
+        console.log('[Transcriber] after transcribe queue drain')
 
         this.stopped = true
 
@@ -88,7 +88,10 @@ export class Transcriber {
                     no_transcript: true,
                 })
             } catch (e) {
-                console.error('[waitUntilComplete]', 'error patching project')
+                console.error(
+                    '[Transcriber] [waitUntilComplete]',
+                    'error patching project',
+                )
             }
         }
         await this.speakerWorker
@@ -97,7 +100,7 @@ export class Transcriber {
         try {
             await this.summarizeWorker
         } catch (e) {
-            console.error('error in summarizeWorker', e)
+            console.error('[Transcriber] error in summarizeWorker', e)
         }
     }
 
@@ -112,7 +115,7 @@ export class Transcriber {
         try {
             this.launchWorkers()
         } catch (e) {
-            console.error('error launching workers', e)
+            console.error('[Transcriber] error launching workers', e)
             throw e
         }
         try {
@@ -127,7 +130,7 @@ export class Transcriber {
                 }, TRANSCRIPTION_CHUNK_DURATION)
             }
         } catch (e) {
-            console.error('error initializing reboot timer', e)
+            console.error('[Transcriber] error initializing reboot timer', e)
             throw e
         }
     }
@@ -138,7 +141,7 @@ export class Transcriber {
         this.transcriptionOffset = newOffset
         await sleep(15000)
         console.log(
-            'ready to do transcription between: ',
+            '[Transcriber] ready to do transcription between: ',
             currentOffset,
             newOffset,
         )
@@ -158,7 +161,7 @@ export class Transcriber {
             let transcripts = parseRunPod(res, currentOffset)
             await onResult(transcripts, currentOffset)
         } catch (e) {
-            console.error('an error occured calling gladia, ', e)
+            console.error('[Transcriber] an error occured calling gladia, ', e)
         } finally {
             try {
                 if (audioExtract != null) {
@@ -166,7 +169,10 @@ export class Transcriber {
                     await api.deleteAudio(audioExtract)
                 }
             } catch (e) {
-                console.error('an error occured deleting audio, ', e)
+                console.error(
+                    '[Transcriber] an error occured deleting audio, ',
+                    e,
+                )
             }
         }
     }
@@ -174,7 +180,8 @@ export class Transcriber {
     /** Launches the workers. */
     private async launchWorkers(): Promise<void> {
         this.wordPosterWorker = wordPosterWorker()
-        this.speakerWorker = speakerWorker()
+        // IMPORTANT : speakerWorker() is disabled because there are timestampa incoherencies
+        // this.speakerWorker = speakerWorker()
 
         if (parameters.bot_id == null) {
             this.summarizeWorker = summarizeWorker()
@@ -188,7 +195,7 @@ let MAX_NO_TRANSCRIPT_DURATION = 60_000 * 6
 
 /** Gets and handles recognizer results. */
 async function onResult(transcripts: RecognizerTranscript[], offset: number) {
-    console.log('[onResult] ')
+    console.log('[Transcriber] [onResult] ')
     // TODO REPORT. Maybe dead code ?
     if (R.all((x) => x.words.length === 0, transcripts)) {
         NO_TRANSCRIPT_DURATION += TRANSCRIPTION_CHUNK_DURATION
@@ -198,7 +205,7 @@ async function onResult(transcripts: RecognizerTranscript[], offset: number) {
                 session_id: parameters.session_id,
                 user_token: parameters.user_token,
             }
-            console.error('no speaker since too long')
+            console.error('[Transcriber] no speaker since too long')
             api.stopBot(params)
         }
     }

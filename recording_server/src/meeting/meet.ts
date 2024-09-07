@@ -278,8 +278,6 @@ async function countParticipantsSpeakerView(page: Page): Promise<number> {
             (img) => img.clientWidth === 32 && img.clientHeight === 32,
         ).length
     })
-
-    console.log('found', count, 'participants')
     return count
 }
 
@@ -347,7 +345,12 @@ async function findEndMeeting(
         'gallery_view'
             ? countParticipantsGaleryView(page)
             : countParticipantsSpeakerView(page))
-        console.log('participant', participant)
+        console.log(
+            new Date().toISOString(),
+            'found',
+            participant,
+            'participants',
+        )
 
         if (participant == 1) {
             return true

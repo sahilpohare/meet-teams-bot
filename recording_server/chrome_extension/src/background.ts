@@ -51,15 +51,26 @@ function setUserAgent(window: Window, userAgent: string) {
     }
 }
 
+// IMPORTANT : For reasons of current compatibility, this function is only called
+// with a single speaker and not an array of multiple speakers. Handling multiple
+// speakers should be implemented at some point.
 function addSpeaker(speaker: SpeakerData) {
-    console.log(`EXTENSION BACKGROUND PAGE - ADD SPEAKER : ${speaker}`)
+    // console.log(`EXTENSION BACKGROUND PAGE - ADD SPEAKER : ${speaker}`)
     LAST_SPEAKER_ACTIVITY = speaker.timestamp
-    SPEAKERS.push(speaker)
-    uploadEditorsTask()
+
+    // IMPORTANT : For reasons of current compatibility with the final processing
+    // of the speakers, we only create a new entry when there is a change of speaker.
+    if (
+        SPEAKERS.length == 0 ||
+        speaker.name != SPEAKERS[SPEAKERS.length - 1].name
+    ) {
+        SPEAKERS.push(speaker)
+        uploadEditorsTask()
+    }
 }
 
 function updateLastSpeakerActivity(timestamp: number) {
-    console.log(`EXTENSION BACKGROUND PAGE - UPDATE TS : ${timestamp}`)
+    // console.log(`EXTENSION BACKGROUND PAGE - UPDATE TS : ${timestamp}`)
     LAST_SPEAKER_ACTIVITY = timestamp
 }
 

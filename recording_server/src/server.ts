@@ -108,7 +108,7 @@ export async function server() {
     // Speakers event from All providers : Write logs and send data to extension
     app.post('/add_speaker', async (req, res) => {
         const speakers: SpeakerData[] = req.body
-        console.log('Speaker update received:', speakers)
+        console.table(speakers)
         let input = JSON.stringify(speakers)
         await fs.appendFile(SPEAKER_LOG_PATHNAME, `${input}\n`).catch((e) => {
             LOGGER.error(`Cannot append speaker log file ! : ${e}`)

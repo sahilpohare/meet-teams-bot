@@ -40,7 +40,12 @@ export async function uploadEditorsTask() {
             }
         }
 
-        console.log(`[resuming] uploadCompleteEditor`, interval)
+        console.log(
+            `[resuming] uploadCompleteEditor`,
+            interval,
+            'duration :',
+            interval.end_time - interval.start_time,
+        )
         try {
             const postableCompleteEditor = createEditorWrapper(
                 interval,

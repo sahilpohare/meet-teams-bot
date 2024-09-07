@@ -1,6 +1,6 @@
 import { RecordingMode, SpeakerData } from '../observeSpeakers'
 
-const SPEAKER_LATENCY = 0 // ms
+export const SPEAKER_LATENCY = 50 // ms
 
 export async function getSpeakerRootToObserve(
     recordingMode: RecordingMode,
@@ -90,11 +90,11 @@ export function getSpeakerFromDocument(
     _recordingMode: RecordingMode,
 ): SpeakerData[] {
     try {
-        let elems = document
+        const elems = document
             .querySelector("[aria-label='Participants']")!
             .querySelectorAll('*')
-        let childs = Array.from(elems).filter((elem) => {
-            let color = getComputedStyle(elem).backgroundColor
+        const childs = Array.from(elems).filter((elem) => {
+            const color = getComputedStyle(elem).backgroundColor
             return (
                 color == 'rgba(26, 115, 232, 0.9)' ||
                 color == 'rgb(26, 115, 232)'
@@ -113,7 +113,7 @@ export function getSpeakerFromDocument(
                 : null
         }
 
-        let timestamp = Date.now() - SPEAKER_LATENCY
+        const timestamp = Date.now() - SPEAKER_LATENCY
         return childs.map((child) => {
             const background_position_x = getComputedStyle(
                 child.children[1],

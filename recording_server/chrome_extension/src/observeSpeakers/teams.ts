@@ -1,7 +1,7 @@
 import { RecordingMode, SpeakerData } from '../observeSpeakers'
 import { sleep } from '../api'
 
-const SPEAKER_LATENCY = 0 // ms
+export const SPEAKER_LATENCY = 0 // ms
 
 export async function getSpeakerRootToObserve(
     _recordingMode: RecordingMode,
@@ -48,8 +48,8 @@ export function getSpeakerFromDocument(
         '[data-cid="calling-participant-stream"]',
     )
     // console.log('[Teams] Found speaker elements:', speakerElements.length)
-    let timestamp = Date.now() - SPEAKER_LATENCY
-    let speakers = Array.from(speakerElements)
+    const timestamp = Date.now() - SPEAKER_LATENCY
+    const speakers = Array.from(speakerElements)
         .map((element) => {
             // can create errors if speaker has a "," in his name
             const name = getParticipantName(element)
