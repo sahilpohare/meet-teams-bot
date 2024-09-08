@@ -39,6 +39,7 @@ function getDocumentRoot(): Document {
 
 export function getSpeakerFromDocument(
     recordingMode: RecordingMode,
+    timestamp: number,
 ): SpeakerData[] {
     // console.log('[Teams] Starting getSpeakerFromDocument', {
     //     recordingMode,
@@ -48,7 +49,6 @@ export function getSpeakerFromDocument(
         '[data-cid="calling-participant-stream"]',
     )
     // console.log('[Teams] Found speaker elements:', speakerElements.length)
-    const timestamp = Date.now() - SPEAKER_LATENCY
     const speakers = Array.from(speakerElements)
         .map((element) => {
             // can create errors if speaker has a "," in his name

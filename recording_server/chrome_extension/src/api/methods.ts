@@ -11,8 +11,6 @@ import {
     MeetingProvider,
     Project,
     RecognizerWord,
-    RunPodResult,
-    RunPodTranscriptionStatus,
     SummaryParam,
     Video,
     Word,
@@ -259,71 +257,6 @@ export async function autoHighlightCount(param: SummaryParam): Promise<number> {
         data: param,
     })
     return resp.data
-}
-const RUNPOD_API_KEY = 'B1EC90VQNXMASRD9QJJAALGOS0YL73JEMKZQ92IJ'
-export async function recognizeRunPod(
-    audioUrl: string,
-    phrases: string[],
-): Promise<RunPodResult> {
-    const requestBody = {
-        input: {
-            audio: audioUrl,
-            model: 'large-v3',
-            transcription: 'plain_text',
-            translate: false,
-            temperature: 0,
-            best_of: 5,
-            beam_size: 5,
-            patience: 1,
-            suppress_tokens: '-1',
-            condition_on_previous_text: false,
-            temperature_increment_on_fallback: 0.2,
-            compression_ratio_threshold: 2.4,
-            logprob_threshold: -1,
-            no_speech_threshold: 0.6,
-            word_timestamps: true,
-        },
-        enable_vad: false,
-    }
-
-    console.log('Requesting RunPod transcription', RUNPOD_API_KEY)
-    let response = await axios.post(
-        'https://api.runpod.ai/v2/oq0i26ut0lom1h/run',
-        requestBody,
-        {
-            headers: {
-                accept: 'application/json',
-                Authorization: RUNPOD_API_KEY,
-                'content-type': 'application/json',
-            },
-        },
-    )
-    console.log(response.data)
-    let status: RunPodTranscriptionStatus = response.data
-    while (status.status !== 'COMPLETED' && status.status !== 'FAILED') {
-        await sleep(5000)
-        status = await checkStatus(status.id)
-    }
-    console.log(status)
-    // Transform or process the response as needed here
-    return status.output!
-}
-
-async function checkStatus(id: string) {
-    const token = RUNPOD_API_KEY
-    const response = await axios.get(
-        `https://api.runpod.ai/v2/oq0i26ut0lom1h/status/${id}`,
-        {
-            headers: {
-                accept: 'application/json',
-                Authorization: token,
-                'content-type': 'application/json',
-            },
-        },
-    )
-
-    console.log(response.data)
-    return response.data
 }
 
 export async function endMeetingTrampoline(

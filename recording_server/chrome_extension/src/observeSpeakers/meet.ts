@@ -1,6 +1,6 @@
 import { RecordingMode, SpeakerData } from '../observeSpeakers'
 
-export const SPEAKER_LATENCY = 50 // ms
+export const SPEAKER_LATENCY = 0 // ms
 
 export async function getSpeakerRootToObserve(
     recordingMode: RecordingMode,
@@ -88,6 +88,7 @@ export async function getSpeakerRootToObserve(
 
 export function getSpeakerFromDocument(
     _recordingMode: RecordingMode,
+    timestamp: number,
 ): SpeakerData[] {
     try {
         const elems = document
@@ -113,7 +114,6 @@ export function getSpeakerFromDocument(
                 : null
         }
 
-        const timestamp = Date.now() - SPEAKER_LATENCY
         return childs.map((child) => {
             const background_position_x = getComputedStyle(
                 child.children[1],

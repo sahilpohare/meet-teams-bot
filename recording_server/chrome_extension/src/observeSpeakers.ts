@@ -23,7 +23,7 @@ type Provider = {
     findAllAttendees: () => string[]
     removeInitialShityHtml: (arg0: RecordingMode) => void
     removeShityHtml: (arg0: RecordingMode) => void
-    getSpeakerFromDocument: (arg0: RecordingMode) => SpeakerData[]
+    getSpeakerFromDocument: (arg0: RecordingMode, arg1: number) => SpeakerData[]
     getSpeakerRootToObserve: (
         arg0: RecordingMode,
     ) => Promise<[Node, MutationObserverInit] | undefined>
@@ -90,13 +90,14 @@ async function removeShityHtmlLoop(mode: RecordingMode) {
 
 // ___PERIODIC_SEQUENCE_FOR_EACH_MUTATIONS___
 var MUTATION_OBSERVER = new MutationObserver(function (mutations) {
+    const timestamp = Date.now() - PROVIDER!.LATENCY
     mutations.forEach(function (_mutation) {
         if (parameters.meetingProvider === 'Teams') {
             PROVIDER?.removeShityHtml(RECORDING_MODE)
         }
         try {
             const currentSpeakersList: SpeakerData[] =
-                PROVIDER!.getSpeakerFromDocument(RECORDING_MODE)
+                PROVIDER!.getSpeakerFromDocument(RECORDING_MODE, timestamp)
 
             let new_speakers = new Map(
                 currentSpeakersList.map((elem) => [elem.name, elem.isSpeaking]),
@@ -152,7 +153,10 @@ async function observeSpeakers() {
     try {
         const currentSpeakersList: SpeakerData[] = R.filter(
             (u: SpeakerData) => u.name !== BOT_NAME && u.isSpeaking == true,
-            PROVIDER!.getSpeakerFromDocument(RECORDING_MODE),
+            PROVIDER!.getSpeakerFromDocument(
+                RECORDING_MODE,
+                Date.now() - PROVIDER!.LATENCY,
+            ),
         )
 
         if (currentSpeakersList.length > 0) {

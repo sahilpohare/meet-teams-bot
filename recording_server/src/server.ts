@@ -51,6 +51,11 @@ async function getAllowedOrigins(): Promise<string[]> {
     ]
 }
 
+const PAUSE_BETWEEN_SENTENCES: number = 1000 // ms
+var CUR_PARTICIPANTS: SpeakerData[] = new Array()
+var CUR_ACTIVE_PARTICIPANTS_COUNTER: number = 0
+var CUR_SPEAKER: SpeakerData | null = null
+
 export async function server() {
     const app = express()
     const allowedOrigins = await getAllowedOrigins()
@@ -113,11 +118,40 @@ export async function server() {
         await fs.appendFile(SPEAKER_LOG_PATHNAME, `${input}\n`).catch((e) => {
             LOGGER.error(`Cannot append speaker log file ! : ${e}`)
         })
-        speakers.forEach((speaker) => {
-            if (speaker.isSpeaking) {
-                MeetingHandle.addSpeaker(speaker)
-            }
-        })
+        // Count the number of active speakers;
+        // an active speaker is a speaker who is currently speaking.
+        const new_active_participants_counter: number = speakers.reduce(
+            (acc, s) => acc + (s.isSpeaking === true ? 1 : 0),
+            0,
+        )
+        switch (new_active_participants_counter) {
+            case 0:
+                // Does nothing if no speaker is active.
+                break
+            case 1:
+                // Only one speaker is detected
+                const active_speaker = speakers.filter(
+                    (v) => v.isSpeaking === true,
+                )[0]
+                MeetingHandle.addSpeaker(active_speaker)
+
+                // const last_timestamp: number | undefined = CUR_SPEAKER?.timestamp
+                // if (last_timestamp === undefined || active_speaker.name !== CUR_SPEAKER?.name) {
+                //     // Speaker change case or init case
+                //     MeetingHandle.addSpeaker(active_speaker)
+                //     CUR_SPEAKER = active_speaker
+                // } else if (active_speaker.timestamp > CUR_SPEAKER?.timestamp + PAUSE_BETWEEN_SENTENCES) {
+                //     // Same speaker case
+                //     MeetingHandle.addSpeaker(active_speaker)
+                //     CUR_SPEAKER = active_speaker
+                // }
+                break
+            default:
+            // Multiple speakers are currently speaking.
+        }
+        // Store speaker list for the next call.
+        // CUR_PARTICIPANTS = speakers
+        // CUR_ACTIVE_PARTICIPANTS_COUNTER = new_active_participants_counter
         res.status(200).send('ok')
 
         // export const MIN_SPEAKER_DURATION = 200
@@ -217,17 +251,6 @@ export async function server() {
         // // essayer de gerer MIN DURATION ICI ?
         // //  && Date.now() - s.timestamp >
         // //     PROVIDER.MIN_SPEAKER_DURATION)),
-
-        // if (newActiveSpeakers.length > 0) {
-        //     // TODO: not handling multiple speakers in the same time
-        //     const newSpeaker = newActiveSpeakers[0]
-        //     SPEAKERS.push(newSpeaker)
-        //     console.log('speaker changed to: ', newSpeaker)
-        //     chrome.runtime.sendMessage({
-        //         type: 'REFRESH_SPEAKERS',
-        //         payload: SPEAKERS,
-        //     })
-        // }
     })
 
     // Leave bot request from api server

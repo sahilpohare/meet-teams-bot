@@ -224,15 +224,6 @@ export type ParagraphEditorJs = {
 
 export type MeetingProvider = 'Zoom' | 'Meet' | 'Teams'
 
-export interface RunPodResult {
-    detected_language: string
-    word_timestamps: RunPodWordTimestamp[]
-}
-export interface RunPodWordTimestamp {
-    start: number
-    end: number
-    word: string
-}
 /** Output word of the `Recognizer`. */
 export type RecognizerWord = {
     /** The type. */
@@ -253,18 +244,19 @@ export type RecognizerResult = {
     json: string
 }
 
+export type RecognizerTranscript = {
+    speaker: number
+    startTime: number
+    endTime: number
+    words: RecognizerWord[]
+}
+
 export type DetectTemplateResponse = {
     meeting_template: string
     justification?: string
 }
 export type DetectClientResponse = {
     client_names: string[]
-}
-
-export interface RunPodTranscriptionStatus {
-    id: string
-    status: string
-    output?: RunPodResult
 }
 
 export type Workspace = {

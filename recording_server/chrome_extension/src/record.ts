@@ -11,6 +11,7 @@ import {
 } from './api'
 import { sleep } from './api'
 import { Transcriber } from './Transcribe/Transcriber'
+import e from 'express'
 
 const STREAM: MediaStream | null = null
 let RECORDED_CHUNKS: BlobEvent[] = []
@@ -149,32 +150,30 @@ export async function startRecording(
     )
 
     console.log(`[startRecording] after post asset`)
-    const date = new Date()
-    const now = date.getTime()
-    const newSession = {
-        upload_queue: newSerialQueue(),
-        project,
-        id: newSessionId,
-        cut_times: [now],
-        start_timestamp: now,
-        asset,
-        completeEditors: [],
-        words: [],
-        uploadChunkCounter: 0,
-        transcribedUntil: 0,
 
-        // complete_video_file_path,
-    }
-
-    SESSION = newSession
-
-    MEDIA_RECORDER.start(10000)
     MEDIA_RECORDER.onerror = function (e) {
         console.error('media recorder error', e)
     }
+    MEDIA_RECORDER.onstart = function (_e) {
+        const now = Date.now()
+        const newSession = {
+            upload_queue: newSerialQueue(),
+            project,
+            id: newSessionId,
+            cut_times: [now],
+            start_timestamp: now,
+            asset,
+            completeEditors: [],
+            words: [],
+            uploadChunkCounter: 0,
+            transcribedUntil: 0,
+        }
+        SESSION = newSession
+        START_RECORD_TIMESTAMP = now
+    }
+    MEDIA_RECORDER.start(10000)
     // TODO : Dead code ? START_RECORD_OFFSET is only SET here but never read
     // START_RECORD_OFFSET = CONTEXT.currentTime
-    START_RECORD_TIMESTAMP = now
     console.log(`after media recorder start`)
 
     return project

@@ -57,16 +57,8 @@ function setUserAgent(window: Window, userAgent: string) {
 function addSpeaker(speaker: SpeakerData) {
     // console.log(`EXTENSION BACKGROUND PAGE - ADD SPEAKER : ${speaker}`)
     LAST_SPEAKER_ACTIVITY = speaker.timestamp
-
-    // IMPORTANT : For reasons of current compatibility with the final processing
-    // of the speakers, we only create a new entry when there is a change of speaker.
-    if (
-        SPEAKERS.length == 0 ||
-        speaker.name != SPEAKERS[SPEAKERS.length - 1].name
-    ) {
-        SPEAKERS.push(speaker)
-        uploadEditorsTask()
-    }
+    SPEAKERS.push(speaker)
+    uploadEditorsTask()
 }
 
 function updateLastSpeakerActivity(timestamp: number) {

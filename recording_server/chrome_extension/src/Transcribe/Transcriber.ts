@@ -3,15 +3,23 @@ import * as R from 'ramda'
 import { parameters } from '../background'
 import { newTranscribeQueue } from '../queue'
 import { SESSION, START_RECORD_TIMESTAMP } from '../record'
-import { api } from '../api'
+import { api, RecognizerTranscript } from '../api'
 import { sleep } from '../api'
-import { RecognizerTranscript, parseRunPod } from './parseTranscript'
 // import { speakerWorker } from './speakerWorker'
 import { summarizeWorker } from './summarizeWorker'
 import { wordPosterWorker } from './wordPosterWorker'
 
+import { recognizeRunPod, parseRunPod } from './providers/runpod'
+import { recognizeGladia, parseGladia } from './providers/gladia'
+
 // milisseconds transcription chunk duration
 const TRANSCRIPTION_CHUNK_DURATION = 60 * 1000 * 3
+enum TranscriptionProvider {
+    Runpod,
+    Gladia,
+}
+const TRANSCRIPTION_PROVIDER: TranscriptionProvider =
+    TranscriptionProvider.Gladia
 
 /**
  * Transcribes an audio stream using the recognizer of the underlying Node server.
@@ -154,11 +162,29 @@ export class Transcriber {
             )
             let path = audioExtract.audio_s3_path // TODO : AWS CP not usefull, can be directy done here
             let audio_url = `https://${parameters.s3_bucket}.s3.eu-west-3.amazonaws.com/${path}`
-            let res = await api.recognizeRunPod(
-                audio_url,
-                parameters.vocabulary, // TODO : Envisager utiliser sur meeting baas.
-            )
-            let transcripts = parseRunPod(res, currentOffset)
+
+            let transcripts: RecognizerTranscript[]
+            switch (TRANSCRIPTION_PROVIDER) {
+                case TranscriptionProvider.Runpod:
+                    let res_runpod = await recognizeRunPod(
+                        audio_url,
+                        parameters.vocabulary, // TODO : Envisager utiliser sur meeting baas.
+                    )
+                    transcripts = parseRunPod(res_runpod, currentOffset)
+                    break
+                case TranscriptionProvider.Gladia:
+                    let res_gladia = await recognizeGladia(
+                        audio_url,
+                        parameters.vocabulary, // TODO : Envisager utiliser sur meeting baas.
+                    )
+                    transcripts = parseGladia(res_gladia, currentOffset)
+                    break
+                default:
+                    console.error(
+                        `Unknown Transcription Provider ! ${TRANSCRIPTION_PROVIDER}`,
+                    )
+                    transcripts = new Array()
+            }
             await onResult(transcripts, currentOffset)
         } catch (e) {
             console.error('[Transcriber] an error occured calling gladia, ', e)
