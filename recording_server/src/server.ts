@@ -51,9 +51,7 @@ async function getAllowedOrigins(): Promise<string[]> {
     ]
 }
 
-const PAUSE_BETWEEN_SENTENCES: number = 1000 // ms
-var CUR_PARTICIPANTS: SpeakerData[] = new Array()
-var CUR_ACTIVE_PARTICIPANTS_COUNTER: number = 0
+const PAUSE_BETWEEN_SENTENCES: number = 600 // ms
 var CUR_SPEAKER: SpeakerData | null = null
 
 export async function server() {
@@ -120,137 +118,94 @@ export async function server() {
         })
         // Count the number of active speakers;
         // an active speaker is a speaker who is currently speaking.
-        const new_active_participants_counter: number = speakers.reduce(
+        const speakers_count: number = speakers.reduce(
             (acc, s) => acc + (s.isSpeaking === true ? 1 : 0),
             0,
         )
-        switch (new_active_participants_counter) {
+        switch (speakers_count) {
             case 0:
-                // Does nothing if no speaker is active.
+                // There are no speaker
+                if (CUR_SPEAKER) {
+                    CUR_SPEAKER.isSpeaking = false
+                    if (speakers.length > 0) {
+                        CUR_SPEAKER.timestamp = speakers[0].timestamp
+                    }
+                }
                 break
             case 1:
                 // Only one speaker is detected
-                const active_speaker = speakers.filter(
+                const active_speaker = speakers.find(
                     (v) => v.isSpeaking === true,
-                )[0]
-                MeetingHandle.addSpeaker(active_speaker)
-
-                // const last_timestamp: number | undefined = CUR_SPEAKER?.timestamp
-                // if (last_timestamp === undefined || active_speaker.name !== CUR_SPEAKER?.name) {
-                //     // Speaker change case or init case
-                //     MeetingHandle.addSpeaker(active_speaker)
-                //     CUR_SPEAKER = active_speaker
-                // } else if (active_speaker.timestamp > CUR_SPEAKER?.timestamp + PAUSE_BETWEEN_SENTENCES) {
-                //     // Same speaker case
-                //     MeetingHandle.addSpeaker(active_speaker)
-                //     CUR_SPEAKER = active_speaker
-                // }
+                )
+                if (active_speaker.name !== CUR_SPEAKER?.name) {
+                    // Change of speaker case
+                    MeetingHandle.addSpeaker(active_speaker)
+                } else {
+                    if (CUR_SPEAKER!.isSpeaking === false) {
+                        // The speaker was no longer speaking
+                        if (
+                            active_speaker.timestamp >=
+                            CUR_SPEAKER!.timestamp + PAUSE_BETWEEN_SENTENCES
+                        ) {
+                            // Update the information that the speaker has started speaking again.
+                            // Make a break between sentences.
+                            MeetingHandle.addSpeaker(active_speaker)
+                        }
+                    } else {
+                        // Speaker is already on speaking : Dont do anything
+                    }
+                }
+                CUR_SPEAKER = active_speaker
                 break
             default:
-            // Multiple speakers are currently speaking.
+                // Multiple speakers are currently speaking.
+
+                // Interuption Behavior - Not the best choice
+                // Make an arbitrary choice for the new speaker; they take over from the previous one.
+                // ------------------------------------------
+                // const new_active_speaker = speakers.find(
+                //     (v) =>
+                //         v.isSpeaking === true &&
+                //         new_active_speaker.name !== CUR_SPEAKER?.name,
+                // )
+                // MeetingHandle.addSpeaker(new_active_speaker)
+                // CUR_SPEAKER = new_active_speaker
+
+                // Same Speaker Prime - Best for me (mordak)
+                // -----------------------------------------
+                const has_speaking_cur_speaker = speakers.some(
+                    (speaker) =>
+                        speaker.name === CUR_SPEAKER?.name &&
+                        speaker.isSpeaking === true,
+                )
+                if (has_speaking_cur_speaker) {
+                    const active_speaker = speakers.find(
+                        (speaker) => speaker.name === CUR_SPEAKER!.name,
+                    )
+                    if (CUR_SPEAKER!.isSpeaking === false) {
+                        // The speaker was no longer speaking
+                        if (
+                            active_speaker.timestamp >=
+                            CUR_SPEAKER!.timestamp + PAUSE_BETWEEN_SENTENCES
+                        ) {
+                            // Update the information that the speaker has started speaking again.
+                            // Make a break between sentences.
+                            MeetingHandle.addSpeaker(active_speaker)
+                        }
+                    } else {
+                        // Speaker is already on speaking : Dont do anything
+                    }
+                    CUR_SPEAKER = active_speaker
+                } else {
+                    // Make an arbitrary choice for the new speaker;
+                    const active_speaker = speakers.find(
+                        (v) => v.isSpeaking === true,
+                    )
+                    MeetingHandle.addSpeaker(active_speaker)
+                    CUR_SPEAKER = active_speaker
+                }
         }
-        // Store speaker list for the next call.
-        // CUR_PARTICIPANTS = speakers
-        // CUR_ACTIVE_PARTICIPANTS_COUNTER = new_active_participants_counter
         res.status(200).send('ok')
-
-        // export const MIN_SPEAKER_DURATION = 200
-        // const COUNT_INTERVAL: number = 100
-
-        // // Array to store the maximum occurrences of a speaker in a 100 ms interval
-        // let MAX_OCCURRENCES: { speaker: string; timestamp: number; count: number }[] =
-        //     []
-
-        // // Array to store current speaker count in this 100 ms interval
-        // let SPEAKERS_COUNT = new Map()
-
-        // // Function to reset speaker counts
-        // function resetSpeakerCounts() {
-        //     SPEAKERS_COUNT = new Map()
-        // }
-
-        // // Function to log speaker counts
-        // function calcSpeaker() {
-        //     let maxCount = 0
-        //     let maxSpeaker = ''
-
-        //     // Find the speaker with the maximum occurrences
-        //     SPEAKERS_COUNT.forEach((count, speaker) => {
-        //         if (count > maxCount) {
-        //             maxSpeaker = speaker
-        //             maxCount = count
-        //         }
-        //     })
-
-        //     if (maxSpeaker) {
-        //         const currentDate = Date.now()
-        //         MAX_OCCURRENCES.push({
-        //             speaker: maxSpeaker,
-        //             timestamp: currentDate,
-        //             count: maxCount,
-        //         })
-        //     }
-        //     resetSpeakerCounts()
-        // }
-
-        //     // Set interval to log and reset speaker counts every 100 ms
-        //     setInterval(calcSpeaker, COUNT_INTERVAL)
-
-        // if (speakers != null) {
-        //     SPEAKERS_COUNT.set(speakers[0].name, (SPEAKERS_COUNT.get(speakers[0].name) || 0) + 1)
-        // }
-
-        // // Check for more than 3 adjacent occurrences of a different speaker
-        // for (let i = 0; i < MAX_OCCURRENCES.length; i++) {
-        //     if (MAX_OCCURRENCES[i].speaker !== currentSpeaker) {
-        //         let differentSpeaker = MAX_OCCURRENCES[i]
-        //         let differentSpeakerCount = 0
-        //         for (let j = i; j < MAX_OCCURRENCES.length; j++) {
-        //             if (MAX_OCCURRENCES[j].speaker === differentSpeaker.speaker) {
-        //                 if (differentSpeakerCount >= 4) {
-        //                     MAX_OCCURRENCES = MAX_OCCURRENCES.slice(j)
-        //                     return [
-        //                         {
-        //                             name: differentSpeaker.speaker,
-        //                             id: 0,
-        //                             timestamp: differentSpeaker.timestamp,
-        //                             isSpeaking: true,
-        //                         },
-        //                     ]
-        //                 }
-        //                 differentSpeakerCount++
-        //             } else {
-        //                 break
-        //             }
-        //         }
-        //     }
-        // }
-        // if (MAX_OCCURRENCES.length > 0) {
-        //     if (
-        //         MAX_OCCURRENCES[MAX_OCCURRENCES.length - 1].speaker ===
-        //         currentSpeaker
-        //     ) {
-        //         MAX_OCCURRENCES = MAX_OCCURRENCES.slice(-1)
-        //     }
-        // }
-        // return []
-
-        // PHILOU : C'est une logique interessante, mais ca devrait etre ailleurs, comme sur la background par ex.
-        // // New logic for Meet and Teams
-        // const activeSpeakers = currentSpeakersList.filter(
-        //     (s) => s.isSpeaking,
-        // )
-        // // si lazare parle,  si Philippe se met a parler en meme temps
-        // // philippe prend forcement la precedence
-        // const newActiveSpeakers = activeSpeakers.filter(
-        //     (s) =>
-        //         s.name !== BOT_NAME &&
-        //         (SPEAKERS.length === 0 ||
-        //             s.name !== SPEAKERS[SPEAKERS.length - 1].name),
-        // )
-        // // essayer de gerer MIN DURATION ICI ?
-        // //  && Date.now() - s.timestamp >
-        // //     PROVIDER.MIN_SPEAKER_DURATION)),
     })
 
     // Leave bot request from api server
