@@ -16,6 +16,7 @@ let LAST_SPEAKER_ACTIVITY: number = Date.now()
 export * from './state'
 
 const INACTIVITY_THRESHOLD = 60 * 1000 * 30 // ms
+const CHECK_INACTIVITY_PERIOD = 60 * 1000
 
 export function addDefaultHeader(name: string, value: string) {
     axios.defaults.headers.common[name] = value
@@ -67,19 +68,23 @@ function updateLastSpeakerActivity(timestamp: number) {
 }
 
 // Check speakers inactivity
-async function checkInactivity() {
+async function checkInactivity(): Promise<number> {
     while (true) {
-        await sleep(1000)
+        await sleep(CHECK_INACTIVITY_PERIOD)
         if (Date.now() - LAST_SPEAKER_ACTIVITY > INACTIVITY_THRESHOLD) {
             console.warn('[wordPosterWorker] Meuh y a que des bots!!!')
             ApiService.sendMessageToRecordingServer('STOP_MEETING', {
                 reason: 'Unusual Inactivity Detected',
-            }).catch((e) => {
-                console.error(
-                    'error STOP_MEETING FROM EXTENSION in background.ts',
-                    e,
-                )
             })
+                .then((_) => {
+                    return 42
+                })
+                .catch((e) => {
+                    console.error(
+                        'error STOP_MEETING FROM EXTENSION in background.ts',
+                        e,
+                    )
+                })
         }
     }
 }
@@ -150,7 +155,11 @@ export async function startRecording(
             'FROM_EXTENSION: ************ Start recording launched. ************',
         )
         observeSpeakers()
-        checkInactivity()
+        checkInactivity().then((n) => {
+            console.log(
+                `${n} is the answer to the ultimate question of life, the universe, and everything.`,
+            )
+        })
         await sleep(1000)
         await record.initMediaRecorder()
         const project = await record.startRecording(

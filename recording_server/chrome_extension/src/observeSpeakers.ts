@@ -66,7 +66,7 @@ async function refreshAttendeesLoop() {
             const allAttendees = R.filter(
                 (attendee: string) =>
                     attendee != BOT_NAME &&
-                    !attendee.toLowerCase().includes('notetaker'),
+                    !attendee.toLowerCase().includes('notetaker'), // notetaker is for competiter bot's
                 PROVIDER!.findAllAttendees(),
             )
             console.log(`refresh participants loop : ${allAttendees}`)

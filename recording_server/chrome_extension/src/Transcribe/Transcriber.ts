@@ -13,7 +13,7 @@ import { recognizeRunPod, parseRunPod } from './providers/runpod'
 import { recognizeGladia, parseGladia } from './providers/gladia'
 
 // milisseconds transcription chunk duration
-const TRANSCRIPTION_CHUNK_DURATION = 60 * 1000 * 3
+const TRANSCRIPTION_CHUNK_DURATION = 60 * 1000 * 3 // // 3 minutes
 enum TranscriptionProvider {
     Runpod,
     Gladia,
@@ -185,7 +185,12 @@ export class Transcriber {
                     )
                     transcripts = new Array()
             }
-            await onResult(transcripts, currentOffset)
+            console.log('[Transcriber] [onResult] ')
+            for (let t of transcripts) {
+                for (let w of t.words) {
+                    SESSION?.words.push(w)
+                }
+            }
         } catch (e) {
             console.error('[Transcriber] an error occured calling gladia, ', e)
         } finally {
@@ -214,31 +219,4 @@ export class Transcriber {
         }
     }
     /** Gets and handles recognizer results every `interval` ms. */
-}
-
-let NO_TRANSCRIPT_DURATION = 0
-let MAX_NO_TRANSCRIPT_DURATION = 60_000 * 6
-
-/** Gets and handles recognizer results. */
-async function onResult(transcripts: RecognizerTranscript[], offset: number) {
-    console.log('[Transcriber] [onResult] ')
-    // TODO REPORT. Maybe dead code ?
-    if (R.all((x) => x.words.length === 0, transcripts)) {
-        NO_TRANSCRIPT_DURATION += TRANSCRIPTION_CHUNK_DURATION
-
-        if (NO_TRANSCRIPT_DURATION > MAX_NO_TRANSCRIPT_DURATION) {
-            let params = {
-                session_id: parameters.session_id,
-                user_token: parameters.user_token,
-            }
-            console.error('[Transcriber] no speaker since too long')
-            api.stopBot(params)
-        }
-    }
-    //console.log('transcripts after parsing gladia', transcripts)
-    for (let t of transcripts) {
-        for (let w of t.words) {
-            SESSION?.words.push(w)
-        }
-    }
 }

@@ -49,11 +49,11 @@ abstract class MediaContext {
             })
 
             // IO output
-            this.process.stdout.on('data', (data) => {
-                console.log(`stdout: ${data}`)
+            this.process.stdout.on('data', (_data) => {
+                // console.log(`stdout: ${_data}`)
             })
-            this.process.stderr.on('data', (data) => {
-                console.error(`stderr: ${data}`)
+            this.process.stderr.on('data', (_data) => {
+                // console.error(`stderr: ${_data}`)
             })
         })
     }
@@ -97,7 +97,7 @@ export class SoundContext extends MediaContext {
     }
 
     public default() {
-        SoundContext.instance.play(`../default_audio.mp3`, false)
+        SoundContext.instance.play(`../silence.opus`, false)
     }
 
     public play(pathname: string, loop: boolean) {
