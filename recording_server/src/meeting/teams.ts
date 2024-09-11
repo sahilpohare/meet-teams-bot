@@ -1,6 +1,7 @@
 import * as jsdom from 'jsdom'
 import * as puppeteer from 'puppeteer'
 
+import { JoinError, JoinErrorCode } from '../meeting'
 import {
     CancellationToken,
     MeetingParams,
@@ -8,7 +9,6 @@ import {
 } from '../types'
 
 import { Page } from 'puppeteer'
-import { JoinError, JoinErrorCode } from '../meeting'
 import { screenshot } from '../puppeteer'
 import { sleep } from '../utils'
 
@@ -339,7 +339,7 @@ export async function clickWithInnerText(
                 click,
             )
         } catch (e) {
-            console.error('failed to find button', e)
+            console.error('failed to find button')
         }
         await sleep(1000)
         console.log(`${innerText} clicked:`, continueButton)
