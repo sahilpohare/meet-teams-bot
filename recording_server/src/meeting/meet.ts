@@ -62,13 +62,23 @@ export class MeetProvider implements MeetingProviderInterface {
     ): Promise<void> {
         await clickDismiss(page)
         await sleep(300)
+        let maxAttempts = 5
 
         console.log(
             'useWithoutAccountClicked:',
             await clickWithInnerText(page, 'span', 'Use without an account', 5),
         )
         await screenshot(page, `before_typing_bot_name`)
-        await typeBotName(page, meetingParams.bot_name)
+        for (let attempt = 1; attempt <= 5; attempt++) {
+            if (await typeBotName(page, meetingParams.bot_name)) {
+                console.log('Bot name typed at attempt', attempt)
+                break
+            }
+            await screenshot(page, `bot_name_typing_failed_attempt_${attempt}`)
+            await clickOutsideModal(page)
+            await page.waitForTimeout(500)
+        }
+        // await typeBotName(page, meetingParams.bot_name)
         await screenshot(page, `after_typing_bot_name`)
         // await MuteMicrophone(page)
         const askToJoinClicked = await clickWithInnerText(
@@ -92,7 +102,6 @@ export class MeetProvider implements MeetingProviderInterface {
             )
             await sleep(100)
         }
-        let maxAttempts = 5
 
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
             if (await changeLayout(page, meetingParams.recording_mode)) {
@@ -491,35 +500,34 @@ async function clickOutsideModal(page: Page) {
     await sleep(10)
     await page.mouse.click(10, 10)
 }
-async function typeBotName(page: Page, botName: string) {
+
+async function typeBotName(page: Page, botName: string): Promise<boolean> {
     const INPUT = 'input[type=text]'
-    const GOT_IT = 'button[aria-label="Got it"]'
+    const BotNameTyped = botName || 'Bot'
 
-    // This triggers:
-    // - The "Ask to join" button (good, must be non empty to be clickable)
-    // - the "Sign in with your Google Account" popup (bad, defocuses the input while typing)
-    await page.focus(INPUT)
-    await page.keyboard.type(botName || 'Bot')
+    try {
+        await page.waitForSelector(INPUT, { timeout: 1000 })
 
-    // Wait for the "Got it" button to appear (probably appeared when typing)
-    const foundGotIt = await (async () => {
-        try {
-            await page.waitForSelector(GOT_IT, { timeout: 1000 })
-            return true
-        } catch (e) {
-            return false
-        }
-    })()
-    console.log('Found "Got it" button?', foundGotIt)
-
-    // Now it is safe to type the bot name, resetting the input first (it's garbage)
-    await page.$$eval(INPUT, (elems) => {
-        for (const elem of elems) {
-            ;(elem as any).value = ''
-        }
-    })
-    await page.focus(INPUT)
-    await page.keyboard.type(botName)
+        await page.$$eval(INPUT, (elems) => {
+            for (const elem of elems) {
+                ;(elem as any).value = ''
+            }
+        })
+        await page.focus(INPUT)
+        await page.keyboard.type(BotNameTyped)
+        return await page.$$eval(
+            INPUT,
+            (elems, BotNameTyped) => {
+                for (const elem of elems) {
+                    return (elem as any).value.includes(BotNameTyped)
+                }
+            },
+            BotNameTyped,
+        )
+    } catch (e) {
+        console.error('error in typeBotName', e)
+        return false
+    }
 }
 
 // async function MuteMicrophone(page: Page) {
