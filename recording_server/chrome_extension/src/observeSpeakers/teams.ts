@@ -1,7 +1,8 @@
 import { RecordingMode, SpeakerData } from '../observeSpeakers'
+
 import { sleep } from '../api'
 
-export const SPEAKER_LATENCY = 0 // ms
+export const SPEAKER_LATENCY = 1500 // ms
 
 export async function getSpeakerRootToObserve(
     _recordingMode: RecordingMode,
