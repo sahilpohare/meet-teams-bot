@@ -1,5 +1,6 @@
 import * as record from './record'
 import * as State from './state'
+import { SoundRecorder } from './sound_recorder'
 
 import { Project, SpokeApiConfig, api, setConfig, sleep } from './api'
 
@@ -161,6 +162,8 @@ export async function startRecording(
             )
         })
         await sleep(1000)
+        // new SoundRecorder()
+        // SoundRecorder.instance.start()
         await record.initMediaRecorder()
         const project = await record.startRecording(
             meetingParams.project_name,

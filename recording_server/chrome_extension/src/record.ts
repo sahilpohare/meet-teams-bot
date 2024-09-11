@@ -11,11 +11,11 @@ import {
 } from './api'
 import { sleep } from './api'
 import { Transcriber } from './Transcribe/Transcriber'
+import { SoundRecorder } from './sound_recorder'
 
 const STREAM: MediaStream | null = null
 let RECORDED_CHUNKS: BlobEvent[] = []
 let MEDIA_RECORDER: MediaRecorder // MediaRecorder instance to capture footage
-let THIS_STREAM: MediaStreamAudioSourceNode
 let HANDLE_STOP_DONE = false
 let CONTEXT: AudioContext
 
@@ -73,11 +73,8 @@ export async function initMediaRecorder(): Promise<void> {
                     return
                 }
 
-                // Combine tab and microphone audio
-                // Keep playing tab audio
-                CONTEXT = new AudioContext()
-                THIS_STREAM = CONTEXT.createMediaStreamSource(stream)
-                THIS_STREAM.connect(CONTEXT.destination)
+                new SoundRecorder()
+                SoundRecorder.instance.start(stream)
 
                 try {
                     MEDIA_RECORDER = new MediaRecorder(stream, {
@@ -178,6 +175,7 @@ export async function startRecording(
     return project
 }
 export async function stop() {
+    SoundRecorder.instance.stop()
     console.log('media recorder stop')
     MEDIA_RECORDER.stop()
     console.log('unset all stream')

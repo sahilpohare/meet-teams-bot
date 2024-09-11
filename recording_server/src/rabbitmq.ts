@@ -12,6 +12,8 @@ import { setLoggerProjectId } from './logger'
 import { MeetingHandle } from './meeting'
 import { LOGGER } from './server'
 import { MeetingParams } from './types'
+import { websocket } from './speaking_bots'
+import { sleep } from './utils'
 
 const POD_NAME = process.env.POD_NAME
 
@@ -107,6 +109,9 @@ export class Consumer {
     // throw error if start recoridng fail
     static async handleStartRecord(data: MeetingParams) {
         let logger = LOGGER.new({})
+        websocket()
+        sleep(10000)
+
         console.log('####### DATA #######', data)
         // Prevent instance for beeing scaled down
         try {
