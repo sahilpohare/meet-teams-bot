@@ -11,7 +11,6 @@ import {
 } from './api'
 import { sleep } from './api'
 import { Transcriber } from './Transcribe/Transcriber'
-import e from 'express'
 
 const STREAM: MediaStream | null = null
 let RECORDED_CHUNKS: BlobEvent[] = []
