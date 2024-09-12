@@ -65,7 +65,7 @@ export class TeamsProvider implements MeetingProviderInterface {
 
         const context = browser.defaultBrowserContext()
         await context.clearPermissionOverrides()
-        await context.overridePermissions(url.origin, ['camera'])
+        await context.overridePermissions(url.origin, ['microphone', 'camera'])
 
         const page = await browser.newPage()
         await page.goto(link, { waitUntil: 'networkidle2' })

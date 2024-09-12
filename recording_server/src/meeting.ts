@@ -259,7 +259,7 @@ export class MeetingHandle {
         try {
             this.brandingGenerateProcess?.kill()
             VideoContext.instance.stop()
-            // SoundContext.instance.stop()
+            SoundContext.instance.stop()
         } catch (e) {
             this.logger.error(`failed to kill process: ${e}`)
         }

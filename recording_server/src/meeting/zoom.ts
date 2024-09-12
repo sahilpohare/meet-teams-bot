@@ -82,7 +82,7 @@ export class ZoomProvider implements MeetingProviderInterface {
         console.log({ url })
         const context = browser.defaultBrowserContext()
         await context.clearPermissionOverrides()
-        await context.overridePermissions(url.origin, ['camera'])
+        await context.overridePermissions(url.origin, ['camera', 'microphone'])
         const page = await browser.newPage()
 
         // Ajoutez ces lignes pour accorder les permissions
