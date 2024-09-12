@@ -3,6 +3,7 @@ const fs = require('fs')
 const WavEncoder = require('wav-encoder')
 
 const audioData: Float32Array[] = []
+const SAMPLE_RATE: number = 48_000
 
 export async function websocket() {
     const wss = new WebSocket.Server({ port: 8081 })
@@ -14,6 +15,10 @@ export async function websocket() {
             if (message instanceof Buffer) {
                 const uint8Array = new Uint8Array(message) // Mandatory : Interprets as a know sized type before converting to f32
                 const float32Array = new Float32Array(uint8Array.buffer)
+                // console.log(float32Array[0])
+                // console.log(float32Array[1])
+                // console.log(float32Array[2])
+                // console.log(float32Array[3])
                 audioData.push(float32Array)
             }
         })
@@ -21,10 +26,10 @@ export async function websocket() {
         ws.on('close', () => {
             console.log('Connexion fermée')
             // const whiteNoise1sec = {
-            //     sampleRate: 44100,
+            //     sampleRate: SAMPLE_RATE,
             //     channelData: [
-            //       new Float32Array(44100).map(() => Math.random() - 0.5),
-            //       new Float32Array(44100).map(() => Math.random() - 0.5)
+            //       new Float32Array(SAMPLE_RATE).map(() => Math.random() - 0.5),
+            //       new Float32Array(SAMPLE_RATE).map(() => Math.random() - 0.5)
             //     ]
             //   };
 
@@ -32,7 +37,6 @@ export async function websocket() {
             //     fs.writeFileSync("noise.wav", new DataView(buffer));
             //   });
 
-            const sampleRate = 44100
             const totalLength = audioData.reduce(
                 (sum, arr) => sum + arr.length,
                 0,
@@ -44,6 +48,7 @@ export async function websocket() {
                 return offset + arr.length
             }, 0)
 
+            const sampleRate = SAMPLE_RATE
             WavEncoder.encode({
                 sampleRate,
                 channelData: [result],
