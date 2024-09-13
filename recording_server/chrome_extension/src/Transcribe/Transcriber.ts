@@ -1,16 +1,17 @@
 import * as asyncLib from 'async'
 import * as R from 'ramda'
+
+import { RecognizerTranscript, api } from '../api'
+import { SESSION, START_RECORD_TIMESTAMP } from '../record'
+import { parseGladia, recognizeGladia } from './providers/gladia'
+import { parseRunPod, recognizeRunPod } from './providers/runpod'
+
+import { sleep } from '../api'
 import { parameters } from '../background'
 import { newTranscribeQueue } from '../queue'
-import { SESSION, START_RECORD_TIMESTAMP } from '../record'
-import { api, RecognizerTranscript } from '../api'
-import { sleep } from '../api'
 // import { speakerWorker } from './speakerWorker'
 import { summarizeWorker } from './summarizeWorker'
 import { wordPosterWorker } from './wordPosterWorker'
-
-import { recognizeRunPod, parseRunPod } from './providers/runpod'
-import { recognizeGladia, parseGladia } from './providers/gladia'
 
 // milisseconds transcription chunk duration
 const TRANSCRIPTION_CHUNK_DURATION = 60 * 1000 * 3 // // 3 minutes
@@ -19,7 +20,7 @@ enum TranscriptionProvider {
     Gladia,
 }
 const TRANSCRIPTION_PROVIDER: TranscriptionProvider =
-    TranscriptionProvider.Gladia
+    TranscriptionProvider.Runpod
 
 /**
  * Transcribes an audio stream using the recognizer of the underlying Node server.
