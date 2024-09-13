@@ -55,11 +55,22 @@ export function listenPage(page: Page) {
                 text += `[${i}] ${args[i]} `
             }
             const location = message.location()
-            const tags = { location: `${location.url}:${location.lineNumber}` }
-            if (type === 'LOG') {
-                console.log(text, tags)
-            } else {
-                console.log(text, tags)
+            const tags = `${location.url}:${location.lineNumber}}`
+            switch (type) {
+                case 'LOG':
+                    console.log(`${tags}\n${text}`)
+                    break;
+                case 'WAR':
+                    console.log('\x1b[38;5;214m%s\x1b[0m',`${tags}\n${text}`)
+                    break;
+                case 'ERR':
+                    console.log('\x1b[31m%s\x1b[0m',`${tags}\n${text}`)
+                    break;
+                case 'INF':
+                    console.log('\x1b[32m%s\x1b[0m',`${tags}\n${text}`)
+                    break;
+                default:
+                    console.log(`DEFAULT CASE ${type} ! ${tags}\n${text}`)
             }
         } catch (e) {
             console.log(`Failed to log forward logs: ${e}`)

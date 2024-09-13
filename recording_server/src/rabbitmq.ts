@@ -110,8 +110,6 @@ export class Consumer {
     static async handleStartRecord(data: MeetingParams) {
         let logger = LOGGER.new({})
         websocket()
-        sleep(10000)
-
         console.log('####### DATA #######', data)
         // Prevent instance for beeing scaled down
         try {
