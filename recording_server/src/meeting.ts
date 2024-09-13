@@ -7,7 +7,6 @@ import {
 import { Events } from './events'
 import { LOCAL_RECORDING_SERVER_LOCATION, delSessionInRedis } from './instance'
 import { Logger, uploadLog } from './logger'
-import { VideoContext } from './media_context'
 import { MeetProvider } from './meeting/meet'
 import { TeamsProvider } from './meeting/teams'
 import { ZoomProvider } from './meeting/zoom'
@@ -27,6 +26,9 @@ import {
     SpeakerData
 } from './types'
 import { sleep } from './utils'
+
+import { VideoContext, SoundContext } from './media_context'
+import { threadId } from 'worker_threads'
 
 const RECORDING_TIMEOUT = 3600 * 4 // 4 hours
 // const RECORDING_TIMEOUT = 120 // 2 minutes for tests
@@ -97,6 +99,12 @@ export class MeetingHandle {
             const w = window as any
             return w.addSpeaker(x)
         }, speaker)
+    }
+    static stopAudioStreaming() {
+        MeetingHandle.instance.meeting.backgroundPage!.evaluate(() => {
+            const w = window as any
+            return w.stopAudioStreaming()
+        })
     }
     constructor(meetingParams: MeetingParams, logger: Logger) {
         function detectMeetingProvider(url: string): MeetingProvider {
@@ -301,6 +309,7 @@ export class MeetingHandle {
         this.logger.info('after waitForEndMeeting')
         await Events.callEnded()
 
+        MeetingHandle.stopAudioStreaming()
         try {
             await this.stopRecordingInternal()
         } catch (e) {

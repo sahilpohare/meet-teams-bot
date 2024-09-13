@@ -11,7 +11,7 @@ import {
 } from './api'
 import { sleep } from './api'
 import { Transcriber } from './Transcribe/Transcriber'
-import { SoundRecorder } from './sound_recorder'
+import { SoundStreamer } from './sound_streamer'
 
 const STREAM: MediaStream | null = null
 let RECORDED_CHUNKS: BlobEvent[] = []
@@ -73,8 +73,8 @@ export async function initMediaRecorder(): Promise<void> {
                     return
                 }
 
-                new SoundRecorder()
-                SoundRecorder.instance.start(stream)
+                new SoundStreamer()
+                SoundStreamer.instance.start(stream)
 
                 try {
                     MEDIA_RECORDER = new MediaRecorder(stream, {
@@ -175,7 +175,6 @@ export async function startRecording(
     return project
 }
 export async function stop() {
-    SoundRecorder.instance.stop()
     console.log('media recorder stop')
     MEDIA_RECORDER.stop()
     console.log('unset all stream')

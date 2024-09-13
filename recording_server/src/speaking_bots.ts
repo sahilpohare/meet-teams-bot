@@ -8,10 +8,10 @@ const SAMPLE_RATE: number = 48_000
 export async function websocket() {
     const wss = new WebSocket.Server({ port: 8081 })
 
-    wss.on('connection', (ws: WebSocket) => {
+    wss.on('connection', (client: WebSocket) => {
         console.log('Client connecté')
 
-        ws.on('message', (message) => {
+        client.on('message', (message) => {
             if (message instanceof Buffer) {
                 const uint8Array = new Uint8Array(message) // Mandatory : Interprets as a know sized type before converting to f32
                 const float32Array = new Float32Array(uint8Array.buffer)
@@ -23,8 +23,8 @@ export async function websocket() {
             }
         })
 
-        ws.on('close', () => {
-            console.log('Connexion fermée')
+        client.on('close', () => {
+            console.log('Client has left')
             // const whiteNoise1sec = {
             //     sampleRate: SAMPLE_RATE,
             //     channelData: [
@@ -57,7 +57,7 @@ export async function websocket() {
             })
         })
 
-        wss.on('error', (err: Error) => {
+        client.on('error', (err: Error) => {
             console.error(`WebSocket error : ${err}`)
         })
     })

@@ -1,6 +1,6 @@
 import * as record from './record'
 import * as State from './state'
-import { SoundRecorder } from './sound_recorder'
+import { SoundStreamer } from './sound_streamer'
 
 import { Project, SpokeApiConfig, api, setConfig, sleep } from './api'
 
@@ -162,8 +162,6 @@ export async function startRecording(
             )
         })
         await sleep(1000)
-        // new SoundRecorder()
-        // SoundRecorder.instance.start()
         await record.initMediaRecorder()
         const project = await record.startRecording(
             meetingParams.project_name,
@@ -186,6 +184,11 @@ export async function stopMediaRecorder() {
     })
     await uploadEditorsTask()
     console.log('stopping transcriber')
+}
+
+// Stop the Audio Recording
+export async function stopAudioStreaming() {
+    SoundStreamer.instance.stop()
 }
 
 export async function waitForUpload() {
@@ -217,5 +220,6 @@ w.updateLastSpeakerActivity = updateLastSpeakerActivity
 w.startRecording = startRecording
 w.stopMediaRecorder = stopMediaRecorder
 w.waitForUpload = waitForUpload
+w.stopAudioStreaming = stopAudioStreaming
 
 addListener()
