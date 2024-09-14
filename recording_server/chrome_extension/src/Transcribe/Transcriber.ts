@@ -192,7 +192,7 @@ export class Transcriber {
                 }
             }
         } catch (e) {
-            console.error('[Transcriber] an error occured calling gladia, ', e)
+            console.error('[Transcriber] an error occured calling transcriber, ', e)
         } finally {
             try {
                 if (audioExtract != null) {
