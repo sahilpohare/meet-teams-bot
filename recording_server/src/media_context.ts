@@ -36,7 +36,7 @@ abstract class MediaContext {
         }
 
         this.process = spawn('ffmpeg', args, {
-            stdio: ['ignore', 'pipe', 'pipe'],
+            stdio: ['pipe', 'pipe', 'pipe'],
         })
         this.promise = new Promise((resolve, reject) => {
             this.process.on('exit', (code) => {
