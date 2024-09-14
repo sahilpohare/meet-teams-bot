@@ -236,7 +236,6 @@ export class MeetingHandle {
             )
             this.logger.info('startRecording called')
 
-            new SoundContext(48000)
             await Events.inCallRecording()
 
             if (project == null) {
