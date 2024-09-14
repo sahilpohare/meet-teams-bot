@@ -144,7 +144,9 @@ export class SoundContext extends MediaContext {
             `pcm_s16le`,
             MICRO_DEVICE,
         )
-        return super.execute(args, null).stdin
+        return super.execute(args, () => {
+            console.warn(`[play_stdin] Sequence ended`)
+        }).stdin
     }
 
     public async stop() {

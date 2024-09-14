@@ -19,7 +19,7 @@ const createFloat32Stream = (data: Float32Array): Readable => {
 
 export async function websocket() {
     const wss = new WebSocket.Server({ port: 8081 })
-    new SoundContext(48000)
+    new SoundContext(SAMPLE_RATE)
     let stdin = SoundContext.instance.play_stdin()
 
     wss.on('connection', (client: WebSocket) => {
