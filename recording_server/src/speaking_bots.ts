@@ -12,7 +12,7 @@ const createFloat32Stream = (data: Float32Array): Readable => {
     stream._read = () => {
         const buffer = Buffer.from(data.buffer)
         stream.push(buffer)
-        stream.push(null) // Signaling end of stream
+        // stream.push(null) // Signaling end of stream
     }
     return stream
 }
