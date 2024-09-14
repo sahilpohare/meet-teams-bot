@@ -59,16 +59,16 @@ export function listenPage(page: Page) {
             switch (type) {
                 case 'LOG':
                     console.log(`${tags}\n${text}`)
-                    break;
+                    break
                 case 'WAR':
-                    console.log('\x1b[38;5;214m%s\x1b[0m',`${tags}\n${text}`)
-                    break;
+                    console.log('\x1b[38;5;214m%s\x1b[0m', `${tags}\n${text}`)
+                    break
                 case 'ERR':
-                    console.log('\x1b[31m%s\x1b[0m',`${tags}\n${text}`)
-                    break;
+                    console.log('\x1b[31m%s\x1b[0m', `${tags}\n${text}`)
+                    break
                 case 'INF':
-                    console.log('\x1b[32m%s\x1b[0m',`${tags}\n${text}`)
-                    break;
+                    console.log('\x1b[32m%s\x1b[0m', `${tags}\n${text}`)
+                    break
                 default:
                     console.log(`DEFAULT CASE ${type} ! ${tags}\n${text}`)
             }

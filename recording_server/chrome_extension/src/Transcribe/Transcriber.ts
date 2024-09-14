@@ -14,12 +14,6 @@ import { recognizeGladia, parseGladia } from './providers/gladia'
 
 // milisseconds transcription chunk duration
 const TRANSCRIPTION_CHUNK_DURATION = 60 * 1000 * 3 // // 3 minutes
-enum TranscriptionProvider {
-    Runpod,
-    Gladia,
-}
-const TRANSCRIPTION_PROVIDER: TranscriptionProvider =
-    TranscriptionProvider.Gladia
 
 /**
  * Transcribes an audio stream using the recognizer of the underlying Node server.
@@ -129,7 +123,7 @@ export class Transcriber {
         try {
             if (
                 parameters.bot_id == null ||
-                parameters.speech_to_text != null
+                parameters.speech_to_text_provider != null
             ) {
                 this.rebootTimer = setInterval(() => {
                     this.transcribeQueue.push(async () => {
@@ -164,15 +158,16 @@ export class Transcriber {
             let audio_url = `https://${parameters.s3_bucket}.s3.eu-west-3.amazonaws.com/${path}`
 
             let transcripts: RecognizerTranscript[]
-            switch (TRANSCRIPTION_PROVIDER) {
-                case TranscriptionProvider.Runpod:
+            switch (parameters.speech_to_text_provider) {
+                case 'Runpod':
+                case 'Default':
                     let res_runpod = await recognizeRunPod(
                         audio_url,
                         parameters.vocabulary, // TODO : Envisager utiliser sur meeting baas.
                     )
                     transcripts = parseRunPod(res_runpod, currentOffset)
                     break
-                case TranscriptionProvider.Gladia:
+                case 'Gladia':
                     let res_gladia = await recognizeGladia(
                         audio_url,
                         parameters.vocabulary, // TODO : Envisager utiliser sur meeting baas.
@@ -181,7 +176,7 @@ export class Transcriber {
                     break
                 default:
                     console.error(
-                        `Unknown Transcription Provider ! ${TRANSCRIPTION_PROVIDER}`,
+                        `Unknown Transcription Provider ! ${parameters.speech_to_text_provider}`,
                     )
                     transcripts = new Array()
             }
@@ -192,7 +187,10 @@ export class Transcriber {
                 }
             }
         } catch (e) {
-            console.error('[Transcriber] an error occured calling transcriber, ', e)
+            console.error(
+                '[Transcriber] an error occured calling transcriber, ',
+                e,
+            )
         } finally {
             try {
                 if (audioExtract != null) {
