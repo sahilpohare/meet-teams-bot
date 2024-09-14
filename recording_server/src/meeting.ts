@@ -1,8 +1,8 @@
+
 import {
     BrandingHandle,
     generateBranding,
     playBranding,
-    playSound,
 } from './branding'
 import { Events } from './events'
 import { LOCAL_RECORDING_SERVER_LOCATION, delSessionInRedis } from './instance'
@@ -236,7 +236,7 @@ export class MeetingHandle {
             )
             this.logger.info('startRecording called')
 
-            playSound()
+            new SoundContext(48000)
             await Events.inCallRecording()
 
             if (project == null) {

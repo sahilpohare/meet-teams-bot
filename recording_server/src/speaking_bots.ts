@@ -1,12 +1,25 @@
 import { WebSocket } from 'ws'
+import { SoundContext } from './media_context'
+import { Readable } from 'stream'
 const fs = require('fs')
 const WavEncoder = require('wav-encoder')
 
 const audioData: Float32Array[] = []
 const SAMPLE_RATE: number = 48_000
 
+const createFloat32Stream = (data: Float32Array): Readable => {
+    const stream = new Readable()
+    stream._read = () => {
+        const buffer = Buffer.from(data.buffer)
+        stream.push(buffer)
+        stream.push(null) // Signaling end of stream
+    }
+    return stream
+}
+
 export async function websocket() {
     const wss = new WebSocket.Server({ port: 8081 })
+    let stdin = SoundContext.instance.play_stdin()
 
     wss.on('connection', (client: WebSocket) => {
         console.log('Client connecté')
@@ -19,6 +32,7 @@ export async function websocket() {
                 // console.log(float32Array[1])
                 // console.log(float32Array[2])
                 // console.log(float32Array[3])
+                createFloat32Stream(float32Array).pipe(stdin)
                 audioData.push(float32Array)
             }
         })
