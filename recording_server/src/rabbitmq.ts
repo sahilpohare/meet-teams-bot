@@ -1,5 +1,4 @@
 import { Channel, connect } from 'amqplib'
-import { notify, notifyApp } from './calendar'
 import {
     LOCK_INSTANCE_AT_STARTUP,
     POD_IP,
@@ -115,14 +114,6 @@ export class Consumer {
         } catch (e) {
             console.error('fail to set protection', e)
         }
-        if (LOCK_INSTANCE_AT_STARTUP) {
-            try {
-                await notifyApp('PrepareRecording', data, {}, {})
-            } catch (e) {
-                logger.error(`fail to nitfy app`, e)
-            }
-        }
-
         let meetingSession = {
             bot_ip: POD_IP,
             user_id: data.user_id,
@@ -140,35 +131,5 @@ export class Consumer {
 
         const project = await MeetingHandle.instance.startRecordMeeting()
         setLoggerProjectId(project?.id)
-        try {
-            await notify({
-                message: 'BotEntered',
-                user_id: data.user_id,
-                payload: {
-                    agenda: data.agenda,
-                    session_id: data.session_id,
-                    meeting_url: data.meeting_url,
-                    project,
-                },
-            })
-        } catch (e) {
-            logger.error(`fail to nitfy app`, e)
-        }
-        try {
-            await notifyApp(
-                'Recording',
-                data,
-                {
-                    session_id: data.session_id,
-                    project_id: project.id,
-                },
-                {
-                    session_id: data.session_id,
-                    project,
-                },
-            )
-        } catch (e) {
-            logger.error(`fail to nitfy app`, e)
-        }
     }
 }

@@ -4,25 +4,24 @@ import * as path from 'path'
 import * as redis from 'redis'
 
 import {
-    ChangeAgendaRequest,
     MessageToBroadcast,
     SpeakerData,
     StatusParams,
     StopRecordParams,
 } from './types'
 
+import { PORT } from './instance'
 import { Logger } from './logger'
 import { MeetingHandle } from './meeting'
-import { PORT } from './instance'
 
 import { sleep } from './utils'
 
 import axios from 'axios'
-import { SoundContext, VideoContext } from './media_context'
 import { execSync } from 'child_process'
 import { unlinkSync } from 'fs'
+import { SoundContext, VideoContext } from './media_context'
+import { TRANSCODER } from './transcoder'
 
-export let PROJECT_ID: number | undefined = undefined
 export const LOGGER = new Logger({})
 
 console.log('redis url: ', process.env.REDIS_URL)
@@ -383,6 +382,65 @@ export async function server() {
         process.exit(0)
     })
 
+    app.post('/transcoder/start', async (req, res) => {
+        try {
+            const audioOnly = req.body.audioOnly || false
+            const color = req.body.color || 'black'
+            const { fifoPath, outputPath } = await TRANSCODER.init(audioOnly, color)
+            res.status(200).json({ message: 'Script lancé avec succès', fifoPath, outputPath })
+        } catch (err) {
+            console.error('Erreur:', err)
+            res.status(500).json({ error: 'Erreur lors de la création de la FIFO ou du lancement du script' })
+        }
+    })
+
+    app.post('/transcoder/upload_chunk', async (req, res) => {
+        if (!req.body) {
+            return res.status(400).json({ error: 'Le corps de la requête doit être un buffer' })
+        }
+
+        try {
+            await TRANSCODER.upload_chunk(req.body)
+            res.status(200).json({ message: 'Chunk uploadé avec succès' })
+        } catch (err) {
+            console.error('Erreur lors de l\'upload du chunk:', err)
+            res.status(500).json({ error: 'Erreur lors de l\'upload du chunk' })
+        }
+    })
+
+    // Ajout d'une route pour arrêter le transcodeur si nécessaire
+    app.post('/transcoder/stop', (req, res) => {
+        TRANSCODER.stop()
+        res.status(200).json({ message: 'Transcoder arrêté avec succès' })
+    })
+    
+
+    // Ajoutez cette nouvelle route pour récupérer le chemin du fichier de sortie
+    app.get('/transcoder/output', (req, res) => {
+        const outputPath = TRANSCODER.getOutputPath()
+        res.status(200).json({ outputPath })
+    })
+
+    app.post('/transcoder/extract_audio', async (req, res) => {
+        const { timeStart, timeEnd, bucketName, s3Path } = req.body
+
+        if (typeof timeStart !== 'number' || typeof timeEnd !== 'number') {
+            return res.status(400).json({ error: 'timeStart et timeEnd doivent être des nombres' })
+        }
+
+        if (typeof bucketName !== 'string' || typeof s3Path !== 'string') {
+            return res.status(400).json({ error: 'bucketName et s3Path doivent être des chaînes de caractères' })
+        }
+
+        try {
+            const s3Url = await TRANSCODER.extractAudio(timeStart, timeEnd, bucketName, s3Path)
+            res.status(200).json({ message: 'Extraction audio et upload réussis', s3Url })
+        } catch (err) {
+            console.error('Erreur lors de l\'extraction audio ou de l\'upload:', err)
+            res.status(500).json({ error: 'Erreur lors de l\'extraction audio ou de l\'upload' })
+        }
+    })
+
     // Only spoke for the moment
     app.post('/status', async (req, res) => {
         function statusReady() {
@@ -434,19 +492,6 @@ export async function server() {
             res.json(null)
             return
         } catch (e) {
-            res.status(500).send(JSON.stringify(e))
-        }
-    })
-
-    // Used by Spoke / Maybe useless : Template Choose
-    app.post('/change_agenda', async (req, res) => {
-        const data: ChangeAgendaRequest = req.body
-        console.log('change agenda request', data)
-        try {
-            await MeetingHandle.instance.changeAgenda(data)
-            res.send('ok')
-        } catch (e) {
-            LOGGER.error(`changing agenda error ${e}`)
             res.status(500).send(JSON.stringify(e))
         }
     })

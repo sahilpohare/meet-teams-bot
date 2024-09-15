@@ -1,3 +1,6 @@
+import axios from 'axios'
+import { exit } from 'process'
+import { generateBranding } from './branding'
 import {
     API_SERVER_BASEURL,
     LOCK_INSTANCE_AT_STARTUP,
@@ -6,13 +9,8 @@ import {
 } from './instance'
 import { JoinError, JoinErrorCode, MeetingHandle } from './meeting'
 import { getCachedExtensionId, getExtensionId, openBrowser } from './puppeteer'
-import { LOGGER, clientRedis, server } from './server'
-
-import axios from 'axios'
-import { exit } from 'process'
-import { generateBranding } from './branding'
-import { notifyApp } from './calendar'
 import { Consumer } from './rabbitmq'
+import { LOGGER, clientRedis, server } from './server'
 import { MeetingParams } from './types'
 import { sleep } from './utils'
 
@@ -31,6 +29,7 @@ console.log('version 0.0.1')
         axios.defaults.baseURL = API_SERVER_BASEURL
         axios.defaults.withCredentials = true
 
+        // trigger system cache in order to decrease latency when first bot come
         try {
             await triggerCache()
         } catch (e) {
@@ -82,7 +81,7 @@ console.log('version 0.0.1')
             } catch (e) {
                 console.error('fail to delete queue', e)
             }
-            await terminateInstance()
+            await terminateInstance(params.bot_id)
         }
         console.log('exiting instance')
         exit(0)
@@ -99,12 +98,6 @@ async function handleErrorInStartRecording(error: Error, data: MeetingParams) {
         )
     }
     try {
-        await notifyApp(
-            'Error',
-            data,
-            { error: JSON.stringify(error) },
-            { error: JSON.stringify(error) },
-        )
         await meetingBotStartRecordFailed(
             data.meeting_url,
             data.event?.id,
@@ -117,10 +110,6 @@ async function handleErrorInStartRecording(error: Error, data: MeetingParams) {
             e,
         )
     }
-}
-
-function isString(value) {
-    return typeof value === 'string' || value instanceof String
 }
 
 export async function meetingBotStartRecordFailed(
@@ -151,24 +140,3 @@ async function triggerCache() {
     ])
     await browser.browser.close()
 }
-
-// Fonction pour gérer l'arrêt propre du serveur
-const gracefulShutdown = () => {
-    if (process.env.PROFILE !== 'DEV') {
-        return
-    }
-    console.log('Received kill signal, shutting down gracefully...')
-    // server.close(() => {
-    //   console.log('Closed out remaining connections.');
-    //   process.exit(0);
-    // });
-
-    // // Force close server after 10 seconds
-    // setTimeout(() => {
-    //   console.error('Could not close connections in time, forcefully shutting down');
-    //   process.exit(1);
-    // }, 10000);
-    process.exit(-1)
-}
-
-process.on('SIGTERM', gracefulShutdown)

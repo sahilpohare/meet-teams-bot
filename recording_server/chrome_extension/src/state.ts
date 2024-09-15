@@ -46,10 +46,6 @@ export function addMeetingParams(meetingParams: MeetingParams) {
     })
 }
 
-export function changeAgenda(agenda: Agenda) {
-    parameters.agenda = agenda
-}
-
 // TODO : language_code - 99% sure it is trash code
 // export function changeLanguage(changeLanguage: ChangeLanguage) {
 //     parameters.language = changeLanguage.language

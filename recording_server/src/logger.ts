@@ -1,18 +1,12 @@
 import { BUCKET_NAME, s3cp } from './s3'
 
-import { LOGGER } from './server'
 import axios from 'axios'
 import { exec } from 'child_process'
 import * as fs from 'fs/promises'
+import { LOGGER } from './server'
 
-import { getFiles } from './utils'
 import * as path from 'path'
-
-let PROJECT_ID: number | undefined = undefined
-
-export function setLoggerProjectId(project_id: number) {
-    PROJECT_ID = project_id
-}
+import { getFiles } from './utils'
 
 export class Logger {
     tags = {}
@@ -148,9 +142,9 @@ export async function uploadLog(
     }
 }
 
-export function uploadLogScript() {
+export function uploadLogScript(bot_id: string) {
     return new Promise<void>((res, _rej) => {
-        exec(`upload_log.sh ${PROJECT_ID ?? ''}`, (_error, stdout, stderr) => {
+        exec(`upload_log.sh ${bot_id ?? ''}`, (_error, stdout, stderr) => {
             LOGGER.info(`upload log`, { stdout, stderr })
             res()
         })

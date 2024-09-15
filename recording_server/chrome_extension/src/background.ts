@@ -1,12 +1,12 @@
-import * as State from './state'
 import * as record from './record'
+import * as State from './state'
 
-import { Project, api, SpokeApiConfig, setConfig, sleep } from './api'
+import { Project, SpokeApiConfig, api, setConfig, sleep } from './api'
 
-import { ApiService } from './recordingServerApi'
-import { SpeakerData } from './observeSpeakers'
-import { Transcriber } from './Transcribe/Transcriber'
 import axios from 'axios'
+import { SpeakerData } from './observeSpeakers'
+import { ApiService } from './recordingServerApi'
+import { Transcriber } from './Transcribe/Transcriber'
 import { uploadEditorsTask } from './uploadEditors'
 
 export let SPEAKERS: SpeakerData[] = []
@@ -208,38 +208,11 @@ export async function waitForUpload() {
     }
 }
 
-export type ChangeLanguage = {
-    meeting_url: string
-    use_my_vocabulary: boolean
-    language: string
-}
-
-export type ChangeAgenda = {
-    agenda_id: number
-}
-
-export async function getAgenda() {
-    return State.parameters.agenda ?? undefined
-}
-
-export async function changeAgenda(data: ChangeAgenda) {
-    if (State.parameters.agenda?.id !== data.agenda_id) {
-        try {
-            const agenda = await api.getAgendaWithId(data.agenda_id)
-            State.changeAgenda(agenda)
-        } catch (e) {
-            console.error('error getting agenda', e)
-        }
-    }
-}
-
 const w = window as any
 w.addSpeaker = addSpeaker
 w.updateLastSpeakerActivity = updateLastSpeakerActivity
 w.startRecording = startRecording
 w.stopMediaRecorder = stopMediaRecorder
 w.waitForUpload = waitForUpload
-w.changeAgenda = changeAgenda
-w.getAgenda = getAgenda
 
 addListener()

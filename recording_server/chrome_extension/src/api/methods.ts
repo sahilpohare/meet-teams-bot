@@ -16,7 +16,6 @@ import {
     Word,
     Workspace,
 } from './types'
-import { sleep } from '../api'
 
 export async function stopBot(params: { session_id: string }) {
     try {
@@ -148,18 +147,6 @@ export async function getAgenda(share_link: string): Promise<Agenda> {
     return (await axios.get(`/agendas/${share_link}`)).data
 }
 
-export async function notifyApp(user_token: string, payload: any) {
-    return (
-        await axios({
-            method: 'POST',
-            url: `/notification/broadcast`,
-            data: payload,
-            headers: {
-                Authorization: user_token,
-            },
-        })
-    ).data
-}
 
 export async function postProject(p: {
     name: string

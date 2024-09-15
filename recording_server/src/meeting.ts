@@ -4,8 +4,13 @@ import {
     playBranding,
     playSound,
 } from './branding'
+import { Events } from './events'
 import { LOCAL_RECORDING_SERVER_LOCATION, delSessionInRedis } from './instance'
 import { Logger, uploadLog } from './logger'
+import { VideoContext } from './media_context'
+import { MeetProvider } from './meeting/meet'
+import { TeamsProvider } from './meeting/teams'
+import { ZoomProvider } from './meeting/zoom'
 import {
     getCachedExtensionId,
     listenPage,
@@ -14,24 +19,14 @@ import {
 } from './puppeteer'
 import {
     CancellationToken,
-    ChangeAgendaRequest,
-    // TODO : language_code - 99% sure it is trash code
-    // ChangeLanguage,
     Meeting,
     MeetingParams,
     MeetingProvider,
     MeetingProviderInterface,
     MeetingStatus,
-    SpeakerData,
+    SpeakerData
 } from './types'
-
-import { notifyApp } from './calendar'
-import { Events } from './events'
-import { MeetProvider } from './meeting/meet'
-import { TeamsProvider } from './meeting/teams'
-import { ZoomProvider } from './meeting/zoom'
 import { sleep } from './utils'
-import { VideoContext, SoundContext } from './media_context'
 
 const RECORDING_TIMEOUT = 3600 * 4 // 4 hours
 // const RECORDING_TIMEOUT = 120 // 2 minutes for tests
@@ -336,35 +331,6 @@ export class MeetingHandle {
         }
     }
 
-    public async getAgenda(): Promise<any | undefined> {
-        const agenda = await this.meeting.backgroundPage!.evaluate(async () => {
-            const w = window as any
-            return await w.getAgenda()
-        })
-        return agenda
-    }
-
-    public async changeAgenda(data: ChangeAgendaRequest) {
-        this.logger.info('Changing agenda', {
-            new_agenda: data.agenda_id,
-        })
-        await this.meeting.backgroundPage!.evaluate(async (data) => {
-            const w = window as any
-            await w.changeAgenda(data)
-        }, data)
-    }
-
-    // TODO : language_code - 99% sure it is trash code
-    // public async changeLanguage(data: ChangeLanguage) {
-    //     this.logger.info('Changing language', {
-    //         new_language: data.language,
-    //     })
-    //     await this.meeting.backgroundPage!.evaluate(async (data) => {
-    //         const w = window as any
-    //         await w.changeLanguage(data)
-    //     }, data)
-    // }
-
     public async stopRecording(reason: string) {
         if (MeetingHandle.status.state !== 'Recording') {
             this.logger.error(
@@ -380,14 +346,6 @@ export class MeetingHandle {
     }
 
     private async stopRecordingInternal() {
-        try {
-            await notifyApp(
-                'EndRecording',
-                this.param,
-                {},
-                { session_id: this.param.session_id },
-            )
-        } catch (e) {}
         let { page, meetingTimeoutInterval, browser, backgroundPage } =
             this.meeting
         await backgroundPage!.evaluate(async () => {

@@ -11,8 +11,8 @@ import {
     SummaryParam,
     Workspace,
     api,
+    sleep,
 } from '../api'
-import { sleep } from '../api'
 import { Transcriber } from './Transcriber'
 
 const MIN_TOKEN_GPT4 = 1000
@@ -106,11 +106,6 @@ async function tryDetectClientAndTemplate(
                 } catch (e) {
                     console.error('failed to patch project')
                 }
-                await api.notifyApp(parameters.user_token, {
-                    message: 'AgendaDetected',
-                    user_id: parameters.user_id,
-                    payload: { agenda_id: parameters.agenda.id },
-                })
             }
             return true
         }

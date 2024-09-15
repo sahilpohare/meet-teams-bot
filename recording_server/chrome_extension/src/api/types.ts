@@ -313,22 +313,6 @@ export const LABEL_COLORS = [
     '#A63163',
 ]
 
-export type SummaryParam = {
-    sentences: Sentence[]
-    max_token?: number
-    labels?: string[]
-    lang?: string
-    project_id?: number
-    title?: string
-    participants?: string[]
-    test_prompt?: string
-    test_model?: string
-    test_gpt4?: boolean
-    client_name?: string
-    template_name?: string
-    highlights_without_timestamp?: string[]
-}
-
 export type Sentence = {
     speaker: string
     start_timestamp?: number
