@@ -21,8 +21,11 @@ export type StatusParams = {
 export type RecordingMode = 'speaker_view' | 'gallery_view' | 'audio_only'
 
 export interface MeetingProviderInterface {
-    openMeetingPage(browser: Browser, link: string): Promise<Page>
-
+    openMeetingPage(
+        browser: Browser,
+        link: string,
+        speaking_bot_output: string | undefined,
+    ): Promise<Page>
     joinMeeting(
         page: Page,
         cancelCheck: () => boolean,
