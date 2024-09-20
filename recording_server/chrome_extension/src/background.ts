@@ -162,7 +162,7 @@ export async function startRecording(
             )
         })
         await sleep(1000)
-        await record.initMediaRecorder()
+        await record.initMediaRecorder(meetingParams.streaming_output)
         const project = await record.startRecording(
             meetingParams.project_name,
             meetingParams.agenda,
@@ -188,7 +188,7 @@ export async function stopMediaRecorder() {
 
 // Stop the Audio Recording
 export async function stopAudioStreaming() {
-    SoundStreamer.instance.stop()
+    SoundStreamer.instance?.stop()
 }
 
 export async function waitForUpload() {

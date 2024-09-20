@@ -12,8 +12,7 @@ import { setLoggerProjectId } from './logger'
 import { MeetingHandle } from './meeting'
 import { LOGGER } from './server'
 import { MeetingParams } from './types'
-import { speaking_bot } from './speaking_bots'
-import { sleep } from './utils'
+import { Streaming } from './streaming'
 
 const POD_NAME = process.env.POD_NAME
 
@@ -109,8 +108,12 @@ export class Consumer {
     // throw error if start recoridng fail
     static async handleStartRecord(data: MeetingParams) {
         let logger = LOGGER.new({})
-        if (data.streaming_input && data.streaming_output) {
-            speaking_bot(data.streaming_input, data.streaming_output)
+        if (data.streaming_input || data.streaming_output) {
+            new Streaming(
+                data.streaming_input,
+                data.streaming_output,
+                data.bot_id,
+            )
         }
         console.log('####### DATA #######', data)
         // Prevent instance for beeing scaled down
