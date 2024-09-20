@@ -23,8 +23,8 @@ export type MeetingParams = {
     translation_lang?: string
     speech_to_text_provider?: SpeechToTextProvider
     speech_to_text_api_key?: string
-    speaking_bot_input?: string
-    speaking_bot_output?: string
+    streaming_input?: string
+    streaming_output?: string
     bot_id?: string
     s3_bucket: string
     recording_mode: RecordingMode

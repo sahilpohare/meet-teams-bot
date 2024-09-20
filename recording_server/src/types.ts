@@ -24,7 +24,7 @@ export interface MeetingProviderInterface {
     openMeetingPage(
         browser: Browser,
         link: string,
-        speaking_bot_output: string | undefined,
+        streaming_input: string | undefined,
     ): Promise<Page>
     joinMeeting(
         page: Page,

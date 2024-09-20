@@ -59,14 +59,14 @@ export class TeamsProvider implements MeetingProviderInterface {
     async openMeetingPage(
         browser: puppeteer.Browser,
         link: string,
-        speaking_bot_output: string | undefined,
+        streaming_input: string | undefined,
     ): Promise<puppeteer.Page> {
         const url = new URL(link)
         console.log({ url })
 
         const context = browser.defaultBrowserContext()
         await context.clearPermissionOverrides()
-        if (speaking_bot_output) {
+        if (streaming_input) {
             await context.overridePermissions(url.origin, [
                 'microphone',
                 'camera',

@@ -109,8 +109,8 @@ export class Consumer {
     // throw error if start recoridng fail
     static async handleStartRecord(data: MeetingParams) {
         let logger = LOGGER.new({})
-        if (data.speaking_bot_input && data.speaking_bot_output) {
-            speaking_bot(data.speaking_bot_input, data.speaking_bot_output)
+        if (data.streaming_input && data.streaming_output) {
+            speaking_bot(data.streaming_input, data.streaming_output)
         }
         console.log('####### DATA #######', data)
         // Prevent instance for beeing scaled down

@@ -183,7 +183,7 @@ export class MeetingHandle {
             this.meeting.page = await this.provider.openMeetingPage(
                 this.meeting.browser,
                 meetingLink,
-                this.param.speaking_bot_output,
+                this.param.streaming_input,
             )
             this.logger.info('meeting page opened')
 
