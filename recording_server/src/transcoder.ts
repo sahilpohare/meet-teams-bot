@@ -5,55 +5,78 @@ import * as path from 'path'
 import { promisify } from 'util'
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
-const mkfifo = promisify(fs.mkfifo)
-const unlink = promisify(fs.unlink)
 const writeFile = promisify(fs.writeFile)
 
 export class Transcoder {
-    private fifoPath: string
     private outputPath: string
     private child: ChildProcess | null = null
+    private videoS3Path: string
 
     constructor() {
-        this.fifoPath = path.join(os.tmpdir(), 'video.pipe')
         this.outputPath = path.join(os.tmpdir(), 'output.mp4')
     }
 
-    private async createFifo(): Promise<void> {
-        try {
-            await unlink(this.fifoPath)
-        } catch (err: any) {
-            if (err.code !== 'ENOENT') throw err
-        }
-        await mkfifo(this.fifoPath, 0o644)
-    }
-
-    public async init(audioOnly: boolean = false, color: string = 'black'): Promise<{ fifoPath: string, outputPath: string }> {
+    public async init(bucketName: string, videoS3Path: string, audioOnly: boolean = false, color: string = 'black'): Promise<void> {
         if (this.child) {
             console.log('Transcoder déjà initialisé')
-            return { fifoPath: this.fifoPath, outputPath: this.outputPath }
+            return
         }
+        this.videoS3Path = videoS3Path
 
-        await this.createFifo()
-        console.log('FIFO créée avec succès:', this.fifoPath)
-        
         // Lancer le script transcode_video.sh de manière asynchrone
-        this.child = spawn('./transcode_video.sh', [this.fifoPath, this.outputPath, audioOnly.toString(), color], {
+        this.child = spawn('./transcode_video.sh', [this.outputPath, audioOnly.toString(), color], {
             detached: true,
-            stdio: 'ignore'
+            stdio: ['pipe', 'inherit', 'inherit']
         })
-        this.child.unref()
         
         console.log('Script lancé avec succès.')
-        return { fifoPath: this.fifoPath, outputPath: this.outputPath }
+        return
+    }
+    // Méthode pour écrire dans stdin
+    private writeToChildStdin(data: string | Buffer): void {
+        if (!this.child || !this.child.stdin) {
+            throw new Error('Le processus enfant n\'est pas initialisé ou stdin n\'est pas disponible')
+        }
+        this.child.stdin.write(data)
     }
 
-    public stop(): void {
-        if (this.child) {
-            this.child.kill()
-            this.child = null
-            console.log('Transcoder arrêté')
+    // Nouvelle méthode pour fermer stdin
+    private closeChildStdin(): void {
+        if (!this.child || !this.child.stdin) {
+            console.log('Le processus enfant n\'est pas initialisé ou stdin n\'est pas disponible')
+            return
         }
+        this.child.stdin.end()
+        console.log('stdin du processus enfant fermé')
+    }
+
+
+    public async stop(): Promise<void> {
+        if (!this.child) {
+            console.log('Transcoder non initialisé, rien à arrêter.');
+            return;
+        }
+
+        console.log('Arrêt du transcoder...');
+
+        this.closeChildStdin()
+
+        // Attendre que le processus enfant se termine
+        await (new Promise<void>((resolve, reject) => {
+            this.child!.on('close', (code) => {
+                console.log(`Processus transcode_video.sh terminé avec le code ${code}`);
+                this.child = null;
+                resolve();
+            });
+
+            setTimeout(() => {
+                if (this.child) {
+                    this.child.kill('SIGTERM');
+                    reject(new Error('Timeout lors de l\'arrêt du transcoder'));
+                }
+            }, 60000); // 30 secondes de timeout
+        }))
+        this.uploadToS3(this.outputPath, this.bucketName, this.videoS3Path)
     }
 
     public async upload_chunk(chunk: Buffer): Promise<void> {
@@ -62,10 +85,10 @@ export class Transcoder {
         }
 
         try {
-            await writeFile(this.fifoPath, chunk, { flag: 'a' })
-            console.log('Chunk écrit avec succès dans le FIFO')
+            this.writeToChildStdin(chunk)
+            console.log('Chunk écrit avec succès dans ffmpeg')
         } catch (err) {
-            console.error('Erreur lors de l\'écriture du chunk dans le FIFO:', err)
+            console.error('Erreur lors de l\'écriture du chunk dans ffmpeg:', err)
             throw err
         }
     }

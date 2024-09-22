@@ -24,7 +24,7 @@ import {
     MeetingProvider,
     MeetingProviderInterface,
     MeetingStatus,
-    SpeakerData
+    SpeakerData,
 } from './types'
 import { sleep } from './utils'
 
@@ -51,11 +51,9 @@ export enum JoinErrorCode {
 export class Status {
     state: MeetingStatus
     error: any | null
-    project: { id: number; share_link?: string } | null
     constructor() {
         this.state = 'Recording'
         this.error = null
-        this.project = null
     }
 }
 
@@ -79,9 +77,6 @@ export class MeetingHandle {
     }
     static getUserId(): number | null {
         return MeetingHandle.instance.param.user_id
-    }
-    static getProject(): { id: number } | null {
-        return MeetingHandle.status?.project
     }
     static getError(): any | null {
         return MeetingHandle.status?.error
@@ -214,29 +209,33 @@ export class MeetingHandle {
             listenPage(this.meeting.backgroundPage)
             await Events.inCallNotRecording()
 
-            const project = await this.meeting.backgroundPage.evaluate(
-                async (meuh) => {
-                    const w = window as any
-                    return await w.startRecording(meuh)
-                },
-                {
-                    ...this.param,
-                    s3_bucket: process.env.AWS_S3_BUCKET,
-                    api_server_baseurl: process.env.API_SERVER_BASEURL,
-                    api_bot_baseurl: process.env.API_BOT_BASEURL,
-                },
-            )
+            const startRecordSuccess =
+                await this.meeting.backgroundPage.evaluate(
+                    async (meuh) => {
+                        try {
+                            const w = window as any
+                            await w.startRecording(meuh)
+                            return true
+                        } catch (error) {
+                            console.error(error)
+                            return false
+                        }
+                    },
+                    {
+                        ...this.param,
+                        s3_bucket: process.env.AWS_S3_BUCKET,
+                        api_server_baseurl: process.env.API_SERVER_BASEURL,
+                        api_bot_baseurl: process.env.API_BOT_BASEURL,
+                    },
+                )
             this.logger.info('startRecording called')
 
             playSound()
             await Events.inCallRecording()
 
-            if (project == null) {
+            if (startRecordSuccess === false) {
                 throw new JoinError(JoinErrorCode.Internal)
             }
-
-            MeetingHandle.status.project = project
-            return project
         } catch (error) {
             await this.cleanEverything(true)
             MeetingHandle.status.error = error
@@ -250,8 +249,6 @@ export class MeetingHandle {
                 this.param.user_id,
                 this.param.email,
                 this.param.bot_id,
-                MeetingHandle.status.project?.id,
-                MeetingHandle.status.project?.share_link,
             )
         } catch (e) {
             this.logger.error(`failed to upload logs: ${e}`)
@@ -401,8 +398,6 @@ export class MeetingHandle {
                     this.param.user_id,
                     this.param.email,
                     this.param.bot_id,
-                    MeetingHandle.status.project?.id,
-                    MeetingHandle.status.project?.share_link,
                 )
             } catch (e) {
                 console.error(e)

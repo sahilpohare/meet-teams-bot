@@ -2,7 +2,7 @@
 
 import axios from 'axios'
 
-type MessageType = 'SPEAKERS' | 'LOG' | 'STOP_MEETING'
+type MessageType = 'SPEAKERS' | 'LOG' | 'STOP_MEETING' | 'START_TRANSCODER' | 'UPLOAD_CHUNK' | 'STOP_TRANSCODER' | 'EXTRACT_AUDIO'
 
 // Yes, any is funny :cow:
 type MessagePayload = any
@@ -51,12 +51,52 @@ export class ApiService {
             url,
         )
         switch (messageType) {
+            case 'START_TRANSCODER':
+                await axios
+                    .post(`${url}transcoder/start`, payload)
+                    .catch((error) => {
+                        console.error(
+                            'Failed to send transcoder start message:',
+                            error,
+                        )
+                    })
+                break
+            case 'UPLOAD_CHUNK':
+                await axios
+                    .post(`${url}transcoder/upload_chunk`, payload)
+                    .catch((error) => {
+                        console.error(
+                            'Failed to send upload chunk message:',
+                            error,
+                        )
+                    })
+                break
+            case 'EXTRACT_AUDIO':
+                await axios
+                    .post(`${url}transcoder/extract_audio`, payload)
+                    .catch((error) => {
+                        console.error(
+                            'Failed to send extract_audio message:',
+                            error,
+                        )
+                    })
+                break
+            case 'STOP_TRANSCODER':
+                await axios
+                    .post(`${url}transcoder/stop`, payload)
+                    .catch((error) => {
+                        console.error(
+                            'Failed to send stop transcoder message:',
+                            error,
+                        )
+                    })
+                break
             case 'SPEAKERS':
                 await axios
                     .post(`${url}add_speaker`, payload)
                     .catch((error) => {
                         console.error(
-                            'Failed to send LOG_SPEAKER message:',
+                            'Failed to send SPEAKER message:',
                             error,
                         )
                     })

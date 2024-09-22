@@ -1,13 +1,13 @@
 import * as record from './record'
 import * as State from './state'
 
-import { Project, SpokeApiConfig, api, setConfig, sleep } from './api'
+import { SpokeApiConfig, api, setConfig, sleep } from './api'
 
 import axios from 'axios'
 import { SpeakerData } from './observeSpeakers'
 import { ApiService } from './recordingServerApi'
 import { Transcriber } from './Transcribe/Transcriber'
-import { uploadEditorsTask } from './uploadEditors'
+import { uploadTranscriptTask } from './uploadTranscripts'
 
 export let SPEAKERS: SpeakerData[] = []
 export let ATTENDEES: string[] = []
@@ -59,7 +59,7 @@ function addSpeaker(speaker: SpeakerData) {
     // console.log(`EXTENSION BACKGROUND PAGE - ADD SPEAKER : ${speaker}`)
     LAST_SPEAKER_ACTIVITY = speaker.timestamp
     SPEAKERS.push(speaker)
-    uploadEditorsTask()
+    uploadTranscriptTask()
 }
 
 function updateLastSpeakerActivity(timestamp: number) {
@@ -137,7 +137,7 @@ function observeSpeakers() {
 // Start recording the current tab
 export async function startRecording(
     meetingParams: State.MeetingParams,
-): Promise<Project | undefined> {
+): Promise<undefined> {
     try {
         State.addMeetingParams(meetingParams)
 
@@ -162,11 +162,7 @@ export async function startRecording(
         })
         await sleep(1000)
         await record.initMediaRecorder()
-        const project = await record.startRecording(
-            meetingParams.project_name,
-            meetingParams.agenda,
-        )
-        return project
+        await record.startRecording()
     } catch (e) {
         console.log('ERROR while start recording', JSON.stringify(e))
     }
@@ -181,7 +177,7 @@ export async function stopMediaRecorder() {
         timestamp: Date.now(),
         isSpeaking: false,
     })
-    await uploadEditorsTask()
+    await uploadTranscriptTask()
     console.log('stopping transcriber')
 }
 
@@ -196,15 +192,10 @@ export async function waitForUpload() {
         console.error('error in stopRecordServer', e)
     }
 
-    if (record.SESSION?.project.id != null) {
-        try {
-            await api.endMeetingTrampoline(
-                record.SESSION.project.id,
-                State.parameters.bot_id,
-            )
-        } catch (e) {
-            console.error('error in endMeetingTranpoline', e)
-        }
+    try {
+        await api.endMeetingTrampoline(State.parameters.bot_id)
+    } catch (e) {
+        console.error('error in endMeetingTranpoline', e)
     }
 }
 

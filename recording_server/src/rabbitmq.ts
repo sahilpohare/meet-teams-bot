@@ -8,7 +8,6 @@ import {
 
 import axios from 'axios'
 import { Events } from './events'
-import { setLoggerProjectId } from './logger'
 import { MeetingHandle } from './meeting'
 import { LOGGER } from './server'
 import { MeetingParams } from './types'
@@ -129,7 +128,6 @@ export class Consumer {
         Events.init(data)
         await Events.joiningCall()
 
-        const project = await MeetingHandle.instance.startRecordMeeting()
-        setLoggerProjectId(project?.id)
+        await MeetingHandle.instance.startRecordMeeting()
     }
 }

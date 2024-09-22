@@ -1,15 +1,8 @@
 import * as asyncLib from 'async'
+import { RecognizerWord, sleep, Transcript } from './api'
 import { parameters } from './background'
 import { newSerialQueue } from './queue'
-import {
-    Agenda,
-    api,
-    Asset,
-    EditorWrapper,
-    Project,
-    RecognizerWord,
-} from './api'
-import { sleep } from './api'
+import { ApiService } from './recordingServerApi'
 import { Transcriber } from './Transcribe/Transcriber'
 
 const STREAM: MediaStream | null = null
@@ -24,25 +17,21 @@ let CONTEXT: AudioContext
 // TODO : Dead code ?
 // export const MIN_DURATION_MOMENT = 2100
 
-// INFO : START_RECORD_TIMESTAMP is shared with Transcriber & UploadEditors(speaker changes)
+// INFO : START_RECORD_TIMESTAMP is shared with Transcriber & UploadTranscripts(speaker changes)
 export let START_RECORD_TIMESTAMP = 0
-// INFO : SESSION is shared with Transcriber & UploadEditors(speaker changes)
+// INFO : SESSION is shared with Transcriber & UploadTranscripts(speaker changes)
 export let SESSION: SpokeSession | null = null
 
 export type SpokeSession = {
-    id: number
     upload_queue: asyncLib.AsyncQueue<() => Promise<void>>
-    project: Project
-    completeEditors: EditorWrapper[]
+    transcripts: Transcript[]
     start_timestamp: number
     cut_times: number[]
-    asset: Asset
     words: RecognizerWord[]
     videoS3Path?: string
     thumbnailPath?: string
     //last word transcribe time
     // complete_video_file_path: string,
-    uploadChunkCounter: number
     transcribedUntil: number
 }
 
@@ -110,45 +99,11 @@ export async function initMediaRecorder(): Promise<void> {
     })
 }
 
-export async function startRecording(
-    projectName: string,
-    agenda?: Agenda,
-): Promise<Project> {
-    const newSessionId = await api.startRecordingSession()
-    console.log('[startRecording]: '.concat(newSessionId.toLocaleString()))
-
-    console.log(`[startRecording] before post project`)
-    let agendaRefreshed = agenda
-    if (agendaRefreshed != null) {
-        try {
-            agendaRefreshed = await api.getAgenda(agendaRefreshed.share_link)
-        } catch (e) {
-            console.error('error refreshing agenda', e)
-        }
-    } else {
-        agendaRefreshed = { json: { blocks: [] } } as any as Agenda
-    }
-    agendaRefreshed.json.blocks = agendaRefreshed.json.blocks.filter(
-        (block: any) => block.type !== 'paragraph',
-    )
-    const project = await api.postProject({
-        name: projectName,
-        template: agendaRefreshed.json,
-        original_agenda_id: agendaRefreshed.id,
-        meeting_provider: parameters.meetingProvider,
+export async function startRecording(): Promise<void> {
+    await ApiService.sendMessageToRecordingServer('START_TRANSCODER', {
+        bucketName: parameters.s3_bucket,
+        videoS3Path: parameters.mp4_s3_path,
     })
-    console.log(`[startRecording] after post project`)
-    const asset = await api.postAsset(
-        {
-            name: projectName,
-            project_id: project.id,
-            uploading: true,
-            is_meeting_bot: true,
-        },
-        true,
-    )
-
-    console.log(`[startRecording] after post asset`)
 
     MEDIA_RECORDER.onerror = function (e) {
         console.error('media recorder error', e)
@@ -157,26 +112,18 @@ export async function startRecording(
         const now = Date.now()
         const newSession = {
             upload_queue: newSerialQueue(),
-            project,
-            id: newSessionId,
             cut_times: [now],
             start_timestamp: now,
-            asset,
-            completeEditors: [],
+            transcripts: [],
             words: [],
-            uploadChunkCounter: 0,
             transcribedUntil: 0,
         }
         SESSION = newSession
         START_RECORD_TIMESTAMP = now
     }
     MEDIA_RECORDER.start(10000)
-    // TODO : Dead code ? START_RECORD_OFFSET is only SET here but never read
-    // START_RECORD_OFFSET = CONTEXT.currentTime
-    console.log(`after media recorder start`)
-
-    return project
 }
+
 export async function stop() {
     console.log('media recorder stop')
     MEDIA_RECORDER.stop()
@@ -191,16 +138,6 @@ export async function stop() {
 export async function waitUntilComplete(kill = false) {
     const spokeSession = SESSION!
 
-    if (spokeSession.project) {
-        try {
-            await api.patchProject({
-                id: spokeSession.project.id,
-                moment_pending: 1,
-            })
-        } catch (e) {
-            console.error('error patching project', e)
-        }
-    }
     console.log('[waitForUpload]'.concat('after patch moment pending'))
 
     if (kill) {
@@ -223,16 +160,7 @@ export async function stopRecordServer(
     spokeSession: SpokeSession | null = null,
 ) {
     if (spokeSession) {
-        await api.destroyRecordingSession(
-            spokeSession.id,
-            spokeSession.project?.id,
-            true,
-            parameters.bot_id,
-        )
-        await api.patchProject({
-            id: spokeSession.project.id,
-            moment_pending: 0,
-        })
+        await ApiService.sendMessageToRecordingServer('STOP_TRANSCODER', {})
     }
 }
 
@@ -262,8 +190,6 @@ async function handleChunk(isFinal: boolean) {
     const spokeSession = SESSION! // ! is the equivalent of unwrap() - throw exception
     const recordedChunks = RECORDED_CHUNKS
     RECORDED_CHUNKS = []
-    const index = spokeSession.uploadChunkCounter
-    spokeSession.uploadChunkCounter += 1
 
     const recordedDataChunk = recordedChunks.map((c) => c.data)
     const blob = new Blob(recordedDataChunk, {
@@ -273,32 +199,20 @@ async function handleChunk(isFinal: boolean) {
         type: 'video/webm',
     })
     spokeSession.upload_queue.push(async () => {
-        await sendDataChunks(spokeSession, file, index, isFinal)
+        await sendDataChunks(spokeSession, file, isFinal)
     })
 }
 
 async function sendDataChunks(
     spokeSession: SpokeSession,
     file: File,
-    index: number,
     isFinal: boolean,
 ) {
     try {
         try {
-            spokeSession.videoS3Path = await api.uploadVideoChunk(
-                file,
-                isFinal,
-                SESSION!.id,
-                index,
-                spokeSession.project.id,
-                false,
-            )
+            await ApiService.sendMessageToRecordingServer('UPLOAD_CHUNK', file)
         } catch (e) {
-            await setUploadError(
-                spokeSession.asset.id,
-                (e as any)?.response?.data ??
-                    'An error occured while uploading the video',
-            )
+            // TODO: handler upload chunk error
             console.log('Error in upload chunk killing')
             spokeSession.upload_queue.kill()
             return
@@ -310,11 +224,4 @@ async function sendDataChunks(
             console.log(e as any)
         }
     }
-}
-
-async function setUploadError(
-    asset_id: number,
-    upload_error: string,
-): Promise<void> {
-    return await api.patchAsset({ upload_error, id: asset_id })
 }

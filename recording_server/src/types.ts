@@ -50,11 +50,9 @@ export type SpeechToTextProvider = 'Gladia'
 
 export type MeetingParams = {
     use_my_vocabulary: boolean
-    language: string
     meeting_url: string
     user_token: string
     bot_name: string
-    project_name: string
     user_id: number
     session_id: string
     email: string
@@ -88,6 +86,7 @@ export type MeetingParams = {
         // The number of seconds after which the bot will automatically leave the call, if it has joined the call but has not started recording. For e.g This can occur due to bot being denied permission to record(Zoom meetings).
         // recording_permission_denied_timeout?: number
     }
+    mp4_s3_path: string
 }
 
 export class CancellationToken {
@@ -106,13 +105,6 @@ export class CancellationToken {
         clearTimeout(this.timeout)
         this.timeout = setTimeout(() => this.cancel(), this.timeInSec * 1000)
     }
-}
-
-export type ChangeLanguage = {
-    meeting_url: string
-    use_my_vocabulary: boolean
-    language: string
-    user_id: number
 }
 
 export type StopRecordParams = {

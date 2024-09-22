@@ -6,15 +6,13 @@ import * as redis from 'redis'
 import {
     MessageToBroadcast,
     SpeakerData,
-    StatusParams,
-    StopRecordParams,
+    StopRecordParams
 } from './types'
 
 import { PORT } from './instance'
 import { Logger } from './logger'
 import { MeetingHandle } from './meeting'
 
-import { sleep } from './utils'
 
 import axios from 'axios'
 import { execSync } from 'child_process'
@@ -386,8 +384,10 @@ export async function server() {
         try {
             const audioOnly = req.body.audioOnly || false
             const color = req.body.color || 'black'
-            const { fifoPath, outputPath } = await TRANSCODER.init(audioOnly, color)
-            res.status(200).json({ message: 'Script lancé avec succès', fifoPath, outputPath })
+            const bucketName = req.body.bucketName
+            const videoS3Path = req.body.videoS3Path
+            await TRANSCODER.init(bucketName, videoS3Path, audioOnly, color)
+            res.status(200).json({ message: 'Script lancé avec succès'})
         } catch (err) {
             console.error('Erreur:', err)
             res.status(500).json({ error: 'Erreur lors de la création de la FIFO ou du lancement du script' })
@@ -441,60 +441,6 @@ export async function server() {
         }
     })
 
-    // Only spoke for the moment
-    app.post('/status', async (req, res) => {
-        function statusReady() {
-            return (
-                MeetingHandle.getProject() != null ||
-                MeetingHandle.getError() != null
-            )
-        }
-        const data: StatusParams = req.body
-        try {
-            let logger = LOGGER.new({
-                user_id: data.user_id,
-                meeting_url: data.meeting_url,
-            })
-            logger.info('status request')
-            for (let i = 0; i < 100; i++) {
-                if (statusReady()) {
-                    const error = MeetingHandle.getError()
-                    const project = MeetingHandle.getProject()
-                    const status = MeetingHandle.getStatus()
-                    if (error != null) {
-                        logger.info('status ready, returning error')
-                        res.status(500).send(JSON.stringify(error))
-                        return
-                    } else if (project != null) {
-                        logger.info('status ready, returning project')
-                        let agenda = null
-                        try {
-                            if (status === 'Recording') {
-                                agenda =
-                                    await MeetingHandle.instance.getAgenda()
-                            }
-                        } catch (e) {
-                            logger.error(
-                                'failed to get agenda in status request',
-                            )
-                        }
-                        res.json({
-                            project: project,
-                            agenda: agenda,
-                            status: status,
-                        })
-                        return
-                    }
-                }
-                await sleep(50)
-            }
-            logger.info('status not ready, returning null')
-            res.json(null)
-            return
-        } catch (e) {
-            res.status(500).send(JSON.stringify(e))
-        }
-    })
 
     try {
         app.listen(PORT, HOST)

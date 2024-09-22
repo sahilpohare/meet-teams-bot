@@ -1,16 +1,12 @@
 import * as asyncLib from 'async'
-import * as R from 'ramda'
+import { RecognizerTranscript, sleep } from '../api'
 import { parameters } from '../background'
 import { newTranscribeQueue } from '../queue'
 import { SESSION, START_RECORD_TIMESTAMP } from '../record'
-import { api, RecognizerTranscript } from '../api'
-import { sleep } from '../api'
-// import { speakerWorker } from './speakerWorker'
-import { summarizeWorker } from './summarizeWorker'
+import { ApiService } from '../recordingServerApi'
+import { parseGladia, recognizeGladia } from './providers/gladia'
+import { parseRunPod, recognizeRunPod } from './providers/runpod'
 import { wordPosterWorker } from './wordPosterWorker'
-
-import { recognizeRunPod, parseRunPod } from './providers/runpod'
-import { recognizeGladia, parseGladia } from './providers/gladia'
 
 // milisseconds transcription chunk duration
 const TRANSCRIPTION_CHUNK_DURATION = 60 * 1000 * 3 // // 3 minutes
@@ -30,8 +26,6 @@ export class Transcriber {
 
     private stopped = false
     private rebootTimer: NodeJS.Timer
-    private summarizeWorker: Promise<void>
-    private speakerWorker: Promise<void>
     private transcribeQueue: asyncLib.QueueObject<() => void>
     private wordPosterWorker: Promise<void>
     private transcriptionOffset: number = 0 // is seconds
@@ -41,8 +35,6 @@ export class Transcriber {
         this.rebootTimer = setInterval(() => {}, 60 * 1000)
         this.transcribeQueue = newTranscribeQueue()
         // Simply not to have undefined properties
-        this.summarizeWorker = new Promise((resolve) => resolve())
-        this.speakerWorker = new Promise((resolve) => resolve())
         this.wordPosterWorker = new Promise((resolve) => resolve())
     }
 
@@ -83,33 +75,7 @@ export class Transcriber {
 
         this.stopped = true
 
-        if (
-            SESSION?.project.id &&
-            R.all(
-                (e) => e.video.transcripts[0]?.words.length === 0,
-                SESSION.completeEditors,
-            )
-        ) {
-            try {
-                await api.patchProject({
-                    id: SESSION?.project.id,
-                    no_transcript: true,
-                })
-            } catch (e) {
-                console.error(
-                    '[Transcriber] [waitUntilComplete]',
-                    'error patching project',
-                )
-            }
-        }
-        await this.speakerWorker
         await this.wordPosterWorker
-
-        try {
-            await this.summarizeWorker
-        } catch (e) {
-            console.error('[Transcriber] error in summarizeWorker', e)
-        }
     }
 
     /**
@@ -153,15 +119,17 @@ export class Transcriber {
             currentOffset,
             newOffset,
         )
-        let audioExtract: any = null
         try {
-            audioExtract = await api.extractAudio(
-                SESSION!.id,
-                currentOffset,
-                final ? -1 : newOffset,
-            )
-            let path = audioExtract.audio_s3_path // TODO : AWS CP not usefull, can be directy done here
-            let audio_url = `https://${parameters.s3_bucket}.s3.eu-west-3.amazonaws.com/${path}`
+            const timeStart = currentOffset
+            const timeEnd = final ? -1 : newOffset
+            const s3Path = `${parameters.user_id}/${parameters.bot_id}/${timeStart}-${timeEnd}-record.wav`
+            await ApiService.sendMessageToRecordingServer('EXTRACT_AUDIO', {
+                timeStart,
+                timeEnd,
+                bucketName: parameters.s3_bucket,
+                s3Path,
+            })
+            let audio_url = `https://${parameters.s3_bucket}.s3.eu-west-3.amazonaws.com/${s3Path}`
 
             let transcripts: RecognizerTranscript[]
             switch (TRANSCRIPTION_PROVIDER) {
@@ -194,29 +162,13 @@ export class Transcriber {
         } catch (e) {
             console.error('[Transcriber] an error occured calling gladia, ', e)
         } finally {
-            try {
-                if (audioExtract != null) {
-                    console.log({ audioExtract })
-                    await api.deleteAudio(audioExtract)
-                }
-            } catch (e) {
-                console.error(
-                    '[Transcriber] an error occured deleting audio, ',
-                    e,
-                )
-            }
+            //TODO : Delete audio from S3
         }
     }
 
     /** Launches the workers. */
     private async launchWorkers(): Promise<void> {
         this.wordPosterWorker = wordPosterWorker()
-        // IMPORTANT : speakerWorker() is disabled because there are timestampa incoherencies
-        // this.speakerWorker = speakerWorker()
-
-        if (parameters.bot_id == null) {
-            this.summarizeWorker = summarizeWorker()
-        }
     }
     /** Gets and handles recognizer results every `interval` ms. */
 }

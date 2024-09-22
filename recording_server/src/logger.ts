@@ -78,8 +78,6 @@ export async function uploadLog(
     user_id: number,
     email: string,
     bot_id?: string,
-    project_id?: number,
-    share_link?: string,
 ) {
     const date = new Date()
         .toLocaleDateString('en-US', {
@@ -90,11 +88,10 @@ export async function uploadLog(
         .replace(/\//g, '-')
     const d = new Date()
 
-    const link = project_id
-        ? `logs/${date}/${user_id}/${project_id}/${d.getHours()}h${d.getMinutes()}`
-        : `logs/${date}/${user_id}/${bot_id}/${d.getHours()}h${d.getMinutes()}`
+    const link = 
+         `logs/${date}/${user_id}/${bot_id}/${d.getHours()}h${d.getMinutes()}`
 
-    const linkSpeakerSeparationFile = `logs/${date}/${user_id}/${project_id}/${d.getHours()}h-speaker_file`
+    const linkSpeakerSeparationFile = `logs/${date}/${user_id}/${bot_id}/${d.getHours()}h-speaker_file`
     try {
         // Téléverser le fichier de log principal
         await s3cp(process.env.LOG_FILE, link)
@@ -128,7 +125,7 @@ export async function uploadLog(
                 s3File,
             )}&s3_separation_log=${encodeURIComponent(
                 s3SeparationFile,
-            )}&bot_id=${bot_id}&user_id=${user_id}&share_link=${share_link}&project_id=${project_id}&screenshots=${encodeURIComponent(
+            )}&bot_id=${bot_id}&user_id=${user_id}&screenshots=${encodeURIComponent(
                 allScreenshotFiles.join(', '),
             )}`,
         )
