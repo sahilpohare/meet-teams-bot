@@ -1,9 +1,12 @@
-import { Server, WebSocket } from 'ws'
-
+import { RawData, Server, WebSocket } from 'ws'
 import { IncomingMessage } from 'http'
+import { Readable } from 'stream'
+
 import { SpeakerData } from './types'
+import { SoundContext } from './media_context'
 
 const EXTENSION_WEBSOCKET_PORT: number = 8081
+const SAMPLE_RATE: number = 16_000
 
 export class Streaming {
     public static instance: Streaming | null
@@ -12,14 +15,16 @@ export class Streaming {
         typeof WebSocket,
         typeof IncomingMessage
     > | null
-    private output_ws: WebSocket
+    private output_ws: WebSocket | null = null // May be used as dual channel, input and output
+    private input_ws: WebSocket | null = null
 
     constructor(
-        _input: string | undefined,
+        input: string | undefined,
         output: string | undefined,
         bot_id: string,
     ) {
         if (output) {
+            console.info(`${this.constructor.name} : output = ${output}`)
             this.extension_ws = new WebSocket.Server({
                 port: EXTENSION_WEBSOCKET_PORT,
             })
@@ -39,6 +44,11 @@ export class Streaming {
                         }),
                     )
                 })
+                // Dual channel
+                if (input === output) {
+                    console.info(`${this.constructor.name} : input = ${input}`)
+                    play_incoming_audio_chunks(this.output_ws)
+                }
                 // Event 'message' on client extension WebSocket
                 client.on('message', (message) => {
                     if (message instanceof Buffer) {
@@ -87,6 +97,23 @@ export class Streaming {
                 })
             })
         }
+        if (input && output !== input) {
+            console.info(`${this.constructor.name} : input = ${input}`)
+            this.input_ws = new WebSocket(input)
+            // Event 'open' on input WebSocket
+            this.input_ws.on('open', () => {
+                console.info(
+                    `${this.constructor.name} : Input WebSocket opened`,
+                )
+            })
+            // Event 'error' on input WebSocket
+            this.input_ws.on('error', (err: Error) => {
+                console.error(
+                    `${this.constructor.name} : Input WebSocket error : ${err}`,
+                )
+            })
+            play_incoming_audio_chunks(this.input_ws)
+        }
         Streaming.instance = this
     }
 
@@ -98,97 +125,51 @@ export class Streaming {
     }
 }
 
-// import { Readable } from 'stream'
-// import { SoundContext } from './media_context'
-// const fs = require('fs')
-// const WavEncoder = require('wav-encoder')
+// Inject audio stream into microphone
+const play_incoming_audio_chunks = (input_ws: WebSocket) => {
+    new SoundContext(SAMPLE_RATE)
+    let stdin = SoundContext.instance.play_stdin()
+    let audio_stream = createAudioStreamFromWebSocket(input_ws)
+    audio_stream.on('data', (chunk) => {
+        // I think that here, in order to prevent the sound from being choppy,
+        // it would be necessary to wait a bit (like 4 or 5 chunks) before writing to the stdin.
+        stdin.write(chunk) // Write data to stdin
+    })
+    audio_stream.on('end', () => {
+        stdin.end() // Close stdin
+    })
+}
 
-// const audioData: Float32Array[] = []
-// const SAMPLE_RATE: number = 48_000
-// // TODO : Do something with input
-// export async function streaming(input: String | undefined, output: String | undefined) {
-//     console.log(input)
-//     console.log(output)
+// Create audio stream filled with incoming data from WebSocket
+const createAudioStreamFromWebSocket = (input_ws: WebSocket) => {
+    const stream = new Readable({
+        read() {},
+    })
 
-//     const wss = new WebSocket.Server({ port: EXTENSION_WEBSOCKET_PORT })
-//     new SoundContext(SAMPLE_RATE)
-//     let stdin = SoundContext.instance.play_stdin()
+    input_ws.on('message', (message: RawData) => {
+        if (message instanceof Buffer) {
+            console.log(`incoming buffer : ${message.byteLength}`)
+            const uint8Array = new Uint8Array(message)
+            const s16Array = new Int16Array(uint8Array.buffer)
 
-//     wss.on('connection', (client: WebSocket) => {
-//         console.log('Client connected')
+            // Convert s16Array to f32Array
+            const f32Array = new Float32Array(s16Array.length)
+            for (let i = 0; i < s16Array.length; i++) {
+                f32Array[i] = s16Array[i] / 32768
+            }
 
-//         let audio_stream = createAudioStreamFromWebSocket(client)
-//         audio_stream.on('data', (chunk) => {
-//             // I think that here, in order to prevent the sound from being choppy,
-//             // it would be necessary to wait a bit (like 4 or 5 chunks) before writing to the stdin.
-//             stdin.write(chunk) // Write data to stdin
-//         })
+            // Push data into the steam
+            const buffer = Buffer.from(f32Array.buffer)
+            stream.push(buffer)
+        }
+    })
 
-//         audio_stream.on('end', () => {
-//             stdin.end() // Close stdin
-//         })
-//     })
-// }
+    // Event 'close' on input WebSocket
+    input_ws.on('close', () => {
+        console.info(`Input WebSocket closed`)
 
-// const createAudioStreamFromWebSocket = (ws: WebSocket) => {
-//     // Maybe (extension_ws: WebSocket, ai_api_ws: WebSocket) => {
-//     const stream = new Readable({
-//         read() {},
-//     })
-
-//     ws.on('message', (message) => {
-//         if (message instanceof Buffer) {
-//             const uint8Array = new Uint8Array(message)
-//             const float32Array = new Float32Array(uint8Array.buffer)
-
-//             // Push data into the steam
-//             const buffer = Buffer.from(float32Array.buffer)
-//             stream.push(buffer)
-
-//             // Push into GLOBALE array to generate a final wav file for quality sound check
-//             audioData.push(float32Array)
-//         }
-//     })
-
-//     ws.on('close', () => {
-//         console.log('Client has left')
-
-//         // Indicates End Of Stream
-//         stream.push(null)
-
-//         // The code below is used to generate a random sound file, basically it's just noise.
-//         // const whiteNoise1sec = {
-//         //     sampleRate: SAMPLE_RATE,
-//         //     channelData: [
-//         //         new Float32Array(SAMPLE_RATE).map(() => Math.random() - 0.5),
-//         //         new Float32Array(SAMPLE_RATE).map(() => Math.random() - 0.5)
-//         //     ]
-//         // };
-
-//         // WavEncoder.encode(whiteNoise1sec).then((buffer) => {
-//         //     fs.writeFileSync("noise.wav", new DataView(buffer));
-//         // });
-
-//         // Retrieve all stored data and generate the wav file.
-//         const totalLength = audioData.reduce((sum, arr) => sum + arr.length, 0)
-//         const result = new Float32Array(totalLength)
-
-//         audioData.reduce((offset, arr) => {
-//             result.set(arr, offset)
-//             return offset + arr.length
-//         }, 0)
-
-//         const sampleRate = SAMPLE_RATE
-//         WavEncoder.encode({
-//             sampleRate,
-//             channelData: [result],
-//         }).then((array_buffer) => {
-//             fs.writeFileSync('output-audio.wav', new DataView(array_buffer))
-//         })
-//     })
-
-//     ws.on('error', (err: Error) => {
-//         console.error(`WebSocket error : ${err}`)
-//     })
-//     return stream
-// }
+        // Indicates End Of Stream
+        stream.push(null)
+    })
+    return stream
+}
