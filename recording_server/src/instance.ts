@@ -1,6 +1,6 @@
 import { exec } from 'child_process'
 import { uploadLogScript } from './logger'
-import { clientRedis, LOGGER } from './server'
+import { clientRedis } from './server'
 
 export const PORT = 8080
 export const LOCK_INSTANCE_AT_STARTUP =
@@ -35,7 +35,7 @@ export function setProtection(enabled: boolean): Promise<void> {
         if (!LOCK_INSTANCE_AT_STARTUP) {
             if (enabled) {
                 exec('set_protection.sh on', (_error, _stdout, _stderr) => {
-                    LOGGER.info(`Set protection`, {
+                    console.log(`Set protection`, {
                         enabled: enabled,
                         stdout: _stdout,
                         stderr: _stderr,
@@ -44,7 +44,7 @@ export function setProtection(enabled: boolean): Promise<void> {
                 })
             } else {
                 exec('set_protection.sh off', (_error, _stdout, _stderr) => {
-                    LOGGER.info(`Set protection`, {
+                    console.log(`Set protection`, {
                         enabled: enabled,
                         stdout: _stdout,
                         stderr: _stderr,
@@ -66,7 +66,7 @@ export async function terminateInstance(bot_id: string) {
     }
     await new Promise<void>((res, _rej) => {
         exec('terminate_instance.sh', (_error, stdout, stderr) => {
-            LOGGER.info(`terminate instance`, { stdout, stderr })
+            console.log(`terminate instance`, { stdout, stderr })
             res()
         })
     })

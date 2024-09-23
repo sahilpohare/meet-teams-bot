@@ -63,11 +63,18 @@ function setDefaultAxios(baseUrl: string, logError: any) {
 
 function onRetryAttempt(err: any) {
     const cfg = rax.getConfig(err)
-
     const response = err.response && err.response.data ? err.response.data : err
+    const request = err.request
+
     console.log(
-        `Retry attempt #${cfg && cfg.currentRetryAttempt}`,
-        err.request,
-        response,
+        `Tentative de nouvelle essai #${cfg && cfg.currentRetryAttempt}`,
+        {
+            url: request.url,
+            method: request.method,
+            params: request.params,
+            headers: request.headers,
+            data: request.data,
+            response: response,
+        },
     )
 }

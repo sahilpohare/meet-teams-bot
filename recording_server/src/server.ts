@@ -3,24 +3,16 @@ import * as fs from 'fs/promises'
 import * as path from 'path'
 import * as redis from 'redis'
 
-import {
-    MessageToBroadcast,
-    SpeakerData,
-    StopRecordParams
-} from './types'
+import { MessageToBroadcast, SpeakerData, StopRecordParams } from './types'
 
 import { PORT } from './instance'
-import { Logger } from './logger'
 import { MeetingHandle } from './meeting'
-
 
 import axios from 'axios'
 import { execSync } from 'child_process'
 import { unlinkSync } from 'fs'
 import { SoundContext, VideoContext } from './media_context'
 import { TRANSCODER } from './transcoder'
-
-export const LOGGER = new Logger({})
 
 console.log('redis url: ', process.env.REDIS_URL)
 export const clientRedis = redis.createClient({
@@ -56,7 +48,9 @@ export async function server() {
     const allowedOrigins = await getAllowedOrigins()
 
     app.use(express.urlencoded({ extended: true }))
-    app.use(express.json({ limit: '50mb' })) // To parse the incoming requests with JSON payloads
+    app.use(express.raw({ type: 'application/octet-stream', limit: '1000mb' }))
+    app.use(express.json({ limit: '1000mb' })) // To parse the incoming requests with JSON payloads
+    app.use(express.urlencoded({ limit: '1000mb' }))
 
     app.use((req, res, next) => {
         const origin = req.headers.origin
@@ -111,7 +105,7 @@ export async function server() {
         console.table(speakers)
         let input = JSON.stringify(speakers)
         await fs.appendFile(SPEAKER_LOG_PATHNAME, `${input}\n`).catch((e) => {
-            LOGGER.error(`Cannot append speaker log file ! : ${e}`)
+            console.error(`Cannot append speaker log file ! : ${e}`)
         })
         // Count the number of active speakers;
         // an active speaker is a speaker who is currently speaking.
@@ -231,7 +225,7 @@ export async function server() {
                 res.status(200)
             })
             .catch((e) => {
-                LOGGER.error(`stop recording error ${e}`)
+                console.error(`stop recording error ${e}`)
                 res.status(400).json({
                     error: e,
                 })
@@ -240,7 +234,7 @@ export async function server() {
 
     // Get Recording Server Build Version Info
     app.get('/version', async (_req, res) => {
-        LOGGER.info(`version requested`)
+        console.log(`version requested`)
         await import('./buildInfo.json')
             .then((buildInfo) => {
                 res.status(200).json(buildInfo)
@@ -375,7 +369,7 @@ export async function server() {
 
     // Unused ?
     app.get('/shutdown', async (_req, res) => {
-        LOGGER.warn('Shutdown requested')
+        console.warn('Shutdown requested')
         res.send('ok')
         process.exit(0)
     })
@@ -387,24 +381,32 @@ export async function server() {
             const bucketName = req.body.bucketName
             const videoS3Path = req.body.videoS3Path
             await TRANSCODER.init(bucketName, videoS3Path, audioOnly, color)
-            res.status(200).json({ message: 'Script lancé avec succès'})
+            res.status(200).json({ message: 'Script lancé avec succès' })
         } catch (err) {
             console.error('Erreur:', err)
-            res.status(500).json({ error: 'Erreur lors de la création de la FIFO ou du lancement du script' })
+            res.status(500).json({
+                error: 'Erreur lors de la création de la FIFO ou du lancement du script',
+            })
         }
     })
 
     app.post('/transcoder/upload_chunk', async (req, res) => {
-        if (!req.body) {
-            return res.status(400).json({ error: 'Le corps de la requête doit être un buffer' })
+        if (!req.body || !Buffer.isBuffer(req.body)) {
+            return res
+                .status(400)
+                .json({ error: 'Le corps de la requête doit être un buffer' })
         }
 
         try {
             await TRANSCODER.upload_chunk(req.body)
-            res.status(200).json({ message: 'Chunk uploadé avec succès' })
+            return res
+                .status(200)
+                .json({ message: 'Chunk uploadé avec succès' })
         } catch (err) {
-            console.error('Erreur lors de l\'upload du chunk:', err)
-            res.status(500).json({ error: 'Erreur lors de l\'upload du chunk' })
+            console.error("Erreur lors de l'upload du chunk:", err)
+            return res
+                .status(500)
+                .json({ error: "Erreur lors de l'upload du chunk" })
         }
     })
 
@@ -413,7 +415,6 @@ export async function server() {
         TRANSCODER.stop()
         res.status(200).json({ message: 'Transcoder arrêté avec succès' })
     })
-    
 
     // Ajoutez cette nouvelle route pour récupérer le chemin du fichier de sortie
     app.get('/transcoder/output', (req, res) => {
@@ -425,27 +426,43 @@ export async function server() {
         const { timeStart, timeEnd, bucketName, s3Path } = req.body
 
         if (typeof timeStart !== 'number' || typeof timeEnd !== 'number') {
-            return res.status(400).json({ error: 'timeStart et timeEnd doivent être des nombres' })
+            return res.status(400).json({
+                error: 'timeStart et timeEnd doivent être des nombres',
+            })
         }
 
         if (typeof bucketName !== 'string' || typeof s3Path !== 'string') {
-            return res.status(400).json({ error: 'bucketName et s3Path doivent être des chaînes de caractères' })
+            return res.status(400).json({
+                error: 'bucketName et s3Path doivent être des chaînes de caractères',
+            })
         }
 
         try {
-            const s3Url = await TRANSCODER.extractAudio(timeStart, timeEnd, bucketName, s3Path)
-            res.status(200).json({ message: 'Extraction audio et upload réussis', s3Url })
+            const s3Url = await TRANSCODER.extractAudio(
+                timeStart,
+                timeEnd,
+                bucketName,
+                s3Path,
+            )
+            return res.status(200).json({
+                message: 'Extraction audio et upload réussis',
+                s3Url,
+            })
         } catch (err) {
-            console.error('Erreur lors de l\'extraction audio ou de l\'upload:', err)
-            res.status(500).json({ error: 'Erreur lors de l\'extraction audio ou de l\'upload' })
+            console.error(
+                "Erreur lors de l'extraction audio ou de l'upload:",
+                err,
+            )
+            return res.status(500).json({
+                error: "Erreur lors de l'extraction audio ou de l'upload",
+            })
         }
     })
 
-
     try {
         app.listen(PORT, HOST)
-        LOGGER.info(`Running on http://${HOST}:${PORT}`)
+        console.log(`Running on http://${HOST}:${PORT}`)
     } catch (e) {
-        LOGGER.error(`Failed to register instance: ${e}`)
+        console.error(`Failed to register instance: ${e}`)
     }
 }

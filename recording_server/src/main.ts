@@ -10,7 +10,7 @@ import {
 import { JoinError, JoinErrorCode, MeetingHandle } from './meeting'
 import { getCachedExtensionId, getExtensionId, openBrowser } from './puppeteer'
 import { Consumer } from './rabbitmq'
-import { LOGGER, clientRedis, server } from './server'
+import { clientRedis, server } from './server'
 import { MeetingParams } from './types'
 import { sleep } from './utils'
 
@@ -33,7 +33,7 @@ console.log('version 0.0.1')
         try {
             await triggerCache()
         } catch (e) {
-            LOGGER.error(`Failed to trigger cache: ${e}`)
+            console.error(`Failed to trigger cache: ${e}`)
         }
 
         // TODO: what to do if we cant connect to redis. Dont know !

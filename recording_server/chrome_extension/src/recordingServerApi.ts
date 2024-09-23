@@ -2,7 +2,14 @@
 
 import axios from 'axios'
 
-type MessageType = 'SPEAKERS' | 'LOG' | 'STOP_MEETING' | 'START_TRANSCODER' | 'UPLOAD_CHUNK' | 'STOP_TRANSCODER' | 'EXTRACT_AUDIO'
+type MessageType =
+    | 'SPEAKERS'
+    | 'LOG'
+    | 'STOP_MEETING'
+    | 'START_TRANSCODER'
+    | 'UPLOAD_CHUNK'
+    | 'STOP_TRANSCODER'
+    | 'EXTRACT_AUDIO'
 
 // Yes, any is funny :cow:
 type MessagePayload = any
@@ -63,7 +70,13 @@ export class ApiService {
                 break
             case 'UPLOAD_CHUNK':
                 await axios
-                    .post(`${url}transcoder/upload_chunk`, payload)
+                    .post(`${url}transcoder/upload_chunk`, payload, {
+                        headers: {
+                            'Content-Type': 'application/octet-stream', // Or 'video/mp4' based on your video type
+                        },
+                        maxContentLength: 500 * 1024 * 1024, // 500MB limit to match server
+                    })
+
                     .catch((error) => {
                         console.error(
                             'Failed to send upload chunk message:',
@@ -95,10 +108,7 @@ export class ApiService {
                 await axios
                     .post(`${url}add_speaker`, payload)
                     .catch((error) => {
-                        console.error(
-                            'Failed to send SPEAKER message:',
-                            error,
-                        )
+                        console.error('Failed to send SPEAKER message:', error)
                     })
                 break
             case 'STOP_MEETING':

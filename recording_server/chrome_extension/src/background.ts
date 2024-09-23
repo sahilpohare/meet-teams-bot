@@ -137,7 +137,7 @@ function observeSpeakers() {
 // Start recording the current tab
 export async function startRecording(
     meetingParams: State.MeetingParams,
-): Promise<undefined> {
+): Promise<void> {
     try {
         State.addMeetingParams(meetingParams)
 

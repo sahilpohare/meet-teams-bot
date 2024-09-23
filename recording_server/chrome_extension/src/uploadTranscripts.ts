@@ -1,6 +1,5 @@
 import * as R from 'ramda'
-
-import { EditorWrapper, PostableTranscript, api } from './api'
+import { PostableTranscript, Transcript, api } from './api'
 import { SPEAKERS, parameters } from './background'
 import { SpeakerData } from './observeSpeakers'
 import { SESSION, START_RECORD_TIMESTAMP, SpokeSession } from './record'
@@ -31,13 +30,10 @@ export async function uploadTranscriptTask() {
         }
     }
 }
-const insertIntoSortedArrayInPlace = (arr: EditorWrapper[], value) => {
+const insertIntoSortedArrayInPlace = (arr: Transcript[], value: Transcript) => {
     // Find the correct index using a binary search-like approach
     const index =
-        R.findIndex(
-            (item) => value.audio_offset < item.video.audio_offset,
-            arr,
-        ) - 1
+        R.findIndex((item) => value.start_time < item.start_time, arr) - 1
 
     // If index is -1, the value is greater than all elements in the array, so push it at the end
     // Otherwise, splice the array to insert the value at the found index, modifying the original array

@@ -3,79 +3,150 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import { promisify } from 'util'
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
-const writeFile = promisify(fs.writeFile)
+const unlink = promisify(fs.unlink)
 
 export class Transcoder {
     private outputPath: string
+    private bucketName: string
     private child: ChildProcess | null = null
     private videoS3Path: string
+    private fifoPath: string
+    private fifoWriteStream: fs.WriteStream | null = null
 
     constructor() {
         this.outputPath = path.join(os.tmpdir(), 'output.mp4')
+        this.fifoPath = path.join(os.tmpdir(), 'video.pipe')
     }
 
-    public async init(bucketName: string, videoS3Path: string, audioOnly: boolean = false, color: string = 'black'): Promise<void> {
+    async createFifo(): Promise<void> {
+        try {
+            await unlink(this.fifoPath)
+        } catch (err: any) {
+            if (err.code !== 'ENOENT') throw err
+        }
+
+        return new Promise<void>((resolve, reject) => {
+            const mkfifoProcess = spawn('mkfifo', [this.fifoPath])
+
+            mkfifoProcess.on('exit', (code) => {
+                if (code === 0) {
+                    console.log('fifo créé : ' + this.fifoPath)
+                    this.fifoWriteStream = fs.createWriteStream(this.fifoPath, {
+                        flags: 'a',
+                    })
+                    resolve()
+                } else {
+                    console.log(
+                        'Échec de création du fifo avec le code : ' + code,
+                    )
+                    reject(
+                        new Error(
+                            `Échec de création du fifo avec le code : ${code}`,
+                        ),
+                    )
+                }
+            })
+
+            mkfifoProcess.on('error', (err) => {
+                console.error('Erreur lors de la création du fifo :', err)
+                reject(err)
+            })
+        })
+    }
+
+    public async init(
+        bucketName: string,
+        videoS3Path: string,
+        audioOnly: boolean = false,
+        color: string = 'black',
+    ): Promise<void> {
         if (this.child) {
             console.log('Transcoder déjà initialisé')
             return
         }
+
+        this.bucketName = bucketName
         this.videoS3Path = videoS3Path
 
+        await this.createFifo()
         // Lancer le script transcode_video.sh de manière asynchrone
-        this.child = spawn('./transcode_video.sh', [this.outputPath, audioOnly.toString(), color], {
-            detached: true,
-            stdio: ['pipe', 'inherit', 'inherit']
-        })
-        
+        this.child = spawn(
+            '../transcode_video.sh',
+            [this.outputPath, audioOnly.toString(), color],
+            {
+                stdio: 'inherit',
+            },
+        )
+
         console.log('Script lancé avec succès.')
         return
     }
     // Méthode pour écrire dans stdin
-    private writeToChildStdin(data: string | Buffer): void {
-        if (!this.child || !this.child.stdin) {
-            throw new Error('Le processus enfant n\'est pas initialisé ou stdin n\'est pas disponible')
+    private async writeToFifo(data: string | Buffer): Promise<void> {
+        if (!this.fifoWriteStream) {
+            throw new Error('FIFO non initialisé')
         }
-        this.child.stdin.write(data)
+
+        return new Promise((resolve, reject) => {
+            this.fifoWriteStream!.write(data, (err) => {
+                if (err) {
+                    console.error(
+                        "Erreur lors de l'écriture du chunk dans le FIFO:",
+                        err,
+                    )
+                    reject(err)
+                } else {
+                    console.log('Chunk écrit avec succès dans le FIFO')
+                    resolve()
+                }
+            })
+        })
     }
 
     // Nouvelle méthode pour fermer stdin
     private closeChildStdin(): void {
         if (!this.child || !this.child.stdin) {
-            console.log('Le processus enfant n\'est pas initialisé ou stdin n\'est pas disponible')
+            console.log(
+                "Le processus enfant n'est pas initialisé ou stdin n'est pas disponible",
+            )
             return
         }
         this.child.stdin.end()
         console.log('stdin du processus enfant fermé')
     }
 
-
     public async stop(): Promise<void> {
         if (!this.child) {
-            console.log('Transcoder non initialisé, rien à arrêter.');
-            return;
+            console.log('Transcoder non initialisé, rien à arrêter.')
+            return
         }
 
-        console.log('Arrêt du transcoder...');
+        console.log('Arrêt du transcoder...')
 
-        this.closeChildStdin()
+        if (this.fifoWriteStream) {
+            this.fifoWriteStream.end()
+            this.fifoWriteStream = null
+        }
 
         // Attendre que le processus enfant se termine
-        await (new Promise<void>((resolve, reject) => {
+        await new Promise<void>((resolve, reject) => {
             this.child!.on('close', (code) => {
-                console.log(`Processus transcode_video.sh terminé avec le code ${code}`);
-                this.child = null;
-                resolve();
-            });
+                console.log(
+                    `Processus transcode_video.sh terminé avec le code ${code}`,
+                )
+                this.child = null
+                resolve()
+            })
 
             setTimeout(() => {
                 if (this.child) {
-                    this.child.kill('SIGTERM');
-                    reject(new Error('Timeout lors de l\'arrêt du transcoder'));
+                    this.child.kill('SIGTERM')
+                    reject(new Error("Timeout lors de l'arrêt du transcoder"))
                 }
-            }, 60000); // 30 secondes de timeout
-        }))
+            }, 60000) // 30 secondes de timeout
+        })
         this.uploadToS3(this.outputPath, this.bucketName, this.videoS3Path)
     }
 
@@ -85,10 +156,13 @@ export class Transcoder {
         }
 
         try {
-            this.writeToChildStdin(chunk)
+            this.writeToFifo(chunk)
             console.log('Chunk écrit avec succès dans ffmpeg')
         } catch (err) {
-            console.error('Erreur lors de l\'écriture du chunk dans ffmpeg:', err)
+            console.error(
+                "Erreur lors de l'écriture du chunk dans ffmpeg:",
+                err,
+            )
             throw err
         }
     }
@@ -97,11 +171,19 @@ export class Transcoder {
         return this.outputPath
     }
 
-    private uploadToS3(filePath: string, bucketName: string, s3Path: string): Promise<string> {
+    private uploadToS3(
+        filePath: string,
+        bucketName: string,
+        s3Path: string,
+    ): Promise<string> {
         return new Promise((resolve, reject) => {
-            const child = spawn('./upload_s3.sh', [filePath, bucketName, s3Path], {
-                stdio: 'pipe'
-            })
+            const child = spawn(
+                '../upload_s3.sh',
+                [filePath, bucketName, s3Path],
+                {
+                    stdio: 'inherit',
+                },
+            )
 
             let output = ''
             child.stdout.on('data', (data) => {
@@ -112,35 +194,56 @@ export class Transcoder {
                 if (code === 0) {
                     resolve(output.trim())
                 } else {
-                    reject(new Error(`Échec de l'upload S3 avec le code ${code}`))
+                    reject(
+                        new Error(`Échec de l'upload S3 avec le code ${code}`),
+                    )
                 }
             })
         })
     }
 
-    public async extractAudio(timeStart: number, timeEnd: number, bucketName: string, s3Path: string): Promise<string> {
+    public async extractAudio(
+        timeStart: number,
+        timeEnd: number,
+        bucketName: string,
+        s3Path: string,
+    ): Promise<string> {
         if (!this.child) {
             throw new Error('Transcoder non initialisé')
         }
 
-        const outputAudioPath = path.join(os.tmpdir(), `output_${Date.now()}.wav`)
+        const outputAudioPath = path.join(
+            os.tmpdir(),
+            `output_${Date.now()}.wav`,
+        )
         const maxRetries = 5
         const retryDelay = 10000 // 10 secondes
 
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
                 await this.runExtractAudio(outputAudioPath, timeStart, timeEnd)
-                console.log(`Extraction audio réussie à la tentative ${attempt}`)
-                
+                console.log(
+                    `Extraction audio réussie à la tentative ${attempt}`,
+                )
+
                 // Upload du fichier audio vers S3
-                const s3Url = await this.uploadToS3(outputAudioPath, bucketName, s3Path)
+                const s3Url = await this.uploadToS3(
+                    outputAudioPath,
+                    bucketName,
+                    s3Path,
+                )
                 console.log(`Fichier audio uploadé sur S3: ${s3Url}`)
-                
+
                 return s3Url
             } catch (error) {
-                console.error(`Échec de l'extraction audio ou de l'upload à la tentative ${attempt}:`, error)
+                console.error(
+                    `Échec de l'extraction audio ou de l'upload à la tentative ${attempt}:`,
+                    error,
+                )
                 if (attempt === maxRetries) {
-                    throw new Error(`Échec de l'extraction audio ou de l'upload après ${maxRetries} tentatives`)
+                    throw new Error(
+                        `Échec de l'extraction audio ou de l'upload après ${maxRetries} tentatives`,
+                    )
                 }
                 await sleep(retryDelay)
             }
@@ -149,17 +252,34 @@ export class Transcoder {
         throw new Error('Extraction audio et upload échoués après 5 tentatives')
     }
 
-    private runExtractAudio(outputAudioPath: string, timeStart: number, timeEnd: number): Promise<void> {
+    private runExtractAudio(
+        outputAudioPath: string,
+        timeStart: number,
+        timeEnd: number,
+    ): Promise<void> {
         return new Promise((resolve, reject) => {
-            const child = spawn('./extract_audio.sh', [this.outputPath, outputAudioPath, timeStart.toString(), timeEnd.toString()], {
-                stdio: 'inherit'
-            })
+            const child = spawn(
+                '../extract_audio.sh',
+                [
+                    this.outputPath,
+                    outputAudioPath,
+                    timeStart.toString(),
+                    timeEnd.toString(),
+                ],
+                {
+                    stdio: 'inherit',
+                },
+            )
 
             child.on('close', (code) => {
                 if (code === 0) {
                     resolve()
                 } else {
-                    reject(new Error(`Échec de l'extraction audio avec le code ${code}`))
+                    reject(
+                        new Error(
+                            `Échec de l'extraction audio avec le code ${code}`,
+                        ),
+                    )
                 }
             })
         })
