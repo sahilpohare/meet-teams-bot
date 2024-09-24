@@ -1,13 +1,13 @@
-import * as puppeteer from 'puppeteer'
 import * as R from 'ramda'
+import * as puppeteer from 'puppeteer'
 
-import { JoinError, JoinErrorCode } from '../meeting'
 import {
     CancellationToken,
     MeetingParams,
     MeetingProviderInterface,
     RecordingMode,
 } from '../types'
+import { JoinError, JoinErrorCode } from '../meeting'
 
 import { Page } from 'puppeteer'
 import { screenshot } from '../puppeteer'
@@ -365,7 +365,7 @@ async function findEndMeeting(
             return true
         } else if (participant <= 0) {
             console.error('NO COHERENT PARTICPANT COUNT : ', participant)
-            return true
+            return false
         } else {
             cancellationToken.reset()
             return false
