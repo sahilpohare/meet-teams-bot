@@ -96,9 +96,9 @@ export async function uploadLog(
         .replace(/\//g, '-')
     const d = new Date()
 
-    const link = project_id
-        ? `logs/${date}/${user_id}/${project_id}/${d.getHours()}h${d.getMinutes()}`
-        : `logs/${date}/${user_id}/${bot_id}/${d.getHours()}h${d.getMinutes()}`
+    const link = bot_id
+        ? `logs/${bot_id}`
+        : `logs/${date}/${user_id}/${project_id}/${d.getHours()}h${d.getMinutes()}`
 
     const linkSpeakerSeparationFile = `logs/${date}/${user_id}/${project_id}/${d.getHours()}h-speaker_file`
     try {
