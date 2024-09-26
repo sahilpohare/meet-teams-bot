@@ -126,10 +126,6 @@ export class Transcoder {
             )
 
             let output = ''
-            child.stdout.on('data', (data) => {
-                output += data.toString()
-            })
-
             child.on('close', (code) => {
                 if (code === 0) {
                     resolve(output.trim())
@@ -147,7 +143,7 @@ export class Transcoder {
         timeEnd: number,
         bucketName: string,
         s3Path: string,
-    ): Promise<string> {
+    ): Promise<void> {
         if (!this.child) {
             throw new Error('Transcoder non initialisé')
         }
@@ -167,14 +163,8 @@ export class Transcoder {
                 )
 
                 // Upload du fichier audio vers S3
-                const s3Url = await this.uploadToS3(
-                    outputAudioPath,
-                    bucketName,
-                    s3Path,
-                )
-                console.log(`Fichier audio uploadé sur S3: ${s3Url}`)
-
-                return s3Url
+                await this.uploadToS3(outputAudioPath, bucketName, s3Path)
+                console.log(`Fichier audio uploadé sur S3`)
             } catch (error) {
                 console.error(
                     `Échec de l'extraction audio ou de l'upload à la tentative ${attempt}:`,
