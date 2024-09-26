@@ -1,13 +1,13 @@
-import * as R from 'ramda'
 import * as puppeteer from 'puppeteer'
+import * as R from 'ramda'
 
+import { JoinError, JoinErrorCode } from '../meeting'
 import {
     CancellationToken,
     MeetingParams,
     MeetingProviderInterface,
     RecordingMode,
 } from '../types'
-import { JoinError, JoinErrorCode } from '../meeting'
 
 import { Page } from 'puppeteer'
 import { screenshot } from '../puppeteer'
@@ -66,7 +66,12 @@ export class MeetProvider implements MeetingProviderInterface {
 
         console.log(
             'useWithoutAccountClicked:',
-            await clickWithInnerText(page, 'span', 'Use without an account', 5),
+            await clickWithInnerText(
+                page,
+                'span',
+                ['Use without an account'],
+                5,
+            ),
         )
         await screenshot(page, `before_typing_bot_name`)
         for (let attempt = 1; attempt <= 5; attempt++) {
@@ -84,7 +89,7 @@ export class MeetProvider implements MeetingProviderInterface {
         const askToJoinClicked = await clickWithInnerText(
             page,
             'span',
-            'Ask to join',
+            ['Ask to join', 'Join now'],
             10,
         )
         if (!askToJoinClicked) {
@@ -397,7 +402,7 @@ async function clickDismiss(page: Page): Promise<boolean> {
 export async function clickWithInnerText(
     page: puppeteer.Page,
     htmlType: string,
-    innerText: string,
+    innerText: string[],
     iterations: number,
     clickParent: boolean = false,
 ): Promise<boolean> {
@@ -412,12 +417,15 @@ export async function clickWithInnerText(
                     let buttonClicked = false
                     for (const e of elems) {
                         let elem = e as any
-                        if (elem.innerText === innerText) {
-                            buttonClicked = true
-                            if (clickParent) {
-                                elem.parentElement.click()
-                            } else {
-                                elem.click()
+                        for (const text of innerText as string[]) {
+                            if (elem.innerText === text) {
+                                buttonClicked = true
+                                if (clickParent) {
+                                    elem.parentElement.click()
+                                } else {
+                                    elem.click()
+                                }
+                                break
                             }
                         }
                     }
@@ -443,7 +451,7 @@ async function changeLayout(
         const moreVertClicked = await clickWithInnerText(
             page,
             'i',
-            'more_vert',
+            ['more_vert'],
             10,
         )
         console.log('more vert clicked: ', moreVertClicked)
@@ -452,7 +460,7 @@ async function changeLayout(
         const changeLayoutClicked = await clickWithInnerText(
             page,
             'span',
-            'Change layout',
+            ['Change layout'],
             10,
         )
         console.log('span change layout clicked: ', changeLayoutClicked)
@@ -463,7 +471,7 @@ async function changeLayout(
             layoutChangeSuccessful = await clickWithInnerText(
                 page,
                 'span',
-                'Tiled',
+                ['Tiled'],
                 10,
                 true,
             )
@@ -472,7 +480,7 @@ async function changeLayout(
             layoutChangeSuccessful = await clickWithInnerText(
                 page,
                 'span',
-                'Spotlight',
+                ['Spotlight'],
                 10,
                 true,
             )
