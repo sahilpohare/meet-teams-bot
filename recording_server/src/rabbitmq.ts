@@ -6,7 +6,6 @@ import {
     setSessionInRedis,
 } from './instance'
 
-import axios from 'axios'
 import { Events } from './events'
 import { MeetingHandle } from './meeting'
 import { MeetingParams } from './types'
@@ -62,24 +61,6 @@ export class Consumer {
                         const meetingParams = JSON.parse(
                             message.content.toString(),
                         )
-
-                        axios.defaults.headers.common['Authorization'] =
-                            meetingParams.user_token
-                        // Ping /meeting_bot/received_message to record waiting time stats
-                        try {
-                            const url = `/meeting_bot/received_message?session_id=${meetingParams.session_id}`
-                            console.log(`POST ${url}`)
-                            await axios({
-                                method: 'POST',
-                                url,
-                            })
-                        } catch (e) {
-                            console.error(
-                                'POST /meeting_bot/received_message FAILED',
-                                e,
-                            )
-                        }
-
                         let error = null
                         try {
                             await handler(meetingParams)
