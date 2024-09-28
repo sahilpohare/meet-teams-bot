@@ -11,7 +11,7 @@ import { MeetingHandle } from './meeting'
 import { Streaming } from './streaming'
 
 import axios from 'axios'
-import { execSync } from 'child_process'
+import { execSync, spawn } from 'child_process'
 import { unlinkSync } from 'fs'
 import { SoundContext, VideoContext } from './media_context'
 import { TRANSCODER } from './transcoder'
@@ -456,6 +456,63 @@ export async function server() {
             )
             return res.status(500).json({
                 error: "Erreur lors de l'extraction audio ou de l'upload",
+            })
+        }
+    })
+
+    // Route modifiée pour supprimer un fichier S3
+    app.delete('/transcoder/s3file', async (req, res) => {
+        const { s3Path, bucketName } = req.body
+
+        function deleteFromS3(
+            bucketName: string,
+            s3Path: string,
+        ): Promise<void> {
+            return new Promise((resolve, reject) => {
+                const s3FullPath = `s3://${bucketName}/${s3Path}`
+
+                const awsCommand = spawn('aws', ['s3', 'rm', s3FullPath])
+
+                let errorOutput = ''
+
+                awsCommand.stderr.on('data', (data) => {
+                    errorOutput += data.toString()
+                })
+
+                awsCommand.on('close', (code) => {
+                    if (code === 0) {
+                        console.log(
+                            `Fichier supprimé avec succès: ${s3FullPath}`,
+                        )
+                        resolve()
+                    } else {
+                        console.error(
+                            'Erreur lors de la suppression du fichier S3:',
+                            errorOutput,
+                        )
+                        reject(
+                            new Error(
+                                `Échec de la suppression S3 avec le code ${code}`,
+                            ),
+                        )
+                    }
+                })
+            })
+        }
+
+        if (!s3Path || typeof s3Path !== 'string') {
+            return res.status(400).json({
+                error: 'Le paramètre s3Path est requis dans le corps de la requête et doit être une chaîne de caractères',
+            })
+        }
+
+        try {
+            await deleteFromS3(bucketName, s3Path)
+            res.status(200).json({ message: 'Fichier S3 supprimé avec succès' })
+        } catch (error) {
+            console.error('Erreur lors de la suppression du fichier S3:', error)
+            res.status(500).json({
+                error: 'Erreur lors de la suppression du fichier S3',
             })
         }
     })

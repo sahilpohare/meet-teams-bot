@@ -106,6 +106,9 @@ export class Transcriber {
     private async transcribe(final: boolean): Promise<void> {
         let currentOffset = this.transcriptionOffset
         let newOffset = (Date.now() - START_RECORD_TIMESTAMP) / 1000
+        const timeStart = currentOffset
+        const timeEnd = final ? -1 : newOffset
+        const s3Path = `${parameters.user_id}/${parameters.bot_id}/${timeStart}-${timeEnd}-record.wav`
         this.transcriptionOffset = newOffset
         await sleep(15000)
         console.log(
@@ -114,9 +117,6 @@ export class Transcriber {
             newOffset,
         )
         try {
-            const timeStart = currentOffset
-            const timeEnd = final ? -1 : newOffset
-            const s3Path = `${parameters.user_id}/${parameters.bot_id}/${timeStart}-${timeEnd}-record.wav`
             const audioUrl = (
                 (await ApiService.sendMessageToRecordingServer(
                     'EXTRACT_AUDIO',
@@ -165,6 +165,21 @@ export class Transcriber {
                 e,
             )
         } finally {
+            try {
+                await ApiService.sendMessageToRecordingServer(
+                    'DELETE_S3_FILE',
+                    {
+                        s3Path,
+                        bucketName: parameters.s3_bucket,
+                    },
+                )
+            } catch (e) {
+                console.error(
+                    '[Transcriber] an error occured deleting audio from S3, ',
+                    e,
+                )
+            }
+
             //TODO : Delete audio from S3
         }
     }

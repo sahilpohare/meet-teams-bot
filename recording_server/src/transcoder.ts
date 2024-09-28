@@ -52,7 +52,6 @@ export class Transcoder {
         this.child = spawn('ffmpeg', ffmpegArgs, {
             stdio: ['pipe', 'inherit', 'inherit'],
         })
-
         console.log('Commande ffmpeg lancée avec succès.')
         return
     }
