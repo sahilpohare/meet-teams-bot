@@ -15,7 +15,7 @@ enum TranscriptionProvider {
     Gladia,
 }
 const TRANSCRIPTION_PROVIDER: TranscriptionProvider =
-    TranscriptionProvider.Gladia
+    TranscriptionProvider.Runpod
 
 /**
  * Transcribes an audio stream using the recognizer of the underlying Node server.
@@ -123,26 +123,31 @@ export class Transcriber {
             const timeStart = currentOffset
             const timeEnd = final ? -1 : newOffset
             const s3Path = `${parameters.user_id}/${parameters.bot_id}/${timeStart}-${timeEnd}-record.wav`
-            await ApiService.sendMessageToRecordingServer('EXTRACT_AUDIO', {
-                timeStart,
-                timeEnd,
-                bucketName: parameters.s3_bucket,
-                s3Path,
-            })
-            let audio_url = `https://${parameters.s3_bucket}.s3.eu-west-3.amazonaws.com/${s3Path}`
+            const audioUrl = (
+                (await ApiService.sendMessageToRecordingServer(
+                    'EXTRACT_AUDIO',
+                    {
+                        timeStart,
+                        timeEnd,
+                        bucketName: parameters.s3_bucket,
+                        s3Path,
+                    },
+                )) as any
+            ).s3Url
+            console.log(audioUrl)
 
             let transcripts: RecognizerTranscript[]
             switch (TRANSCRIPTION_PROVIDER) {
                 case TranscriptionProvider.Runpod:
                     let res_runpod = await recognizeRunPod(
-                        audio_url,
+                        audioUrl,
                         parameters.vocabulary, // TODO : Envisager utiliser sur meeting baas.
                     )
                     transcripts = parseRunPod(res_runpod, currentOffset)
                     break
                 case TranscriptionProvider.Gladia:
                     let res_gladia = await recognizeGladia(
-                        audio_url,
+                        audioUrl,
                         parameters.vocabulary, // TODO : Envisager utiliser sur meeting baas.
                     )
                     transcripts = parseGladia(res_gladia, currentOffset)

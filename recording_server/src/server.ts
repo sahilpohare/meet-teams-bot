@@ -376,11 +376,9 @@ export async function server() {
 
     app.post('/transcoder/start', async (req, res) => {
         try {
-            const audioOnly = req.body.audioOnly || false
-            const color = req.body.color || 'black'
             const bucketName = req.body.bucketName
             const videoS3Path = req.body.videoS3Path
-            await TRANSCODER.init(bucketName, videoS3Path, audioOnly, color)
+            await TRANSCODER.init(bucketName, videoS3Path)
             res.status(200).json({ message: 'Script lancé avec succès' })
         } catch (err) {
             console.error('Erreur:', err)
@@ -398,7 +396,7 @@ export async function server() {
         }
 
         try {
-            await TRANSCODER.upload_chunk(req.body)
+            await TRANSCODER.uploadChunk(req.body)
             return res
                 .status(200)
                 .json({ message: 'Chunk uploadé avec succès' })

@@ -85,15 +85,9 @@ export class ApiService {
                     })
                 break
             case 'EXTRACT_AUDIO':
-                await axios
-                    .post(`${url}transcoder/extract_audio`, payload)
-                    .catch((error) => {
-                        console.error(
-                            'Failed to send extract_audio message:',
-                            error,
-                        )
-                    })
-                break
+                return (
+                    await axios.post(`${url}transcoder/extract_audio`, payload)
+                ).data
             case 'STOP_TRANSCODER':
                 await axios
                     .post(`${url}transcoder/stop`, payload)
