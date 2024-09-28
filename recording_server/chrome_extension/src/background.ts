@@ -1,5 +1,6 @@
 import * as record from './record'
 import * as State from './state'
+import { SoundStreamer } from './sound_streamer'
 
 import { SpokeApiConfig, api, setConfig, sleep } from './api'
 
@@ -161,7 +162,7 @@ export async function startRecording(
             )
         })
         await sleep(1000)
-        await record.initMediaRecorder()
+        await record.initMediaRecorder(meetingParams.streaming_output)
         await record.startRecording()
     } catch (e) {
         console.log('ERROR while start recording', JSON.stringify(e))
@@ -179,6 +180,11 @@ export async function stopMediaRecorder() {
     })
     await uploadTranscriptTask()
     console.log('stopping transcriber')
+}
+
+// Stop the Audio Recording
+export async function stopAudioStreaming() {
+    SoundStreamer.instance?.stop()
 }
 
 export async function waitForUpload() {
@@ -205,5 +211,6 @@ w.updateLastSpeakerActivity = updateLastSpeakerActivity
 w.startRecording = startRecording
 w.stopMediaRecorder = stopMediaRecorder
 w.waitForUpload = waitForUpload
+w.stopAudioStreaming = stopAudioStreaming
 
 addListener()

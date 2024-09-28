@@ -1,13 +1,13 @@
+
 import {
     BrandingHandle,
     generateBranding,
     playBranding,
-    playSound,
 } from './branding'
 import { Events } from './events'
 import { LOCAL_RECORDING_SERVER_LOCATION, delSessionInRedis } from './instance'
+
 import { uploadLog } from './logger'
-import { VideoContext } from './media_context'
 import { MeetProvider } from './meeting/meet'
 import { TeamsProvider } from './meeting/teams'
 import { ZoomProvider } from './meeting/zoom'
@@ -27,6 +27,9 @@ import {
     SpeakerData,
 } from './types'
 import { sleep } from './utils'
+
+import { VideoContext, SoundContext } from './media_context'
+import { threadId } from 'worker_threads'
 
 const RECORDING_TIMEOUT = 3600 * 4 // 4 hours
 // const RECORDING_TIMEOUT = 120 // 2 minutes for tests
@@ -92,7 +95,14 @@ export class MeetingHandle {
             return w.addSpeaker(x)
         }, speaker)
     }
+    static stopAudioStreaming() {
+        MeetingHandle.instance.meeting.backgroundPage!.evaluate(() => {
+            const w = window as any
+            return w.stopAudioStreaming()
+        })
+    }
     constructor(meetingParams: MeetingParams) {
+
         function detectMeetingProvider(url: string): MeetingProvider {
             if (url.includes('https://teams')) {
                 return 'Teams'
@@ -168,6 +178,7 @@ export class MeetingHandle {
             this.meeting.page = await this.provider.openMeetingPage(
                 this.meeting.browser,
                 meetingLink,
+                this.param.streaming_input,
             )
             console.log('meeting page opened')
 
@@ -228,7 +239,6 @@ export class MeetingHandle {
                 )
             console.log('startRecording called')
 
-            playSound()
             await Events.inCallRecording()
 
             if (startRecordSuccess === false) {
@@ -254,7 +264,7 @@ export class MeetingHandle {
         try {
             this.brandingGenerateProcess?.kill()
             VideoContext.instance.stop()
-            // SoundContext.instance.stop()
+            SoundContext.instance.stop()
         } catch (e) {
             console.error(`failed to kill process: ${e}`)
         }
@@ -296,6 +306,7 @@ export class MeetingHandle {
         console.log('after waitForEndMeeting')
         await Events.callEnded()
 
+        MeetingHandle.stopAudioStreaming()
         try {
             await this.stopRecordingInternal()
         } catch (e) {

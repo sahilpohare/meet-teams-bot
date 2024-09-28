@@ -1,18 +1,8 @@
+//! IMPORTANT : That file contains a lot of server dependencies.
+
 import axios from 'axios'
 import { PostableTranscript, RecognizerWord, Word } from './types'
 
-export async function stopBot(params: { session_id: string }) {
-    try {
-        const resp = await axios({
-            method: 'POST',
-            url: `/meeting_bot/stop_record`,
-            data: params,
-        })
-        return resp.data
-    } catch (e) {
-        console.error('[stopZoom] failed to stop meeting bot session', e)
-    }
-}
 export type ExtractPreview = {
     s3_path: string
 }

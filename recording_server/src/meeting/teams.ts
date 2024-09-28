@@ -59,13 +59,21 @@ export class TeamsProvider implements MeetingProviderInterface {
     async openMeetingPage(
         browser: puppeteer.Browser,
         link: string,
+        streaming_input: string | undefined,
     ): Promise<puppeteer.Page> {
         const url = new URL(link)
         console.log({ url })
 
         const context = browser.defaultBrowserContext()
         await context.clearPermissionOverrides()
-        await context.overridePermissions(url.origin, ['camera'])
+        if (streaming_input) {
+            await context.overridePermissions(url.origin, [
+                'microphone',
+                'camera',
+            ])
+        } else {
+            await context.overridePermissions(url.origin, ['camera'])
+        }
 
         const page = await browser.newPage()
         await page.goto(link, { waitUntil: 'networkidle2' })

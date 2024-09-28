@@ -4,13 +4,14 @@ import { parameters } from './background'
 import { newSerialQueue } from './queue'
 import { ApiService } from './recordingServerApi'
 import { Transcriber } from './Transcribe/Transcriber'
+import { SoundStreamer } from './sound_streamer'
 
 const STREAM: MediaStream | null = null
 let RECORDED_CHUNKS: BlobEvent[] = []
 let MEDIA_RECORDER: MediaRecorder // MediaRecorder instance to capture footage
-let THIS_STREAM: MediaStreamAudioSourceNode
 let HANDLE_STOP_DONE = false
-let CONTEXT: AudioContext
+let CONTEXT: AudioContext | null = null // No streaming_output audio mode
+let THIS_STREAM: MediaStreamAudioSourceNode | null = null // No streaming_output audio mode
 
 // TODO : Dead code ?
 // let START_RECORD_OFFSET = 0
@@ -41,7 +42,9 @@ export type SpokeSession = {
 //     height: number | undefined
 // }
 
-export async function initMediaRecorder(): Promise<void> {
+export async function initMediaRecorder(
+    streaming_output: string | undefined,
+): Promise<void> {
     const fps = 30
 
     return new Promise((resolve, reject) => {
@@ -62,11 +65,14 @@ export async function initMediaRecorder(): Promise<void> {
                     return
                 }
 
-                // Combine tab and microphone audio
-                // Keep playing tab audio
-                CONTEXT = new AudioContext()
-                THIS_STREAM = CONTEXT.createMediaStreamSource(stream)
-                THIS_STREAM.connect(CONTEXT.destination)
+                if (streaming_output) {
+                    new SoundStreamer()
+                    SoundStreamer.instance.start(stream)
+                } else {
+                    CONTEXT = new AudioContext()
+                    THIS_STREAM = CONTEXT!.createMediaStreamSource(stream)
+                    THIS_STREAM!.connect(CONTEXT!.destination)
+                }
 
                 try {
                     MEDIA_RECORDER = new MediaRecorder(stream, {

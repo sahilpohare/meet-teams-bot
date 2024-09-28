@@ -1,7 +1,8 @@
 import axios from 'axios'
 import { RecognizerTranscript, sleep } from '../../api'
+import { parameters } from '../../background'
 
-const GLADIA_API_KEY = '8b82f7ea-c1c8-4e3d-abc3-18af0fce1f03'
+// const GLADIA_API_KEY = '8b82f7ea-c1c8-4e3d-abc3-18af0fce1f03'
 const API_URL = 'https://api.gladia.io/v2/transcription'
 const CREATED_HTML_CODE = 201
 const DONE_HTML_CODE = 200
@@ -53,11 +54,12 @@ export async function recognizeGladia(
         enable_code_switching: false,
         detect_language: true,
     }
-    console.log('Requesting Gladia transcription', GLADIA_API_KEY)
+    const api_key = parameters.speech_to_text_api_key!
+    console.log('Requesting Gladia transcription', api_key)
     let axios_response = await axios.post(`${API_URL}`, requestBody, {
         headers: {
             accept: 'application/json',
-            'x-gladia-key': GLADIA_API_KEY,
+            'x-gladia-key': api_key,
             'content-type': 'application/json',
         },
     })
@@ -120,10 +122,11 @@ export function parseGladia(
 }
 
 async function getResult(id: string): Promise<GladiaResult> {
+    const api_key = parameters.speech_to_text_api_key!
     const axios_response = await axios.get(`${API_URL}/${id}`, {
         headers: {
             accept: 'application/json',
-            'x-gladia-key': GLADIA_API_KEY,
+            'x-gladia-key': api_key,
             'content-type': 'application/json',
         },
     })

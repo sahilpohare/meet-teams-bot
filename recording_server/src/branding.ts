@@ -53,13 +53,3 @@ export function playBranding() {
         console.error('fail to play video branding ', e)
     }
 }
-
-export function playSound() {
-    try {
-        // new SoundContext(44100)
-        // SoundContext.instance.play('../vache.mp3', false)
-        // SoundContext.instance.default()
-    } catch (e) {
-        console.error('fail to play sound branding ', e)
-    }
-}

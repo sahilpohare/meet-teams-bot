@@ -21,8 +21,11 @@ export type StatusParams = {
 export type RecordingMode = 'speaker_view' | 'gallery_view' | 'audio_only'
 
 export interface MeetingProviderInterface {
-    openMeetingPage(browser: Browser, link: string): Promise<Page>
-
+    openMeetingPage(
+        browser: Browser,
+        link: string,
+        streaming_input: string | undefined,
+    ): Promise<Page>
     joinMeeting(
         page: Page,
         cancelCheck: () => boolean,
@@ -46,7 +49,7 @@ export interface MeetingProviderInterface {
     ): string
 }
 
-export type SpeechToTextProvider = 'Gladia'
+export type SpeechToTextProvider = 'Gladia' | 'Runpod' | 'Default'
 
 export type MeetingParams = {
     use_my_vocabulary: boolean
@@ -65,7 +68,10 @@ export type MeetingParams = {
     vocabulary: string[]
     force_lang: boolean
     translation_lang?: string
-    speech_to_text?: SpeechToTextProvider
+    speech_to_text_provider?: SpeechToTextProvider
+    speech_to_text_api_key?: string
+    streaming_input?: string
+    streaming_output?: string
     bot_id: string
     enter_message?: string
     bots_api_key?: string

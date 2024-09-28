@@ -1,4 +1,5 @@
 import { spawn, ChildProcess } from 'child_process'
+import internal from 'stream'
 
 // sudo apt install linux-modules-extra-`uname -r`
 // const MICRO_DEVICE: string = 'hw:Loopback,1' // sndloop module
@@ -25,14 +26,17 @@ abstract class MediaContext {
         this.promise = null
     }
 
-    protected execute(args: string[], after: { (): void }) {
+    protected execute(
+        args: string[],
+        after: { (): void },
+    ): ChildProcess | null {
         if (this.process) {
             console.warn('Already on execution')
-            return
+            return null
         }
 
         this.process = spawn('ffmpeg', args, {
-            stdio: ['ignore', 'pipe', 'pipe'],
+            stdio: ['pipe', 'pipe', 'pipe'],
         })
         this.promise = new Promise((resolve, reject) => {
             this.process.on('exit', (code) => {
@@ -56,6 +60,7 @@ abstract class MediaContext {
                 // console.error(`stderr: ${_data}`)
             })
         })
+        return this.process
     }
 
     protected async stop_process() {
@@ -118,6 +123,30 @@ export class SoundContext extends MediaContext {
             MICRO_DEVICE,
         )
         super.execute(args, this.default)
+    }
+
+    // Return stdin and play sound to microphone
+    public play_stdin(): internal.Writable {
+        // ffmpeg -f f32le -ar 48000 -ac 1 -i - -f alsa -acodec pcm_s16le "pulse:virtual_mic"
+        let args: string[] = []
+        args.push(
+            `-f`,
+            `f32le`,
+            `-ar`,
+            `${this.sampleRate}`,
+            `-ac`,
+            `1`,
+            `-i`,
+            `-`,
+            `-f`,
+            `alsa`,
+            `-acodec`,
+            `pcm_s16le`,
+            MICRO_DEVICE,
+        )
+        return super.execute(args, () => {
+            console.warn(`[play_stdin] Sequence ended`)
+        }).stdin
     }
 
     public async stop() {

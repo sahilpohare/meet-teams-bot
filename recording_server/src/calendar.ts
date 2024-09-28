@@ -1,6 +1,8 @@
+//! IMPORTANT : That file contains some server dependencies.
+
 import axios from 'axios'
 
-export async function patchEvent(payload: any) {
+async function patchEvent(payload: any) {
     console.log('patching event payload: ', { payload })
     return (
         await axios({

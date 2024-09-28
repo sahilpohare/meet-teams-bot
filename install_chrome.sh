@@ -5,4 +5,4 @@ export CHROME_VERSION=92.0.4515.107-1
 sudo echo sudo
 wget --no-verbose -O /tmp/chrome.deb https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_${CHROME_VERSION}_amd64.deb   && sudo apt install -y --allow-downgrades /tmp/chrome.deb   && rm /tmp/chrome.deb
 
-#mac https://dw.uptodown.com/dwn/-EIcMx7llWECf0d1md4aVFQMJJNwjbNPrMF15RV21j76o119Ffv9ybTuA0_cXIKWzVHFS0r8Bw1jDgXozVyL9UrwamuWhIrJ0O2olzcP-lQB1tTveafVDHKhhmdjzjfO/ugdP73kw0s_qrNWcTJ3EVjGk85K5UEplJm8osIm9f59DCuoVQpSd7gAomoGC1YuWJl9_CPVwu-7nHKXTQgVSXTWEWfbrN1iT2nWmufkSGf5hv_IUgXZ7fJ9LQ3-CnZO8/xht16SeurI3AaZsNyZgSs9l-WQHP9Eg7ZNof9b01nP5-6_nodUvmJ0yH0m9yaTp1QwkUkWc-AThzWX2zwkyY7A==/
+#mac https://dw.uptodown.net/dwn/_xxW1jSb0HcSoXIEX4kEPtOHIkWOhY8KgieJ0eoNk8-lQf-xCIwaVC1LJ9C9OVAnwEQsWlS9lGr_AUwCKhJqCeC_sj8N54P2b5FM1NlcUW7I2rg5ZOlu6kXkHRN5iXX8/jDpoYJfnFWWbV5ChMyVLt94ZAh_TfZwj64tVMrlE3UmuR73l_XGGll0mBw0SNfMXsl5u-HYPILXTfC3MscMLwqrsoLVpWCFyCzb5ccAZp48VvLSEyWnIMTxYvvQ71PSy/t2qqFfW0Fjsf3RwkyPH5vVPTK1rpBrfKB2DiogXvCtL-Iaxj4SgKfXQ2-ZfejIuIth4nL1XB-1273Yl0iDFdUg==/google-chrome-92-0-4515-107.dmg

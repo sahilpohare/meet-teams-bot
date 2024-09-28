@@ -10,6 +10,7 @@ import axios from 'axios'
 import { Events } from './events'
 import { MeetingHandle } from './meeting'
 import { MeetingParams } from './types'
+import { Streaming } from './streaming'
 
 const POD_NAME = process.env.POD_NAME
 
@@ -104,6 +105,13 @@ export class Consumer {
 
     // throw error if start recoridng fail
     static async handleStartRecord(data: MeetingParams) {
+        if (data.streaming_input || data.streaming_output) {
+            new Streaming(
+                data.streaming_input,
+                data.streaming_output,
+                data.bot_id,
+            )
+        }
         console.log('####### DATA #######', data)
         // Prevent instance for beeing scaled down
         try {

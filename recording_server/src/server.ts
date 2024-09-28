@@ -8,6 +8,8 @@ import { MessageToBroadcast, SpeakerData, StopRecordParams } from './types'
 import { PORT } from './instance'
 import { MeetingHandle } from './meeting'
 
+import { Streaming } from './streaming'
+
 import axios from 'axios'
 import { execSync } from 'child_process'
 import { unlinkSync } from 'fs'
@@ -102,6 +104,7 @@ export async function server() {
     // Speakers event from All providers : Write logs and send data to extension
     app.post('/add_speaker', async (req, res) => {
         const speakers: SpeakerData[] = req.body
+        Streaming.instance?.send_speaker_state(speakers)
         console.table(speakers)
         let input = JSON.stringify(speakers)
         await fs.appendFile(SPEAKER_LOG_PATHNAME, `${input}\n`).catch((e) => {
