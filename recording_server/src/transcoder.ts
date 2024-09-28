@@ -233,6 +233,15 @@ export class Transcoder {
                     )
                 }
                 await sleep(retryDelay)
+            } finally {
+                try {
+                    await fs.unlink(outputAudioPath)
+                } catch (err) {
+                    console.error(
+                        'Erreur lors de la suppression du fichier audio:',
+                        err,
+                    )
+                }
             }
         }
 
