@@ -27,11 +27,11 @@ import {
 
 import { notifyApp } from './calendar'
 import { Events } from './events'
+import { VideoContext } from './media_context'
 import { MeetProvider } from './meeting/meet'
 import { TeamsProvider } from './meeting/teams'
 import { ZoomProvider } from './meeting/zoom'
 import { sleep } from './utils'
-import { VideoContext, SoundContext } from './media_context'
 
 const RECORDING_TIMEOUT = 3600 * 4 // 4 hours
 // const RECORDING_TIMEOUT = 120 // 2 minutes for tests
@@ -321,17 +321,24 @@ export class MeetingHandle {
             this.param.automatic_leave.noone_joined_timeout,
         )
         while (MeetingHandle.status.state === 'Recording') {
-            if (
-                await this.provider.findEndMeeting(
-                    this.param,
-                    this.meeting.page!,
-                    cancelationToken,
+            try {
+                if (
+                    await this.provider.findEndMeeting(
+                        this.param,
+                        this.meeting.page!,
+                        cancelationToken,
+                    )
+                ) {
+                    return
+                } else {
+                    console.log('[waiting for end meeting] meeting not ended')
+                    await sleep(1000)
+                }
+            } catch (e) {
+                console.error(
+                    '[waitForEndMeeting] find EndMeeting crashed with error: ',
+                    e,
                 )
-            ) {
-                return
-            } else {
-                console.log('[waiting for end meeting] meeting not ended')
-                await sleep(1000)
             }
         }
     }
