@@ -9,7 +9,7 @@ import {
 
 import axios from 'axios'
 import { Events } from './events'
-import { setLoggerProjectId } from './logger'
+import { setLoggerProjectId, updateGrafanaAgentAddBotUuid } from './logger'
 import { MeetingHandle } from './meeting'
 import { LOGGER } from './server'
 import { MeetingParams } from './types'
@@ -108,6 +108,7 @@ export class Consumer {
     // throw error if start recoridng fail
     static async handleStartRecord(data: MeetingParams) {
         let logger = LOGGER.new({})
+        await updateGrafanaAgentAddBotUuid(data.bot_id)
         console.log('####### DATA #######', data)
         // Prevent instance for beeing scaled down
         try {

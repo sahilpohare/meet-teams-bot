@@ -1,12 +1,12 @@
-import { BUCKET_NAME, s3cp } from './s3'
-
-import { LOGGER } from './server'
 import axios from 'axios'
 import { exec } from 'child_process'
 import * as fs from 'fs/promises'
-
-import { getFiles } from './utils'
 import * as path from 'path'
+import { BUCKET_NAME, s3cp } from './s3'
+import { LOGGER } from './server'
+import { getFiles } from './utils'
+const util = require('util')
+const execPromise = util.promisify(exec)
 
 let PROJECT_ID: number | undefined = undefined
 
@@ -155,4 +155,38 @@ export function uploadLogScript() {
             res()
         })
     })
+}
+
+export async function updateGrafanaAgentAddBotUuid(botUuid: string) {
+    try {
+        console.log('Starting config update...')
+
+        // Mise à jour du fichier de configuration
+        const sedResult = await execPromise(
+            `sudo sed -i 's/BOT_UUID_PLACEHOLDER/${botUuid}/g' /etc/grafana-agent.yaml`,
+        )
+
+        if (sedResult.stderr) {
+            console.error(
+                `Erreur lors de la mise à jour du fichier de configuration : ${sedResult.stderr}`,
+            )
+        }
+
+        console.log('Fichier de configuration mis à jour avec succès')
+
+        // Rechargement de l'agent Grafana
+        const reloadResult = await execPromise(
+            'sudo systemctl restart grafana-agent.service',
+        )
+
+        if (reloadResult.stderr) {
+            console.error(
+                `Erreur lors du rechargement de l'agent Grafana : ${reloadResult.stderr}`,
+            )
+        }
+
+        console.log('Agent Grafana rechargé avec succès')
+    } catch (error) {
+        console.error(`Une erreur est survenue : ${error}`)
+    }
 }
