@@ -467,7 +467,7 @@ async function countParticipants(page: Page): Promise<number> {
                 if (participantCountSpan != null) {
                     return parseInt(participantCountSpan.innerText, 10) - 1
                 } else {
-                    return 0
+                    return -1
                 }
             } else {
                 throw new Error('Roster button not found')
@@ -500,8 +500,12 @@ async function countParticipants(page: Page): Promise<number> {
 }
 async function noParticipantsforDuration(page: Page, duration: number) {
     for (let i = 0; i < duration; i++) {
+        let count = await countParticipants(page)
         try {
-            if ((await countParticipants(page)) > 0) {
+            if (count > 0) {
+                return false
+            } else if (count === -1) {
+                console.log('INCOHERENTE PARTICIpANTS COUNT')
                 return false
             }
         } catch (e) {

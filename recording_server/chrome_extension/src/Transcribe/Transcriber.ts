@@ -1,11 +1,17 @@
 import * as asyncLib from 'async'
-import { RecognizerTranscript, sleep } from '../api'
-import { parameters } from '../background'
-import { newTranscribeQueue } from '../queue'
-import { SESSION, START_RECORD_TIMESTAMP } from '../record'
+
 import { ApiService } from '../recordingServerApi'
+
+import { RecognizerTranscript, api } from '../api'
+import { SESSION, START_RECORD_TIMESTAMP } from '../record'
 import { parseGladia, recognizeGladia } from './providers/gladia'
 import { parseRunPod, recognizeRunPod } from './providers/runpod'
+
+import { sleep } from '../api'
+import { parameters } from '../background'
+import { newTranscribeQueue } from '../queue'
+// import { speakerWorker } from './speakerWorker'
+
 import { wordPosterWorker } from './wordPosterWorker'
 
 // milisseconds transcription chunk duration
