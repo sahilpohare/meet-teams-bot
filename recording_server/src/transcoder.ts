@@ -16,6 +16,13 @@ export class Transcoder {
     constructor() {
         this.outputPath = path.join(os.tmpdir(), 'output.mp4')
         this.webmPath = path.join(os.tmpdir(), 'output.webm')
+
+        const fs = require('fs');
+        try {
+            fs.writeFileSync(this.webmPath, Buffer.alloc(0));
+        } catch(err) {
+            console.error(`Cannot create new webm file: ${err}`);
+        }
     }
 
     public async init(bucketName: string, videoS3Path: string): Promise<void> {
