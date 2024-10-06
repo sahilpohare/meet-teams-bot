@@ -69,13 +69,13 @@ async function refreshAttendeesLoop() {
                     !attendee.toLowerCase().includes('notetaker'), // notetaker is for competiter bot's
                 PROVIDER!.findAllAttendees(),
             )
-            console.log(`refresh participants loop : ${allAttendees}`)
+            console.log('refresh participants loop :', allAttendees)
             chrome.runtime.sendMessage({
                 type: 'REFRESH_ATTENDEES',
                 payload: allAttendees,
             })
         } catch (e) {
-            console.error(`Catch on refresh attendees : ${e}`)
+            console.error('Catch on refresh attendees :', e)
         }
         await sleep(10000)
     }
@@ -122,12 +122,12 @@ var MUTATION_OBSERVER = new MutationObserver(function (mutations) {
                     'SPEAKERS',
                     currentSpeakersList,
                 ).catch((e) => {
-                    console.error(`Catch on send currentSpeakersList : ${e}`)
+                    console.error('Catch on send currentSpeakersList :', e)
                 })
                 CUR_SPEAKERS = new_speakers
             }
         } catch (e) {
-            console.error(`Catch on MutationObserver : ${e}`)
+            console.error('Catch on MutationObserver :', e)
         }
     })
 })
@@ -140,13 +140,13 @@ async function observeSpeakers() {
         )
         return
     } else {
-        console.log(`start observe speakers ${RECORDING_MODE}`)
+        console.log('start observe speakers', RECORDING_MODE)
     }
     try {
         removeShityHtmlLoop(RECORDING_MODE)
         refreshAttendeesLoop()
     } catch (e) {
-        console.log(`Catch on Initial step into observeSpeaker failed : ${e}`)
+        console.log('Catch on Initial step into observeSpeaker failed :', e)
     }
 
     // ___INITIAL_SEQUENCE___
@@ -165,7 +165,7 @@ async function observeSpeakers() {
                 'SPEAKERS',
                 currentSpeakersList,
             ).catch((e) => {
-                console.error(`Catch on send initial speakers list : ${e}`)
+                console.error('Catch on send initial speakers list :', e)
             })
         } else {
             // El Famoso speaker '-'
@@ -177,11 +177,11 @@ async function observeSpeakers() {
                     isSpeaking: true, // I am confused !
                 },
             ] as SpeakerData[]).catch((e) => {
-                console.error(`Catch on send special speaker - : ${e}`)
+                console.error('Catch on send special speaker - :', e)
             })
         }
     } catch (e) {
-        console.error(`Catch on initial observe speaker sequence : ${e}`)
+        console.error('Catch on initial observe speaker sequence :', e)
     }
 
     try {
@@ -191,6 +191,6 @@ async function observeSpeakers() {
         ))!
         MUTATION_OBSERVER.observe(observe_parameters[0], observe_parameters[1])
     } catch (e) {
-        console.error(`Catch on observe speaker init terminaison : ${e}`)
+        console.error('Catch on observe speaker init terminaison :', e)
     }
 }

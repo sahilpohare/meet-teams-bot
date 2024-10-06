@@ -67,7 +67,7 @@ function onRetryAttempt(err: any) {
     const request = err.request
 
     console.log(
-        `Tentative de nouvelle essai #${cfg && cfg.currentRetryAttempt}`,
+        'Tentative de nouvelle essai #', cfg && cfg.currentRetryAttempt,
         {
             url: request.url,
             method: request.method,

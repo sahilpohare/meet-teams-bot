@@ -57,14 +57,14 @@ function setUserAgent(window: Window, userAgent: string) {
 // with a single speaker and not an array of multiple speakers. Handling multiple
 // speakers should be implemented at some point.
 function addSpeaker(speaker: SpeakerData) {
-    // console.log(`EXTENSION BACKGROUND PAGE - ADD SPEAKER : ${speaker}`)
+    // console.log('EXTENSION BACKGROUND PAGE - ADD SPEAKER :', speaker)
     LAST_SPEAKER_ACTIVITY = speaker.timestamp
     SPEAKERS.push(speaker)
     uploadTranscriptTask()
 }
 
 function updateLastSpeakerActivity(timestamp: number) {
-    // console.log(`EXTENSION BACKGROUND PAGE - UPDATE TS : ${timestamp}`)
+    // console.log('EXTENSION BACKGROUND PAGE - UPDATE TS :', timestamp)
     LAST_SPEAKER_ACTIVITY = timestamp
 }
 
@@ -157,9 +157,7 @@ export async function startRecording(
         )
         observeSpeakers()
         checkInactivity().then((n) => {
-            console.log(
-                `${n} is the answer to the ultimate question of life, the universe, and everything.`,
-            )
+            console.log(n, 'is the answer to the ultimate question of life, the universe, and everything.')
         })
         await sleep(1000)
         await record.initMediaRecorder(meetingParams.streaming_output)

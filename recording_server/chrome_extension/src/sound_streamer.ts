@@ -9,7 +9,7 @@ export class SoundStreamer {
     private processor: ScriptProcessorNode | null = null
 
     constructor() {
-        console.info(`${this.constructor.name} : Constructor called`)
+        console.info(this.constructor.name, 'Constructor called')
 
         this.ws = new WebSocket(LOCAL_WEBSOCKET_URL)
         this.ws.binaryType = 'arraybuffer'
@@ -18,17 +18,17 @@ export class SoundStreamer {
             console.log('Websocket opened !')
         }
         this.ws.onclose = (_) => {
-            console.log(`Websocket closed !`)
+            console.log('Websocket closed !')
         }
         this.ws.onerror = (evt: Event) => {
-            console.error(`Websocket error : ${evt}`)
+            console.error('Websocket error :', evt)
         }
 
         SoundStreamer.instance = this
     }
 
     public start(stream: MediaStream) {
-        console.info(`${this.constructor.name} : Starting audio capture`)
+        console.info(this.constructor.name, ': Starting audio capture')
 
         const audioContext = new AudioContext({
             sampleRate: FREQUENCY,
@@ -62,7 +62,7 @@ export class SoundStreamer {
     }
 
     public stop() {
-        console.info(`${this.constructor.name} : Stoping audio capture`)
+        console.info(this.constructor.name, ': Stoping audio capture')
 
         this.ws.close()
         this.processor?.disconnect()

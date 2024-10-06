@@ -154,9 +154,7 @@ export class Transcriber {
                     transcripts = parseGladia(res_gladia, currentOffset)
                     break
                 default:
-                    console.error(
-                        `Unknown Transcription Provider ! ${parameters.speech_to_text_provider}`,
-                    )
+                    console.error('Unknown Transcription Provider !', parameters.speech_to_text_provider)
                     transcripts = new Array()
             }
             console.log('[Transcriber] [onResult] ')

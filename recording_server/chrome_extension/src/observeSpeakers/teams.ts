@@ -268,7 +268,7 @@ export function removeShityHtml(mode: RecordingMode) {
                 hiddenDivs++
             }
         })
-        // console.log(`[Teams] Hidden ${hiddenDivs} additional elements`)
+        // console.log('Teams] Hidden', hiddenDivs, 'additional elements')
     } catch (e) {
         // console.error('[Teams] Error in remove additional elements', e)
     }

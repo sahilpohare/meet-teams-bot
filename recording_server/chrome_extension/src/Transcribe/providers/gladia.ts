@@ -64,9 +64,7 @@ export async function recognizeGladia(
         },
     })
     if (axios_response.status !== CREATED_HTML_CODE) {
-        console.error(
-            `Cannot make transcribe request to Gladia : ${axios_response}`,
-        )
+        console.error('Cannot make transcribe request to Gladia :', axios_response)
         throw axios_response
     }
     let response: TranscribeRequestResponse = axios_response.data
@@ -76,7 +74,7 @@ export async function recognizeGladia(
         await sleep(TRANSCRIPTION_WAIT_TIME)
         result = await getResult(response.id)
         if (result.status === 'error') {
-            console.error(`Error from Gladia : ${result}`)
+            console.error('Error from Gladia :', result)
             throw result
         }
         if (result.status === 'done') {
@@ -131,7 +129,7 @@ async function getResult(id: string): Promise<GladiaResult> {
         },
     })
     if (axios_response.status !== DONE_HTML_CODE) {
-        console.error(`Cannot make get request to Gladia : ${axios_response}`)
+        console.error('Cannot make get request to Gladia :', axios_response)
         throw axios_response
     }
     let result = axios_response.data
