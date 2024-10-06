@@ -9,7 +9,6 @@ import { getFiles } from './utils'
 const util = require('util')
 const execPromise = util.promisify(exec)
 
-
 export async function uploadLog(
     user_id: number,
     email: string,

@@ -1,9 +1,4 @@
-
-import {
-    BrandingHandle,
-    generateBranding,
-    playBranding,
-} from './branding'
+import { BrandingHandle, generateBranding, playBranding } from './branding'
 import { Events } from './events'
 import { LOCAL_RECORDING_SERVER_LOCATION, delSessionInRedis } from './instance'
 
@@ -103,7 +98,6 @@ export class MeetingHandle {
         })
     }
     constructor(meetingParams: MeetingParams) {
-
         function detectMeetingProvider(url: string): MeetingProvider {
             if (url.includes('https://teams')) {
                 return 'Teams'
