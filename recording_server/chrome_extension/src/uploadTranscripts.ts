@@ -21,6 +21,7 @@ export async function uploadTranscriptTask() {
         const postableTranscript = createTranscript(bot.id, interval)
         try {
             const transcript = await api.postTranscript(postableTranscript)
+            transcript.words = []
             insertIntoSortedArrayInPlace(
                 spokeSession.transcripts,
                 R.clone(transcript),
@@ -55,8 +56,8 @@ function createTranscript(
         speaker: speaker.speaker ?? '',
         //TODO: get language from Gladia / runpod
         lang: 'en-US',
-        start_time: speaker.start_time,
-        end_time: speaker.end_time,
+        start_time: speaker.start_time / 1000,
+        end_time: speaker.end_time / 1000,
     }
     return transcript
 }

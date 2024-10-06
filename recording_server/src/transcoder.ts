@@ -17,6 +17,7 @@ export class Transcoder {
         this.outputPath = path.join(os.tmpdir(), 'output.mp4')
         this.webmPath = path.join(os.tmpdir(), 'output.webm')
 
+        // Set a new empty webm file for voice transcription
         const fs = require('fs');
         try {
             fs.writeFileSync(this.webmPath, Buffer.alloc(0));
