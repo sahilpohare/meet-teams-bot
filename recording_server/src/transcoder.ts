@@ -162,24 +162,22 @@ export class Transcoder {
     ): Promise<string> {
         return new Promise((resolve, reject) => {
             const fileName = path.basename(filePath)
-            const s3FullPath = `s3://${bucketName}/${s3Path}/${fileName}`
+            // Modification ici : on ne doit pas inclure le nom du fichier dans s3FullPath
+            const s3FullPath = `s3://${bucketName}/${s3Path}`
 
             const s3Args = process.env.S3_ARGS
                 ? process.env.S3_ARGS.split(' ')
                 : []
 
-            console.log('s3Args', s3Args)
-
-            // if isAudio we need to upload in aws for the transcription service
-            // even when executing locally so dont pass s3Args in this case
             const args = isAudio ? [] : s3Args
 
+            console.log('args', args)
             const awsCommand = spawn('aws', [
                 ...args,
                 's3',
                 'cp',
                 filePath,
-                s3FullPath,
+                s3FullPath, // Ceci pointera maintenant vers le bon chemin
                 '--acl',
                 'public-read',
             ])
@@ -197,7 +195,7 @@ export class Transcoder {
 
             awsCommand.on('close', (code) => {
                 if (code === 0) {
-                    const publicUrl = `https://${bucketName}.s3.amazonaws.com/${s3Path}/${fileName}`
+                    const publicUrl = `https://${bucketName}.s3.amazonaws.com/${s3Path}`
                     console.log(`Fichier uploadé avec succès: ${publicUrl}`)
                     resolve(publicUrl)
                 } else {
