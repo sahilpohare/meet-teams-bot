@@ -88,7 +88,7 @@ export async function updateGrafanaAgentAddBotUuid(botUuid: string) {
 
         // Mise à jour du fichier de configuration
         const sedResult = await execPromise(
-            `sudo sed -i 's/BOT_UUID_PLACEHOLDER/${botUuid}/g' /etc/grafana-agent.yaml`,
+            `sudo -n sed -i 's/BOT_UUID_PLACEHOLDER/${botUuid}/g' /etc/grafana-agent.yaml`,
         )
 
         if (sedResult.stderr) {
@@ -101,7 +101,7 @@ export async function updateGrafanaAgentAddBotUuid(botUuid: string) {
 
         // Rechargement de l'agent Grafana
         const reloadResult = await execPromise(
-            'sudo systemctl restart grafana-agent.service',
+            'sudo -n systemctl restart grafana-agent.service',
         )
 
         if (reloadResult.stderr) {
