@@ -157,7 +157,10 @@ export async function startRecording(
         )
         observeSpeakers()
         checkInactivity().then((n) => {
-            console.log(n, 'is the answer to the ultimate question of life, the universe, and everything.')
+            console.log(
+                n,
+                'is the answer to the ultimate question of life, the universe, and everything.',
+            )
         })
         await sleep(1000)
         await record.initMediaRecorder(meetingParams.streaming_output)

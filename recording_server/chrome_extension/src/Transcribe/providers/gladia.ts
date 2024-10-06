@@ -64,7 +64,10 @@ export async function recognizeGladia(
         },
     })
     if (axios_response.status !== CREATED_HTML_CODE) {
-        console.error('Cannot make transcribe request to Gladia :', axios_response)
+        console.error(
+            'Cannot make transcribe request to Gladia :',
+            axios_response,
+        )
         throw axios_response
     }
     let response: TranscribeRequestResponse = axios_response.data
