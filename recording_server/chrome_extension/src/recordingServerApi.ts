@@ -10,6 +10,7 @@ type MessageType =
     | 'UPLOAD_CHUNK'
     | 'STOP_TRANSCODER'
     | 'EXTRACT_AUDIO'
+    | 'DELETE_S3_FILE'
 
 // Yes, any is funny :cow:
 type MessagePayload = any
@@ -121,6 +122,14 @@ export class ApiService {
                     .catch((error) => {
                         console.error('Failed to send LOG message:', error)
                     })
+                break
+            case 'DELETE_S3_FILE':
+                await axios.delete(`${url}transcoder/s3file`, {
+                    data: payload,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                })
                 break
             default:
                 console.error('Unexpected message type !')

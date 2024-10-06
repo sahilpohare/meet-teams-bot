@@ -1,6 +1,6 @@
 import * as record from './record'
-import * as State from './state'
 import { SoundStreamer } from './sound_streamer'
+import * as State from './state'
 
 import { SpokeApiConfig, api, setConfig, sleep } from './api'
 

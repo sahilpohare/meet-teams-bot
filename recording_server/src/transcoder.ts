@@ -60,7 +60,6 @@ export class Transcoder {
         this.child = spawn('ffmpeg', ffmpegArgs, {
             stdio: ['pipe', 'inherit', 'inherit'],
         })
-
         console.log('Commande ffmpeg lancée avec succès.')
         return
     }
@@ -123,7 +122,12 @@ export class Transcoder {
                 }
             }, 60000) // 30 secondes de timeout
         })
-        this.uploadToS3(this.outputPath, this.bucketName, this.videoS3Path)
+        this.uploadToS3(
+            this.outputPath,
+            this.bucketName,
+            this.videoS3Path,
+            false,
+        )
     }
 
     public async uploadChunk(chunk: Buffer): Promise<void> {
@@ -154,12 +158,24 @@ export class Transcoder {
         filePath: string,
         bucketName: string,
         s3Path: string,
+        isAudio: boolean,
     ): Promise<string> {
         return new Promise((resolve, reject) => {
             const fileName = path.basename(filePath)
             const s3FullPath = `s3://${bucketName}/${s3Path}/${fileName}`
 
+            const s3Args = process.env.S3_ARGS
+                ? process.env.S3_ARGS.split(' ')
+                : []
+
+            console.log('s3Args', s3Args)
+
+            // if isAudio we need to upload in aws for the transcription service
+            // even when executing locally so dont pass s3Args in this case
+            const args = isAudio ? [] : s3Args
+
             const awsCommand = spawn('aws', [
+                ...args,
                 's3',
                 'cp',
                 filePath,
@@ -189,7 +205,7 @@ export class Transcoder {
                         "Erreur lors de l'upload vers S3:",
                         errorOutput,
                     )
-                    console.log(process.env);
+                    console.log(process.env)
                     reject(
                         new Error(`Échec de l'upload S3 avec le code ${code}`),
                     )
@@ -227,6 +243,7 @@ export class Transcoder {
                     outputAudioPath,
                     bucketName,
                     s3Path,
+                    true,
                 )
                 console.log(
                     `Fichier audio uploadé sur S3 à la tentative ${attempt}`,
@@ -243,6 +260,15 @@ export class Transcoder {
                     )
                 }
                 await sleep(retryDelay)
+            } finally {
+                try {
+                    await fs.unlink(outputAudioPath)
+                } catch (err) {
+                    console.error(
+                        'Erreur lors de la suppression du fichier audio:',
+                        err,
+                    )
+                }
             }
         }
 
