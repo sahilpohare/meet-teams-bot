@@ -189,6 +189,7 @@ export class Transcoder {
                         "Erreur lors de l'upload vers S3:",
                         errorOutput,
                     )
+                    console.log(process.env);
                     reject(
                         new Error(`Échec de l'upload S3 avec le code ${code}`),
                     )
