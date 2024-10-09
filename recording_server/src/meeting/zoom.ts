@@ -35,7 +35,7 @@ export class ZoomProvider implements MeetingProviderInterface {
                 const q = params.get('q')
 
                 console.log({ q })
-                const { meetingId, password } = parse(q)
+                const { meetingId, password } = this.parse(q)
                 return { meetingId, password }
             } catch (e) {
                 console.error('[parseMeetingUrl] parse meeting url', e)
@@ -44,7 +44,7 @@ export class ZoomProvider implements MeetingProviderInterface {
         }
         try {
             try {
-                const { meetingId, password } = parse(meeting_url)
+                const { meetingId, password } = this.parse(meeting_url)
                 if (!(/^\d+$/.test(meetingId) || meetingId === '')) {
                     throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
                 }
@@ -57,7 +57,7 @@ export class ZoomProvider implements MeetingProviderInterface {
                     await page.goto(meeting_url, { waitUntil: 'networkidle2' })
                     const url = page.url()
                     console.log({ url })
-                    const { meetingId, password } = parse(url)
+                    const { meetingId, password } = this.parse(url)
 
                     try {
                         await page.close()
@@ -74,6 +74,53 @@ export class ZoomProvider implements MeetingProviderInterface {
             throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
         }
     }
+
+    protected parse(meeting_url: string) {
+        // Gérer les URL de redirection Google
+        if (meeting_url.startsWith('https://www.google.com/url?')) {
+            const googleUrl = new URL(meeting_url)
+            meeting_url = googleUrl.searchParams.get('q') || meeting_url
+        }
+
+        // Séparer l'URL du mot de passe si ils sont collés
+        const urlPasswordSplit = meeting_url.split(
+            /(\(Password:|[\s(]Passcode:)/i,
+        )
+        const urlPart = urlPasswordSplit[0].trim()
+
+        let url: URL
+        try {
+            url = new URL(urlPart)
+        } catch (e) {
+            throw 'invalid meeting url'
+        }
+
+        const params = url.searchParams
+        const meetingId = url.pathname.split('/')[2]
+
+        let password = params.get('pwd') || undefined
+        if (!password && urlPasswordSplit.length > 1) {
+            // Extraire le mot de passe de la partie après le séparateur
+            const passwordPart = urlPasswordSplit.slice(1).join('')
+            const passwordMatch = passwordPart.match(
+                /(Password|Passcode):\s*(.*?)\)/i,
+            )
+            if (passwordMatch) {
+                password = passwordMatch[2]
+            }
+        }
+
+        if (!meetingId) {
+            throw 'invalid meeting url'
+        }
+
+        console.log('ZOOM PARSING MeetingId and password', {
+            meetingId,
+            password,
+        })
+        return { meetingId, password }
+    }
+
     getMeetingLink(
         meeting_id: string,
         password: string,
@@ -164,25 +211,4 @@ export class ZoomProvider implements MeetingProviderInterface {
         //TODO COMUNICATE WITH THE SERVER TO FIND THE END MEETING BUTTON
         return false
     }
-}
-
-function parse(meeting_url: string) {
-    const urlSplited = meeting_url.split(' ')[0]
-    const url = new URL(urlSplited)
-    const params = url.searchParams
-    const meetingId = url.pathname.split('/')[2]
-
-    let password = params.get('pwd')
-    if (password == null) {
-        try {
-            const array = [...meeting_url.matchAll(/: (.*)\)/g)]
-            password = array[0][1]
-        } catch (e) {}
-    }
-
-    if (meetingId == null) {
-        throw 'invalid meeting url'
-    }
-    console.log('ZOOM PARSING MeetingId and password', { meetingId, password })
-    return { meetingId, password }
 }
