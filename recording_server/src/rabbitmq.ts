@@ -9,8 +9,8 @@ import {
 import { Events } from './events'
 import { updateGrafanaAgentAddBotUuid } from './logger'
 import { MeetingHandle } from './meeting'
-import { MeetingParams } from './types'
 import { Streaming } from './streaming'
+import { MeetingParams } from './types'
 
 const POD_NAME = process.env.POD_NAME
 
@@ -108,11 +108,13 @@ export class Consumer {
             user_id: data.user_id,
             meeting_url: data.meeting_url,
         }
+        console.log('before set session in redis')
         try {
             await setSessionInRedis(data.session_id, meetingSession)
         } catch (e) {
             console.error('fail to set session in redis: ', e)
         }
+        console.log('after set session in redis')
         MeetingHandle.init(data)
 
         Events.init(data)
