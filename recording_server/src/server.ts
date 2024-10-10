@@ -4,17 +4,15 @@ import * as path from 'path'
 import * as redis from 'redis'
 
 import { MessageToBroadcast, SpeakerData, StopRecordParams } from './types'
+import { SoundContext, VideoContext } from './media_context'
 
-import { PORT } from './instance'
 import { MeetingHandle } from './meeting'
-
+import { PORT } from './instance'
 import { Streaming } from './streaming'
-
+import { TRANSCODER } from './transcoder'
 import axios from 'axios'
 import { execSync, spawn } from 'child_process'
 import { unlinkSync } from 'fs'
-import { SoundContext, VideoContext } from './media_context'
-import { TRANSCODER } from './transcoder'
 
 console.log('redis url: ', process.env.REDIS_URL)
 export const clientRedis = redis.createClient({
@@ -219,6 +217,45 @@ export async function server() {
     app.post('/stop_meeting', async (_req, res) => {
         console.log('end meeting from extension notification')
         stop_record(res, 'extension request')
+    })
+
+    //logger zoom
+    app.post('/logs', (req, res) => {
+        // console.log('logs from zoom', req.body)
+        const { level, message, timestamp } = req.body
+
+        // Fonction pour colorer les logs dans le terminal
+        function colorLog(level, message, timestamp) {
+            switch (level) {
+                case 'warn':
+                    console.warn(
+                        '\x1b[33m%s\x1b[0m',
+                        `[WARN] ${timestamp}: ${message}`,
+                    )
+                    break
+                case 'info':
+                    console.info(
+                        '\x1b[36m%s\x1b[0m',
+                        `[INFO] ${timestamp}: ${message}`,
+                    )
+                    break
+                case 'error':
+                    console.error(
+                        '\x1b[31m%s\x1b[0m',
+                        `[ERROR] ${timestamp}: ${message}`,
+                    )
+                    break
+                default:
+                    console.log(
+                        '\x1b[0m%s\x1b[0m',
+                        `[LOG] ${timestamp}: ${message}`,
+                    )
+            }
+        }
+
+        colorLog(level, message, timestamp)
+
+        res.sendStatus(200)
     })
 
     function stop_record(res: any, reason: string) {
