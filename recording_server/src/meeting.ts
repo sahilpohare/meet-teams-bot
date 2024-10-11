@@ -24,6 +24,15 @@ import { TeamsProvider } from './meeting/teams'
 import { ZoomProvider } from './meeting/zoom'
 import { sleep } from './utils'
 
+let _NO_SPEAKER_DETECTED_TIMESTAMP: number | null = null
+
+export const NO_SPEAKER_DETECTED_TIMESTAMP = {
+    get: () => _NO_SPEAKER_DETECTED_TIMESTAMP,
+    set: (value: number | null) => {
+        _NO_SPEAKER_DETECTED_TIMESTAMP = value
+    },
+}
+const NO_SPEAKER_DETECTED_TIMEOUT = 1000 * 60 * 1 // 5 minutes
 const RECORDING_TIMEOUT = 3600 * 4 // 4 hours
 // const RECORDING_TIMEOUT = 120 // 2 minutes for tests
 const MAX_TIME_TO_LIVE_AFTER_TIMEOUT = 3600 * 2 // 2 hours
@@ -314,28 +323,22 @@ export class MeetingHandle {
 
     private async waitForEndMeeting() {
         console.log('waiting for end meeting')
-        const cancelationToken = new CancellationToken(
-            this.param.automatic_leave.noone_joined_timeout,
-        )
         while (MeetingHandle.status.state === 'Recording') {
-            try {
-                if (
-                    await this.provider.findEndMeeting(
-                        this.param,
-                        this.meeting.page!,
-                        cancelationToken,
-                    )
-                ) {
-                    return
-                } else {
-                    console.log('[waiting for end meeting] meeting not ended')
-                    await sleep(1000)
-                }
-            } catch (e) {
-                console.error(
-                    '[waitForEndMeeting] find EndMeeting crashed with error: ',
-                    e,
+            if (
+                NO_SPEAKER_DETECTED_TIMESTAMP.get() !== null &&
+                NO_SPEAKER_DETECTED_TIMESTAMP.get() +
+                    NO_SPEAKER_DETECTED_TIMEOUT <
+                    Date.now()
+            ) {
+                this.stopRecording('no speaker detected timeout')
+                return
+            } else {
+                console.log(
+                    '[waiting for end meeting] no speaker detected timestamp',
+                    NO_SPEAKER_DETECTED_TIMESTAMP.get(),
                 )
+                console.log('[waiting for end meeting] meeting not ended')
+                await sleep(1000)
             }
         }
     }
