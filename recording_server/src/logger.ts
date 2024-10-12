@@ -5,7 +5,7 @@ import { exec } from 'child_process'
 import * as fs from 'fs/promises'
 
 import * as path from 'path'
-import { POD_NAME } from './rabbitmq'
+const POD_NAME = process.env.POD_NAME
 import { getFiles } from './utils'
 const util = require('util')
 const execPromise = util.promisify(exec)

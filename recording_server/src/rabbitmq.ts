@@ -12,7 +12,7 @@ import { MeetingHandle } from './meeting'
 import { Streaming } from './streaming'
 import { MeetingParams } from './types'
 
-export const POD_NAME = process.env.POD_NAME
+const POD_NAME = process.env.POD_NAME
 
 export type StartRecordingResult = {
     params: MeetingParams
