@@ -12,7 +12,7 @@ import { MeetingHandle } from './meeting'
 import { Streaming } from './streaming'
 import { MeetingParams } from './types'
 
-const POD_NAME = process.env.POD_NAME
+const NODE_NAME = process.env.NODE_NAME
 
 export type StartRecordingResult = {
     params: MeetingParams
@@ -21,7 +21,7 @@ export type StartRecordingResult = {
 
 export class Consumer {
     static readonly QUEUE_NAME = LOCK_INSTANCE_AT_STARTUP
-        ? POD_NAME
+        ? NODE_NAME
         : 'worker_bot_queue'
     static readonly PREFETCH_COUNT = 1
 
@@ -40,7 +40,7 @@ export class Consumer {
     }
 
     async deleteQueue() {
-        if (LOCK_INSTANCE_AT_STARTUP && Consumer.QUEUE_NAME === POD_NAME) {
+        if (LOCK_INSTANCE_AT_STARTUP && Consumer.QUEUE_NAME === NODE_NAME) {
             try {
                 await this.channel.deleteQueue(Consumer.QUEUE_NAME)
             } catch (e) {

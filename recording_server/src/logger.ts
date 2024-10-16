@@ -5,8 +5,8 @@ import { exec } from 'child_process'
 import * as fs from 'fs/promises'
 
 import * as path from 'path'
-const POD_NAME = process.env.POD_NAME
 import { getFiles } from './utils'
+const NODE_NAME = process.env.NODE_NAME
 const util = require('util')
 const execPromise = util.promisify(exec)
 
@@ -89,7 +89,7 @@ export async function updateGrafanaAgentAddBotUuid(botUuid: string) {
 
         // Mise à jour du fichier de configuration
         const sedResult = await execPromise(
-            `sudo -n sed -i 's/${POD_NAME}/${botUuid}/g' /etc/grafana-agent.yaml`,
+            `sudo -n sed -i 's/${NODE_NAME}/${botUuid}/g' /etc/grafana-agent.yaml`,
         )
 
         if (sedResult.stderr) {
