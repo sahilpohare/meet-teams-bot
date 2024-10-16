@@ -3,16 +3,17 @@ import * as fs from 'fs/promises'
 import * as path from 'path'
 import * as redis from 'redis'
 
-import { MessageToBroadcast, SpeakerData, StopRecordParams } from './types'
+import { execSync, spawn } from 'child_process'
 import { SoundContext, VideoContext } from './media_context'
+import { MessageToBroadcast, SpeakerData, StopRecordParams } from './types'
 
-import { MeetingHandle } from './meeting'
+import axios from 'axios'
+import { unlinkSync } from 'fs'
 import { PORT } from './instance'
+import { MeetingHandle } from './meeting'
+import { ZOOM_RECORDING_APPROVAL_STATUS } from './meeting/zoom'
 import { Streaming } from './streaming'
 import { TRANSCODER } from './transcoder'
-import axios from 'axios'
-import { execSync, spawn } from 'child_process'
-import { unlinkSync } from 'fs'
 
 console.log('redis url: ', process.env.REDIS_URL)
 export const clientRedis = redis.createClient({
@@ -217,6 +218,19 @@ export async function server() {
     app.post('/stop_meeting', async (_req, res) => {
         console.log('end meeting from extension notification')
         stop_record(res, 'extension request')
+    })
+    app.post('/start_zoom_recording', async (_req, res) => {
+        console.log('start recording from zoom notification')
+
+        try {
+            await ZOOM_RECORDING_APPROVAL_STATUS.set(true)
+            res.status(200).json({ message: 'Recording started successfully' })
+        } catch (e) {
+            console.error(`start recording error: ${e}`)
+            res.status(400).json({
+                error: e || 'An error occurred while starting the recording',
+            })
+        }
     })
 
     //logger zoom

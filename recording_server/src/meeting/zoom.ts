@@ -11,6 +11,14 @@ import { Page } from 'puppeteer'
 import { URL } from 'url'
 import { sleep } from '../utils'
 
+let IS_ZOOOM_RECORDING_APPROVED: boolean | null = null
+
+export const ZOOM_RECORDING_APPROVAL_STATUS = {
+    get: () => IS_ZOOOM_RECORDING_APPROVED,
+    set: (value: boolean) => {
+        IS_ZOOOM_RECORDING_APPROVED = value
+    },
+}
 const MEETINGJS_BASEURL = `http://localhost:3005`
 
 export class ZoomProvider implements MeetingProviderInterface {
@@ -113,9 +121,25 @@ export class ZoomProvider implements MeetingProviderInterface {
         cancelCheck: () => boolean,
         meetingParams: MeetingParams,
     ): Promise<void> {
-        await sleep(1000)
+        console.log(
+            '#### meuh [joinMeeting] - zoom - waiting approval',
+            ZOOM_RECORDING_APPROVAL_STATUS.get(),
+        )
+        while (ZOOM_RECORDING_APPROVAL_STATUS.get() === null) {
+            console.log(
+                '[joinMeeting] - zoom - waiting approval',
+                ZOOM_RECORDING_APPROVAL_STATUS.get(),
+                IS_ZOOOM_RECORDING_APPROVED,
+            )
+            await sleep(1000)
+        }
+        if (ZOOM_RECORDING_APPROVAL_STATUS.get() === true) {
+            console.log('[joinMeeting] - zoom - approval granted')
+            return
+        }
     }
 
+    //This function is not used for zoom
     async findEndMeeting(
         meetingParams: MeetingParams,
         page: Page,
