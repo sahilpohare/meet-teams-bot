@@ -177,6 +177,15 @@ export async function removeInitialShityHtml(mode: RecordingMode) {
     } catch (e) {
         console.error('Error with removeBlackBox:', e)
     }
+    try {
+        const politeDivs = document.querySelectorAll('div[aria-live="polite"]')
+        politeDivs.forEach((div) => {
+            ;(div as HTMLElement).style.opacity = '0'
+        })
+    } catch (e) {
+        console.error('Error setting opacity for aria-live="polite" divs:', e)
+    }
+
     if (mode !== 'gallery_view') {
         try {
             const video = document.getElementsByTagName(
@@ -259,6 +268,14 @@ export function removeShityHtml(mode: RecordingMode) {
             }
         }
     } catch (e) {}
+    try {
+        const politeDivs = document.querySelectorAll('div[aria-live="polite"]')
+        politeDivs.forEach((div) => {
+            ;(div as HTMLElement).style.opacity = '0'
+        })
+    } catch (e) {
+        console.error('Error setting opacity for aria-live="polite" divs:', e)
+    }
     try {
         var icons = Array.from(
             document.querySelectorAll('i.google-material-icons'),
