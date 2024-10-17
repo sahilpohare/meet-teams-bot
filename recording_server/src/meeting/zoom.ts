@@ -1,11 +1,12 @@
 import * as puppeteer from 'puppeteer'
 
-import { JoinError, JoinErrorCode } from '../meeting'
 import {
     CancellationToken,
     MeetingParams,
     MeetingProviderInterface,
 } from '../types'
+import { JoinError, JoinErrorCode } from '../meeting'
+import { getCachedExtensionId, openBrowser } from '../puppeteer'
 
 import { Page } from 'puppeteer'
 import { URL } from 'url'
@@ -82,6 +83,7 @@ export class ZoomProvider implements MeetingProviderInterface {
             message,
         )}`
     }
+
     async openMeetingPage(
         browser: puppeteer.Browser,
         link: string,
@@ -89,7 +91,14 @@ export class ZoomProvider implements MeetingProviderInterface {
     ): Promise<puppeteer.Page> {
         const url = new URL(link)
         console.log({ url })
-        const context = browser.defaultBrowserContext()
+
+        const extensionId = await getCachedExtensionId()
+        const { browser: chromiumBrowser, backgroundPage } = await openBrowser(
+            extensionId,
+            true,
+        )
+
+        const context = chromiumBrowser.defaultBrowserContext()
         await context.clearPermissionOverrides()
         if (streaming_input) {
             await context.overridePermissions(url.origin, [
@@ -99,9 +108,8 @@ export class ZoomProvider implements MeetingProviderInterface {
         } else {
             await context.overridePermissions(url.origin, ['camera'])
         }
-        const page = await browser.newPage()
+        const page = await chromiumBrowser.newPage()
 
-        // Ajoutez ces lignes pour accorder les permissions
         await page
             .target()
             .createCDPSession()
