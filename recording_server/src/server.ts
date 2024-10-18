@@ -5,7 +5,12 @@ import * as redis from 'redis'
 
 import { execSync, spawn } from 'child_process'
 import { SoundContext, VideoContext } from './media_context'
-import { MessageToBroadcast, SpeakerData, StopRecordParams } from './types'
+import {
+    MessageToBroadcast,
+    RecordingApprovalState,
+    SpeakerData,
+    StopRecordParams,
+} from './types'
 
 import axios from 'axios'
 import { unlinkSync } from 'fs'
@@ -211,6 +216,7 @@ export async function server() {
     // Stop meeting from zoom
     app.post('/end_zoom_meeting', async (_req, res) => {
         console.log('end meeting from zoom notification')
+        ZOOM_RECORDING_APPROVAL_STATUS.set(RecordingApprovalState.DISABLE)
         stop_record(res, 'zoom request')
     })
 
@@ -223,7 +229,9 @@ export async function server() {
         console.log('start recording from zoom notification')
 
         try {
-            await ZOOM_RECORDING_APPROVAL_STATUS.set(true)
+            await ZOOM_RECORDING_APPROVAL_STATUS.set(
+                RecordingApprovalState.ENABLE,
+            )
             res.status(200).json({ message: 'Recording started successfully' })
         } catch (e) {
             console.error(`start recording error: ${e}`)

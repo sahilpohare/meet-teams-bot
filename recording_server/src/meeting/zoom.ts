@@ -5,20 +5,23 @@ import {
     CancellationToken,
     MeetingParams,
     MeetingProviderInterface,
+    RecordingApprovalState,
 } from '../types'
 
 import { Page } from 'puppeteer'
 import { URL } from 'url'
 import { sleep } from '../utils'
 
-let IS_ZOOOM_RECORDING_APPROVED: boolean | null = null
+let IS_ZOOOM_RECORDING_APPROVED: RecordingApprovalState =
+    RecordingApprovalState.WAITING
 
 export const ZOOM_RECORDING_APPROVAL_STATUS = {
-    get: () => IS_ZOOOM_RECORDING_APPROVED,
-    set: (value: boolean) => {
+    get: (): RecordingApprovalState => IS_ZOOOM_RECORDING_APPROVED,
+    set: (value: RecordingApprovalState) => {
         IS_ZOOOM_RECORDING_APPROVED = value
     },
 }
+
 const MEETINGJS_BASEURL = `http://localhost:3005`
 
 export class ZoomProvider implements MeetingProviderInterface {
@@ -126,7 +129,10 @@ export class ZoomProvider implements MeetingProviderInterface {
             '#### meuh [joinMeeting] - zoom - waiting approval',
             ZOOM_RECORDING_APPROVAL_STATUS.get(),
         )
-        while (ZOOM_RECORDING_APPROVAL_STATUS.get() === null) {
+        while (
+            ZOOM_RECORDING_APPROVAL_STATUS.get() ===
+            RecordingApprovalState.WAITING
+        ) {
             console.log(
                 '[joinMeeting] - zoom - waiting approval',
                 ZOOM_RECORDING_APPROVAL_STATUS.get(),
@@ -134,7 +140,16 @@ export class ZoomProvider implements MeetingProviderInterface {
             )
             await sleep(1000)
         }
-        if (ZOOM_RECORDING_APPROVAL_STATUS.get() === true) {
+        if (
+            ZOOM_RECORDING_APPROVAL_STATUS.get() ===
+            RecordingApprovalState.DISABLE
+        ) {
+            throw new Error('Recording approval is not granted')
+        }
+        if (
+            ZOOM_RECORDING_APPROVAL_STATUS.get() ===
+            RecordingApprovalState.ENABLE
+        ) {
             console.log('[joinMeeting] - zoom - approval granted')
             return
         }
