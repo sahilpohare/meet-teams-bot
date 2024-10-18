@@ -228,7 +228,7 @@ export async function tryGetExtensionId() {
 }
 export async function openBrowser(
     extensionId: string,
-    useChromium: boolean = false,
+    useChromium: boolean,
 ): Promise<{ browser: Browser; backgroundPage: Page }> {
     let error = null
     const NUMBER_TRY_OPEN_BROWSER = 5

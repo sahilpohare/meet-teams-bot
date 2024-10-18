@@ -1,11 +1,6 @@
 import { BrandingHandle, generateBranding, playBranding } from './branding'
-import { Events } from './events'
 import { LOCAL_RECORDING_SERVER_LOCATION, delSessionInRedis } from './instance'
-
-import { uploadLog } from './logger'
-import { MeetProvider } from './meeting/meet'
-import { TeamsProvider } from './meeting/teams'
-import { ZoomProvider } from './meeting/zoom'
+import { SoundContext, VideoContext } from './media_context'
 import {
     getCachedExtensionId,
     listenPage,
@@ -22,10 +17,12 @@ import {
     SpeakerData,
 } from './types'
 
+import { Events } from './events'
+import { uploadLog } from './logger'
+import { MeetProvider } from './meeting/meet'
+import { TeamsProvider } from './meeting/teams'
+import { ZoomProvider } from './meeting/zoom'
 import { sleep } from './utils'
-
-import { VideoContext, SoundContext } from './media_context'
-import { threadId } from 'worker_threads'
 
 const RECORDING_TIMEOUT = 3600 * 4 // 4 hours
 // const RECORDING_TIMEOUT = 120 // 2 minutes for tests
@@ -150,7 +147,10 @@ export class MeetingHandle {
             }
 
             const extensionId = await getCachedExtensionId()
-            const { browser, backgroundPage } = await openBrowser(extensionId)
+            const { browser, backgroundPage } = await openBrowser(
+                extensionId,
+                this.param.meetingProvider === 'Zoom',
+            )
             this.meeting.browser = browser
             this.meeting.backgroundPage = backgroundPage
             console.log('Extension found', { extensionId })

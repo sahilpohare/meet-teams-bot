@@ -1,12 +1,11 @@
 import * as puppeteer from 'puppeteer'
 
+import { JoinError, JoinErrorCode } from '../meeting'
 import {
     CancellationToken,
     MeetingParams,
     MeetingProviderInterface,
 } from '../types'
-import { JoinError, JoinErrorCode } from '../meeting'
-import { getCachedExtensionId, openBrowser } from '../puppeteer'
 
 import { Page } from 'puppeteer'
 import { URL } from 'url'
@@ -92,13 +91,7 @@ export class ZoomProvider implements MeetingProviderInterface {
         const url = new URL(link)
         console.log({ url })
 
-        const extensionId = await getCachedExtensionId()
-        const { browser: chromiumBrowser, backgroundPage } = await openBrowser(
-            extensionId,
-            true,
-        )
-
-        const context = chromiumBrowser.defaultBrowserContext()
+        const context = browser.defaultBrowserContext()
         await context.clearPermissionOverrides()
         if (streaming_input) {
             await context.overridePermissions(url.origin, [
@@ -108,7 +101,7 @@ export class ZoomProvider implements MeetingProviderInterface {
         } else {
             await context.overridePermissions(url.origin, ['camera'])
         }
-        const page = await chromiumBrowser.newPage()
+        const page = await browser.newPage()
 
         await page
             .target()
