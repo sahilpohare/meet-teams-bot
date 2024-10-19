@@ -136,3 +136,9 @@ export interface MessageData {
     msg: SpeakerData[]
 }
 export type MeetingProvider = 'Zoom' | 'Meet' | 'Teams'
+
+export enum RecordingApprovalState {
+    WAITING = 'WAITING',
+    ENABLE = 'ENABLE',
+    DISABLE = 'DISABLE',
+}

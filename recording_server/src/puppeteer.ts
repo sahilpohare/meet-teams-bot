@@ -13,7 +13,7 @@ const StealthPlugin = require('puppeteer-extra-plugin-stealth')
 const EXTENSION_NAME = 'spoke'
 // NOTE: local scripts sed this! (correct value: '<slash>usr<slash>bin<slash>google-chrome')
 // TODO: make an env for this, stop overriding with local scripts...
-const GOOGLE_CHROME_EXECTUTABLE_PATH =
+const GOOGLE_CHROME_EXECUTABLE_PATH =
     process.env.GOOGLE_CHROME_EXECTUTABLE_PATH || '/usr/bin/google-chrome'
 
 puppeteer.use(StealthPlugin())
@@ -200,7 +200,7 @@ export async function tryGetExtensionId() {
             // '--use-fake-device-for-media-stream',
             // '--use-file-for-fake-video-capture=/Users/vcombey/Downloads/example.y4m',
         ],
-        executablePath: GOOGLE_CHROME_EXECTUTABLE_PATH,
+        executablePath: GOOGLE_CHROME_EXECUTABLE_PATH,
         headless: false,
         devtools: false,
         defaultViewport: null,
@@ -226,25 +226,22 @@ export async function tryGetExtensionId() {
     await browser.close()
     return extensionId
 }
-
 export async function openBrowser(
     extensionId: string,
+    useChromium: boolean,
 ): Promise<{ browser: Browser; backgroundPage: Page }> {
     let error = null
     const NUMBER_TRY_OPEN_BROWSER = 5
     for (let i = 0; i < NUMBER_TRY_OPEN_BROWSER; i++) {
         try {
-            // Attempt to open the browser with the specified extension
-            const browser = await tryOpenBrowser(extensionId)
+            const browser = await tryOpenBrowser(extensionId, useChromium)
             await reload_extension(browser)
 
-            // Find the background page of the extension within the browser
             const backgroundPage = await findBackgroundPage(
                 browser,
                 extensionId,
             )
 
-            // Return the browser and the fully configured background page
             return { browser, backgroundPage }
         } catch (e) {
             console.error(`Failed to open browser: ${e}`, {
@@ -254,11 +251,13 @@ export async function openBrowser(
             continue
         }
     }
-    // If all retries fail, throw the last encountered error
     throw error
 }
 
-export async function tryOpenBrowser(extensionId: string): Promise<Browser> {
+export async function tryOpenBrowser(
+    extensionId: string,
+    useChromium: boolean = false,
+): Promise<Browser> {
     const pathToExtension =
         process.env.PROFILE !== 'DEV'
             ? join(__dirname, '..', '..', 'chrome_extension', 'dist')
@@ -267,14 +266,14 @@ export async function tryOpenBrowser(extensionId: string): Promise<Browser> {
     console.log('Path to Extension : ', pathToExtension)
     const width = WIDTH_FRAMEBUFFER
     const height = HEIGHT_FRAMEBUFFER + HEIGHT_INTERFACE_CHROME
-    const browser = await puppeteer.launch({
+
+    const launchOptions: any = {
         ignoreDefaultArgs: ['--mute-audio'],
         args: [
             `--window-size=${width},${height}`,
             '--no-sandbox',
             '--disable-setuid-sandbox',
             `--load-extension=${pathToExtension}`,
-
             '--autoplay-policy=no-user-gesture-required',
             '--remote-debugging-address=0.0.0.0',
             '--remote-debugging-port=9223',
@@ -283,28 +282,27 @@ export async function tryOpenBrowser(extensionId: string): Promise<Browser> {
             '--disable-background-timer-throttling',
             '--disable-dev-shm-usage',
             `--disable-extensions-except=${pathToExtension}`,
-            `--enable-features=SharedArrayBuffer`,
-
+            '--enable-features=SharedArrayBuffer',
             `--whitelisted-extension-id=${extensionId}`,
-            // '--use-fake-ui-for-media-stream',
-            // '--use-fake-device-for-media-stream',
-            // '--use-file-for-fake-video-capture=/Users/vcombey/Downloads/example.y4m',
-
             '--ignore-certificate-errors',
             '--ignore-ssl-errors',
             '--allow-insecure-localhost',
             '--unsafely-treat-insecure-origin-as-secure=http://localhost:3005',
         ],
-        executablePath: GOOGLE_CHROME_EXECTUTABLE_PATH,
         headless: false,
         devtools: false,
         defaultViewport: null,
-    })
+    }
+
+    if (!useChromium) {
+        launchOptions.executablePath = GOOGLE_CHROME_EXECUTABLE_PATH
+    }
+
+    const browser = await puppeteer.launch(launchOptions)
 
     const pages = await browser.pages()
     const page = pages[0]
 
-    // Ajoutez ces lignes pour accorder les permissions
     await page
         .target()
         .createCDPSession()

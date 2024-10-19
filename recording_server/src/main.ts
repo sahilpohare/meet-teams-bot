@@ -1,6 +1,3 @@
-import axios from 'axios'
-import { exit } from 'process'
-import { generateBranding } from './branding'
 import {
     API_SERVER_BASEURL,
     LOCK_INSTANCE_AT_STARTUP,
@@ -9,8 +6,12 @@ import {
 } from './instance'
 import { JoinError, JoinErrorCode, MeetingHandle } from './meeting'
 import { getCachedExtensionId, getExtensionId, openBrowser } from './puppeteer'
-import { Consumer } from './rabbitmq'
 import { clientRedis, server } from './server'
+
+import axios from 'axios'
+import { exit } from 'process'
+import { generateBranding } from './branding'
+import { Consumer } from './rabbitmq'
 import { MeetingParams } from './types'
 import { sleep } from './utils'
 
@@ -134,9 +135,11 @@ export async function meetingBotStartRecordFailed(
 /// open the browser a first time to speed up the next openings
 async function triggerCache() {
     const extensionId = await getCachedExtensionId()
-    const [browser] = await Promise.all([
-        openBrowser(extensionId),
+    const [chrome, chromium] = await Promise.all([
+        openBrowser(extensionId, false),
+        openBrowser(extensionId, true),
         generateBranding('cache').wait,
     ])
-    await browser.browser.close()
+    await chrome.browser.close()
+    await chromium.browser.close()
 }
