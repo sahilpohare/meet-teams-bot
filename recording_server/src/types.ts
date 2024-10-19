@@ -1,3 +1,4 @@
+import { Json } from 'aws-sdk/clients/robomaker'
 import { Browser, Page } from 'puppeteer'
 
 export type MeetingStatus = 'Recording' | 'Cleanup' | 'Done'
@@ -93,7 +94,7 @@ export type MeetingParams = {
         // recording_permission_denied_timeout?: number
     }
     mp4_s3_path: string
-    extra?: string
+    extra?: any
 }
 
 export class CancellationToken {

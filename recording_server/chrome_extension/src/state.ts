@@ -25,7 +25,7 @@ export type MeetingParams = {
     mp4_s3_path: string
     recording_mode: RecordingMode
     local_recording_server_location: string
-    extra?: string
+    extra?: any
 }
 
 export type RecordingMode = 'speaker_view' | 'gallery_view' | 'audio_only'
