@@ -80,7 +80,7 @@ export class MeetingHandle {
         return MeetingHandle.status?.state
     }
     static getBotId(): string {
-        return MeetingHandle.instance.param.bot_id
+        return MeetingHandle.instance.param.bot_uuid
     }
     static addSpeaker(speaker: SpeakerData) {
         MeetingHandle.instance.meeting.backgroundPage!.evaluate((x) => {
@@ -251,7 +251,7 @@ export class MeetingHandle {
             await uploadLog(
                 this.param.user_id,
                 this.param.email,
-                this.param.bot_id,
+                this.param.bot_uuid,
             )
         } catch (e) {
             console.error(`failed to upload logs: ${e}`)
@@ -408,7 +408,7 @@ export class MeetingHandle {
                 await uploadLog(
                     this.param.user_id,
                     this.param.email,
-                    this.param.bot_id,
+                    this.param.bot_uuid,
                 )
             } catch (e) {
                 console.error(e)

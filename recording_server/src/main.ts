@@ -82,7 +82,7 @@ console.log('version 0.0.1')
             } catch (e) {
                 console.error('fail to delete queue', e)
             }
-            await terminateInstance(params.bot_id)
+            await terminateInstance(params.bot_uuid)
         }
         console.log('exiting instance')
         exit(0)
@@ -102,7 +102,7 @@ async function handleErrorInStartRecording(error: Error, data: MeetingParams) {
         await meetingBotStartRecordFailed(
             data.meeting_url,
             data.event?.id,
-            data.bot_id,
+            data.bot_uuid,
             error instanceof JoinError ? error.message : JoinErrorCode.Internal,
         )
     } catch (e) {

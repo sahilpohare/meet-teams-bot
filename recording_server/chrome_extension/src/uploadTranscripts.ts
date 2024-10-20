@@ -16,9 +16,9 @@ export async function uploadTranscriptTask() {
     let intervals = timestampToInterval(SPEAKERS)
     const spokeSession = SESSION as SpokeSession
     if (intervals.length > spokeSession.transcripts.length) {
-        const bot = await api.getBot(parameters.bot_id)
+        const bot = await api.getBot(parameters.bot_uuid)
         let interval = intervals[intervals.length - 1]
-        const postableTranscript = createTranscript(bot.id, interval)
+        const postableTranscript = createTranscript(bot.bot.id, interval)
         try {
             const transcript = await api.postTranscript(postableTranscript)
             transcript.words = []

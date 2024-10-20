@@ -91,10 +91,10 @@ export class Consumer {
             new Streaming(
                 data.streaming_input,
                 data.streaming_output,
-                data.bot_id,
+                data.bot_uuid,
             )
         }
-        await updateGrafanaAgentAddBotUuid(data.bot_id)
+        await updateGrafanaAgentAddBotUuid(data.bot_uuid)
 
         console.log('####### DATA #######', data)
         // Prevent instance for beeing scaled down

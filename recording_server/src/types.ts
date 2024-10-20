@@ -73,7 +73,7 @@ export type MeetingParams = {
     speech_to_text_api_key?: string
     streaming_input?: string
     streaming_output?: string
-    bot_id: string
+    bot_uuid: string
     enter_message?: string
     bots_api_key?: string
     bots_webhook_url?: string

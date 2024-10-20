@@ -94,7 +94,7 @@ export class Transcriber {
         }
         try {
             if (
-                parameters.bot_id == null ||
+                parameters.bot_uuid == null ||
                 parameters.speech_to_text_provider != null
             ) {
                 this.rebootTimer = setInterval(() => {
@@ -114,7 +114,7 @@ export class Transcriber {
         let newOffset = (Date.now() - START_RECORD_TIMESTAMP) / 1000
         const timeStart = currentOffset
         const timeEnd = final ? -1 : newOffset
-        const s3Path = `${parameters.user_id}/${parameters.bot_id}/${timeStart}-${timeEnd}-record.wav`
+        const s3Path = `${parameters.user_id}/${parameters.bot_uuid}/${timeStart}-${timeEnd}-record.wav`
         this.transcriptionOffset = newOffset
         await sleep(15000)
         console.log(

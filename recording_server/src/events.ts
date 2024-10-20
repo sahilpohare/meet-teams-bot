@@ -5,12 +5,12 @@ export class Events {
     private static EVENTS: Events | null = null
 
     static init(params: MeetingParams) {
-        if (params.bot_id == null) return
+        if (params.bot_uuid == null) return
         if (params.bots_api_key == null) return
         if (params.bots_webhook_url == null) return
 
         Events.EVENTS = new Events(
-            params.bot_id,
+            params.bot_uuid,
             params.bots_api_key,
             params.bots_webhook_url,
         )

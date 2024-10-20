@@ -200,7 +200,7 @@ export async function waitForUpload() {
     }
 
     try {
-        await api.endMeetingTrampoline(State.parameters.bot_id)
+        await api.endMeetingTrampoline(State.parameters.bot_uuid)
     } catch (e) {
         console.error('error in endMeetingTranpoline', e)
     }
