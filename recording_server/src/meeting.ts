@@ -32,7 +32,15 @@ export const NO_SPEAKER_DETECTED_TIMESTAMP = {
         _NO_SPEAKER_DETECTED_TIMESTAMP = value
     },
 }
-const NO_SPEAKER_DETECTED_TIMEOUT = 1000 * 60 * 1 // 5 minutes
+let _START_RECORDING_TIMESTAMP = null
+export const START_RECORDING_TIMESTAMP = {
+    get: () => _START_RECORDING_TIMESTAMP,
+    set: (value: number | null) => {
+        _START_RECORDING_TIMESTAMP = value
+    },
+}
+const NO_SPEAKER_THRESHOLD = 15 * 1000 * 60 // 15 minutes
+const NO_SPEAKER_DETECTED_TIMEOUT = 1000 * 60 * 5 // 5 minutes
 const RECORDING_TIMEOUT = 3600 * 4 // 4 hours
 // const RECORDING_TIMEOUT = 120 // 2 minutes for tests
 const MAX_TIME_TO_LIVE_AFTER_TIMEOUT = 3600 * 2 // 2 hours
@@ -242,6 +250,7 @@ export class MeetingHandle {
                         api_bot_baseurl: process.env.API_BOT_BASEURL,
                     },
                 )
+            START_RECORDING_TIMESTAMP.set(Date.now())
             console.log('startRecording called')
 
             await Events.inCallRecording()
@@ -325,6 +334,9 @@ export class MeetingHandle {
         console.log('waiting for end meeting')
         while (MeetingHandle.status.state === 'Recording') {
             if (
+                START_RECORDING_TIMESTAMP.get() !== null &&
+                START_RECORDING_TIMESTAMP.get() + NO_SPEAKER_THRESHOLD <
+                    Date.now() &&
                 NO_SPEAKER_DETECTED_TIMESTAMP.get() !== null &&
                 NO_SPEAKER_DETECTED_TIMESTAMP.get() +
                     NO_SPEAKER_DETECTED_TIMEOUT <
@@ -335,6 +347,7 @@ export class MeetingHandle {
             } else {
                 console.log(
                     '[waiting for end meeting] no speaker detected timestamp',
+                    START_RECORDING_TIMESTAMP.get(),
                     NO_SPEAKER_DETECTED_TIMESTAMP.get(),
                 )
                 console.log('[waiting for end meeting] meeting not ended')
