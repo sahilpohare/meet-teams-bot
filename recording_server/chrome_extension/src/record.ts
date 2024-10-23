@@ -3,8 +3,8 @@ import { RecognizerWord, sleep, Transcript } from './api'
 import { parameters } from './background'
 import { newSerialQueue } from './queue'
 import { ApiService } from './recordingServerApi'
-import { Transcriber } from './Transcribe/Transcriber'
 import { SoundStreamer } from './sound_streamer'
+import { Transcriber } from './Transcribe/Transcriber'
 
 const STREAM: MediaStream | null = null
 let RECORDED_CHUNKS: BlobEvent[] = []
@@ -76,7 +76,7 @@ export async function initMediaRecorder(
 
                 try {
                     MEDIA_RECORDER = new MediaRecorder(stream, {
-                        mimeType: 'video/webm; codecs=vp9,pcm',
+                        mimeType: 'video/webm; codecs=h264,pcm',
                     })
                 } catch (e) {
                     console.error('error creating media recorder', e)
