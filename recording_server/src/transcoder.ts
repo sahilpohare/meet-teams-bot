@@ -137,10 +137,14 @@ export class Transcoder {
 
         try {
             await this.appendChunkToWebm(chunk)
-            await this.writeToChildStdin(chunk)
             console.log(
-                'Chunk écrit avec succès dans ffmpeg et ajouté au fichier WebM',
+                `${this.constructor} : Incoming video data writed appened to webM`,
             )
+            await this.writeToChildStdin(chunk).then((_) => {
+                console.log(
+                    `${this.constructor} : Incoming video data writed into ffmpeg stdin`,
+                )
+            })
         } catch (err) {
             console.error(
                 "Erreur lors de l'écriture du chunk dans ffmpeg ou de l'ajout au fichier WebM:",
