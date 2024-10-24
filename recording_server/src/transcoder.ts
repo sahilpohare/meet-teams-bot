@@ -138,11 +138,11 @@ export class Transcoder {
         try {
             await this.appendChunkToWebm(chunk)
             console.log(
-                `${this.constructor} : Incoming video data writed appened to webM`,
+                `${this.constructor.name} : Incoming video data writed appened to webM`,
             )
             await this.writeToChildStdin(chunk).then((_) => {
                 console.log(
-                    `${this.constructor} : Incoming video data writed into ffmpeg stdin`,
+                    `${this.constructor.name} : Incoming video data writed into ffmpeg stdin`,
                 )
             })
         } catch (err) {
