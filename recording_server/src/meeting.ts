@@ -149,7 +149,8 @@ export class MeetingHandle {
             const extensionId = await getCachedExtensionId()
             const { browser, backgroundPage } = await openBrowser(
                 extensionId,
-                this.param.meetingProvider === 'Zoom',
+                // this.param.meetingProvider === 'Zoom',
+                false
             )
             this.meeting.browser = browser
             this.meeting.backgroundPage = backgroundPage
