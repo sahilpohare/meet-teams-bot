@@ -4,6 +4,13 @@ import { MeetingParams } from './types'
 export class Events {
     private static EVENTS: Events | null = null
 
+    private log(...args: any[]): void {
+        console.log(`[${this.constructor.name}]`, ...args)
+    }
+    private error(...args: any[]): void {
+        console.error(`[${this.constructor.name}]`, ...args)
+    }
+
     static init(params: MeetingParams) {
         if (params.bot_uuid == null) return
         if (params.bots_api_key == null) return
@@ -59,13 +66,17 @@ export class Events {
                     },
                 },
             },
-        }).catch((e) => {
-            console.error(
+        })
+        .then(() => {
+            this.log('Event sended', code, this.botId, this.webhookUrl)
+        })
+        .catch((_e) => {
+            this.error(
                 'Unable to send event',
                 code,
                 this.botId,
                 this.webhookUrl,
-                e,
+                // e,
             )
         })
     }
