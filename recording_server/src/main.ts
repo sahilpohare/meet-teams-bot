@@ -15,10 +15,10 @@ import { Consumer } from './rabbitmq'
 import { MeetingParams } from './types'
 import { sleep } from './utils'
 
-const originalError = console.error;
+const originalError = console.error
 console.error = (...args: any[]) => {
-    originalError('\x1b[31m%s\x1b[0m', ...args);
-};
+    originalError('\x1b[31m%s\x1b[0m', ...args)
+}
 
 // ENTRY POINT
 // syntax convention

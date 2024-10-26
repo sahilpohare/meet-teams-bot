@@ -22,7 +22,7 @@ import { uploadLog } from './logger'
 import { MeetProvider } from './meeting/meet'
 import { TeamsProvider } from './meeting/teams'
 import { ZoomProvider } from './meeting/zoom'
-import { sleep } from './utils'
+import { Console, sleep } from './utils'
 
 const RECORDING_TIMEOUT = 3600 * 4 // 4 hours
 // const RECORDING_TIMEOUT = 120 // 2 minutes for tests
@@ -53,7 +53,7 @@ export class Status {
     }
 }
 
-export class MeetingHandle {
+export class MeetingHandle extends Console {
     static instance: MeetingHandle = null
     static status: Status = new Status()
     private meeting: Meeting
@@ -95,6 +95,7 @@ export class MeetingHandle {
         })
     }
     constructor(meetingParams: MeetingParams) {
+        super()
         function detectMeetingProvider(url: string): MeetingProvider {
             if (url.includes('https://teams')) {
                 return 'Teams'
@@ -116,7 +117,7 @@ export class MeetingHandle {
                 return new ZoomProvider()
             }
         }
-        console.log(
+        this.log(
             '************ meetingParams meeting_url!!!',
             meetingParams.meeting_url,
         )
@@ -154,13 +155,13 @@ export class MeetingHandle {
             )
             this.meeting.browser = browser
             this.meeting.backgroundPage = backgroundPage
-            console.log('Extension found', { extensionId })
+            this.log('Extension found', { extensionId })
 
             const { meetingId, password } = await this.provider.parseMeetingUrl(
                 this.meeting.browser,
                 this.param.meeting_url,
             )
-            console.log('meeting id found', { meetingId })
+            this.log('meeting id found', { meetingId })
 
             const meetingLink = this.provider.getMeetingLink(
                 meetingId,
@@ -169,14 +170,14 @@ export class MeetingHandle {
                 this.param.bot_name,
                 this.param.enter_message,
             )
-            console.log('Meeting link found', { meetingLink })
+            this.log('Meeting link found', { meetingLink })
 
             this.meeting.page = await this.provider.openMeetingPage(
                 this.meeting.browser,
                 meetingLink,
                 this.param.streaming_input,
             )
-            console.log('meeting page opened')
+            this.log('meeting page opened')
 
             this.meeting.meetingTimeoutInterval = setTimeout(
                 () => {
@@ -190,7 +191,7 @@ export class MeetingHandle {
             const waintingRoomToken = new CancellationToken(
                 this.param.automatic_leave.waiting_room_timeout,
             )
-            console.log(
+            this.log(
                 'waitingroom timeout',
                 this.param.automatic_leave.waiting_room_timeout,
             )
@@ -205,9 +206,9 @@ export class MeetingHandle {
                     },
                     this.param,
                 )
-                console.log('meeting page joined')
+                this.log('meeting page joined')
             } catch (error) {
-                console.error(error)
+                this.error(error)
                 throw error
             }
 
@@ -222,7 +223,7 @@ export class MeetingHandle {
                             await w.startRecording(meuh)
                             return true
                         } catch (error) {
-                            console.error(error)
+                            this.error(error)
                             return false
                         }
                     },
@@ -233,7 +234,7 @@ export class MeetingHandle {
                         api_bot_baseurl: process.env.API_BOT_BASEURL,
                     },
                 )
-            console.log('startRecording called')
+            this.log('startRecording called')
 
             await Events.inCallRecording()
 
@@ -255,20 +256,20 @@ export class MeetingHandle {
                 this.param.bot_uuid,
             )
         } catch (e) {
-            console.error(`failed to upload logs: ${e}`)
+            this.error(`failed to upload logs: ${e}`)
         }
         try {
             this.brandingGenerateProcess?.kill()
             VideoContext.instance.stop()
             SoundContext.instance.stop()
         } catch (e) {
-            console.error(`failed to kill process: ${e}`)
+            this.error(`failed to kill process: ${e}`)
         }
         await this.cleanMeeting()
         try {
             await delSessionInRedis(this.param.session_id)
         } catch (e) {
-            console.error(`failed to del session in redis: ${e}`)
+            this.error(`failed to del session in redis: ${e}`)
         }
     }
 
@@ -276,44 +277,44 @@ export class MeetingHandle {
         try {
             await this.meeting.page?.close()
         } catch (e) {
-            console.error(e)
+            this.error(e)
         }
         try {
             await this.meeting.backgroundPage?.close()
         } catch (e) {
-            console.error(e)
+            this.error(e)
         }
         try {
             await this.meeting.browser?.close()
         } catch (e) {
-            console.error(e)
+            this.error(e)
         }
         try {
             clearTimeout(this.meeting.meetingTimeoutInterval!)
         } catch (e) {
-            console.error(e)
+            this.error(e)
         }
     }
 
     public async recordMeetingToEnd() {
-        console.log('[recordMeetingToEnd]')
+        this.log('[recordMeetingToEnd]')
         await this.waitForEndMeeting()
 
-        console.log('after waitForEndMeeting')
+        this.log('after waitForEndMeeting')
         await Events.callEnded()
 
         MeetingHandle.stopAudioStreaming()
         try {
             await this.stopRecordingInternal()
         } catch (e) {
-            console.error(`Failed to stop recording: ${e}`)
+            this.error(`Failed to stop recording: ${e}`)
         } finally {
             await this.cleanEverything(false)
         }
     }
 
     private async waitForEndMeeting() {
-        console.log('waiting for end meeting')
+        this.log('waiting for end meeting')
         const cancelationToken = new CancellationToken(
             this.param.automatic_leave.noone_joined_timeout,
         )
@@ -328,11 +329,11 @@ export class MeetingHandle {
                 ) {
                     return
                 } else {
-                    console.log('[waiting for end meeting] meeting not ended')
+                    this.log('[waiting for end meeting] meeting not ended')
                     await sleep(1000)
                 }
             } catch (e) {
-                console.error(
+                this.error(
                     '[waitForEndMeeting] find EndMeeting crashed with error: ',
                     e,
                 )
@@ -342,14 +343,14 @@ export class MeetingHandle {
 
     public async stopRecording(reason: string) {
         if (MeetingHandle.status.state !== 'Recording') {
-            console.error(
+            this.error(
                 `Can't exit meeting, the meeting is not in recording state`,
                 { status: MeetingHandle.status.state, exit_reason: reason },
             )
             return
         }
         MeetingHandle.status.state = 'Cleanup'
-        console.log(`Stop recording scheduled`, {
+        this.log(`Stop recording scheduled`, {
             exit_reason: reason,
         })
     }
@@ -364,46 +365,46 @@ export class MeetingHandle {
         try {
             await page!.goto('about:blank')
         } catch (e) {
-            console.error(e)
+            this.error(e)
         }
 
         try {
             clearTimeout(meetingTimeoutInterval!)
         } catch (e) {
-            console.error(e)
+            this.error(e)
         }
         try {
             await page!.close()
         } catch (e) {
-            console.error(`Failed to close page: ${e}`)
+            this.error(`Failed to close page: ${e}`)
         }
 
-        console.log('Waiting for all chunks to be uploaded')
+        this.log('Waiting for all chunks to be uploaded')
         await backgroundPage!.evaluate(async () => {
             const w = window as any
             await w.waitForUpload()
         })
-        console.log('All chunks uploaded')
+        this.log('All chunks uploaded')
         try {
             removeListenPage(backgroundPage!)
             await backgroundPage!.close()
             await sleep(1)
             await browser!.close()
         } catch (e) {
-            console.error(`Failed to close browser: ${e}`)
+            this.error(`Failed to close browser: ${e}`)
         }
-        console.log('Meeting successfully terminated')
+        this.log('Meeting successfully terminated')
     }
 
     private meetingTimeout() {
-        console.log('stopping meeting timeout reason')
+        this.log('stopping meeting timeout reason')
         try {
             this.stopRecording('timeout')
         } catch (e) {
-            console.error(e)
+            this.error(e)
         }
         setTimeout(async () => {
-            console.log('killing process')
+            this.log('killing process')
             //TODO : appeler clean everything
             try {
                 await uploadLog(
@@ -412,7 +413,7 @@ export class MeetingHandle {
                     this.param.bot_uuid,
                 )
             } catch (e) {
-                console.error(e)
+                this.error(e)
             }
             process.exit(0)
         }, MAX_TIME_TO_LIVE_AFTER_TIMEOUT * 1000)

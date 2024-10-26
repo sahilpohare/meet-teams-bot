@@ -67,17 +67,17 @@ export class Events {
                 },
             },
         })
-        .then(() => {
-            this.log('Event sended', code, this.botId, this.webhookUrl)
-        })
-        .catch((_e) => {
-            this.error(
-                'Unable to send event',
-                code,
-                this.botId,
-                this.webhookUrl,
-                // e,
-            )
-        })
+            .then(() => {
+                this.log('Event sended', code, this.botId, this.webhookUrl)
+            })
+            .catch((_e) => {
+                this.error(
+                    'Unable to send event',
+                    code,
+                    this.botId,
+                    this.webhookUrl,
+                    // e,
+                )
+            })
     }
 }
