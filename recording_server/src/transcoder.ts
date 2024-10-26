@@ -13,6 +13,11 @@ class Transcoder {
     private videoS3Path: string
     private webmPath: string
 
+    static FFMPEG_CLOSE_TIMEOUT: number = 60_000 // 60 seconds
+
+    static EXTRACT_AUDIO_MAX_RETRIES: number = 5
+    static EXTRACT_AUDIO_RETRY_DELAY: number = 10_000 // 10 seconds
+
     constructor() {
         this.outputPath = path.join(os.tmpdir(), 'output.mp4')
         this.webmPath = path.join(os.tmpdir(), 'output.webm')
@@ -90,33 +95,24 @@ class Transcoder {
         })
     }
 
-    // New method to close stdin
-    private closeChildStdin(): void {
-        if (!this.ffmpeg_process || !this.ffmpeg_process.stdin) {
-            this.log(
-                'The child process is not initialized or stdin is unavailable',
-            )
-            return
-        }
-        this.ffmpeg_process.stdin.end()
-        this.log('Child process stdin closed')
-    }
-
     public async stop(): Promise<void> {
         if (!this.ffmpeg_process) {
             this.log('Transcoder not initialized, nothing to stop')
             return
         }
-
-        this.closeChildStdin()
+        // New method to close stdin
+        if (this.ffmpeg_process.stdin) {
+            this.ffmpeg_process.stdin.end()
+            this.log('Child process stdin closed')
+        } else {
+            this.log('stdin is unavailable')
+        }
         this.log('Transcoder stopped')
 
         // Wait for the child process to finish
         await new Promise<void>((resolve, reject) => {
             this.ffmpeg_process!.on('close', (code) => {
-                this.log(
-                    `Process transcode_video.sh finished with code ${code}`,
-                )
+                this.log(`Process ffmpeg finished with code ${code}`)
                 this.ffmpeg_process = null
                 resolve()
             })
@@ -126,7 +122,7 @@ class Transcoder {
                     this.ffmpeg_process.kill('SIGTERM')
                     reject(new Error('Timeout while stopping the transcoder'))
                 }
-            }, 60000) // 60 seconds before timeout
+            }, Transcoder.FFMPEG_CLOSE_TIMEOUT) // 60 seconds before timeout
         })
         this.uploadToS3(
             this.outputPath,
@@ -227,10 +223,12 @@ class Transcoder {
             os.tmpdir(),
             `output_${Date.now()}.wav`,
         )
-        const maxRetries = 5
-        const retryDelay = 10000 // 10 seconds
 
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        for (
+            let attempt = 1;
+            attempt <= Transcoder.EXTRACT_AUDIO_MAX_RETRIES;
+            attempt++
+        ) {
             try {
                 await this.runExtractAudio(outputAudioPath, timeStart, timeEnd)
                 this.log(`Audio extraction successful on attempt ${attempt}`)
@@ -249,12 +247,12 @@ class Transcoder {
                     `Audio extraction or upload failed on attempt ${attempt}:`,
                     error,
                 )
-                if (attempt === maxRetries) {
+                if (attempt === Transcoder.EXTRACT_AUDIO_MAX_RETRIES) {
                     throw new Error(
-                        `Audio extraction or upload failed after ${maxRetries} attempts`,
+                        `Audio extraction or upload failed after ${Transcoder.EXTRACT_AUDIO_MAX_RETRIES} attempts`,
                     )
                 }
-                await sleep(retryDelay)
+                await sleep(Transcoder.EXTRACT_AUDIO_RETRY_DELAY)
             } finally {
                 try {
                     await fs.unlink(outputAudioPath)
@@ -265,7 +263,7 @@ class Transcoder {
         }
 
         throw new Error(
-            `Audio extraction and upload failed after ${maxRetries} attempts`,
+            `Audio extraction and upload failed after ${Transcoder.EXTRACT_AUDIO_MAX_RETRIES} attempts`,
         )
     }
 
