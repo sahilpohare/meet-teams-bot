@@ -1,9 +1,9 @@
 import { ChildProcess, spawn } from 'child_process'
-import { Console } from './utils'
 import * as fs from 'fs/promises'
 import * as os from 'os'
 import * as path from 'path'
 import { Writable } from 'stream'
+import { Console } from './utils'
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -31,6 +31,12 @@ class Transcoder extends Console {
         } catch (err) {
             this.error(`Cannot create new webm file: ${err}`)
         }
+    }
+    private log(...args: any[]): void {
+        console.log(`[${this.constructor.name}]`, ...args)
+    }
+    private error(...args: any[]): void {
+        console.error(`[${this.constructor.name}]`, ...args)
     }
 
     public async init(bucketName: string, videoS3Path: string): Promise<void> {
