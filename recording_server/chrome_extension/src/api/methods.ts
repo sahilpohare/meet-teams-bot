@@ -16,7 +16,7 @@ export async function endMeetingTrampoline(bot_id?: string) {
             retry: 0,
         },
         method: 'POST',
-        url: '/v1/speech/end_meeting_trampoline',
+        url: '/bots/end_meeting_trampoline',
         timeout: 600000,
     })
     return resp.data
