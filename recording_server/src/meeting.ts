@@ -242,13 +242,13 @@ export class MeetingHandle extends Console {
                 throw new JoinError(JoinErrorCode.Internal)
             }
         } catch (error) {
-            await this.cleanEverything(true)
+            await this.cleanEverything()
             MeetingHandle.status.error = error
             throw error
         }
     }
 
-    private async cleanEverything(failed: boolean) {
+    private async cleanEverything() {
         try {
             await uploadLog(
                 this.param.user_id,
@@ -276,24 +276,16 @@ export class MeetingHandle extends Console {
     private async cleanMeeting() {
         try {
             await this.meeting.page?.close()
-        } catch (e) {
-            this.error(e)
-        }
+        } catch (e) {}
         try {
             await this.meeting.backgroundPage?.close()
-        } catch (e) {
-            this.error(e)
-        }
+        } catch (e) {}
         try {
             await this.meeting.browser?.close()
-        } catch (e) {
-            this.error(e)
-        }
+        } catch (e) {}
         try {
             clearTimeout(this.meeting.meetingTimeoutInterval!)
-        } catch (e) {
-            this.error(e)
-        }
+        } catch (e) {}
     }
 
     public async recordMeetingToEnd() {
@@ -309,7 +301,9 @@ export class MeetingHandle extends Console {
         } catch (e) {
             this.error(`Failed to stop recording: ${e}`)
         } finally {
-            await this.cleanEverything(false)
+            console.log('before cleanEverything')
+            await this.cleanEverything()
+            console.log('after cleanEverything')
         }
     }
 
@@ -358,10 +352,12 @@ export class MeetingHandle extends Console {
     private async stopRecordingInternal() {
         let { page, meetingTimeoutInterval, browser, backgroundPage } =
             this.meeting
+        console.log('before stopMediaRecorder')
         await backgroundPage!.evaluate(async () => {
             const w = window as any
             await w.stopMediaRecorder()
         })
+        console.log('after stopMediaRecorder')
         try {
             await page!.goto('about:blank')
         } catch (e) {
@@ -379,12 +375,12 @@ export class MeetingHandle extends Console {
             this.error(`Failed to close page: ${e}`)
         }
 
-        this.log('Waiting for all chunks to be uploaded')
+        this.log('before waitForUpload')
         await backgroundPage!.evaluate(async () => {
             const w = window as any
             await w.waitForUpload()
         })
-        this.log('All chunks uploaded')
+        this.log('after waitForUpload')
         try {
             removeListenPage(backgroundPage!)
             await backgroundPage!.close()

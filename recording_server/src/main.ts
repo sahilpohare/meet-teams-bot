@@ -12,6 +12,7 @@ import axios from 'axios'
 import { exit } from 'process'
 import { generateBranding } from './branding'
 import { Consumer } from './rabbitmq'
+import { TRANSCODER } from './transcoder'
 import { MeetingParams } from './types'
 import { sleep } from './utils'
 
@@ -71,6 +72,10 @@ console.log('version 0.0.1')
                 await MeetingHandle.instance.recordMeetingToEnd()
             } catch (e) {
                 console.error('record meeting to end failed: ', e)
+            } finally {
+                // stop transcoder even if the meeting ended with an error
+                // to have a video uploaded to s3 even in case there is a crash
+                TRANSCODER.stop()
             }
         }
         console.log('sleeping to let api server make status requests')

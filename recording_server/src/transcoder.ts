@@ -13,7 +13,7 @@ class Transcoder extends Console {
     private ffmpeg_process: ChildProcess | null = null
     private videoS3Path: string
     private webmPath: string
-
+    private transcoder_successfully_stopped: boolean = false
     static FFMPEG_CLOSE_TIMEOUT: number = 60_000 // 60 seconds
 
     static EXTRACT_AUDIO_MAX_RETRIES: number = 5
@@ -31,12 +31,6 @@ class Transcoder extends Console {
         } catch (err) {
             this.error(`Cannot create new webm file: ${err}`)
         }
-    }
-    private log(...args: any[]): void {
-        console.log(`[${this.constructor.name}]`, ...args)
-    }
-    private error(...args: any[]): void {
-        console.error(`[${this.constructor.name}]`, ...args)
     }
 
     public async init(bucketName: string, videoS3Path: string): Promise<void> {
@@ -98,6 +92,10 @@ class Transcoder extends Console {
     }
 
     public async stop(): Promise<void> {
+        if (this.transcoder_successfully_stopped) {
+            this.log('Transcoder already stopped')
+            return
+        }
         if (!this.ffmpeg_process) {
             this.log('Transcoder not initialized, nothing to stop')
             return
@@ -126,12 +124,13 @@ class Transcoder extends Console {
                 }
             }, Transcoder.FFMPEG_CLOSE_TIMEOUT) // 60 seconds before timeout
         })
-        this.uploadToS3(
+        await this.uploadToS3(
             this.outputPath,
             this.bucketName,
             this.videoS3Path,
             false,
         )
+        this.transcoder_successfully_stopped = true
     }
 
     public async uploadChunk(chunk: Buffer): Promise<void> {

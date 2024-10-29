@@ -180,7 +180,6 @@ export async function stopMediaRecorder() {
         isSpeaking: false,
     })
     await uploadTranscriptTask()
-    console.log('stopping transcriber')
 }
 
 // Stop the Audio Recording
