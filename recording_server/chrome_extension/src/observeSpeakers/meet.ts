@@ -232,7 +232,7 @@ export function getSpeakerFromDocument(
                 name: participant.name,
                 id: 0,
                 timestamp,
-                isSpeaking: participant.isSpeaking || participant.isPresenting,
+                isSpeaking: participant.isSpeaking,
             }),
         )
 
