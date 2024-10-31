@@ -327,7 +327,30 @@ export class MeetingHandle extends Console {
 
     private async waitForEndMeeting() {
         this.log('waiting for end meeting')
+        const cancelationToken = new CancellationToken(
+            this.param.automatic_leave.noone_joined_timeout,
+        )
         while (MeetingHandle.status.state === 'Recording') {
+            try {
+                if (
+                    await this.provider.findEndMeeting(
+                        this.param,
+                        this.meeting.page!,
+                        cancelationToken,
+                    )
+                ) {
+                    return
+                } else {
+                    console.log('[waiting for end meeting] meeting not ended')
+                    await sleep(1000)
+                }
+            } catch (e) {
+                console.error(
+                    '[waitForEndMeeting] find EndMeeting crashed with error: ',
+                    e,
+                )
+            }
+
             if (
                 START_RECORDING_TIMESTAMP.get() !== null &&
                 START_RECORDING_TIMESTAMP.get() + NO_SPEAKER_THRESHOLD <
