@@ -366,7 +366,7 @@ export class MeetingHandle {
             }
             if (NUMBER_OF_ATTENDEES.get() === 0) {
                 this.stopRecording('no attendees')
-                await sleep(30000)
+                await sleep(10000) // wait 10 seconds to be sure
                 if (NUMBER_OF_ATTENDEES.get() === 0) {
                     return
                 }
