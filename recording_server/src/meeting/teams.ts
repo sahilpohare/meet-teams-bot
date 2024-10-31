@@ -130,10 +130,7 @@ export class TeamsProvider implements MeetingProviderInterface {
         page: Page,
         _cancellationToken: CancellationToken,
     ): Promise<boolean> {
-        return (
-            (await isRemovedFromTheMeeting(page)) ||
-            (await noParticipantsforDuration(page, 10))
-        )
+        return await isRemovedFromTheMeeting(page)
     }
 }
 
@@ -453,68 +450,6 @@ async function getInput(
         await sleep(1000)
     }
     return null
-}
-async function countParticipants(page: Page): Promise<number> {
-    const count = await page.evaluate(() => {
-        // Fonction pour extraire le nombre de participants à partir d'un document
-        function extractParticipantsCount(doc) {
-            const button = doc.getElementById('roster-button')
-
-            if (button != null) {
-                const participantCountSpan = button.querySelector(
-                    'span[data-tid="roster-button-tile"]',
-                )
-                if (participantCountSpan != null) {
-                    return parseInt(participantCountSpan.innerText, 10) - 1
-                } else {
-                    return -1
-                }
-            } else {
-                throw new Error('Roster button not found')
-            }
-        }
-
-        try {
-            return extractParticipantsCount(document)
-        } catch (e) {
-            console.error('Error extracting participants count:', e)
-        }
-
-        const iframes = document.querySelectorAll('iframe')
-        for (const iframe of iframes) {
-            const doc = iframe.contentDocument || iframe.contentWindow.document
-            if (doc) {
-                try {
-                    return extractParticipantsCount(doc)
-                } catch (e) {
-                    console.error('Error extracting participants count:', e)
-                }
-            }
-        }
-
-        throw new Error('Participants count not found')
-    })
-
-    console.log('Found', count, 'participants en plus du bot')
-    return count
-}
-async function noParticipantsforDuration(page: Page, duration: number) {
-    for (let i = 0; i < duration; i++) {
-        let count = await countParticipants(page)
-        try {
-            if (count > 0) {
-                return false
-            } else if (count === -1) {
-                console.log('INCOHERENTE PARTICIpANTS COUNT')
-                return false
-            }
-        } catch (e) {
-            console.error('error in findEndMeeting', e)
-            return false
-        }
-        await sleep(1000)
-    }
-    return true
 }
 
 async function checkPageForText(
