@@ -13,7 +13,7 @@ import {
 } from './types'
 
 import axios from 'axios'
-import { NO_SPEAKER_DETECTED_TIMESTAMP } from './meeting'
+import { NO_SPEAKER_DETECTED_TIMESTAMP, NUMBER_OF_ATTENDEES } from './meeting'
 
 import { unlinkSync } from 'fs'
 import { PORT } from './instance'
@@ -116,12 +116,18 @@ export async function server() {
         await fs.appendFile(SPEAKER_LOG_PATHNAME, `${input}\n`).catch((e) => {
             console.error(`Cannot append speaker log file ! : ${e}`)
         })
+
+        // Set the number of attendees in the meeting
+        NUMBER_OF_ATTENDEES.set(speakers.length)
+
         // Count the number of active speakers;
         // an active speaker is a speaker who is currently speaking.
+
         const speakers_count: number = speakers.reduce(
             (acc, s) => acc + (s.isSpeaking === true ? 1 : 0),
             0,
         )
+
         switch (speakers_count) {
             case 0:
                 // There are no speaker
