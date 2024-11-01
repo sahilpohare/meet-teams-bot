@@ -25,14 +25,13 @@ import { ZoomProvider } from './meeting/zoom'
 import { Console, sleep } from './utils'
 
 let _NO_SPEAKER_DETECTED_TIMESTAMP: number | null = null
-
 export const NO_SPEAKER_DETECTED_TIMESTAMP = {
     get: () => _NO_SPEAKER_DETECTED_TIMESTAMP,
     set: (value: number | null) => {
         _NO_SPEAKER_DETECTED_TIMESTAMP = value
     },
 }
-let _START_RECORDING_TIMESTAMP = null
+let _START_RECORDING_TIMESTAMP: number | null = null
 export const START_RECORDING_TIMESTAMP = {
     get: () => _START_RECORDING_TIMESTAMP,
     set: (value: number | null) => {
@@ -40,7 +39,7 @@ export const START_RECORDING_TIMESTAMP = {
     },
 }
 
-let _NUMBER_OF_ATTENDEES = null
+let _NUMBER_OF_ATTENDEES: number | null = null
 export const NUMBER_OF_ATTENDEES = {
     get: () => _NUMBER_OF_ATTENDEES,
     set: (value: number | null) => {
@@ -240,8 +239,8 @@ export class MeetingHandle extends Console {
             listenPage(this.meeting.backgroundPage)
             await Events.inCallNotRecording()
 
-            const startRecordSuccess =
-                await this.meeting.backgroundPage.evaluate(
+            if (
+                (await this.meeting.backgroundPage.evaluate(
                     async (meuh) => {
                         try {
                             const w = window as any
@@ -258,15 +257,14 @@ export class MeetingHandle extends Console {
                         api_server_baseurl: process.env.API_SERVER_BASEURL,
                         api_bot_baseurl: process.env.API_BOT_BASEURL,
                     },
-                )
-            START_RECORDING_TIMESTAMP.set(Date.now())
-            this.log('startRecording called')
-
-            await Events.inCallRecording()
-
-            if (startRecordSuccess === false) {
+                )) === false
+            ) {
                 throw new JoinError(JoinErrorCode.Internal)
             }
+
+            START_RECORDING_TIMESTAMP.set(Date.now())
+            this.log('startRecording called')
+            await Events.inCallRecording()
         } catch (error) {
             await this.cleanEverything()
             MeetingHandle.status.error = error
@@ -358,23 +356,21 @@ export class MeetingHandle extends Console {
                     e,
                 )
             }
-            if (NUMBER_OF_ATTENDEES.get() === 0) {
-                this.stopRecording('no attendees')
-                await sleep(10000) // wait 10 seconds to be sure
-                if (NUMBER_OF_ATTENDEES.get() === 0) {
-                    return
-                }
-            }
-            if (
+            let now = Date.now()
+            if (NUMBER_OF_ATTENDEES.get() === 0) { // TODO : NEVER OCCURED IN MEET BECAUSE BOT IS ON SPEAKER TAB
+                                                   // AND NO SPEAKING EVT ARE SENDED IF WE LEAVE THE MEETING.
+                                                   // TEST IT IN MEET
+                await this.stopRecording('no attendees')
+                return
+            } else if (
                 START_RECORDING_TIMESTAMP.get() !== null &&
-                START_RECORDING_TIMESTAMP.get() + NO_SPEAKER_THRESHOLD <
-                    Date.now() &&
+                START_RECORDING_TIMESTAMP.get() + NO_SPEAKER_THRESHOLD < now &&
                 NO_SPEAKER_DETECTED_TIMESTAMP.get() !== null &&
                 NO_SPEAKER_DETECTED_TIMESTAMP.get() +
                     NO_SPEAKER_DETECTED_TIMEOUT <
-                    Date.now()
+                    now
             ) {
-                this.stopRecording('no speaker detected timeout')
+                await this.stopRecording('no speaker detected timeout')
                 return
             } else {
                 this.log(
@@ -382,8 +378,8 @@ export class MeetingHandle extends Console {
                     START_RECORDING_TIMESTAMP.get(),
                     NO_SPEAKER_DETECTED_TIMESTAMP.get(),
                 )
-                console.log('[waiting for end meeting] meeting not ended')
-                await sleep(1000)
+                this.log('[waiting for end meeting] meeting not ended')
+                await sleep(1_000)
             }
         }
     }
