@@ -301,9 +301,9 @@ export class MeetingHandle extends Console {
         } catch (e) {
             this.error(`Failed to stop recording: ${e}`)
         } finally {
-            console.log('before cleanEverything')
+            this.log('before cleanEverything')
             await this.cleanEverything()
-            console.log('after cleanEverything')
+            this.log('after cleanEverything')
         }
     }
 
@@ -352,12 +352,12 @@ export class MeetingHandle extends Console {
     private async stopRecordingInternal() {
         let { page, meetingTimeoutInterval, browser, backgroundPage } =
             this.meeting
-        console.log('before stopMediaRecorder')
+        this.log('before stopMediaRecorder')
         await backgroundPage!.evaluate(async () => {
             const w = window as any
             await w.stopMediaRecorder()
         })
-        console.log('after stopMediaRecorder')
+        this.log('after stopMediaRecorder')
         try {
             await page!.goto('about:blank')
         } catch (e) {

@@ -1,15 +1,9 @@
 import axios from 'axios'
 import { MeetingParams } from './types'
+import { Console } from './utils'
 
-export class Events {
+export class Events extends Console {
     private static EVENTS: Events | null = null
-
-    private log(...args: any[]): void {
-        console.log(`[${this.constructor.name}]`, ...args)
-    }
-    private error(...args: any[]): void {
-        console.error(`[${this.constructor.name}]`, ...args)
-    }
 
     static init(params: MeetingParams) {
         if (params.bot_uuid == null) return
@@ -47,7 +41,9 @@ export class Events {
         private botId: string,
         private apiKey: string,
         private webhookUrl: string,
-    ) {}
+    ) {
+        super()
+    }
 
     private async send(code: string) {
         axios({
