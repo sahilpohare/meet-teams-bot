@@ -55,6 +55,7 @@ export class ApiService {
 
         console.log(
             'Sending message to recording server with PATH:',
+            messageType,
             payload,
             url,
         )

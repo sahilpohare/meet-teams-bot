@@ -16,6 +16,23 @@ export async function* getFiles(dir) {
         }
     }
 }
+
+export class Console {
+    constructor() {}
+    protected log(...args: any[]): void {
+        console.log(`[${this.constructor.name}]`, ...args)
+    }
+    protected info(...args: any[]): void {
+        console.info(`[${this.constructor.name}]`, ...args)
+    }
+    protected warn(...args: any[]): void {
+        console.warn(`[${this.constructor.name}]`, ...args)
+    }
+    protected error(...args: any[]): void {
+        console.error(`[${this.constructor.name}]`, ...args)
+    }
+}
+
 // ['log', 'warn', 'error'].forEach((methodName) => {
 //    const originalMethod = console[methodName];
 //    console[methodName] = (...args) => {

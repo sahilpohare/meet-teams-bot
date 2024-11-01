@@ -108,6 +108,7 @@ export async function startRecording(
     meetingParams: State.MeetingParams,
 ): Promise<void> {
     try {
+        ApiService.init(meetingParams.local_recording_server_location)
         State.addMeetingParams(meetingParams)
 
         addDefaultHeader('Authorization', State.parameters.user_token)
@@ -118,7 +119,6 @@ export async function startRecording(
             logError: () => {},
         }
         setConfig(axios_config)
-        ApiService.init(meetingParams.local_recording_server_location)
         await ApiService.sendMessageToRecordingServer(
             'LOG',
             'FROM_EXTENSION: ************ Start recording launched. ************',
@@ -142,7 +142,6 @@ export async function stopMediaRecorder() {
         isSpeaking: false,
     })
     await uploadTranscriptTask()
-    console.log('stopping transcriber')
 }
 
 // Stop the Audio Recording
