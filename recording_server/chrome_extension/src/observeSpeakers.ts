@@ -100,6 +100,7 @@ var MUTATION_OBSERVER = new MutationObserver(function (mutations) {
                 PROVIDER!.getSpeakerFromDocument(RECORDING_MODE, timestamp)
 
             // BOT_NAME is not a speaker and we havent in Teams so we remove it from meet also
+            //TODO: work on bot speaking detection for speaking bot
             currentSpeakersList = currentSpeakersList.filter(
                 (speaker) => speaker.name !== BOT_NAME,
             )
