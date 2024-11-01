@@ -47,8 +47,8 @@ export const NUMBER_OF_ATTENDEES = {
         _NUMBER_OF_ATTENDEES = value
     },
 }
-const NO_SPEAKER_THRESHOLD = 15 * 1000 * 60 // 15 minutes
-const NO_SPEAKER_DETECTED_TIMEOUT = 1000 * 60 * 5 // 5 minutes
+const NO_SPEAKER_THRESHOLD = 1000 * 60 * 7 // 7 minutes
+const NO_SPEAKER_DETECTED_TIMEOUT = 1000 * 60 * 15 // 15 minutes
 const RECORDING_TIMEOUT = 3600 * 4 // 4 hours
 // const RECORDING_TIMEOUT = 120 // 2 minutes for tests
 const MAX_TIME_TO_LIVE_AFTER_TIMEOUT = 3600 * 2 // 2 hours
@@ -364,7 +364,11 @@ export class MeetingHandle {
                     e,
                 )
             }
-            if (NUMBER_OF_ATTENDEES.get() === 0) {
+            if (
+                NUMBER_OF_ATTENDEES.get() === 0 &&
+                START_RECORDING_TIMESTAMP.get() + NO_SPEAKER_THRESHOLD <
+                    Date.now()
+            ) {
                 this.stopRecording('no attendees')
                 await sleep(10000) // wait 10 seconds to be sure
                 if (NUMBER_OF_ATTENDEES.get() === 0) {
