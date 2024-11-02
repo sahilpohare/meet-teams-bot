@@ -13,6 +13,8 @@ import {
 } from './types'
 
 import axios from 'axios'
+import { NO_SPEAKER_DETECTED_TIMESTAMP, NUMBER_OF_ATTENDEES } from './meeting'
+
 import { unlinkSync } from 'fs'
 import { PORT } from './instance'
 import { MeetingHandle } from './meeting'
@@ -114,15 +116,22 @@ export async function server() {
         await fs.appendFile(SPEAKER_LOG_PATHNAME, `${input}\n`).catch((e) => {
             console.error(`Cannot append speaker log file ! : ${e}`)
         })
+
+        // Set the number of attendees in the meeting
+        NUMBER_OF_ATTENDEES.set(speakers.length)
+
         // Count the number of active speakers;
         // an active speaker is a speaker who is currently speaking.
+
         const speakers_count: number = speakers.reduce(
             (acc, s) => acc + (s.isSpeaking === true ? 1 : 0),
             0,
         )
+
         switch (speakers_count) {
             case 0:
                 // There are no speaker
+                NO_SPEAKER_DETECTED_TIMESTAMP.set(Date.now())
                 if (CUR_SPEAKER) {
                     CUR_SPEAKER.isSpeaking = false
                     if (speakers.length > 0) {
@@ -131,6 +140,7 @@ export async function server() {
                 }
                 break
             case 1:
+                NO_SPEAKER_DETECTED_TIMESTAMP.set(null)
                 // Only one speaker is detected
                 const active_speaker = speakers.find(
                     (v) => v.isSpeaking === true,
@@ -156,6 +166,7 @@ export async function server() {
                 CUR_SPEAKER = active_speaker
                 break
             default:
+                NO_SPEAKER_DETECTED_TIMESTAMP.set(null)
                 // Multiple speakers are currently speaking.
 
                 // Interuption Behavior - Not the best choice

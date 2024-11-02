@@ -1,7 +1,8 @@
 import axios from 'axios'
 import { MeetingParams } from './types'
+import { Console } from './utils'
 
-export class Events {
+export class Events extends Console {
     private static EVENTS: Events | null = null
 
     static init(params: MeetingParams) {
@@ -40,7 +41,9 @@ export class Events {
         private botId: string,
         private apiKey: string,
         private webhookUrl: string,
-    ) {}
+    ) {
+        super()
+    }
 
     private async send(code: string) {
         axios({
@@ -59,14 +62,18 @@ export class Events {
                     },
                 },
             },
-        }).catch((e) => {
-            console.error(
-                'Unable to send event',
-                code,
-                this.botId,
-                this.webhookUrl,
-                e,
-            )
         })
+            .then(() => {
+                this.log('Event sended', code, this.botId, this.webhookUrl)
+            })
+            .catch((_e) => {
+                this.error(
+                    'Unable to send event',
+                    code,
+                    this.botId,
+                    this.webhookUrl,
+                    // e,
+                )
+            })
     }
 }

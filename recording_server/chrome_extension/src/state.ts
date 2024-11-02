@@ -33,11 +33,11 @@ export type RecordingMode = 'speaker_view' | 'gallery_view' | 'audio_only'
 export const parameters: MeetingParams = {} as MeetingParams
 
 export function addMeetingParams(meetingParams: MeetingParams) {
-    ApiService.sendMessageToRecordingServer('LOG', meetingParams).catch((e) => {
-        console.error('error LOG FROM EXTENSION in observeSpeaker', e)
-    })
     // Copy all keys from meetingParams input TO parameters globale variable
     Object.keys(meetingParams).forEach((key) => {
         parameters[key] = meetingParams[key]
+    })
+    ApiService.sendMessageToRecordingServer('LOG', parameters).catch((e) => {
+        console.error('Cannot echo parameters to recording_server', e)
     })
 }

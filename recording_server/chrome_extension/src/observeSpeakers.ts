@@ -34,7 +34,7 @@ var CUR_SPEAKERS: Map<string, boolean> = new Map()
 
 setMeetingProvider()
 observeSpeakers()
-
+parameters.bot_name
 function setMeetingProvider() {
     if (MEETING_PROVIDER === 'Teams') {
         PROVIDER = {
@@ -96,8 +96,14 @@ var MUTATION_OBSERVER = new MutationObserver(function (mutations) {
             PROVIDER?.removeShityHtml(RECORDING_MODE)
         }
         try {
-            const currentSpeakersList: SpeakerData[] =
+            let currentSpeakersList: SpeakerData[] =
                 PROVIDER!.getSpeakerFromDocument(RECORDING_MODE, timestamp)
+
+            // BOT_NAME is not a speaker and we havent in Teams so we remove it from meet also
+            //TODO: work on bot speaking detection for speaking bot
+            currentSpeakersList = currentSpeakersList.filter(
+                (speaker) => speaker.name !== BOT_NAME,
+            )
 
             let new_speakers = new Map(
                 currentSpeakersList.map((elem) => [elem.name, elem.isSpeaking]),

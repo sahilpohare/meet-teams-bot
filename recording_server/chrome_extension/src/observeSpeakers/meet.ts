@@ -91,42 +91,158 @@ export function getSpeakerFromDocument(
     timestamp: number,
 ): SpeakerData[] {
     try {
-        const elems = document
-            .querySelector("[aria-label='Participants']")!
-            .querySelectorAll('*')
-        const childs = Array.from(elems).filter((elem) => {
-            const color = getComputedStyle(elem).backgroundColor
-            return (
-                color == 'rgba(26, 115, 232, 0.9)' ||
-                color == 'rgb(26, 115, 232)'
+        console.log(
+            '[getSpeakerFromDocument] - Starting participant detection...',
+        )
+
+        const participantsList = document.querySelector(
+            "[aria-label='Participants']",
+        )!
+        const participantItems =
+            participantsList.querySelectorAll('[role="listitem"]')
+        console.log(
+            '[getSpeakerFromDocument] - Found participants items:',
+            participantItems.length,
+        )
+
+        // Map to store unique participants with their speaking status
+        const uniqueParticipants = new Map<
+            string,
+            {
+                name: string
+                isSpeaking: boolean
+                isPresenting: boolean
+            }
+        >()
+
+        participantItems.forEach((item, index) => {
+            const ariaLabel = item.getAttribute('aria-label')?.trim()
+            if (!ariaLabel) {
+                console.warn(
+                    '[getSpeakerFromDocument] - Participant item without aria-label found:',
+                    item,
+                )
+                return
+            }
+
+            console.log(
+                `[getSpeakerFromDocument] - Processing participant ${
+                    index + 1
+                }/${participantItems.length}:`,
+                ariaLabel,
+            )
+
+            // Check if this participant is already in our map
+            if (!uniqueParticipants.has(ariaLabel)) {
+                console.log(
+                    '[getSpeakerFromDocument] - New participant detected:',
+                    ariaLabel,
+                )
+                uniqueParticipants.set(ariaLabel, {
+                    name: ariaLabel,
+                    isSpeaking: false,
+                    isPresenting: false,
+                })
+            } else {
+                console.log(
+                    '[getSpeakerFromDocument] - Updating existing participant:',
+                    ariaLabel,
+                )
+            }
+
+            const participant = uniqueParticipants.get(ariaLabel)!
+
+            // Check if participant is presenting
+            const allDivs = Array.from(item.querySelectorAll('div'))
+            console.log(
+                '[getSpeakerFromDocument] - Checking presentation status...',
+            )
+            const isPresenting = allDivs.some((div) => {
+                const text = div.textContent?.trim()
+                if (text === 'Presentation') {
+                    console.log(
+                        '[getSpeakerFromDocument] - Presentation detected for:',
+                        ariaLabel,
+                    )
+                    return true
+                }
+                return false
+            })
+
+            if (isPresenting) {
+                participant.isPresenting = true
+            }
+
+            // Check for speaking indicators
+            console.log('🎤 Checking speaking indicators...')
+            const speakingIndicators = Array.from(
+                item.querySelectorAll('*'),
+            ).filter((elem) => {
+                const color = getComputedStyle(elem).backgroundColor
+                const isIndicator =
+                    color === 'rgba(26, 115, 232, 0.9)' ||
+                    color === 'rgb(26, 115, 232)'
+                if (isIndicator) {
+                    console.log(
+                        '[getSpeakerFromDocument] - Found speaking indicator:',
+                        color,
+                    )
+                }
+                return isIndicator
+            })
+
+            console.log('Found speaking indicators:', speakingIndicators.length)
+
+            // Check background position for speaking status
+            speakingIndicators.forEach((indicator) => {
+                const backgroundElement = indicator.children[1]
+                if (backgroundElement) {
+                    const backgroundPosition =
+                        getComputedStyle(backgroundElement).backgroundPositionX
+                    console.log(
+                        '[getSpeakerFromDocument] - Background position:',
+                        backgroundPosition,
+                    )
+                    if (backgroundPosition !== '0px') {
+                        console.log(
+                            '[getSpeakerFromDocument] - Speaking detected for:',
+                            ariaLabel,
+                        )
+                        participant.isSpeaking = true
+                    }
+                }
+            })
+
+            // Update the map with potentially modified participant data
+            uniqueParticipants.set(ariaLabel, participant)
+            console.log(
+                '[getSpeakerFromDocument] - Current status for',
+                ariaLabel,
+                ':',
+                {
+                    isSpeaking: participant.isSpeaking,
+                    isPresenting: participant.isPresenting,
+                },
             )
         })
 
-        // Return the speaker name
-        // Find parent recursively with given aria-label (with role as listitem)
-        const findParentWithAriaLabel = (element) => {
-            const hasAriaLabel = (el) => el?.getAttribute('aria-label')?.trim()
-            return hasAriaLabel(element) &&
-                element.getAttribute('role') === 'listitem'
-                ? element
-                : element?.parentElement
-                ? findParentWithAriaLabel(element.parentElement)
-                : null
-        }
-
-        return childs.map((child) => {
-            const background_position_x = getComputedStyle(
-                child.children[1],
-            ).backgroundPositionX
-            return {
-                name: findParentWithAriaLabel(child).ariaLabel,
+        // Convert map to array of SpeakerData
+        const result = Array.from(uniqueParticipants.values()).map(
+            (participant) => ({
+                name: participant.name,
                 id: 0,
                 timestamp,
-                isSpeaking: background_position_x !== '0px',
-            }
-        })
+                isSpeaking: participant.isSpeaking,
+            }),
+        )
+
+        console.log('[getSpeakerFromDocument] - Final results:', result)
+        return result
     } catch (e) {
-        console.error('error in getSpeakerFromMutation', e)
+        console.error(
+            '[getSpeakerFromDocument] - Error in getSpeakerFromDocument:',
+            e,
+        )
         return []
     }
 }

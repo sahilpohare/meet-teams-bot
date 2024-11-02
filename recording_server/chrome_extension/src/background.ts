@@ -12,12 +12,8 @@ import { uploadTranscriptTask } from './uploadTranscripts'
 
 export let SPEAKERS: SpeakerData[] = []
 export let ATTENDEES: string[] = []
-let LAST_SPEAKER_ACTIVITY: number = Date.now()
 
 export * from './state'
-
-const INACTIVITY_THRESHOLD = 60 * 1000 * 30 // ms
-const CHECK_INACTIVITY_PERIOD = 60 * 1000
 
 export function addDefaultHeader(name: string, value: string) {
     axios.defaults.headers.common[name] = value
@@ -58,36 +54,8 @@ function setUserAgent(window: Window, userAgent: string) {
 // speakers should be implemented at some point.
 function addSpeaker(speaker: SpeakerData) {
     // console.log('EXTENSION BACKGROUND PAGE - ADD SPEAKER :', speaker)
-    LAST_SPEAKER_ACTIVITY = speaker.timestamp
     SPEAKERS.push(speaker)
     uploadTranscriptTask()
-}
-
-function updateLastSpeakerActivity(timestamp: number) {
-    // console.log('EXTENSION BACKGROUND PAGE - UPDATE TS :', timestamp)
-    LAST_SPEAKER_ACTIVITY = timestamp
-}
-
-// Check speakers inactivity
-async function checkInactivity(): Promise<number> {
-    while (true) {
-        await sleep(CHECK_INACTIVITY_PERIOD)
-        if (Date.now() - LAST_SPEAKER_ACTIVITY > INACTIVITY_THRESHOLD) {
-            console.warn('[wordPosterWorker] Meuh y a que des bots!!!')
-            ApiService.sendMessageToRecordingServer('STOP_MEETING', {
-                reason: 'Unusual Inactivity Detected',
-            })
-                .then((_) => {
-                    return 42
-                })
-                .catch((e) => {
-                    console.error(
-                        'error STOP_MEETING FROM EXTENSION in background.ts',
-                        e,
-                    )
-                })
-        }
-    }
 }
 
 setUserAgent(
@@ -140,6 +108,7 @@ export async function startRecording(
     meetingParams: State.MeetingParams,
 ): Promise<void> {
     try {
+        ApiService.init(meetingParams.local_recording_server_location)
         State.addMeetingParams(meetingParams)
 
         addDefaultHeader('Authorization', State.parameters.user_token)
@@ -150,18 +119,11 @@ export async function startRecording(
             logError: () => {},
         }
         setConfig(axios_config)
-        ApiService.init(meetingParams.local_recording_server_location)
         await ApiService.sendMessageToRecordingServer(
             'LOG',
             'FROM_EXTENSION: ************ Start recording launched. ************',
         )
         observeSpeakers()
-        checkInactivity().then((n) => {
-            console.log(
-                n,
-                'is the answer to the ultimate question of life, the universe, and everything.',
-            )
-        })
         await sleep(1000)
         await record.initMediaRecorder(meetingParams.streaming_output)
         await record.startRecording()
@@ -180,7 +142,6 @@ export async function stopMediaRecorder() {
         isSpeaking: false,
     })
     await uploadTranscriptTask()
-    console.log('stopping transcriber')
 }
 
 // Stop the Audio Recording
@@ -208,7 +169,6 @@ export async function waitForUpload() {
 
 const w = window as any
 w.addSpeaker = addSpeaker
-w.updateLastSpeakerActivity = updateLastSpeakerActivity
 w.startRecording = startRecording
 w.stopMediaRecorder = stopMediaRecorder
 w.waitForUpload = waitForUpload

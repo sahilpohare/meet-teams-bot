@@ -275,34 +275,6 @@ async function sendEntryMessage(
     }
 }
 
-async function countParticipantsGaleryView(page: Page): Promise<number> {
-    let i = 0
-
-    const iterations = 10
-    while (i < iterations) {
-        try {
-            return await page.$$eval('div[data-self-name]', (elems) => {
-                return elems.length
-            })
-        } catch (e) {
-            console.error('exeption in use without an account')
-        }
-        await sleep(100)
-        i += 1
-    }
-    return 1
-}
-
-async function countParticipantsSpeakerView(page: Page): Promise<number> {
-    const count = await page.evaluate(() => {
-        const images = Array.from(document.querySelectorAll('img'))
-        return images.filter(
-            (img) => img.clientWidth === 32 && img.clientHeight === 32,
-        ).length
-    })
-    return count
-}
-
 async function notAcceptedInMeeting(page: Page): Promise<boolean> {
     try {
         const denied = await page.$$eval('*', (elems) => {
@@ -361,30 +333,6 @@ async function findEndMeeting(
         }
     } catch (e) {
         console.error(e)
-    }
-    try {
-        const participant = await (meetingParams.recording_mode ===
-        'gallery_view'
-            ? countParticipantsGaleryView(page)
-            : countParticipantsSpeakerView(page))
-        console.log(
-            new Date().toISOString(),
-            'found',
-            participant,
-            'participants',
-        )
-
-        if (participant == 1) {
-            return true
-        } else if (participant <= 0) {
-            console.error('NO COHERENT PARTICPANT COUNT : ', participant)
-            return false
-        } else {
-            cancellationToken.reset()
-            return false
-        }
-    } catch (e) {
-        console.error('error happened in count partiicpants', e)
     }
     return false
 }
