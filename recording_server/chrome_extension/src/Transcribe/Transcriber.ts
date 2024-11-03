@@ -152,8 +152,14 @@ export class Transcriber {
                     words = new Array()
             }
             console.log('[Transcriber] [onResult] ')
-            const bot = await api.getBot(parameters.bot_uuid)
-            await api.postWords(words, bot.id)
+            const bot = await api.getBot(parameters.bot_uuid).catch((e) => {
+                console.error('Failed to get bot :', e)
+                throw e
+            })
+            await api.postWords(words, bot.bot.id).catch((e) => {
+                console.error('Failed to post words :', e)
+                throw e
+            })
         } catch (e) {
             console.error(
                 '[Transcriber] an error occured calling transcriber, ',

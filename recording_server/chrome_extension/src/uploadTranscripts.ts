@@ -11,7 +11,10 @@ import { START_RECORD_TIMESTAMP } from './record'
 var LAST_TRANSRIPT: QueryableTranscript | null = null
 
 export async function uploadTranscriptTask(speaker: SpeakerData, end: boolean) {
-    const bot = await api.getBot(parameters.bot_uuid)
+    const bot = await api.getBot(parameters.bot_uuid).catch((e) => {
+        console.error('Failed to get bot :', e)
+        throw e
+    })
     if (LAST_TRANSRIPT) {
         await api
             .patchTranscript({
@@ -29,7 +32,7 @@ export async function uploadTranscriptTask(speaker: SpeakerData, end: boolean) {
     } else {
         LAST_TRANSRIPT = await api
             .postTranscript({
-                bot_id: bot.id,
+                bot_id: bot.bot.id,
                 speaker: speaker.name,
                 start_time: (speaker.timestamp - START_RECORD_TIMESTAMP) / 1000,
                 end_time: null,

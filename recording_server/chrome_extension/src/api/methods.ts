@@ -3,6 +3,7 @@
 import axios from 'axios'
 import {
     ChangeableTranscript,
+    GetableBot,
     PostableTranscript,
     QueryableTranscript,
     RecognizerWord,
@@ -28,7 +29,7 @@ export async function endMeetingTrampoline(bot_uuid: string) {
     return resp.data
 }
 
-export async function getBot(bot_uuid: string) {
+export async function getBot(bot_uuid: string): Promise<GetableBot> {
     return (
         await axios({
             method: 'GET',

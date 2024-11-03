@@ -1,3 +1,14 @@
+export type GetableBot = {
+    bot: QueryableBot
+    params: any // Unused key/values
+    duration: number
+}
+
+export type QueryableBot = {
+    id: number
+    // Unused key/values
+}
+
 export type Word = {
     id: number
     text: string
@@ -46,11 +57,4 @@ export type RecognizerWord = {
     end_ts: number
     /** Confidence ([0.0, 1.0]). */
     confidence: number
-}
-
-export type RecognizerTranscript = {
-    speaker: number
-    startTime: number
-    endTime: number
-    words: RecognizerWord[]
 }
