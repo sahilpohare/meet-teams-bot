@@ -136,7 +136,7 @@ export async function meetingBotStartRecordFailed(
     }
     await axios({
         method: 'POST',
-        url: `/meeting_bot/start_record_failed`,
+        url: `/bots/start_record_failed`,
         data: meetingParams,
         params: { bot_id },
     })
