@@ -5,22 +5,28 @@ export type Word = {
     end_time: number
     transcript_id: number
 }
-export type Transcript = {
-    id: number
-    speaker: string
-    bot_id: number
-    start_time: number
-    words: Word[]
-    lang: string
-    end_time: number
-}
+
 export type PostableTranscript = {
-    speaker: string
     bot_id: number
+    speaker: string
     start_time: number
-    lang: string
+    end_time: number | null
+    lang: string | null
+}
+export type QueryableTranscript = {
+    id: number
+    bot_id: number
+    speaker: string
+    start_time: number
+    end_time: number | null
+    lang: string | null
+}
+
+export type ChangeableTranscript = {
+    id: number
     end_time: number
 }
+
 export type PostableWord = {
     text: string
     start_time: number

@@ -10,7 +10,6 @@ import { ApiService } from './recordingServerApi'
 import { Transcriber } from './Transcribe/Transcriber'
 import { uploadTranscriptTask } from './uploadTranscripts'
 
-export let SPEAKERS: SpeakerData[] = []
 export let ATTENDEES: string[] = []
 
 export * from './state'
@@ -54,8 +53,7 @@ function setUserAgent(window: Window, userAgent: string) {
 // speakers should be implemented at some point.
 function addSpeaker(speaker: SpeakerData) {
     // console.log('EXTENSION BACKGROUND PAGE - ADD SPEAKER :', speaker)
-    SPEAKERS.push(speaker)
-    uploadTranscriptTask()
+    uploadTranscriptTask(speaker, false)
 }
 
 setUserAgent(
@@ -135,13 +133,15 @@ export async function startRecording(
 export async function stopMediaRecorder() {
     await record.stop()
     // add a last fake speaker to trigger the upload of the last editor ( generates an interval )
-    SPEAKERS.push({
-        name: 'END',
-        id: 0,
-        timestamp: Date.now(),
-        isSpeaking: false,
-    })
-    await uploadTranscriptTask()
+    await uploadTranscriptTask(
+        {
+            name: 'END',
+            id: 0,
+            timestamp: Date.now(),
+            isSpeaking: false,
+        } as SpeakerData,
+        true,
+    )
 }
 
 // Stop the Audio Recording

@@ -2,17 +2,14 @@ import * as asyncLib from 'async'
 
 import { ApiService } from '../recordingServerApi'
 
-import { RecognizerTranscript, api } from '../api'
-import { SESSION, START_RECORD_TIMESTAMP } from '../record'
+import { RecognizerWord, api } from '../api'
+import { START_RECORD_TIMESTAMP } from '../record'
 import { parseGladia, recognizeGladia } from './providers/gladia'
 import { parseRunPod, recognizeRunPod } from './providers/runpod'
 
 import { sleep } from '../api'
 import { parameters } from '../background'
 import { newTranscribeQueue } from '../queue'
-// import { speakerWorker } from './speakerWorker'
-
-import { wordPosterWorker } from './wordPosterWorker'
 
 // milisseconds transcription chunk duration
 const TRANSCRIPTION_CHUNK_DURATION = 60 * 1000 * 3 // // 3 minutes
@@ -87,12 +84,6 @@ export class Transcriber {
 
     private async start(): Promise<void> {
         try {
-            this.launchWorkers()
-        } catch (e) {
-            console.error('[Transcriber] error launching workers', e)
-            throw e
-        }
-        try {
             if (
                 parameters.bot_uuid == null ||
                 parameters.speech_to_text_provider != null
@@ -136,7 +127,7 @@ export class Transcriber {
             ).s3Url
             console.log(audioUrl)
 
-            let transcripts: RecognizerTranscript[]
+            let words: RecognizerWord[]
             switch (parameters.speech_to_text_provider) {
                 case 'Runpod':
                 case 'Default':
@@ -144,28 +135,25 @@ export class Transcriber {
                         audioUrl,
                         parameters.vocabulary, // TODO : Envisager utiliser sur meeting baas.
                     )
-                    transcripts = parseRunPod(res_runpod, currentOffset)
+                    words = parseRunPod(res_runpod, currentOffset)
                     break
                 case 'Gladia':
                     let res_gladia = await recognizeGladia(
                         audioUrl,
                         parameters.vocabulary, // TODO : Envisager utiliser sur meeting baas.
                     )
-                    transcripts = parseGladia(res_gladia, currentOffset)
+                    words = parseGladia(res_gladia, currentOffset)
                     break
                 default:
                     console.error(
                         'Unknown Transcription Provider !',
                         parameters.speech_to_text_provider,
                     )
-                    transcripts = new Array()
+                    words = new Array()
             }
             console.log('[Transcriber] [onResult] ')
-            for (let t of transcripts) {
-                for (let w of t.words) {
-                    SESSION?.words.push(w)
-                }
-            }
+            const bot = await api.getBot(parameters.bot_uuid)
+            await api.postWords(words, bot.id)
         } catch (e) {
             console.error(
                 '[Transcriber] an error occured calling transcriber, ',
@@ -186,14 +174,7 @@ export class Transcriber {
                     e,
                 )
             }
-
             //TODO : Delete audio from S3
         }
     }
-
-    /** Launches the workers. */
-    private async launchWorkers(): Promise<void> {
-        this.wordPosterWorker = wordPosterWorker()
-    }
-    /** Gets and handles recognizer results every `interval` ms. */
 }

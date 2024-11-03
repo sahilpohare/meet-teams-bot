@@ -1,5 +1,5 @@
 import * as asyncLib from 'async'
-import { RecognizerWord, sleep, Transcript } from './api'
+import { sleep } from './api'
 import { parameters } from './background'
 import { newSerialQueue } from './queue'
 import { ApiService } from './recordingServerApi'
@@ -13,11 +13,6 @@ let HANDLE_STOP_DONE = false
 let CONTEXT: AudioContext | null = null // No streaming_output audio mode
 let THIS_STREAM: MediaStreamAudioSourceNode | null = null // No streaming_output audio mode
 
-// TODO : Dead code ?
-// let START_RECORD_OFFSET = 0
-// TODO : Dead code ?
-// export const MIN_DURATION_MOMENT = 2100
-
 // INFO : START_RECORD_TIMESTAMP is shared with Transcriber & UploadTranscripts(speaker changes)
 export let START_RECORD_TIMESTAMP = 0
 // INFO : SESSION is shared with Transcriber & UploadTranscripts(speaker changes)
@@ -25,10 +20,8 @@ export let SESSION: SpokeSession | null = null
 
 export type SpokeSession = {
     upload_queue: asyncLib.AsyncQueue<() => Promise<void>>
-    transcripts: Transcript[]
     start_timestamp: number
     cut_times: number[]
-    words: RecognizerWord[]
     videoS3Path?: string
     thumbnailPath?: string
     //last word transcribe time

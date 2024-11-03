@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { RecognizerTranscript, sleep } from '../../api'
+import { RecognizerWord, sleep } from '../../api'
 import { parameters } from '../../background'
 
 const RUNPOD_API_KEY = 'B1EC90VQNXMASRD9QJJAALGOS0YL73JEMKZQ92IJ'
@@ -69,34 +69,22 @@ export async function recognizeRunPod(
 }
 
 /** Handles detected language. */
-// TODO : handle language
 export function parseRunPod(
     apiResponse: RunPodResult,
     offset: number,
-): RecognizerTranscript[] {
-    const words = apiResponse.word_timestamps.map((w) => {
-        let ts = w.start
-        let end_ts = w.end
-        ts += offset
-        end_ts += offset
-
+): RecognizerWord[] {
+    return apiResponse.word_timestamps.map((w: RunPodWordTimestamp) => {
         return {
             type: 'text',
             value: w.word.trim(),
-            ts,
-            end_ts,
-            confidence: 1.0,
-        }
+            ts: w.start + offset,
+            end_ts: w.end + offset,
+            // confidence: w.confidence,
+            // IMPORTANT : The server doesn't seem to interpret things correctly if we return the actual confidence,
+            // which is less than 1.
+            confidence: 1,
+        } as RecognizerWord
     })
-
-    return [
-        {
-            words,
-            startTime: 0,
-            endTime: 0,
-            speaker: 0,
-        },
-    ]
 }
 
 async function checkStatus(id: string) {
