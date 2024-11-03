@@ -5,6 +5,7 @@ import { newSerialQueue } from './queue'
 import { ApiService } from './recordingServerApi'
 import { SoundStreamer } from './sound_streamer'
 import { Transcriber } from './Transcribe/Transcriber'
+import * as State from './state'
 
 const STREAM: MediaStream | null = null
 let RECORDED_CHUNKS: BlobEvent[] = []
@@ -119,6 +120,27 @@ export async function startRecording(): Promise<void> {
         }
         SESSION = newSession
         START_RECORD_TIMESTAMP = now
+
+        // Launch observeSpeakers.js() script inside web page DOM (Meet, teams ...)
+        function observeSpeakers() {
+            chrome.tabs.executeScript(
+                {
+                    code: `var RECORDING_MODE = ${JSON.stringify(
+                        State.parameters.recording_mode,
+                    )}; var BOT_NAME = ${JSON.stringify(
+                        State.parameters.bot_name,
+                    )}; var MEETING_PROVIDER=${JSON.stringify(
+                        State.parameters.meetingProvider,
+                    )}`,
+                },
+                function () {
+                    chrome.tabs.executeScript({
+                        file: './js/observeSpeakers.js',
+                    })
+                },
+            )
+        }
+        observeSpeakers()
     }
     MEDIA_RECORDER.start(10000)
 }

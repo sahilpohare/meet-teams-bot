@@ -82,24 +82,6 @@ function addListener() {
     })
 }
 
-// Launch observeSpeakers.js() script inside web page DOM (Meet, teams ...)
-function observeSpeakers() {
-    chrome.tabs.executeScript(
-        {
-            code: `var RECORDING_MODE = ${JSON.stringify(
-                State.parameters.recording_mode,
-            )}; var BOT_NAME = ${JSON.stringify(
-                State.parameters.bot_name,
-            )}; var MEETING_PROVIDER=${JSON.stringify(
-                State.parameters.meetingProvider,
-            )}`,
-        },
-        function () {
-            chrome.tabs.executeScript({ file: './js/observeSpeakers.js' })
-        },
-    )
-}
-
 // make startRecording accessible from puppeteer
 // Start recording the current tab
 export async function startRecording(
@@ -121,7 +103,6 @@ export async function startRecording(
             'LOG',
             'FROM_EXTENSION: ************ Start recording launched. ************',
         )
-        observeSpeakers()
         await sleep(1000)
         await record.initMediaRecorder(meetingParams.streaming_output)
         await record.startRecording()
