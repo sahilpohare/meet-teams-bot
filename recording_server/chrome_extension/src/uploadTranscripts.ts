@@ -11,10 +11,6 @@ import { START_RECORD_TIMESTAMP } from './record'
 var LAST_TRANSRIPT: QueryableTranscript | null = null
 
 export async function uploadTranscriptTask(speaker: SpeakerData, end: boolean) {
-    const bot = await api.getBot(parameters.bot_uuid).catch((e) => {
-        console.error('Failed to get bot :', e)
-        throw e
-    })
     if (LAST_TRANSRIPT) {
         await api
             .patchTranscript({
@@ -30,6 +26,10 @@ export async function uploadTranscriptTask(speaker: SpeakerData, end: boolean) {
         // Just patch the last transcript if in end
         return
     } else {
+        const bot = await api.getBot(parameters.bot_uuid).catch((e) => {
+            console.error('Failed to get bot :', e)
+            throw e
+        })
         LAST_TRANSRIPT = await api
             .postTranscript({
                 bot_id: bot.bot.id,

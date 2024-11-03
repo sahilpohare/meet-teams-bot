@@ -14,27 +14,12 @@ let HANDLE_STOP_DONE = false
 let CONTEXT: AudioContext | null = null // No streaming_output audio mode
 let THIS_STREAM: MediaStreamAudioSourceNode | null = null // No streaming_output audio mode
 
-// INFO : START_RECORD_TIMESTAMP is shared with Transcriber & UploadTranscripts(speaker changes)
-export let START_RECORD_TIMESTAMP = 0
-// INFO : SESSION is shared with Transcriber & UploadTranscripts(speaker changes)
+export let START_RECORD_TIMESTAMP = 0 // Shared with Transcriber & UploadTranscripts(speaker changes)
 export let SESSION: SpokeSession | null = null
 
 export type SpokeSession = {
     upload_queue: asyncLib.AsyncQueue<() => Promise<void>>
-    start_timestamp: number
-    cut_times: number[]
-    videoS3Path?: string
-    thumbnailPath?: string
-    //last word transcribe time
-    // complete_video_file_path: string,
-    transcribedUntil: number
 }
-
-// TODO : Dead code ? Why this type is never used ?
-// type VideoSize = {
-//     width: number | undefined
-//     height: number | undefined
-// }
 
 export async function initMediaRecorder(
     streaming_output: string | undefined,
@@ -116,7 +101,6 @@ export async function startRecording(): Promise<void> {
             start_timestamp: now,
             transcripts: [],
             words: [],
-            transcribedUntil: 0,
         }
         SESSION = newSession
         START_RECORD_TIMESTAMP = now
