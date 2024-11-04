@@ -141,11 +141,9 @@ class Transcoder extends Console {
         try {
             await this.appendChunkToWebm(chunk)
             this.log('Incoming video data writed appened to webM')
-
-            //TODO: uncomment this when we have an ffmpeg version
-            // await this.writeToChildStdin(chunk).then((_) => {
-            //     this.log('Incoming video data writed into ffmpeg stdin')
-            // })
+            await this.writeToChildStdin(chunk).then((_) => {
+                this.log('Incoming video data writed into ffmpeg stdin')
+            })
         } catch (err) {
             this.error(
                 'Error writing the chunk in ffmpeg or adding it to the WebM file:',
