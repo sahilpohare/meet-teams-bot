@@ -146,8 +146,8 @@ export async function meetingBotStartRecordFailed(
 async function triggerCache() {
     const extensionId = await getCachedExtensionId()
     const [chrome, chromium] = await Promise.all([
-        openBrowser(extensionId, false),
-        openBrowser(extensionId, true),
+        openBrowser(extensionId, false, false),
+        openBrowser(extensionId, true, false),
         generateBranding('cache').wait,
     ])
     await chrome.browser.close()

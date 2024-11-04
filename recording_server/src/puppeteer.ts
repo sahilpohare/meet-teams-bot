@@ -18,9 +18,23 @@ const GOOGLE_CHROME_EXECUTABLE_PATH =
 
 puppeteer.use(StealthPlugin())
 
+type Resolution = {
+    width: number
+    height: number
+}
+
+const P480: Resolution = {
+    width: 854,
+    height: 480,
+}
+
+const P720: Resolution = {
+    width: 1280,
+    height: 720,
+}
+
 const HEIGHT_INTERFACE_CHROME = 120
-const HEIGHT_FRAMEBUFFER = 720
-const WIDTH_FRAMEBUFFER = 1280
+var RESOLUTION: Resolution = P720
 
 export function listenPage(page: Page) {
     const describe = (jsHandle) => {
@@ -105,7 +119,7 @@ export async function screenshot(page: Page, name: string) {
     }
 }
 
-export async function findBackgroundPage(
+async function findBackgroundPage(
     browser: Browser,
     extensionId: string,
 ): Promise<Page> {
@@ -167,7 +181,7 @@ export async function getExtensionId() {
 }
 
 //https://gokatz.me/blog/automate-chrome-extension-testing/
-export async function tryGetExtensionId() {
+async function tryGetExtensionId() {
     const pathToExtension = join(
         __dirname,
         '..',
@@ -176,8 +190,8 @@ export async function tryGetExtensionId() {
         'dist',
     )
     console.log(`Path to Extension = ${pathToExtension}`)
-    const width = WIDTH_FRAMEBUFFER
-    const height = HEIGHT_FRAMEBUFFER + HEIGHT_INTERFACE_CHROME
+    const width = RESOLUTION.width
+    const height = RESOLUTION.height + HEIGHT_INTERFACE_CHROME
 
     const browser = await puppeteer.launch({
         args: [
@@ -226,15 +240,21 @@ export async function tryGetExtensionId() {
     await browser.close()
     return extensionId
 }
+
 export async function openBrowser(
     extensionId: string,
     useChromium: boolean,
+    lowResolution: boolean,
 ): Promise<{ browser: Browser; backgroundPage: Page }> {
     let error = null
     const NUMBER_TRY_OPEN_BROWSER = 5
     for (let i = 0; i < NUMBER_TRY_OPEN_BROWSER; i++) {
         try {
-            const browser = await tryOpenBrowser(extensionId, useChromium)
+            const browser = await tryOpenBrowser(
+                extensionId,
+                useChromium,
+                lowResolution,
+            )
             await reload_extension(browser)
 
             const backgroundPage = await findBackgroundPage(
@@ -254,18 +274,22 @@ export async function openBrowser(
     throw error
 }
 
-export async function tryOpenBrowser(
+async function tryOpenBrowser(
     extensionId: string,
-    useChromium: boolean = false,
+    useChromium: boolean,
+    lowResolution: boolean,
 ): Promise<Browser> {
+    if (lowResolution) {
+        RESOLUTION = P480
+    }
     const pathToExtension =
         process.env.PROFILE !== 'DEV'
             ? join(__dirname, '..', '..', 'chrome_extension', 'dist')
             : join(__dirname, '..', 'chrome_extension', 'dist')
 
     console.log('Path to Extension : ', pathToExtension)
-    const width = WIDTH_FRAMEBUFFER
-    const height = HEIGHT_FRAMEBUFFER + HEIGHT_INTERFACE_CHROME
+    const width = RESOLUTION.width
+    const height = RESOLUTION.height + HEIGHT_INTERFACE_CHROME
 
     const launchOptions: any = {
         ignoreDefaultArgs: ['--mute-audio'],
