@@ -11,6 +11,7 @@ import { updateGrafanaAgentAddBotUuid } from './logger'
 import { MeetingHandle } from './meeting'
 import { Streaming } from './streaming'
 import { MeetingParams } from './types'
+import axios from 'axios'
 
 const NODE_NAME = process.env.NODE_NAME
 
@@ -62,6 +63,7 @@ export class Consumer {
                         const meetingParams = JSON.parse(
                             message.content.toString(),
                         )
+                        axios.defaults.headers.common["Authorization"] = meetingParams.user_token;
                         let error = null
                         try {
                             await handler(meetingParams)
