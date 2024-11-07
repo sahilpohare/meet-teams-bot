@@ -175,7 +175,8 @@ export class MeetingHandle extends Console {
             const { browser, backgroundPage } = await openBrowser(
                 extensionId,
                 false,
-                this.param.meetingProvider === 'Zoom',
+                // this.param.meetingProvider === 'Zoom',
+                false,
             )
             this.meeting.browser = browser
             this.meeting.backgroundPage = backgroundPage
