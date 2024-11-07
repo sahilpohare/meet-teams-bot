@@ -7,10 +7,10 @@ export type ExtractPreview = {
     s3_path: string
 }
 
-export async function endMeetingTrampoline(bot_id?: string) {
+export async function endMeetingTrampoline(bot_uuid: string) {
     const resp = await axios({
         params: {
-            bot_id,
+            bot_uuid,
         },
         raxConfig: {
             retry: 0,
@@ -22,11 +22,11 @@ export async function endMeetingTrampoline(bot_id?: string) {
     return resp.data
 }
 
-export async function getBot(bot_id: string) {
+export async function getBot(bot_uuid: string) {
     return (
         await axios({
             method: 'GET',
-            url: `/bots/${bot_id}`,
+            url: `/bots/${bot_uuid}`,
         })
     ).data
 }
