@@ -174,17 +174,7 @@ async function observeSpeakers() {
                 console.error('Catch on send initial speakers list :', e)
             })
         } else {
-            // El Famoso speaker '-'
-            ApiService.sendMessageToRecordingServer('SPEAKERS', [
-                {
-                    name: '-',
-                    id: 0,
-                    timestamp: Date.now() - PROVIDER!.LATENCY,
-                    isSpeaking: true, // I am confused !
-                },
-            ] as SpeakerData[]).catch((e) => {
-                console.error('Catch on send special speaker - :', e)
-            })
+            // RIP -> El Famoso speaker '-'
         }
     } catch (e) {
         console.error('Catch on initial observe speaker sequence :', e)
