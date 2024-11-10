@@ -94,7 +94,6 @@ export async function startRecording(
         addDefaultHeader('Authorization', State.parameters.user_token)
         let axios_config: SpokeApiConfig = {
             api_server_internal_url: State.parameters.api_server_baseurl,
-            api_bot_internal_url: State.parameters.api_bot_baseurl,
             authorizationToken: State.parameters.user_token,
             logError: () => {},
         }

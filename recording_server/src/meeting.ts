@@ -256,7 +256,6 @@ export class MeetingHandle extends Console {
                         ...this.param,
                         s3_bucket: process.env.AWS_S3_BUCKET,
                         api_server_baseurl: process.env.API_SERVER_BASEURL,
-                        api_bot_baseurl: process.env.API_BOT_BASEURL,
                     },
                 )) === false
             ) {

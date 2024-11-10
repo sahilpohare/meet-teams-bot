@@ -11,7 +11,6 @@ export type MeetingParams = {
     meeting_url: string
     meetingProvider: MeetingProvider
     api_server_baseurl: string
-    api_bot_baseurl: string
     session_id: string
     vocabulary: string[]
     force_lang: boolean

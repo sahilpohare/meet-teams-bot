@@ -1,15 +1,12 @@
 import axios from 'axios'
 import * as rax from 'retry-axios'
 
-export let API_BOT_BASEURL: string = ''
-
 /**
  * Configuration of MeetingBaas/Spoke environment
  */
 export type SpokeApiConfig = {
     authorizationToken?: string
     api_server_internal_url?: string
-    api_bot_internal_url?: string
     defaultUrl?: string
     logError: any
 }
@@ -23,14 +20,10 @@ export function setConfig(config: SpokeApiConfig) {
         setDefaultHeader('Authorization', config.authorizationToken)
     }
     if (config.defaultUrl) {
-        API_BOT_BASEURL = config.defaultUrl
         setDefaultAxios(config.defaultUrl, config.logError)
     }
     if (config.api_server_internal_url) {
         setDefaultAxios(config.api_server_internal_url, config.logError)
-    }
-    if (config.api_bot_internal_url) {
-        API_BOT_BASEURL = config.api_bot_internal_url
     }
 }
 
