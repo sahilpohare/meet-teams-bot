@@ -7,7 +7,7 @@ import { SoundContext } from './media_context'
 import { Console } from './utils'
 
 const EXTENSION_WEBSOCKET_PORT: number = 8081
-const SAMPLE_RATE: number = 16_000
+const SAMPLE_RATE: number = 24_000
 
 export class Streaming extends Console {
     public static instance: Streaming | null

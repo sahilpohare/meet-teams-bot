@@ -1,5 +1,5 @@
 const LOCAL_WEBSOCKET_URL: string = 'ws://localhost:8081'
-const FREQUENCY: number = 16000 // 16khz sample frequency
+const FREQUENCY: number = 24000 // 24khz sample frequency
 const BUFFER_SIZE: number = 256 // Assuming chunks of 62.5 ms
 
 export class SoundStreamer {
