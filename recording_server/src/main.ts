@@ -92,7 +92,7 @@ console.log('version 0.0.1')
             } catch (e) {
                 console.error('fail to delete queue', e)
             }
-            await terminateInstance(params.bot_uuid)
+            await terminateInstance()
         }
         console.log('exiting instance')
         exit(0)

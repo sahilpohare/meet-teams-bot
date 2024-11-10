@@ -1,5 +1,5 @@
 import { exec } from 'child_process'
-import { uploadLogScript } from './logger'
+import { Logger } from './logger'
 import { clientRedis } from './server'
 
 export const PORT = 8080
@@ -58,9 +58,9 @@ export function setProtection(enabled: boolean): Promise<void> {
     })
 }
 
-export async function terminateInstance(bot_id: string) {
+export async function terminateInstance() {
     try {
-        await uploadLogScript(bot_id)
+        await Logger.instance.upload_log_script()
     } catch (e) {
         console.error('fail to upload logs: ', e)
     }

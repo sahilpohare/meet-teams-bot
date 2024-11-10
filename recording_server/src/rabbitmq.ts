@@ -7,11 +7,13 @@ import {
 } from './instance'
 
 import { Events } from './events'
-import { updateGrafanaAgentAddBotUuid } from './logger'
+import { Logger, updateGrafanaAgentAddBotUuid } from './logger'
 import { MeetingHandle } from './meeting'
 import { Streaming } from './streaming'
 import { MeetingParams } from './types'
 import axios from 'axios'
+
+import { promises as fs } from 'fs';
 
 const NODE_NAME = process.env.NODE_NAME
 
@@ -62,7 +64,12 @@ export class Consumer {
 
                         const meetingParams = JSON.parse(
                             message.content.toString(),
-                        )
+                        ) as MeetingParams
+
+                        let logger = new Logger(meetingParams)
+                        await logger.init()
+                        await logger.periodic_log_update()
+
                         axios.defaults.headers.common["Authorization"] = meetingParams.user_token;
                         let error = null
                         try {

@@ -10,8 +10,8 @@ import {
 } from '../types'
 
 import { Page } from 'puppeteer'
-import { screenshot } from '../puppeteer'
 import { sleep } from '../utils'
+import { Logger } from '../logger'
 
 export class MeetProvider implements MeetingProviderInterface {
     constructor() {}
@@ -81,18 +81,18 @@ export class MeetProvider implements MeetingProviderInterface {
                 5,
             ),
         )
-        await screenshot(page, `before_typing_bot_name`)
+        await Logger.instance.screenshot(page, `before_typing_bot_name`)
         for (let attempt = 1; attempt <= 5; attempt++) {
             if (await typeBotName(page, meetingParams.bot_name)) {
                 console.log('Bot name typed at attempt', attempt)
                 break
             }
-            await screenshot(page, `bot_name_typing_failed_attempt_${attempt}`)
+            await Logger.instance.screenshot(page, `bot_name_typing_failed_attempt_${attempt}`)
             await clickOutsideModal(page)
             await page.waitForTimeout(500)
         }
         // await typeBotName(page, meetingParams.bot_name)
-        await screenshot(page, `after_typing_bot_name`)
+        await Logger.instance.screenshot(page, `after_typing_bot_name`)
         // await MuteMicrophone(page)
         const askToJoinClicked = await clickWithInnerText(
             page,
@@ -125,7 +125,7 @@ export class MeetProvider implements MeetingProviderInterface {
             }
 
             console.log(`Tentative ${attempt} échouée.`)
-            await screenshot(page, `layout_change_failed_attempt_${attempt}`)
+            await Logger.instance.screenshot(page, `layout_change_failed_attempt_${attempt}`)
 
             await clickOutsideModal(page)
             await page.waitForTimeout(500)
@@ -182,7 +182,7 @@ async function findShowEveryOne(
             },
             click,
         )
-        await screenshot(page, `findShowEveryone`)
+        await Logger.instance.screenshot(page, `findShowEveryone`)
         console.log({ showEveryOneFound })
         if (cancelCheck()) {
             throw new JoinError(JoinErrorCode.TimeoutWaitingToStart)

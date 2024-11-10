@@ -9,8 +9,8 @@ import {
 } from '../types'
 
 import { Page } from 'puppeteer'
-import { screenshot } from '../puppeteer'
 import { sleep } from '../utils'
+import { Logger } from '../logger'
 
 export class TeamsProvider implements MeetingProviderInterface {
     constructor() {}
@@ -97,7 +97,7 @@ export class TeamsProvider implements MeetingProviderInterface {
         )
         await typeBotName(page, meetingParams.bot_name, 20)
         await clickWithInnerText(page, 'button', 'Join now', 20)
-        await screenshot(page, `afterjoinnow`)
+        await Logger.instance.screenshot(page, `afterjoinnow`)
 
         while (true) {
             const botNotAccepted = await isBotNotAccepted(page)

@@ -18,7 +18,7 @@ import {
 } from './types'
 
 import { Events } from './events'
-import { uploadLog } from './logger'
+import { Logger } from './logger'
 import { MeetProvider } from './meeting/meet'
 import { TeamsProvider } from './meeting/teams'
 import { ZoomProvider } from './meeting/zoom'
@@ -274,10 +274,10 @@ export class MeetingHandle extends Console {
 
     private async cleanEverything() {
         try {
-            await uploadLog(
-                this.param.user_id,
-                this.param.email,
-                this.param.bot_uuid,
+            await Logger.instance.upload_log(
+                // this.param.user_id,
+                // this.param.email,
+                // this.param.bot_uuid,
             )
         } catch (e) {
             this.error(`failed to upload logs: ${e}`)
@@ -454,10 +454,10 @@ export class MeetingHandle extends Console {
             this.log('killing process')
             //TODO : appeler clean everything
             try {
-                await uploadLog(
-                    this.param.user_id,
-                    this.param.email,
-                    this.param.bot_uuid,
+                await Logger.instance.upload_log(
+                    // this.param.user_id,
+                    // this.param.email,
+                    // this.param.bot_uuid,
                 )
             } catch (e) {
                 this.error(e)
