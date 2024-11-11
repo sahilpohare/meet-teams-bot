@@ -1,7 +1,7 @@
 node_modules/
-test_transcript.txt
-tmp_summary.txt
 botname.txt
 branding.mp4
 temp_branding.mp4
-recording_server/screenshot/
+SeparationSpeakerLog.txt
+logs.txt
+branding_file.png

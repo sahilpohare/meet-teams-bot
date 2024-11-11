@@ -202,7 +202,9 @@ class Transcoder extends Console {
                     const publicUrl = `https://${bucketName}.s3.amazonaws.com/${s3Path}`
                     this.log(`File uploaded successfully: ${publicUrl}`)
 
-                    await Logger.instance.remove_video()
+                    if (!isAudio) {
+                        await Logger.instance.remove_video()
+                    }
                     resolve(publicUrl)
                 } else {
                     this.error('Error uploading to S3:', errorOutput)

@@ -17,7 +17,7 @@ import { Page } from 'puppeteer'
 import { SPEAKER_LOG_PATHNAME } from './server'
 
 const EFS_MOUNT_POINT: string = '/mnt/efs'
-const LOG_UPDATE_INTERVAL: number = 1_000 // ms
+const LOG_UPDATE_INTERVAL: number = 5_000 // ms
 
 export class Logger extends Console {
     public static instance: Logger | null
@@ -36,7 +36,7 @@ export class Logger extends Console {
         } else if (environ === 'preprod') {
             this.destination_dir = `${EFS_MOUNT_POINT}/preprod/${meetingParams.bot_uuid}`
         } else {
-            this.destination_dir = `./${meetingParams.bot_uuid}`
+            this.destination_dir = `./logs/${meetingParams.bot_uuid}`
         }
         Logger.instance = this
     }

@@ -1,6 +1,5 @@
 import * as express from 'express'
 import * as fs from 'fs/promises'
-import * as path from 'path'
 import * as redis from 'redis'
 
 import { execSync, spawn } from 'child_process'
@@ -31,10 +30,8 @@ clientRedis.on('error', (err) => {
 })
 const HOST = '0.0.0.0'
 
-export const SPEAKER_LOG_PATHNAME = path.join(
-    __dirname,
-    'SeparationSpeakerLog.txt',
-)
+export const SPEAKER_LOG_PATHNAME = '../SeparationSpeakerLog.txt'
+
 console.log(`Speaker log pathname : ${SPEAKER_LOG_PATHNAME}`)
 
 const MEET_ORIGINS = [
