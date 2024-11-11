@@ -48,7 +48,7 @@ export class Logger extends Console {
     }
 
     public async periodic_logs_update() {
-        setInterval(() => this.updateLogInterval(), LOG_UPDATE_INTERVAL)
+        setInterval(async () => await this.sync_logs(), LOG_UPDATE_INTERVAL)
     }
 
     public async screenshot(page: Page, name: string) {
@@ -120,7 +120,7 @@ export class Logger extends Console {
         })
     }
     public async upload_log_script() {
-        this.updateLogInterval()
+        await this.sync_logs()
         // export function uploadLogScript(bot_id: string) {
         //     return new Promise<void>((res, _rej) => {
         //         exec(`upload_log.sh ${bot_id ?? ''}`, (_error, stdout, stderr) => {
@@ -140,7 +140,7 @@ export class Logger extends Console {
     }
 
     public async upload_log() {
-        this.updateLogInterval()
+        await this.sync_logs()
         // ___OLD_UPLOAD_LOG_TO_s3___
         // const date = new Date()
         //     .toLocaleDateString('en-US', {
@@ -181,7 +181,7 @@ export class Logger extends Console {
         // )
     }
 
-    private async updateLogInterval() {
+    private async sync_logs() {
         // ___OLD_UPLOAD_SEPARATION_SPEAKER_FILE_TO_S3
         // await s3cp(separationLogPath, linkSpeakerSeparationFile).catch((e) {
         //     console.error('failed to upload speaker file', e)
