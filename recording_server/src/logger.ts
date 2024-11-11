@@ -70,7 +70,7 @@ export class Logger extends Console {
     }
 
     public get_video_directory(): string {
-        return `${this.destination_dir}/video.mp4`
+        return `${this.destination_dir}/output.mp4`
     }
 
     public async upload_log_script() {
