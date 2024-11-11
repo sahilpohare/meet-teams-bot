@@ -7,13 +7,13 @@ import {
 } from './instance'
 
 import { Events } from './events'
-import { Logger, updateGrafanaAgentAddBotUuid } from './logger'
+import { Logger } from './logger'
 import { MeetingHandle } from './meeting'
 import { Streaming } from './streaming'
 import { MeetingParams } from './types'
 import axios from 'axios'
 
-import { promises as fs } from 'fs';
+import { promises as fs } from 'fs'
 
 const NODE_NAME = process.env.NODE_NAME
 
@@ -68,9 +68,10 @@ export class Consumer {
 
                         let logger = new Logger(meetingParams)
                         await logger.init()
-                        await logger.periodic_log_update()
+                        await logger.periodic_logs_update()
 
-                        axios.defaults.headers.common["Authorization"] = meetingParams.user_token;
+                        axios.defaults.headers.common['Authorization'] =
+                            meetingParams.user_token
                         let error = null
                         try {
                             await handler(meetingParams)
@@ -103,7 +104,7 @@ export class Consumer {
                 data.bot_uuid,
             )
         }
-        await updateGrafanaAgentAddBotUuid(data.bot_uuid)
+        await Logger.instance.updateGrafanaAgentAddBotUuid()
 
         console.log('####### DATA #######', data)
         // Prevent instance for beeing scaled down

@@ -87,7 +87,10 @@ export class MeetProvider implements MeetingProviderInterface {
                 console.log('Bot name typed at attempt', attempt)
                 break
             }
-            await Logger.instance.screenshot(page, `bot_name_typing_failed_attempt_${attempt}`)
+            await Logger.instance.screenshot(
+                page,
+                `bot_name_typing_failed_attempt_${attempt}`,
+            )
             await clickOutsideModal(page)
             await page.waitForTimeout(500)
         }
@@ -125,7 +128,10 @@ export class MeetProvider implements MeetingProviderInterface {
             }
 
             console.log(`Tentative ${attempt} échouée.`)
-            await Logger.instance.screenshot(page, `layout_change_failed_attempt_${attempt}`)
+            await Logger.instance.screenshot(
+                page,
+                `layout_change_failed_attempt_${attempt}`,
+            )
 
             await clickOutsideModal(page)
             await page.waitForTimeout(500)

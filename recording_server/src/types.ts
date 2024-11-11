@@ -1,4 +1,3 @@
-import { Json } from 'aws-sdk/clients/robomaker'
 import { Browser, Page } from 'puppeteer'
 
 export type MeetingStatus = 'Recording' | 'Cleanup' | 'Done'
@@ -8,15 +7,6 @@ export type Meeting = {
     backgroundPage: Page
     browser: Browser
     meetingTimeoutInterval: NodeJS.Timeout
-}
-export type Session = {
-    meeting_url: string
-    user_id: number
-}
-
-export type StatusParams = {
-    meeting_url: string
-    user_id: number
 }
 
 export type RecordingMode = 'speaker_view' | 'gallery_view' | 'audio_only'

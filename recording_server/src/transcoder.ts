@@ -38,7 +38,7 @@ class Transcoder extends Console {
             this.log('Transcoder already initialized')
             return
         }
-        this.outputPath = Logger.instance.get_video_directory();
+        this.outputPath = Logger.instance.get_video_directory()
 
         this.bucketName = bucketName
         this.videoS3Path = videoS3Path
@@ -197,10 +197,12 @@ class Transcoder extends Console {
                 errorOutput += data.toString()
             })
 
-            awsCommand.on('close', (code) => {
+            awsCommand.on('close', async (code) => {
                 if (code === 0) {
                     const publicUrl = `https://${bucketName}.s3.amazonaws.com/${s3Path}`
                     this.log(`File uploaded successfully: ${publicUrl}`)
+
+                    await Logger.instance.remove_video()
                     resolve(publicUrl)
                 } else {
                     this.error('Error uploading to S3:', errorOutput)

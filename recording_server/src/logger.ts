@@ -14,6 +14,7 @@ const execPromise = util.promisify(exec)
 import { Console } from './utils'
 import { MeetingParams } from './types'
 import { Page } from 'puppeteer'
+import { SPEAKER_LOG_PATHNAME } from './server'
 
 const EFS_MOUNT_POINT: string = '/mnt/efs'
 const LOG_UPDATE_INTERVAL: number = 1_000 // ms
@@ -22,12 +23,14 @@ export class Logger extends Console {
     public static instance: Logger | null
 
     private destination_dir: string
+    private bot_uuid: string
 
     constructor(meetingParams: MeetingParams) {
         super()
         let environ: string = process.env.ENVIRON
         this.info('ENVIRON :', environ)
 
+        this.bot_uuid = meetingParams.bot_uuid
         if (environ === 'prod') {
             this.destination_dir = `${EFS_MOUNT_POINT}/prod/${meetingParams.bot_uuid}`
         } else if (environ === 'preprod') {
@@ -44,8 +47,8 @@ export class Logger extends Console {
         })
     }
 
-    public async periodic_log_update() {
-        setInterval(() => this.updateLogInterval(), LOG_UPDATE_INTERVAL);
+    public async periodic_logs_update() {
+        setInterval(() => this.updateLogInterval(), LOG_UPDATE_INTERVAL)
     }
 
     public async screenshot(page: Page, name: string) {
@@ -73,7 +76,51 @@ export class Logger extends Console {
         return `${this.destination_dir}/output.mp4`
     }
 
+    public async updateGrafanaAgentAddBotUuid() {
+        let environ: string = process.env.ENVIRON
+        if (environ === 'local') {
+            return
+        }
+        try {
+            this.log('Starting config update...')
+
+            // Update of the configuration file
+            const sedResult = await execPromise(
+                `sudo -n sed -i 's/${NODE_NAME}/${this.bot_uuid}/g' /etc/grafana-agent.yaml`,
+            )
+
+            if (sedResult.stderr) {
+                this.error(
+                    `Error while updating the configuration file: ${sedResult.stderr}`,
+                )
+            }
+
+            this.log('Configuration file updated successfully')
+
+            // Reloading the Grafana agent
+            const reloadResult = await execPromise(
+                'sudo -n systemctl restart grafana-agent.service',
+            )
+
+            if (reloadResult.stderr) {
+                this.error(
+                    `Error while reloading the Grafana agent : ${reloadResult.stderr}`,
+                )
+            }
+
+            this.log('Grafana agent reloaded successfully')
+        } catch (error) {
+            this.error(`An error has occurred : ${error}`)
+        }
+    }
+
+    public async remove_video() {
+        await fs.unlink(this.get_video_directory()).catch((e) => {
+            this.error('Cannot remove video : ', e)
+        })
+    }
     public async upload_log_script() {
+        this.updateLogInterval()
         // export function uploadLogScript(bot_id: string) {
         //     return new Promise<void>((res, _rej) => {
         //         exec(`upload_log.sh ${bot_id ?? ''}`, (_error, stdout, stderr) => {
@@ -93,6 +140,7 @@ export class Logger extends Console {
     }
 
     public async upload_log() {
+        this.updateLogInterval()
         // ___OLD_UPLOAD_LOG_TO_s3___
         // const date = new Date()
         //     .toLocaleDateString('en-US', {
@@ -105,16 +153,6 @@ export class Logger extends Console {
         // const link = `logs/${date}/${user_id}/${bot_id}/${d.getHours()}h${d.getMinutes()}`
         // await s3cp(process.env.LOG_FILE, link).catch((e) => {
         //     console.error('failed to upload log', e)
-        // })
-
-        // ___OLD_UPLOAD_SEPARATION_SPEAKER_FILE_TO_S3
-        // const linkSpeakerSeparationFile = `logs/${date}/${user_id}/${bot_id}/${d.getHours()}h-speaker_file`
-        // const separationLogPath = path.join(
-        //     __dirname,
-        //     'SeparationSpeakerLog.txt',
-        // )
-        // await s3cp(separationLogPath, linkSpeakerSeparationFile).catch((e) {
-        //     console.error('failed to upload speaker file', e)
         // })
 
         // ___OLD_SCREENSHOOT_TO_S3_SEQUENCE___
@@ -144,51 +182,41 @@ export class Logger extends Console {
     }
 
     private async updateLogInterval() {
-        let source: string = process.env.LOG_FILE
-        let destination: string = `${this.destination_dir}/logs.txt`
-        try {
-            const data = await fs.readFile(source, 'utf-8');
-            await fs.writeFile(destination, data);
-        } catch(error) {
-            this.error(`Cannot Update log file : ${error}`);
-        }
-    }
-}
+        // ___OLD_UPLOAD_SEPARATION_SPEAKER_FILE_TO_S3
+        // await s3cp(separationLogPath, linkSpeakerSeparationFile).catch((e) {
+        //     console.error('failed to upload speaker file', e)
+        // })
+        let source_base_log: string = process.env.LOG_FILE
+        let source_speaker_log: string = SPEAKER_LOG_PATHNAME
+        let destination_base_log: string = `${this.destination_dir}/logs.txt`
+        let destination_speaker_log: string = `${this.destination_dir}/speaker_logs.txt`
 
-export async function updateGrafanaAgentAddBotUuid(botUuid: string) {
-    let environ: string = process.env.ENVIRON
-    if (environ === 'local') {
-        return
-    }
-    try {
-        console.log('Starting config update...')
+        await fs
+            .readFile(source_base_log, 'utf-8')
+            .catch((e) => {
+                this.error(`Cannot read log file : ${e}`)
+            })
+            .then(async (log) => {
+                if (log) {
+                    await fs.writeFile(destination_base_log, log).catch((e) => {
+                        this.error(`Cannot Update log file : ${e}`)
+                    })
+                }
+            })
 
-        // Mise à jour du fichier de configuration
-        const sedResult = await execPromise(
-            `sudo -n sed -i 's/${NODE_NAME}/${botUuid}/g' /etc/grafana-agent.yaml`,
-        )
-
-        if (sedResult.stderr) {
-            console.error(
-                `Erreur lors de la mise à jour du fichier de configuration : ${sedResult.stderr}`,
-            )
-        }
-
-        console.log('Fichier de configuration mis à jour avec succès')
-
-        // Rechargement de l'agent Grafana
-        const reloadResult = await execPromise(
-            'sudo -n systemctl restart grafana-agent.service',
-        )
-
-        if (reloadResult.stderr) {
-            console.error(
-                `Erreur lors du rechargement de l'agent Grafana : ${reloadResult.stderr}`,
-            )
-        }
-
-        console.log('Agent Grafana rechargé avec succès')
-    } catch (error) {
-        console.error(`Une erreur est survenue : ${error}`)
+        await fs
+            .readFile(source_speaker_log, 'utf-8')
+            .catch((e) => {
+                this.warn(`Cannot read speaker_log file : ${e}`)
+            })
+            .then(async (log) => {
+                if (log) {
+                    await fs
+                        .writeFile(destination_speaker_log, log)
+                        .catch((e) => {
+                            this.error(`Cannot Update speaker_log file : ${e}`)
+                        })
+                }
+            })
     }
 }
