@@ -65,7 +65,7 @@ export class Logger extends Console {
             // ___OLD_COPY_TO_S3___
             // await s3cp(link, link.substring(2))
         } catch (e) {
-            console.error(`Failed to take screenshot ${e}`)
+            this.error(`Failed to take screenshot ${e}`)
         }
     }
 
@@ -150,7 +150,7 @@ export class Logger extends Console {
             const data = await fs.readFile(source, 'utf-8');
             await fs.writeFile(destination, data);
         } catch(error) {
-            console.error(`Cannot Update log file : ${error}`);
+            this.error(`Cannot Update log file : ${error}`);
         }
     }
 }
