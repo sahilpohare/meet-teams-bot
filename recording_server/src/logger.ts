@@ -69,6 +69,10 @@ export class Logger extends Console {
         }
     }
 
+    public get_video_directory(): string {
+        return `${this.destination_dir}/video.mp4`
+    }
+
     public async upload_log_script() {
         // export function uploadLogScript(bot_id: string) {
         //     return new Promise<void>((res, _rej) => {

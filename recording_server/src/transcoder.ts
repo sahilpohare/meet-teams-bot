@@ -4,6 +4,7 @@ import * as os from 'os'
 import * as path from 'path'
 import { Writable } from 'stream'
 import { Console } from './utils'
+import { Logger } from './logger'
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -21,7 +22,6 @@ class Transcoder extends Console {
 
     constructor() {
         super()
-        this.outputPath = path.join(os.tmpdir(), 'output.mp4')
         this.webmPath = path.join(os.tmpdir(), 'output.webm')
 
         // Set a new empty webm file for voice transcription
@@ -38,6 +38,7 @@ class Transcoder extends Console {
             this.log('Transcoder already initialized')
             return
         }
+        this.outputPath = Logger.instance.get_video_directory();
 
         this.bucketName = bucketName
         this.videoS3Path = videoS3Path
