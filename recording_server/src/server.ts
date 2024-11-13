@@ -12,7 +12,11 @@ import {
 } from './types'
 
 import axios from 'axios'
-import { NO_SPEAKER_DETECTED_TIMESTAMP, NUMBER_OF_ATTENDEES } from './meeting'
+import {
+    FIRST_USER_JOINED,
+    NO_SPEAKER_DETECTED_TIMESTAMP,
+    NUMBER_OF_ATTENDEES,
+} from './meeting'
 
 import { unlinkSync } from 'fs'
 import { PORT } from './instance'
@@ -141,6 +145,7 @@ export async function server() {
                 break
             case 1:
                 NO_SPEAKER_DETECTED_TIMESTAMP.set(null)
+                FIRST_USER_JOINED.set(true)
                 // Only one speaker is detected
                 const active_speaker = speakers.find(
                     (v) => v.isSpeaking === true,

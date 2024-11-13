@@ -46,6 +46,15 @@ export const NUMBER_OF_ATTENDEES = {
         _NUMBER_OF_ATTENDEES = value
     },
 }
+
+let _FIRST_USER_JOINED: boolean = false
+export const FIRST_USER_JOINED = {
+    get: () => FIRST_USER_JOINED,
+    set: (value: boolean) => {
+        _FIRST_USER_JOINED = value
+    },
+}
+
 const NO_SPEAKER_THRESHOLD = 1000 * 60 * 7 // 7 minutes
 const NO_SPEAKER_DETECTED_TIMEOUT = 1000 * 60 * 15 // 15 minutes
 const RECORDING_TIMEOUT = 3600 * 4 // 4 hours
@@ -360,8 +369,10 @@ export class MeetingHandle extends Console {
             }
             let now = Date.now()
             if (
-                NUMBER_OF_ATTENDEES.get() === 0 &&
-                START_RECORDING_TIMESTAMP.get() + NO_SPEAKER_THRESHOLD < now
+                (NUMBER_OF_ATTENDEES.get() === 0 &&
+                    START_RECORDING_TIMESTAMP.get() + NO_SPEAKER_THRESHOLD <
+                        now) ||
+                (NUMBER_OF_ATTENDEES.get() === 0 && FIRST_USER_JOINED.get())
             ) {
                 await this.stopRecording('no attendees')
                 return
