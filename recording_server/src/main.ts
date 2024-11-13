@@ -15,6 +15,7 @@ import { Consumer } from './rabbitmq'
 import { TRANSCODER } from './transcoder'
 import { MeetingParams } from './types'
 import { sleep } from './utils'
+import { endMeetingTrampoline } from './api'
 
 const originalError = console.error
 console.error = (...args: any[]) => {
@@ -62,21 +63,34 @@ console.log('version 0.0.1')
 
         if (error) {
             console.error('error in start meeting', error)
-            try {
-                await handleErrorInStartRecording(error, params)
-            } catch (e) {
+            await handleErrorInStartRecording(error, params).catch((e) => {
                 console.error('error in handleErrorInStartRecording', e)
-            }
+            })
         } else {
-            try {
-                await MeetingHandle.instance.recordMeetingToEnd()
-            } catch (e) {
-                console.error('record meeting to end failed: ', e)
-            } finally {
-                // stop transcoder even if the meeting ended with an error
-                // to have a video uploaded to s3 even in case there is a crash
-                TRANSCODER.stop()
-            }
+            await MeetingHandle.instance
+                .recordMeetingToEnd()
+                .catch(async (e) => {
+                    console.error('record meeting to end failed: ', e)
+                    // Stop transcoder even if the meeting ended with an error
+                    // to have a video uploaded to s3 even in case there is a crash
+                    await TRANSCODER.stop().catch((e) => {
+                        console.error('error when stopping transcoder: ', e)
+                    })
+                })
+                .then(async (_) => {
+                    await TRANSCODER.stop()
+                        .catch((e) => {
+                            console.error('error when stopping transcoder: ', e)
+                        })
+                        .then(async (_) => {
+                            await endMeetingTrampoline(params).catch((e) => {
+                                console.error(
+                                    'error in endMeetingTranpoline',
+                                    e,
+                                )
+                            })
+                        })
+                })
         }
         console.log('sleeping to let api server make status requests')
         // sleep 30 secs to let api server make status requests

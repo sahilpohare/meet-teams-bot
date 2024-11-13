@@ -14,21 +14,6 @@ export type ExtractPreview = {
     s3_path: string
 }
 
-export async function endMeetingTrampoline(bot_uuid: string) {
-    const resp = await axios({
-        params: {
-            bot_uuid,
-        },
-        raxConfig: {
-            retry: 0,
-        },
-        method: 'POST',
-        url: '/bots/end_meeting_trampoline',
-        timeout: 600000,
-    })
-    return resp.data
-}
-
 export async function getBot(bot_uuid: string): Promise<GetableBot> {
     return (
         await axios({

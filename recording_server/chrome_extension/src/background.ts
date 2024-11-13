@@ -139,12 +139,6 @@ export async function waitForUpload() {
     } catch (e) {
         console.error('error in stopRecordServer', e)
     }
-
-    try {
-        await api.endMeetingTrampoline(State.parameters.bot_uuid)
-    } catch (e) {
-        console.error('error in endMeetingTranpoline', e)
-    }
 }
 
 const w = window as any

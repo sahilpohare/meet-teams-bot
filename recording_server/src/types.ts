@@ -65,7 +65,7 @@ export type MeetingParams = {
     streaming_output?: string
     bot_uuid: string
     enter_message?: string
-    bots_api_key?: string
+    bots_api_key: string
     bots_webhook_url?: string
     recording_mode: RecordingMode
     local_recording_server_location: string
