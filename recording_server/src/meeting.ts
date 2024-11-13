@@ -49,7 +49,7 @@ export const NUMBER_OF_ATTENDEES = {
 
 let _FIRST_USER_JOINED: boolean = false
 export const FIRST_USER_JOINED = {
-    get: () => FIRST_USER_JOINED,
+    get: () => _FIRST_USER_JOINED,
     set: (value: boolean) => {
         _FIRST_USER_JOINED = value
     },
