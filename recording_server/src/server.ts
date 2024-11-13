@@ -172,6 +172,7 @@ export async function server() {
                 break
             default:
                 NO_SPEAKER_DETECTED_TIMESTAMP.set(null)
+                FIRST_USER_JOINED.set(true)
                 // Multiple speakers are currently speaking.
 
                 // Interuption Behavior - Not the best choice
