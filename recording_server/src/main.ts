@@ -47,14 +47,11 @@ console.log('version 0.0.1')
             throw e
         })
 
-        await server()
-            .catch((e) => {
-                console.error(`Fail to start server: ${e}`)
-                throw e
-            })
-            .then(() => {
-                console.log('Server started succesfully')
-            })
+        await server().catch((e) => {
+            console.error(`Fail to start server: ${e}`)
+            throw e
+        })
+        console.log('Server started succesfully')
 
         const consumer = await Consumer.init().catch((e) => {
             console.error(`Fail to init consumer: ${e}`)
@@ -66,10 +63,12 @@ console.log('version 0.0.1')
         try {
             consumeResult = await consumer.consume(Consumer.handleStartRecord)
         } catch (e) {
-            await consumer.deleteQueue().catch((e) => {
-                console.error('fail to delete queue', e)
-            })
-            throw e
+            if (LOCK_INSTANCE_AT_STARTUP) {
+                await consumer.deleteQueue().catch((e) => {
+                    console.error('fail to delete queue', e)
+                })
+                throw e
+            }
         }
 
         if (consumeResult.error) {
@@ -117,16 +116,12 @@ console.log('version 0.0.1')
         })
 
         if (LOCK_INSTANCE_AT_STARTUP) {
-            await consumer
-                .deleteQueue()
-                .catch((e) => {
-                    console.error('fail to delete queue', e)
-                })
-                .finally(async () => {
-                    await terminateInstance().catch((e) => {
-                        console.error('fail to terminate instance', e)
-                    })
-                })
+            await consumer.deleteQueue().catch((e) => {
+                console.error('fail to delete queue', e)
+            })
+            await terminateInstance().catch((e) => {
+                console.error('fail to terminate instance', e)
+            })
         }
         console.log('exiting instance')
         exit(0)

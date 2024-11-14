@@ -154,12 +154,17 @@ class Transcoder extends Console {
 
     // Upload Video To s3
     public async uploadVideoToS3() {
-        await this.uploadToS3(
-            this.videoOutputPath,
-            this.bucketName,
-            this.videoS3Path,
-            false,
-        )
+        try {
+            await this.uploadToS3(
+                this.videoOutputPath,
+                this.bucketName,
+                this.videoS3Path,
+                false,
+            )
+        } catch (e) {
+            console.error(e)
+            throw e
+        }
     }
 
     private uploadToS3(
