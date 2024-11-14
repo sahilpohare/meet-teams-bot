@@ -59,7 +59,10 @@ console.log('version 0.0.1')
         })
 
         console.log('start consuming rabbitmq messages')
-        let consumeResult: any
+        let consumeResult: {
+            params: MeetingParams,
+            error: Error
+        }
         try {
             consumeResult = await consumer.consume(Consumer.handleStartRecord)
         } catch (e) {
@@ -105,9 +108,11 @@ console.log('version 0.0.1')
                 console.log(
                     `${Date.now()} Finalize project && Sending WebHook complete`,
                 )
-                await endMeetingTrampoline(consumeResult.params).catch((e) => {
-                    console.error('error in endMeetingTranpoline', e)
-                })
+                await endMeetingTrampoline(consumeResult.params.bot_uuid).catch(
+                    (e) => {
+                        console.error('error in endMeetingTranpoline', e)
+                    },
+                )
             }
         }
 
