@@ -9,7 +9,7 @@ import { Logger } from './logger'
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 class Transcoder extends Console {
-    private outputPath: string
+    private videoOutputPath: string
     private bucketName: string
     private ffmpeg_process: ChildProcess | null = null
     private videoS3Path: string
@@ -38,7 +38,7 @@ class Transcoder extends Console {
             this.log('Transcoder already initialized')
             return
         }
-        this.outputPath = Logger.instance.get_video_directory()
+        this.videoOutputPath = Logger.instance.get_video_directory()
 
         this.bucketName = bucketName
         this.videoS3Path = videoS3Path
@@ -59,7 +59,7 @@ class Transcoder extends Console {
             '-movflags',
             '+faststart',
             '-y',
-            this.outputPath,
+            this.videoOutputPath,
             '-loglevel',
             'verbose',
         ]
@@ -125,12 +125,6 @@ class Transcoder extends Console {
                 }
             }, Transcoder.FFMPEG_CLOSE_TIMEOUT) // 60 seconds before timeout
         })
-        await this.uploadToS3(
-            this.outputPath,
-            this.bucketName,
-            this.videoS3Path,
-            false,
-        )
         this.transcoder_successfully_stopped = true
     }
 
@@ -155,7 +149,17 @@ class Transcoder extends Console {
     }
 
     public getOutputPath(): string {
-        return this.outputPath
+        return this.videoOutputPath
+    }
+
+    // Upload Video To s3
+    public async uploadVideoToS3() {
+        await this.uploadToS3(
+            this.videoOutputPath,
+            this.bucketName,
+            this.videoS3Path,
+            false,
+        )
     }
 
     private uploadToS3(
@@ -215,6 +219,7 @@ class Transcoder extends Console {
         })
     }
 
+    // Extract Audio by uploading audio WAV into S3
     public async extractAudio(
         timeStart: number,
         timeEnd: number,

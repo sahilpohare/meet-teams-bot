@@ -487,10 +487,19 @@ export async function server() {
         }
     })
 
-    // Ajout d'une route pour arrêter le transcodeur si nécessaire
-    app.post('/transcoder/stop', (req, res) => {
-        TRANSCODER.stop()
-        res.status(200).json({ message: 'Transcoder arrêté avec succès' })
+    // Stop Transcoder
+    app.post('/transcoder/stop', async (req, res) => {
+        await TRANSCODER.stop()
+            .catch((e) => {
+                res.status(500).json({
+                    message: `Error occured when stoping transcoder: ${e}`,
+                })
+            })
+            .then(() => {
+                res.status(200).json({
+                    message: 'Transcoder successfuly stoped',
+                })
+            })
     })
 
     // Ajoutez cette nouvelle route pour récupérer le chemin du fichier de sortie

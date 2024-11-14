@@ -16,6 +16,7 @@ import { TRANSCODER } from './transcoder'
 import { MeetingParams } from './types'
 import { sleep } from './utils'
 import { endMeetingTrampoline } from './api'
+import { resolve } from 'path'
 
 const originalError = console.error
 console.error = (...args: any[]) => {
@@ -38,75 +39,92 @@ console.log('version 0.0.1')
         axios.defaults.withCredentials = true
 
         // trigger system cache in order to decrease latency when first bot come
-        try {
-            await triggerCache()
-        } catch (e) {
+        await triggerCache().catch((e) => {
             console.error(`Failed to trigger cache: ${e}`)
-        }
+            throw e
+        })
 
-        // TODO: what to do if we cant connect to redis. Dont know !
-        try {
-            await clientRedis.connect()
-        } catch (e) {
-            console.error('fail to connect to redis: ', e)
-        }
+        await clientRedis.connect().catch((e) => {
+            console.error(`Fail to connect to redis: ${e}`)
+            throw e
+        })
 
-        // TODO: what to do if we cant instanciate express server. Dont know !
         await server()
-        console.log('after server started')
+            .catch((e) => {
+                console.error(`Fail to start server: ${e}`)
+                throw e
+            })
+            .then(() => {
+                console.log('Server started succesfully')
+            })
 
-        const consumer: Consumer = await Consumer.init()
+        const consumer = await Consumer.init().catch((e) => {
+            console.error(`Fail to init consumer: ${e}`)
+            throw e
+        })
+
         console.log('start consuming rabbitmq messages')
-        const { params, error } = await consumer.consume(
-            Consumer.handleStartRecord,
-        )
+        let consumeResult: any
+        try {
+            consumeResult = await consumer.consume(Consumer.handleStartRecord)
+        } catch (e) {
+            await consumer.deleteQueue().catch((e) => {
+                console.error('fail to delete queue', e)
+            })
+            throw e
+        }
 
-        if (error) {
-            console.error('error in start meeting', error)
-            await handleErrorInStartRecording(error, params).catch((e) => {
+        if (consumeResult.error) {
+            // Assuming Recording does not start at this point
+            // So there are not video to upload. Just send webhook failure
+            console.error('error in start meeting', consumeResult.error)
+            await handleErrorInStartRecording(
+                consumeResult.error,
+                consumeResult.params,
+            ).catch((e) => {
                 console.error('error in handleErrorInStartRecording', e)
             })
         } else {
-            await MeetingHandle.instance
+            // Assuming that recording is active at this point
+            let meeting_succesful = await MeetingHandle.instance
                 .recordMeetingToEnd()
-                .catch(async (e) => {
+                .catch((e) => {
                     console.error('record meeting to end failed: ', e)
-                    // Stop transcoder even if the meeting ended with an error
-                    // to have a video uploaded to s3 even in case there is a crash
-                    await TRANSCODER.stop().catch((e) => {
-                        console.error('error when stopping transcoder: ', e)
+                    return false
+                })
+                .then((_) => {
+                    return true
+                })
+            // Stop transcoder even if the meeting ended with an error
+            // to have a video uploaded to s3 even in case there is a crash
+            await TRANSCODER.stop().catch((e) => {
+                console.error('error when stopping transcoder: ', e)
+            })
+            await TRANSCODER.uploadVideoToS3().catch((e) => {
+                console.error('Cannot upload video to S3: ', e)
+            })
+            if (meeting_succesful) {
+                await endMeetingTrampoline(consumeResult.params).catch((e) => {
+                    console.error('error in endMeetingTranpoline', e)
+                })
+            }
+        }
+
+        await delSessionInRedis(consumeResult.params.session_id).catch((e) => {
+            console.error('fail delete session in redis: ', e)
+        })
+
+        if (LOCK_INSTANCE_AT_STARTUP) {
+            await consumer
+                .deleteQueue()
+                .catch((e) => {
+                    console.error('fail to delete queue', e)
+                })
+                .finally(async () => {
+                    await terminateInstance().catch((e) => {
+                        console.error('fail to terminate instance', e)
                     })
                 })
-                .then(async (_) => {
-                    await TRANSCODER.stop()
-                        .catch((e) => {
-                            console.error('error when stopping transcoder: ', e)
-                        })
-                        .then(async (_) => {
-                            await endMeetingTrampoline(params).catch((e) => {
-                                console.error(
-                                    'error in endMeetingTranpoline',
-                                    e,
-                                )
-                            })
-                        })
-                })
-        }
-        console.log('sleeping to let api server make status requests')
-        // sleep 30 secs to let api server make status requests
-        await sleep(30000)
-        try {
-            await delSessionInRedis(params.session_id)
-        } catch (e) {
-            console.error('fail delete session in redis: ', e)
-        }
-        if (LOCK_INSTANCE_AT_STARTUP) {
-            try {
-                await consumer.deleteQueue()
-            } catch (e) {
-                console.error('fail to delete queue', e)
-            }
-            await terminateInstance()
         }
         console.log('exiting instance')
         exit(0)
