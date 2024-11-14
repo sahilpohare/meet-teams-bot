@@ -60,7 +60,7 @@ console.log('version 0.0.1')
 
         console.log('start consuming rabbitmq messages')
         let consumeResult: {
-            params: MeetingParams,
+            params: MeetingParams
             error: Error
         }
         try {
