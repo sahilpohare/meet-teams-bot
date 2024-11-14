@@ -283,19 +283,14 @@ export class MeetingHandle extends Console {
 
     private async cleanEverything() {
         try {
-            await Logger.instance
-                .upload_log
-                // this.param.user_id,
-                // this.param.email,
-                // this.param.bot_uuid,
-                ()
+            await Logger.instance.upload_log()
         } catch (e) {
             this.error(`failed to upload logs: ${e}`)
         }
         try {
             this.brandingGenerateProcess?.kill()
-            VideoContext.instance.stop()
-            SoundContext.instance.stop()
+            VideoContext.instance?.stop()
+            SoundContext.instance?.stop()
         } catch (e) {
             this.error(`failed to kill process: ${e}`)
         }

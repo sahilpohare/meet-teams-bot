@@ -14,9 +14,7 @@ import { generateBranding } from './branding'
 import { Consumer } from './rabbitmq'
 import { TRANSCODER } from './transcoder'
 import { MeetingParams } from './types'
-import { sleep } from './utils'
 import { endMeetingTrampoline } from './api'
-import { resolve } from 'path'
 
 const originalError = console.error
 console.error = (...args: any[]) => {
@@ -28,7 +26,7 @@ console.error = (...args: any[]) => {
 // minus => Library
 // CONST => Const
 // camelCase => Fn
-// CamelCase => Classes
+// PascalCase => Classes
 console.log('version 0.0.1')
 ;(async () => {
     if (process.argv[2]?.includes('get_extension_id')) {
@@ -100,10 +98,14 @@ console.log('version 0.0.1')
             await TRANSCODER.stop().catch((e) => {
                 console.error('error when stopping transcoder: ', e)
             })
+            console.log(`${Date.now()} Uploading video to S3`)
             await TRANSCODER.uploadVideoToS3().catch((e) => {
                 console.error('Cannot upload video to S3: ', e)
             })
             if (meeting_succesful) {
+                console.log(
+                    `${Date.now()} Finalize project && Sending WebHook complete`,
+                )
                 await endMeetingTrampoline(consumeResult.params).catch((e) => {
                     console.error('error in endMeetingTranpoline', e)
                 })

@@ -9,9 +9,9 @@ export async function endMeetingTrampoline(meeting_params: MeetingParams) {
         timeout: 60_000, // ms (1 minute)
         headers: {
             Authorization: meeting_params.user_token,
-            'x-meeting-baas-api-key': meeting_params.bots_api_key,
+            // 'x-meeting-baas-api-key': meeting_params.bots_api_key,
         },
-        data: {
+        params: {
             bot_uuid: meeting_params.bot_uuid,
         },
     })
