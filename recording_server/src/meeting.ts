@@ -22,8 +22,10 @@ import { Logger } from './logger'
 import { MeetProvider } from './meeting/meet'
 import { TeamsProvider } from './meeting/teams'
 import { ZoomProvider } from './meeting/zoom'
-import { Console, sleep } from './utils'
+import { TRANSCODER } from './transcoder'
 import { uploadTranscriptTask } from './uploadTranscripts'
+import { Console, sleep } from './utils'
+import { WordsPoster } from './words_poster/words_poster'
 
 let _NO_SPEAKER_DETECTED_TIMESTAMP: number | null = null
 export const NO_SPEAKER_DETECTED_TIMESTAMP = {
@@ -236,6 +238,14 @@ export class MeetingHandle extends Console {
             listenPage(this.meeting.backgroundPage)
             await Events.inCallNotRecording()
 
+            // Start transcoder
+            await TRANSCODER.init(
+                process.env.AWS_S3_BUCKET,
+                this.param.mp4_s3_path,
+            ).catch((e) => {
+                this.error(`Cannot start Transcoder: ${e}`)
+            })
+
             // Start recording
             let result: string | number =
                 await this.meeting.backgroundPage.evaluate(
@@ -249,9 +259,10 @@ export class MeetingHandle extends Console {
                         }
                     },
                     {
-                        ...this.param,
-                        s3_bucket: process.env.AWS_S3_VIDEO_BUCKET,
-                        api_server_baseurl: process.env.API_SERVER_BASEURL,
+                        local_recording_server_location:
+                            this.param.local_recording_server_location,
+                        streaming_audio_frequency:
+                            this.param.streaming_audio_frequency,
                     },
                 )
             if (typeof result === 'number') {
@@ -261,11 +272,23 @@ export class MeetingHandle extends Console {
                 this.error(`Unexpected error: ${result}`)
                 throw new JoinError(JoinErrorCode.Internal)
             }
-            // Start to observe speakers
-            await this.meeting.backgroundPage.evaluate(async () => {
-                const w = window as any
-                await w.start_speakers_observer()
+            // Start WordPoster for transcribing
+            await WordsPoster.init(this.param).catch((e) => {
+                this.error(`Cannot start Transcriber: ${e}`)
             })
+
+            // Start to observe speakers
+            await this.meeting.backgroundPage.evaluate(
+                async (params) => {
+                    const w = window as any
+                    await w.start_speakers_observer(params)
+                },
+                {
+                    recording_mode: this.param.recording_mode,
+                    bot_name: this.param.bot_name,
+                    meetingProvider: this.param.meetingProvider,
+                },
+            )
             this.log('startRecording called')
             // Send recording confirmation webhook
             await Events.inCallRecording()
@@ -445,6 +468,17 @@ export class MeetingHandle extends Console {
             await w.waitForUpload()
         })
         this.log('after waitForUpload')
+
+        await WordsPoster.TRANSCRIBER?.stop().catch((e) => {
+            this.error(`Cannot stop Transcriber: ${e}`)
+        })
+        await WordsPoster.TRANSCRIBER?.waitUntilComplete().catch((e) => {
+            this.error(`Cannot waitUntilComplete in Transcriber: ${e}`)
+        })
+        await TRANSCODER.stop().catch((e) => {
+            this.error(`Cannot stop Transcoder: ${e}`)
+        })
+
         try {
             removeListenPage(backgroundPage!)
             await backgroundPage!.close()

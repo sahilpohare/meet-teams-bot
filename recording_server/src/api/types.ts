@@ -30,4 +30,18 @@ export namespace ApiTypes {
         id: number
         end_time: number
     }
+
+    export type Word = {
+        id: number
+        text: string
+        start_time: number
+        end_time: number
+        transcript_id: number
+    }
+
+    export type PostableWord = {
+        text: string
+        start_time: number
+        end_time: number
+    }
 }

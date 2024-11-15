@@ -2,9 +2,7 @@ import * as R from 'ramda'
 import * as MeetProvider from './observeSpeakers/meet'
 import * as TeamsProvider from './observeSpeakers/teams'
 
-import { sleep } from './api'
-import { ApiService } from './recordingServerApi'
-import { parameters } from './state'
+import { ApiService, sleep } from './api'
 
 export type SpeakerData = {
     name: string
@@ -34,7 +32,7 @@ var CUR_SPEAKERS: Map<string, boolean> = new Map()
 
 setMeetingProvider()
 observeSpeakers()
-parameters.bot_name
+
 function setMeetingProvider() {
     if (MEETING_PROVIDER === 'Teams') {
         PROVIDER = {
@@ -92,7 +90,7 @@ async function removeShityHtmlLoop(mode: RecordingMode) {
 var MUTATION_OBSERVER = new MutationObserver(function (mutations) {
     const timestamp = Date.now() - PROVIDER!.LATENCY
     mutations.forEach(async function (_mutation) {
-        if (parameters.meetingProvider === 'Teams') {
+        if (MEETING_PROVIDER === 'Teams') {
             PROVIDER?.removeShityHtml(RECORDING_MODE)
         }
         try {

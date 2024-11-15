@@ -1,3 +1,4 @@
+// Actually dead code
 export function getSupportedMimeTypes() {
     const VIDEO_TYPES = ['webm', 'ogg', 'mp4', 'x-matroska']
     const VIDEO_CODECS = [

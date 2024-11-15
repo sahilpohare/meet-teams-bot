@@ -6,11 +6,16 @@ import { SpeakerData } from './types'
 import { START_RECORDING_TIMESTAMP } from './meeting'
 
 var LAST_TRANSRIPT: ApiTypes.QueryableTranscript | null = null
+var TRANSCIBER_STOPED: boolean = false
 
 // IMPORTANT : For reasons of current compatibility, this function is only called
 // with a single speaker and not an array of multiple speakers. Handling multiple
 // speakers should be implemented at some point.
 export async function uploadTranscriptTask(speaker: SpeakerData, end: boolean) {
+    if (TRANSCIBER_STOPED) {
+        console.info('Transcriber is stoped')
+        return
+    }
     const api = Api.instance
     if (LAST_TRANSRIPT) {
         await api
@@ -27,6 +32,7 @@ export async function uploadTranscriptTask(speaker: SpeakerData, end: boolean) {
     }
     if (end === true) {
         // Just patch the last transcript if in end
+        TRANSCIBER_STOPED = true
         return
     } else {
         const bot = await api.getBot().catch((e) => {

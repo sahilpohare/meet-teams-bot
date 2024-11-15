@@ -2,7 +2,7 @@ import express from 'express'
 import * as fs from 'fs/promises'
 import * as redis from 'redis'
 
-import { execSync, spawn } from 'child_process'
+import { execSync } from 'child_process'
 import { SoundContext, VideoContext } from './media_context'
 import {
     MessageToBroadcast,
@@ -241,11 +241,6 @@ export async function server() {
         stop_record(res, 'zoom request')
     })
 
-    // Stop meeting from extension
-    app.post('/stop_meeting', async (_req, res) => {
-        console.log('end meeting from extension notification')
-        stop_record(res, 'extension request')
-    })
     app.post('/start_zoom_recording', async (_req, res) => {
         console.log('start recording from zoom notification')
 
@@ -457,20 +452,6 @@ export async function server() {
         process.exit(0)
     })
 
-    app.post('/transcoder/start', async (req, res) => {
-        try {
-            const bucketName = req.body.bucketName
-            const videoS3Path = req.body.videoS3Path
-            await TRANSCODER.init(bucketName, videoS3Path)
-            res.status(200).json({ message: 'Script lancé avec succès' })
-        } catch (err) {
-            console.error('Erreur:', err)
-            res.status(500).json({
-                error: 'Erreur lors de la création de la FIFO ou du lancement du script',
-            })
-        }
-    })
-
     app.post('/transcoder/upload_chunk', async (req, res) => {
         if (!req.body || !Buffer.isBuffer(req.body)) {
             return res
@@ -507,110 +488,110 @@ export async function server() {
     })
 
     // Ajoutez cette nouvelle route pour récupérer le chemin du fichier de sortie
-    app.get('/transcoder/output', (req, res) => {
-        const outputPath = TRANSCODER.getOutputPath()
-        res.status(200).json({ outputPath })
-    })
+    // app.get('/transcoder/output', (req, res) => {
+    //     const outputPath = TRANSCODER.getOutputPath()
+    //     res.status(200).json({ outputPath })
+    // })
 
-    app.post('/transcoder/extract_audio', async (req, res) => {
-        const { timeStart, timeEnd, bucketName, s3Path } = req.body
+    // app.post('/transcoder/extract_audio', async (req, res) => {
+    //     const { timeStart, timeEnd, bucketName, s3Path } = req.body
 
-        if (typeof timeStart !== 'number' || typeof timeEnd !== 'number') {
-            return res.status(400).json({
-                error: 'timeStart et timeEnd doivent être des nombres',
-            })
-        }
+    //     if (typeof timeStart !== 'number' || typeof timeEnd !== 'number') {
+    //         return res.status(400).json({
+    //             error: 'timeStart et timeEnd doivent être des nombres',
+    //         })
+    //     }
 
-        if (typeof bucketName !== 'string' || typeof s3Path !== 'string') {
-            return res.status(400).json({
-                error: 'bucketName et s3Path doivent être des chaînes de caractères',
-            })
-        }
+    //     if (typeof bucketName !== 'string' || typeof s3Path !== 'string') {
+    //         return res.status(400).json({
+    //             error: 'bucketName et s3Path doivent être des chaînes de caractères',
+    //         })
+    //     }
 
-        try {
-            const s3Url = await TRANSCODER.extractAudio(
-                timeStart,
-                timeEnd,
-                bucketName,
-                s3Path,
-            )
-            return res.status(200).json({
-                message: 'Extraction audio et upload réussis',
-                s3Url,
-            })
-        } catch (err) {
-            console.error(
-                "Erreur lors de l'extraction audio ou de l'upload:",
-                err,
-            )
-            return res.status(500).json({
-                error: "Erreur lors de l'extraction audio ou de l'upload",
-            })
-        }
-    })
+    //     try {
+    //         const s3Url = await TRANSCODER.extractAudio(
+    //             timeStart,
+    //             timeEnd,
+    //             bucketName,
+    //             s3Path,
+    //         )
+    //         return res.status(200).json({
+    //             message: 'Extraction audio et upload réussis',
+    //             s3Url,
+    //         })
+    //     } catch (err) {
+    //         console.error(
+    //             "Erreur lors de l'extraction audio ou de l'upload:",
+    //             err,
+    //         )
+    //         return res.status(500).json({
+    //             error: "Erreur lors de l'extraction audio ou de l'upload",
+    //         })
+    //     }
+    // })
 
-    // Route modifiée pour supprimer un fichier S3
-    app.delete('/transcoder/s3file', async (req, res) => {
-        const { s3Path, bucketName } = req.body
+    // // Route modifiée pour supprimer un fichier S3
+    // app.delete('/transcoder/s3file', async (req, res) => {
+    //     const { s3Path, bucketName } = req.body
 
-        function deleteFromS3(
-            _bucketName: string,
-            s3Path: string,
-        ): Promise<void> {
-            return new Promise((resolve, reject) => {
-                // TODO : Given _bucketName is completly bullshit here !!! FUCK IT !
-                let bucketName: string =
-                    process.env.AWS_S3_TEMPORARY_AUDIO_BUCKET
+    //     function deleteFromS3(
+    //         _bucketName: string,
+    //         s3Path: string,
+    //     ): Promise<void> {
+    //         return new Promise((resolve, reject) => {
+    //             // TODO : Given _bucketName is completly bullshit here !!! FUCK IT !
+    //             let bucketName: string =
+    //                 process.env.AWS_S3_TEMPORARY_AUDIO_BUCKET
 
-                const s3FullPath = `s3://${bucketName}/${s3Path}`
+    //             const s3FullPath = `s3://${bucketName}/${s3Path}`
 
-                const awsCommand = spawn('aws', ['s3', 'rm', s3FullPath])
+    //             const awsCommand = spawn('aws', ['s3', 'rm', s3FullPath])
 
-                let errorOutput = ''
+    //             let errorOutput = ''
 
-                awsCommand.stderr.on('data', (data) => {
-                    errorOutput += data.toString()
-                })
+    //             awsCommand.stderr.on('data', (data) => {
+    //                 errorOutput += data.toString()
+    //             })
 
-                awsCommand.on('close', (code) => {
-                    if (code === 0) {
-                        console.log(
-                            `Fichier supprimé avec succès: ${s3FullPath}`,
-                        )
-                        resolve()
-                    } else {
-                        console.error(
-                            'Erreur lors de la suppression du fichier S3:',
-                            errorOutput,
-                        )
-                        reject(
-                            new Error(
-                                `Échec de la suppression S3 avec le code ${code}`,
-                            ),
-                        )
-                    }
-                })
-            })
-        }
+    //             awsCommand.on('close', (code) => {
+    //                 if (code === 0) {
+    //                     console.log(
+    //                         `Fichier supprimé avec succès: ${s3FullPath}`,
+    //                     )
+    //                     resolve()
+    //                 } else {
+    //                     console.error(
+    //                         'Erreur lors de la suppression du fichier S3:',
+    //                         errorOutput,
+    //                     )
+    //                     reject(
+    //                         new Error(
+    //                             `Échec de la suppression S3 avec le code ${code}`,
+    //                         ),
+    //                     )
+    //                 }
+    //             })
+    //         })
+    //     }
 
-        if (!s3Path || typeof s3Path !== 'string') {
-            return res.status(400).json({
-                error: 'Le paramètre s3Path est requis dans le corps de la requête et doit être une chaîne de caractères',
-            })
-        }
+    //     if (!s3Path || typeof s3Path !== 'string') {
+    //         return res.status(400).json({
+    //             error: 'Le paramètre s3Path est requis dans le corps de la requête et doit être une chaîne de caractères',
+    //         })
+    //     }
 
-        try {
-            await deleteFromS3(bucketName, s3Path)
-            return res
-                .status(200)
-                .json({ message: 'Fichier S3 supprimé avec succès' })
-        } catch (error) {
-            console.error('Erreur lors de la suppression du fichier S3:', error)
-            return res.status(500).json({
-                error: 'Erreur lors de la suppression du fichier S3',
-            })
-        }
-    })
+    //     try {
+    //         await deleteFromS3(bucketName, s3Path)
+    //         return res
+    //             .status(200)
+    //             .json({ message: 'Fichier S3 supprimé avec succès' })
+    //     } catch (error) {
+    //         console.error('Erreur lors de la suppression du fichier S3:', error)
+    //         return res.status(500).json({
+    //             error: 'Erreur lors de la suppression du fichier S3',
+    //         })
+    //     }
+    // })
 
     try {
         app.listen(PORT, HOST)

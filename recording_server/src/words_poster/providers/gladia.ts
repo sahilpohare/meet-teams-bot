@@ -1,6 +1,6 @@
 import axios from 'axios'
-import { RecognizerWord, sleep } from '../../api'
-import { parameters } from '../../background'
+import { sleep } from '../../utils'
+import { RecognizerWord } from '../words_poster'
 
 const GLADIA_API_KEY = '8b82f7ea-c1c8-4e3d-abc3-18af0fce1f03'
 const API_URL = 'https://api.gladia.io/v2/transcription'
@@ -44,7 +44,8 @@ type GladiaWordWithTimestamp = {
 // Get Gladia raw Transcipt
 export async function recognizeGladia(
     audioUrl: string,
-    _phrases: string[],
+    _vocabulary: string[],
+    speech_to_text_api_key: string | null,
 ): Promise<GladiaResult> {
     const requestBody = {
         audio_url: audioUrl,
@@ -54,8 +55,8 @@ export async function recognizeGladia(
         enable_code_switching: false,
         detect_language: true,
     }
-    const api_key = parameters.speech_to_text_api_key
-        ? parameters.speech_to_text_api_key
+    const api_key = speech_to_text_api_key
+        ? speech_to_text_api_key
         : GLADIA_API_KEY
     console.log('Requesting Gladia transcription', api_key)
     let axios_response = await axios.post(`${API_URL}`, requestBody, {
@@ -77,7 +78,7 @@ export async function recognizeGladia(
     let result: GladiaResult
     while (true) {
         await sleep(TRANSCRIPTION_WAIT_TIME)
-        result = await getResult(response.id)
+        result = await getResult(response.id, api_key)
         if (result.status === 'error') {
             console.error('Error from Gladia :', result)
             throw result
@@ -109,10 +110,11 @@ export function parseGladia(
     })
 }
 
-async function getResult(id: string): Promise<GladiaResult> {
-    const api_key = parameters.speech_to_text_api_key
-        ? parameters.speech_to_text_api_key
-        : GLADIA_API_KEY
+async function getResult(
+    id: string,
+    speech_to_text_api_key: string,
+): Promise<GladiaResult> {
+    const api_key = speech_to_text_api_key
     const axios_response = await axios.get(`${API_URL}/${id}`, {
         headers: {
             accept: 'application/json',

@@ -1,6 +1,6 @@
 import axios from 'axios'
-import { RecognizerWord, sleep } from '../../api'
-import { parameters } from '../../background'
+import { RecognizerWord } from '../words_poster'
+import { sleep } from '../../utils'
 
 const RUNPOD_API_KEY = 'B1EC90VQNXMASRD9QJJAALGOS0YL73JEMKZQ92IJ'
 const API_URL = 'https://api.runpod.ai/v2/oq0i26ut0lom1h'
@@ -23,7 +23,8 @@ type RunPodTranscriptionStatus = {
 
 export async function recognizeRunPod(
     audioUrl: string,
-    phrases: string[],
+    _vocabulary: string[],
+    speech_to_text_api_key: string | null,
 ): Promise<RunPodResult> {
     const requestBody = {
         input: {
@@ -46,8 +47,8 @@ export async function recognizeRunPod(
         enable_vad: false,
     }
 
-    const api_key = parameters.speech_to_text_api_key
-        ? parameters.speech_to_text_api_key
+    const api_key = speech_to_text_api_key
+        ? speech_to_text_api_key
         : RUNPOD_API_KEY
     console.log('Requesting RunPod transcription', api_key)
     let response = await axios.post(`${API_URL}/run`, requestBody, {

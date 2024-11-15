@@ -5,6 +5,7 @@ import { ApiTypes } from './types'
 
 import { MeetingParams } from '../types'
 import { Console } from '../utils'
+import { RecognizerWord } from '../words_poster/words_poster'
 
 export class Api extends Console {
     public static instance: Api | null = null // Singleton class
@@ -55,18 +56,14 @@ export class Api extends Console {
             err.response && err.response.data ? err.response.data : err
         const request = err.request
 
-        console.log(
-            'Attempt of a new trial #',
-            cfg && cfg.currentRetryAttempt,
-            {
-                url: request.url,
-                method: request.method,
-                params: request.params,
-                headers: request.headers,
-                data: request.data,
-                response: response,
-            },
-        )
+        this.log('Attempt of a new trial #', cfg && cfg.currentRetryAttempt, {
+            url: request.url,
+            method: request.method,
+            params: request.params,
+            headers: request.headers,
+            data: request.data,
+            response: response,
+        })
     }
 
     // Finalize bot structure into BDD and send webhook
@@ -116,6 +113,20 @@ export class Api extends Console {
                 method: 'PATCH',
                 url: `/bots/transcripts`,
                 data: transcript,
+            })
+        ).data
+    }
+
+    // Post words into server
+    public async postWords(
+        words: RecognizerWord[],
+        bot_id: number,
+    ): Promise<ApiTypes.Word[]> {
+        return (
+            await axios({
+                method: 'POST',
+                url: `/bots/transcripts/${bot_id}/words`,
+                data: words,
             })
         ).data
     }

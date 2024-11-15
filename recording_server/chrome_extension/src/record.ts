@@ -1,10 +1,6 @@
 import * as asyncLib from 'async'
-import { sleep } from './api'
-import { parameters } from './background'
-import { newSerialQueue } from './queue'
-import { ApiService } from './recordingServerApi'
+import { ApiService, sleep } from './api'
 import { SoundStreamer } from './sound_streamer'
-import { Transcriber } from './Transcribe/Transcriber'
 
 const STREAM: MediaStream | null = null
 let RECORDED_CHUNKS: BlobEvent[] = []
@@ -13,11 +9,21 @@ let HANDLE_STOP_DONE = false
 let CONTEXT: AudioContext | null = null // No streaming_output audio mode
 let THIS_STREAM: MediaStreamAudioSourceNode | null = null // No streaming_output audio mode
 
-export let START_RECORD_TIMESTAMP = 0 // Shared with Transcriber & UploadTranscripts(speaker changes)
 export let SESSION: SpokeSession | null = null
 
 export type SpokeSession = {
     upload_queue: asyncLib.AsyncQueue<() => Promise<void>>
+}
+
+function newSerialQueue() {
+    return asyncLib.queue(async function (
+        task: () => Promise<void>,
+        done: any,
+    ) {
+        await task()
+        done()
+    },
+    1)
 }
 
 export async function initMediaRecorder(
@@ -70,50 +76,36 @@ export async function initMediaRecorder(
                     return
                 }
 
-                Transcriber.init()
-                    .then(() => {
-                        try {
-                            MEDIA_RECORDER.ondataavailable =
-                                handleDataAvailable()
-                            MEDIA_RECORDER.onstop = handleStop
-                        } catch (e) {
-                            console.error('error starting media recorder', e)
-                            throw e
-                        }
-                        resolve()
-                    })
-                    .catch((e) => {
-                        console.error('an error occured in transcriber init', e)
-                        reject()
-                    })
+                try {
+                    MEDIA_RECORDER.ondataavailable = handleDataAvailable()
+                    MEDIA_RECORDER.onstop = handleStop
+                } catch (e) {
+                    console.error('error starting media recorder', e)
+                    reject()
+                }
+                resolve()
             },
         )
     })
 }
 
 export async function startRecording(): Promise<number> {
-    await ApiService.sendMessageToRecordingServer('START_TRANSCODER', {
-        bucketName: parameters.s3_bucket,
-        videoS3Path: parameters.mp4_s3_path,
-    })
-
     const events = new Promise<number>((resolve, reject) => {
         MEDIA_RECORDER.onerror = function (e) {
             console.error('media recorder error', e)
             reject('Error on MEDIA_RECORDER')
         }
         MEDIA_RECORDER.onstart = function (_e) {
-            const now = Date.now()
+            const start_recording_timestamp = Date.now()
             const newSession = {
                 upload_queue: newSerialQueue(),
-                cut_times: [now],
-                start_timestamp: now,
+                cut_times: [start_recording_timestamp],
+                start_timestamp: start_recording_timestamp,
                 transcripts: [],
                 words: [],
             }
             SESSION = newSession
-            START_RECORD_TIMESTAMP = now
-            resolve(START_RECORD_TIMESTAMP)
+            resolve(start_recording_timestamp)
         }
     })
     MEDIA_RECORDER.start(10000)
@@ -145,19 +137,11 @@ export async function waitUntilComplete(kill = false) {
             '[waitForUpload] upload queue',
             spokeSession.upload_queue.idle(),
         )
-        spokeSession.upload_queue.push(async () => {
+        await spokeSession.upload_queue.push(async () => {
             return
         })
         await spokeSession.upload_queue.drain()
         console.log('[waitForUpload] after transcribe queue drain')
-    }
-}
-
-export async function stopRecordServer(
-    spokeSession: SpokeSession | null = null,
-) {
-    if (spokeSession) {
-        await ApiService.sendMessageToRecordingServer('STOP_TRANSCODER', {})
     }
 }
 
