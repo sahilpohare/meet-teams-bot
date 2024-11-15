@@ -137,7 +137,7 @@ export async function waitUntilComplete(kill = false) {
             '[waitForUpload] upload queue',
             spokeSession.upload_queue.idle(),
         )
-        await spokeSession.upload_queue.push(async () => {
+        spokeSession.upload_queue.push(async () => {
             return
         })
         await spokeSession.upload_queue.drain()
