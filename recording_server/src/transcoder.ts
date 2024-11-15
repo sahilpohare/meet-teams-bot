@@ -5,13 +5,11 @@ import * as path from 'path'
 import { Writable } from 'stream'
 import { Logger } from './logger'
 
-import { Console } from './utils'
-
 import { WordsPoster } from './words_poster/words_poster'
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
-class Transcoder extends Console {
+class Transcoder {
     private videoOutputPath: string
     private bucketName: string
     private ffmpeg_process: ChildProcess | null = null
@@ -27,7 +25,6 @@ class Transcoder extends Console {
     static EXTRACT_AUDIO_RETRY_DELAY: number = 10_000 // 10 seconds
 
     constructor() {
-        super()
         this.webmPath = path.join(os.tmpdir(), 'output.webm')
 
         // Set a new empty webm file for voice transcription
@@ -35,7 +32,7 @@ class Transcoder extends Console {
         try {
             fs.writeFileSync(this.webmPath, Buffer.alloc(0))
         } catch (err) {
-            this.error(`Cannot create new webm file: ${err}`)
+            console.error(`Cannot create new webm file: ${err}`)
         }
     }
 
@@ -46,7 +43,7 @@ class Transcoder extends Console {
         transcribeDuration: number,
     ): Promise<void> {
         if (this.ffmpeg_process) {
-            this.log('Transcoder already initialized')
+            console.log('Transcoder already initialized')
             return
         }
         this.videoOutputPath = Logger.instance.get_video_directory()
@@ -81,7 +78,7 @@ class Transcoder extends Console {
         this.ffmpeg_process = spawn('ffmpeg', ffmpegArgs, {
             stdio: ['pipe', 'inherit', 'inherit'],
         })
-        this.log('FFmpeg command launched successfully')
+        console.log('FFmpeg command launched successfully')
         return
     }
 
@@ -107,32 +104,32 @@ class Transcoder extends Console {
 
     public async stop(): Promise<void> {
         if (this.transcoder_successfully_stopped) {
-            this.log('Transcoder already stopped')
+            console.log('Transcoder already stopped')
             return
         }
         if (!this.ffmpeg_process) {
-            this.log('Transcoder not initialized, nothing to stop')
+            console.log('Transcoder not initialized, nothing to stop')
             return
         }
         // New method to close stdin
         if (this.ffmpeg_process.stdin) {
             this.ffmpeg_process.stdin.end()
-            this.log('Child process stdin closed')
+            console.log('Child process stdin closed')
         } else {
-            this.log('stdin is unavailable')
+            console.log('stdin is unavailable')
         }
-        this.log('Transcoder stopped')
+        console.log('Transcoder stopped')
 
         // Wait for the child process to finish
         await new Promise<void>((resolve, reject) => {
             this.ffmpeg_process!.on('close', async (code) => {
-                this.log(`Process ffmpeg finished with code ${code}`)
+                console.log(`Process ffmpeg finished with code ${code}`)
 
                 if (code === 0) {
                     try {
                         const tempOutputPath = `${this.videoOutputPath}_temp.mp4`
 
-                        this.log('Starting faststart process...')
+                        console.log('Starting faststart process...')
 
                         await new Promise<void>((resolve, reject) => {
                             const fastStartProcess = spawn('ffmpeg', [
@@ -146,11 +143,11 @@ class Transcoder extends Console {
                             ])
 
                             fastStartProcess.stdout.on('data', (data) => {
-                                this.log(`Faststart stdout: ${data}`)
+                                console.log(`Faststart stdout: ${data}`)
                             })
 
                             fastStartProcess.stderr.on('data', (data) => {
-                                this.log(`Faststart stderr: ${data}`)
+                                console.log(`Faststart stderr: ${data}`)
                             })
                             // prettier-ignore
                             fastStartProcess.on('close',async (fastStartCode) => {
@@ -159,12 +156,12 @@ class Transcoder extends Console {
                                         tempOutputPath,
                                         this.videoOutputPath,
                                     )
-                                    this.log(
+                                    console.log(
                                         'Faststart process completed successfully',
                                     )
                                     resolve()
                                 } else {
-                                    this.error(
+                                    console.error(
                                         `Faststart process failed with code ${fastStartCode}`,
                                     )
                                     reject(
@@ -176,16 +173,15 @@ class Transcoder extends Console {
                             })
                         })
                     } catch (err) {
-                        this.error('Error during faststart process:', err)
+                        console.error('Error during faststart process:', err)
                         throw err
                     }
                 } else {
-                    this.error(`Faststart process failed with code ${code}`)
+                    console.error(`Faststart process failed with code ${code}`)
                     reject(
                         new Error(`Faststart process failed with code ${code}`),
                     )
                 }
-
                 this.ffmpeg_process = null
                 resolve()
             })
@@ -201,7 +197,7 @@ class Transcoder extends Console {
 
     public async uploadChunk(chunk: Buffer, isFinal: boolean): Promise<void> {
         if (this.transcoder_successfully_stopped) {
-            this.log('Transcoder is in stop state!')
+            console.log('Transcoder is in stop state!')
             return
         }
         if (!this.ffmpeg_process) {
@@ -211,7 +207,7 @@ class Transcoder extends Console {
         try {
             this.chunkReceavedCounter += 1
             await this.appendChunkToWebm(chunk)
-            this.log('Incoming video data writed appened to webM')
+            console.log('Incoming video data writed appened to webM')
 
             let chunksPerTranscribe =
                 this.transcribeDuration / this.chunkDuration
@@ -239,12 +235,11 @@ class Transcoder extends Console {
                 let timeEnd = -1
                 await WordsPoster.TRANSCRIBER?.push(timeStart, timeEnd)
             }
-
             await this.writeToChildStdin(chunk).then((_) => {
-                this.log('Incoming video data writed into ffmpeg stdin')
+                console.log('Incoming video data writed into ffmpeg stdin')
             })
         } catch (err) {
-            this.error(
+            console.error(
                 'Error writing the chunk in ffmpeg or adding it to the WebM file:',
                 err,
             )
@@ -288,7 +283,7 @@ class Transcoder extends Console {
 
             const args = isAudio ? [] : s3Args
 
-            this.log('args', args)
+            console.log('args', args)
             const awsCommand = spawn('aws', [
                 ...args,
                 's3',
@@ -313,15 +308,15 @@ class Transcoder extends Console {
             awsCommand.on('close', async (code) => {
                 if (code === 0) {
                     const publicUrl = `https://${bucketName}.s3.amazonaws.com/${s3Path}`
-                    this.log(`File uploaded successfully: ${publicUrl}`)
+                    console.log(`File uploaded successfully: ${publicUrl}`)
 
                     if (!isAudio) {
                         await Logger.instance.remove_video()
                     }
                     resolve(publicUrl)
                 } else {
-                    this.error('Error uploading to S3:', errorOutput)
-                    this.log(process.env)
+                    console.error('Error uploading to S3:', errorOutput)
+                    console.log(process.env)
                     reject(new Error(`Failed S3 upload with code ${code}`))
                 }
             })
@@ -353,7 +348,7 @@ class Transcoder extends Console {
         ) {
             try {
                 await this.runExtractAudio(outputAudioPath, timeStart, timeEnd)
-                this.log(`Audio extraction successful on attempt ${attempt}`)
+                console.log(`Audio extraction successful on attempt ${attempt}`)
 
                 // Uploading audio file to S3
                 const s3Url = await this.uploadToS3(
@@ -362,10 +357,10 @@ class Transcoder extends Console {
                     s3Path,
                     true,
                 )
-                this.log(`Audio file uploaded to S3 on attempt ${attempt}`)
+                console.log(`Audio file uploaded to S3 on attempt ${attempt}`)
                 return s3Url
             } catch (error) {
-                this.error(
+                console.error(
                     `Audio extraction or upload failed on attempt ${attempt}:`,
                     error,
                 )
@@ -379,7 +374,7 @@ class Transcoder extends Console {
                 try {
                     await fs.unlink(outputAudioPath)
                 } catch (err) {
-                    this.error('Error deleting the audio file:', err)
+                    console.error('Error deleting the audio file:', err)
                 }
             }
         }
@@ -430,15 +425,18 @@ class Transcoder extends Console {
                 if (code === 0) {
                     resolve()
                 } else {
-                    this.error('Sortie ffmpeg:', output)
+                    console.error('Sortie ffmpeg:', output)
                     if (output.includes('File ended prematurely at pos.')) {
                         try {
                             await fs.unlink(outputAudioPath)
-                            this.log(
+                            console.log(
                                 'Output file deleted due to premature termination',
                             )
                         } catch (err) {
-                            this.error('Error deleting the output file:', err)
+                            console.error(
+                                'Error deleting the output file:',
+                                err,
+                            )
                         }
                         reject(new Error('The file terminated prematurely'))
                     } else {
@@ -456,9 +454,9 @@ class Transcoder extends Console {
     private async appendChunkToWebm(chunk: Buffer): Promise<void> {
         try {
             await fs.appendFile(this.webmPath, new Uint8Array(chunk))
-            this.log('Chunk successfully added to the WebM file')
+            console.log('Chunk successfully added to the WebM file')
         } catch (err) {
-            this.error('Error adding chunk to the WebM file:', err)
+            console.error('Error adding chunk to the WebM file:', err)
             throw err
         }
     }

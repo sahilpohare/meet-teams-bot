@@ -4,6 +4,12 @@ import { join } from 'path'
 import { Browser, ConsoleMessage, Page } from 'puppeteer'
 
 import puppeteer from 'puppeteer-extra'
+import {
+    rawConsoleError,
+    rawConsoleInfo,
+    rawConsoleLog,
+    rawConsoleWarn,
+} from './main'
 
 // add stealth plugin and use defaults (all evasion techniques)
 const StealthPlugin = require('puppeteer-extra-plugin-stealth')
@@ -70,19 +76,19 @@ export function listenPage(page: Page) {
             const tags = `${location.url}:${location.lineNumber}}`
             switch (type) {
                 case 'LOG':
-                    console.log(`${tags}\n${text}`)
+                    rawConsoleLog(`${tags}\n${text}`)
                     break
                 case 'WAR':
-                    console.log('\x1b[38;5;214m%s\x1b[0m', `${tags}\n${text}`)
+                    rawConsoleWarn(`${tags}\n${text}`)
                     break
                 case 'ERR':
-                    console.log('\x1b[31m%s\x1b[0m', `${tags}\n${text}`)
+                    rawConsoleError(`${tags}\n${text}`)
                     break
                 case 'INF':
-                    console.log('\x1b[32m%s\x1b[0m', `${tags}\n${text}`)
+                    rawConsoleInfo(`${tags}\n${text}`)
                     break
                 default:
-                    console.log(`DEFAULT CASE ${type} ! ${tags}\n${text}`)
+                    rawConsoleLog(`DEFAULT CASE ${type} ! ${tags}\n${text}`)
             }
         } catch (e) {
             console.log(`Failed to log forward logs: ${e}`)

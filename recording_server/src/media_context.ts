@@ -1,6 +1,5 @@
-import { spawn, ChildProcess } from 'child_process'
+import { ChildProcess, spawn } from 'child_process'
 import internal from 'stream'
-import { Console } from './utils'
 
 // sudo apt install linux-modules-extra-`uname -r`
 // const MICRO_DEVICE: string = 'hw:Loopback,1' // sndloop module
@@ -18,12 +17,11 @@ const CAMERA_DEVICE: string = '/dev/video10'
 // ffmpeg -re -i La_bataille_de_Farador.mp4 \
 //    -map 0:v -f v4l2 -vcodec mjpeg -s 640x360 /dev/video10 \
 //    -map 0:a -f alsa -ac 2 -ar 44100 hw:Loopback,1
-abstract class MediaContext extends Console {
+abstract class MediaContext {
     private process: ChildProcess | null
     private promise: Promise<number> | null
 
     constructor() {
-        super()
         this.process = null
         this.promise = null
     }
@@ -33,7 +31,7 @@ abstract class MediaContext extends Console {
         after: { (): void },
     ): ChildProcess | null {
         if (this.process) {
-            this.warn('Already on execution')
+            console.warn('Already on execution')
             return null
         }
 
@@ -42,7 +40,7 @@ abstract class MediaContext extends Console {
         })
         this.promise = new Promise((resolve, reject) => {
             this.process.on('exit', (code) => {
-                this.log(`process exited with code ${code}`)
+                console.log(`process exited with code ${code}`)
                 if (code == 0) {
                     this.process = null
                     after()
@@ -50,16 +48,16 @@ abstract class MediaContext extends Console {
                 resolve(code)
             })
             this.process.on('error', (err) => {
-                this.error(err)
+                console.error(err)
                 reject(err)
             })
 
             // IO output
             this.process.stdout.on('data', (_data) => {
-                // this.log(`stdout: ${_data}`)
+                // console.log(`stdout: ${_data}`)
             })
             this.process.stderr.on('data', (_data) => {
-                // this.error(`stderr: ${_data}`)
+                // console.error(`stderr: ${_data}`)
             })
         })
         return this.process
@@ -67,19 +65,19 @@ abstract class MediaContext extends Console {
 
     protected async stop_process() {
         if (!this.process) {
-            this.warn('Already stoped')
+            console.warn('Already stoped')
             return
         }
 
         let res = this.process.kill('SIGTERM')
-        this.log(`Signal sended to process : ${res}`)
+        console.log(`Signal sended to process : ${res}`)
 
         await this.promise
             .then((code) => {
-                this.log(`process exited with code ${code}`)
+                console.log(`process exited with code ${code}`)
             })
             .catch((err) => {
-                this.log(`process exited with error ${err}`)
+                console.log(`process exited with error ${err}`)
             })
             .finally(() => {
                 this.process = null
@@ -147,7 +145,7 @@ export class SoundContext extends MediaContext {
             MICRO_DEVICE,
         )
         return super.execute(args, () => {
-            this.warn(`[play_stdin] Sequence ended`)
+            console.warn(`[play_stdin] Sequence ended`)
         }).stdin
     }
 

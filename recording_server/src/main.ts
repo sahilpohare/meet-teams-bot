@@ -9,12 +9,15 @@ import { getCachedExtensionId, getExtensionId, openBrowser } from './puppeteer'
 import { clientRedis } from './server'
 
 import axios from 'axios'
+import { join } from 'path'
+import pino from 'pino'
+import caller from 'pino-caller'
 import { exit } from 'process'
 // import { generateBranding } from './branding'
+import { Api } from './api/methods'
 import { Consumer } from './rabbitmq'
 import { TRANSCODER } from './transcoder'
 import { MeetingParams } from './types'
-import { Api } from './api/methods'
 
 import { spawn } from 'child_process'
 
@@ -23,10 +26,64 @@ const ZOOM_SDK_RELEASE_EXECUTABLE_PATHNAME = './target/release/client'
 const ZOOM_SDK_LIBRARY_PATH = './zoom-sdk-linux-rs/zoom-meeting-sdk-linux'
 const ZOOM_SDK_RELATIVE_DIRECTORY = '../zoom'
 
-const originalError = console.error
-console.error = (...args: any[]) => {
-    originalError('\x1b[31m%s\x1b[0m', ...args)
-}
+// const originalError = console.error
+// console.error = (...args: any[]) => {
+//     originalError('\x1b[31m%s\x1b[0m', ...args)
+// }
+// Create the logger instance
+const baseLogger = pino({
+    level: 'debug',
+    timestamp: true,
+    formatters: {
+        level: (label) => {
+            return { level: label }
+        },
+    },
+    transport: {
+        target: 'pino-pretty',
+        options: {
+            colorize: true,
+            translateTime: 'SYS:standard',
+            ignore: 'pid,hostname',
+            colorizeObjects: true, //--colorizeObjects
+            crlf: false, // --crlf
+            levelKey: 'level', // --levelKey
+            timestampKey: 'time', // --timestampKey
+            // The file or file descriptor (1 is stdout) to write to
+            destination: 1,
+            // You can also configure some SonicBoom options directly
+            append: true, // the file is opened with the 'a' flag
+            mkdir: true, // create the target destination
+            customPrettifiers: {},
+        },
+    },
+})
+
+// Add caller information to logs
+export const logger = caller(baseLogger, {
+    relativeTo: join(__dirname, '..', '..', 'src'),
+    stackAdjustment: 1,
+})
+
+const formatArgs = (msg: string, args: any[]) =>
+    msg + ' ' + args.map((arg) => JSON.stringify(arg)).join(' ')
+
+export let rawConsoleLog = console.log
+export let rawConsoleInfo = console.info
+export let rawConsoleWarn = console.warn
+export let rawConsoleError = console.error
+export let rawConsoleDebug = console.debug
+
+console.log = (msg: string, ...args: any[]) =>
+    logger.info(formatArgs(msg, args))
+console.info = (msg: string, ...args: any[]) =>
+    logger.info(formatArgs(msg, args))
+console.warn = (msg: string, ...args: any[]) =>
+    logger.warn(formatArgs(msg, args))
+console.error = (msg: string, ...args: any[]) =>
+    logger.error(formatArgs(msg, args))
+console.debug = (msg: string, ...args: any[]) =>
+    logger.debug(formatArgs(msg, args))
 
 // ENTRY POINT
 // syntax convention
@@ -34,7 +91,7 @@ console.error = (...args: any[]) => {
 // CONST => Const
 // camelCase => Fn
 // PascalCase => Classes
-console.log('version 0.0.1')
+logger.info('version 0.0.1')
 ;(async () => {
     if (process.argv[2]?.includes('get_extension_id')) {
         getExtensionId().then((x) => console.log(x))

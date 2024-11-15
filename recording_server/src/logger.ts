@@ -12,22 +12,21 @@ const util = require('util')
 const execPromise = util.promisify(exec)
 
 import { Page } from 'puppeteer'
+
 import { s3cp } from './s3'
 import { MeetingParams } from './types'
-import { Console } from './utils'
 
 const EFS_MOUNT_POINT: string = '/mnt/efs'
 
-export class Logger extends Console {
+export class Logger {
     public static instance: Logger | null
 
     private destination_dir: string
     private bot_uuid: string
 
     constructor(meetingParams: MeetingParams) {
-        super()
         let environ: string = process.env.ENVIRON
-        this.info('ENVIRON :', environ)
+        console.log('ENVIRON :', environ)
 
         this.bot_uuid = meetingParams.bot_uuid
         if (environ === 'prod') {
@@ -42,7 +41,7 @@ export class Logger extends Console {
 
     public async init() {
         await fs.mkdir(this.destination_dir, { recursive: true }).catch((e) => {
-            this.error('Unable to create logger directory :', e)
+            console.error('Unable to create logger directory :', e)
         })
     }
 
@@ -67,10 +66,10 @@ export class Logger extends Console {
                     '',
                 )}_${date}.jpg`,
             ).catch((e) => {
-                this.error(`Failed to upload screenshot to s3 ${e}`)
+                console.error(`Failed to upload screenshot to s3 ${e}`)
             })
         } catch (e) {
-            this.error(`Failed to take screenshot ${e}`)
+            console.error(`Failed to take screenshot ${e}`)
         }
     }
 
@@ -88,7 +87,7 @@ export class Logger extends Console {
             return
         }
         try {
-            this.log('Starting config update...')
+            console.log('Starting config update...')
 
             // Update of the configuration file
             const sedResult = await execPromise(
@@ -96,12 +95,12 @@ export class Logger extends Console {
             )
 
             if (sedResult.stderr) {
-                this.error(
+                console.error(
                     `Error while updating the configuration file: ${sedResult.stderr}`,
                 )
             }
 
-            this.log('Configuration file updated successfully')
+            console.log('Configuration file updated successfully')
 
             // Reloading the Grafana agent
             const reloadResult = await execPromise(
@@ -109,20 +108,20 @@ export class Logger extends Console {
             )
 
             if (reloadResult.stderr) {
-                this.error(
+                console.error(
                     `Error while reloading the Grafana agent : ${reloadResult.stderr}`,
                 )
             }
 
-            this.log('Grafana agent reloaded successfully')
+            console.log('Grafana agent reloaded successfully')
         } catch (error) {
-            this.error(`An error has occurred : ${error}`)
+            console.error(`An error has occurred : ${error}`)
         }
     }
 
     public async remove_video() {
         await fs.unlink(this.get_video_directory()).catch((e) => {
-            this.error('Cannot remove video : ', e)
+            console.error('Cannot remove video : ', e)
         })
     }
 
@@ -133,12 +132,12 @@ export class Logger extends Console {
         await fs
             .readFile(source_base_log, 'utf-8')
             .catch((e) => {
-                this.error(`Cannot read log file : ${e}`)
+                console.error(`Cannot read log file : ${e}`)
             })
             .then(async (log) => {
                 if (log) {
                     await fs.writeFile(destination_base_log, log).catch((e) => {
-                        this.error(`Cannot Update log file : ${e}`)
+                        console.error(`Cannot Update log file : ${e}`)
                     })
                 }
             })

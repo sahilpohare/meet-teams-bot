@@ -1,15 +1,13 @@
-import { RawData, Server, WebSocket } from 'ws'
 import { IncomingMessage } from 'http'
 import { Readable } from 'stream'
+import { RawData, Server, WebSocket } from 'ws'
 
-import { SpeakerData } from './types'
 import { SoundContext } from './media_context'
-import { Console } from './utils'
+import { SpeakerData } from './types'
 
 const EXTENSION_WEBSOCKET_PORT: number = 8081
 const DEFAULT_SAMPLE_RATE: number = 24_000
-
-export class Streaming extends Console {
+export class Streaming {
     public static instance: Streaming | null
 
     private extension_ws: Server<
@@ -26,19 +24,19 @@ export class Streaming extends Console {
         sample_rate: number | undefined,
         bot_id: string,
     ) {
-        super()
+
         if (sample_rate) {
             this.sample_rate = sample_rate
-        }
+            }
         if (output) {
-            this.info(`output = ${output}`)
+            console.log(`output = ${output}`)
             this.extension_ws = new WebSocket.Server({
                 port: EXTENSION_WEBSOCKET_PORT,
             })
 
             // Event 'connection' on client extension WebSocket
             this.extension_ws.on('connection', (client: WebSocket) => {
-                this.log(`Client connected`)
+                console.log(`Client connected`)
 
                 this.output_ws = new WebSocket(output)
                 // Send initial message to output webSocket
@@ -53,7 +51,7 @@ export class Streaming extends Console {
                 })
                 // Dual channel
                 if (input === output) {
-                    this.info(`input = ${input}`)
+                    console.log(`input = ${input}`)
                     this.play_incoming_audio_chunks(this.output_ws)
                 }
                 // Event 'message' on client extension WebSocket
@@ -80,34 +78,34 @@ export class Streaming extends Console {
                 })
                 // Event 'close' on client extension WebSocket
                 client.on('close', () => {
-                    this.log(`Client has left`)
+                    console.log(`Client has left`)
 
                     this.output_ws.close()
                 })
                 // Event 'error' on client extension WebSocket
                 client.on('error', (err: Error) => {
-                    this.error(`WebSocket error : ${err}`)
+                    console.error(`WebSocket error : ${err}`)
                 })
                 // Event 'close' on output WebSocket
                 this.output_ws.on('close', () => {
-                    this.info(`Output WebSocket closed`)
+                    console.log(`Output WebSocket closed`)
                 })
                 // Event 'error' on output WebSocket
                 this.output_ws.on('error', (err: Error) => {
-                    this.error(`Output WebSocket error : ${err}`)
+                    console.error(`Output WebSocket error : ${err}`)
                 })
             })
         }
         if (input && output !== input) {
-            this.info(`input = ${input}`)
+            console.log(`input = ${input}`)
             this.input_ws = new WebSocket(input)
             // Event 'open' on input WebSocket
             this.input_ws.on('open', () => {
-                this.info(`Input WebSocket opened`)
+                console.log(`Input WebSocket opened`)
             })
             // Event 'error' on input WebSocket
             this.input_ws.on('error', (err: Error) => {
-                this.error(`Input WebSocket error : ${err}`)
+                console.error(`Input WebSocket error : ${err}`)
             })
             this.play_incoming_audio_chunks(this.input_ws)
         }
@@ -167,7 +165,7 @@ export class Streaming extends Console {
 
         // Event 'close' on input WebSocket
         input_ws.on('close', () => {
-            this.info(`Input WebSocket closed`)
+            console.log(`Input WebSocket closed`)
 
             // Indicates End Of Stream
             stream.push(null)

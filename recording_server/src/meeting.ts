@@ -24,7 +24,7 @@ import { TeamsProvider } from './meeting/teams'
 import { ZoomProvider } from './meeting/zoom'
 import { TRANSCODER } from './transcoder'
 import { uploadTranscriptTask } from './uploadTranscripts'
-import { Console, sleep } from './utils'
+import { sleep } from './utils'
 import { WordsPoster } from './words_poster/words_poster'
 
 let _NO_SPEAKER_DETECTED_TIMESTAMP: number | null = null
@@ -89,11 +89,11 @@ export class Status {
     error: any | null
     constructor() {
         this.state = 'Recording'
-        this.error = null
+        console.error = null
     }
 }
 
-export class MeetingHandle extends Console {
+export class MeetingHandle {
     static instance: MeetingHandle = null
     static status: Status = new Status()
     private meeting: Meeting
@@ -129,7 +129,6 @@ export class MeetingHandle extends Console {
         })
     }
     constructor(meetingParams: MeetingParams) {
-        super()
         function newMeetingProvider(
             meetingProvider: MeetingProvider,
         ): MeetingProviderInterface {
@@ -141,7 +140,7 @@ export class MeetingHandle extends Console {
                 return new ZoomProvider()
             }
         }
-        this.log(
+        console.log(
             '************ meetingParams meeting_url!!!',
             meetingParams.meeting_url,
         )
@@ -182,13 +181,13 @@ export class MeetingHandle extends Console {
             )
             this.meeting.browser = browser
             this.meeting.backgroundPage = backgroundPage
-            this.log('Extension found', { extensionId })
+            console.log('Extension found', { extensionId })
 
             const { meetingId, password } = await this.provider.parseMeetingUrl(
                 this.meeting.browser,
                 this.param.meeting_url,
             )
-            this.log('meeting id found', { meetingId })
+            console.log('meeting id found', { meetingId })
 
             const meetingLink = this.provider.getMeetingLink(
                 meetingId,
@@ -197,14 +196,14 @@ export class MeetingHandle extends Console {
                 this.param.bot_name,
                 this.param.enter_message,
             )
-            this.log('Meeting link found', { meetingLink })
+            console.log('Meeting link found', { meetingLink })
 
             this.meeting.page = await this.provider.openMeetingPage(
                 this.meeting.browser,
                 meetingLink,
                 this.param.streaming_input,
             )
-            this.log('meeting page opened')
+            console.log('meeting page opened')
 
             this.meeting.meetingTimeoutInterval = setTimeout(
                 () => {
@@ -218,7 +217,7 @@ export class MeetingHandle extends Console {
             const waintingRoomToken = new CancellationToken(
                 this.param.automatic_leave.waiting_room_timeout,
             )
-            this.log(
+            console.log(
                 'waitingroom timeout',
                 this.param.automatic_leave.waiting_room_timeout,
             )
@@ -233,9 +232,9 @@ export class MeetingHandle extends Console {
                     },
                     this.param,
                 )
-                this.log('meeting page joined')
+                console.log('meeting page joined')
             } catch (error) {
-                this.error(error)
+                console.error(error)
                 throw error
             }
 
@@ -249,12 +248,12 @@ export class MeetingHandle extends Console {
                 CHUNK_DURATION,
                 TRANSCRIBE_DURATION,
             ).catch((e) => {
-                this.error(`Cannot start Transcoder: ${e}`)
+                console.error(`Cannot start Transcoder: ${e}`)
             })
 
             // Start WordPoster for transcribing
             await WordsPoster.init(this.param).catch((e) => {
-                this.error(`Cannot start Transcriber: ${e}`)
+                console.error(`Cannot start Transcriber: ${e}`)
             })
 
             // First, remove Shitty Html...
@@ -289,6 +288,7 @@ export class MeetingHandle extends Console {
                             )
                             return res as number
                         } catch (error) {
+                            console.error(error)
                             return error as string
                         }
                     },
@@ -302,10 +302,10 @@ export class MeetingHandle extends Console {
                     },
                 )
             if (typeof result === 'number') {
-                this.info(`START_RECORDING_TIMESTAMP = ${result}`)
+                console.info(`START_RECORDING_TIMESTAMP = ${result}`)
                 START_RECORDING_TIMESTAMP.set(result)
             } else {
-                this.error(`Unexpected error: ${result}`)
+                console.error(`Unexpected error: ${result}`)
                 throw new JoinError(JoinErrorCode.Internal)
             }
 
@@ -325,7 +325,7 @@ export class MeetingHandle extends Console {
                     meetingProvider: this.param.meetingProvider,
                 },
             )
-            this.log('startRecording called')
+            console.log('startRecording called')
             // Send recording confirmation webhook
             await Events.inCallRecording()
         } catch (error) {
@@ -339,20 +339,20 @@ export class MeetingHandle extends Console {
         try {
             await Logger.instance.upload_log()
         } catch (e) {
-            this.error(`failed to upload logs: ${e}`)
+            console.error(`failed to upload logs: ${e}`)
         }
         try {
             this.brandingGenerateProcess?.kill()
             VideoContext.instance?.stop()
             SoundContext.instance?.stop()
         } catch (e) {
-            this.error(`failed to kill process: ${e}`)
+            console.error(`failed to kill process: ${e}`)
         }
         await this.cleanMeeting()
         try {
             await delSessionInRedis(this.param.session_id)
         } catch (e) {
-            this.error(`failed to del session in redis: ${e}`)
+            console.error(`failed to del session in redis: ${e}`)
         }
     }
 
@@ -372,25 +372,26 @@ export class MeetingHandle extends Console {
     }
 
     public async recordMeetingToEnd() {
-        this.log('[recordMeetingToEnd]')
+        console.log('[recordMeetingToEnd]')
         await this.waitForEndMeeting()
 
-        this.log('after waitForEndMeeting')
+        console.log('after waitForEndMeeting')
         await Events.callEnded()
+
 
         await MeetingHandle.stopAudioStreaming()
 
         await this.stopRecordingInternal().catch((e) => {
-            this.error(`Failed to stop recording: ${e}`)
+            console.error(`Failed to stop recording: ${e}`)
         })
 
-        this.log('before cleanEverything')
+        console.log('before cleanEverything')
         await this.cleanEverything()
-        this.log('after cleanEverything')
+        console.log('after cleanEverything')
     }
 
     private async waitForEndMeeting() {
-        this.log('waiting for end meeting')
+        console.log('waiting for end meeting')
         const cancelationToken = new CancellationToken(
             this.param.automatic_leave.noone_joined_timeout,
         )
@@ -405,7 +406,7 @@ export class MeetingHandle extends Console {
                         cancelationToken,
                     )
                     .catch((e) => {
-                        this.error(`findEndMeeting crashed with error: ${e}`)
+                        console.error(`findEndMeeting crashed with error: ${e}`)
                     })
             ) {
                 await this.stopRecording('findEndMeeting')
@@ -426,12 +427,12 @@ export class MeetingHandle extends Console {
             ) {
                 await this.stopRecording('no speaker detected timeout')
             } else {
-                // this.log(
-                //     '[waiting for end meeting] no speaker detected timestamp',
-                //     START_RECORDING_TIMESTAMP.get(),
-                //     NO_SPEAKER_DETECTED_TIMESTAMP.get(),
-                // )
-                // this.log('[waiting for end meeting] meeting not ended')
+                console.log(
+                    '[waiting for end meeting] no speaker detected timestamp',
+                    START_RECORDING_TIMESTAMP.get(),
+                    NO_SPEAKER_DETECTED_TIMESTAMP.get(),
+                )
+                console.log('[waiting for end meeting] meeting not ended')
                 await sleep(FIND_END_MEETING_SLEEP)
             }
         }
@@ -439,7 +440,7 @@ export class MeetingHandle extends Console {
 
     public async stopRecording(reason: string) {
         if (MeetingHandle.status.state !== 'Recording') {
-            this.error(
+            console.error(
                 `Can't exit meeting, the meeting is not in recording state`,
                 { status: MeetingHandle.status.state, exit_reason: reason },
             )
@@ -448,7 +449,7 @@ export class MeetingHandle extends Console {
         MeetingHandle.status.state = 'Cleanup'
         //TODO : Cut the video with the timestamp
         // EndmeetingTimesatamp = Date.now() - FIND_END_MEETING_SLEEP
-        this.log(`Stop recording scheduled`, {
+        console.log(`Stop recording scheduled`, {
             exit_reason: reason,
         })
     }
@@ -466,7 +467,7 @@ export class MeetingHandle extends Console {
             } as SpeakerData,
             true,
         )
-        this.log('before stopMediaRecorder')
+        console.log('before stopMediaRecorder')
         let result: boolean = await backgroundPage!.evaluate(async () => {
             const w = window as any
             try {
@@ -477,31 +478,32 @@ export class MeetingHandle extends Console {
             }
         })
         if (!result) {
-            this.error(`Unexpected error when stoping MediaRecorder`)
+            console.error(`Unexpected error when stoping MediaRecorder`)
         }
-        this.log(`after stopMediaRecorder`)
+        console.log(`after stopMediaRecorder`)
         try {
             await page!.goto('about:blank')
         } catch (e) {
-            this.error(e)
+            console.error(e)
         }
 
         try {
             clearTimeout(meetingTimeoutInterval!)
         } catch (e) {
-            this.error(e)
+            console.error(e)
         }
         try {
             await page!.close()
         } catch (e) {
-            this.error(`Failed to close page: ${e}`)
+            console.error(`Failed to close page: ${e}`)
         }
 
+
         await WordsPoster.TRANSCRIBER?.stop().catch((e) => {
-            this.error(`Cannot stop Transcriber: ${e}`)
+            console.error(`Cannot stop Transcriber: ${e}`)
         })
         await TRANSCODER.stop().catch((e) => {
-            this.error(`Cannot stop Transcoder: ${e}`)
+            console.error(`Cannot stop Transcoder: ${e}`)
         })
 
         try {
@@ -510,20 +512,20 @@ export class MeetingHandle extends Console {
             await sleep(1)
             await browser!.close()
         } catch (e) {
-            this.error(`Failed to close browser: ${e}`)
+            console.error(`Failed to close browser: ${e}`)
         }
-        this.log('Meeting successfully terminated')
+        console.log('Meeting successfully terminated')
     }
 
     private meetingTimeout() {
-        this.log('stopping meeting timeout reason')
+        console.log('stopping meeting timeout reason')
         try {
             this.stopRecording('timeout')
         } catch (e) {
-            this.error(e)
+            console.error(e)
         }
         setTimeout(async () => {
-            this.log('killing process')
+            console.log('killing process')
             //TODO : appeler clean everything
             try {
                 await Logger.instance
@@ -533,7 +535,7 @@ export class MeetingHandle extends Console {
                     // this.param.bot_uuid,
                     ()
             } catch (e) {
-                this.error(e)
+                console.error(e)
             }
             process.exit(0)
         }, MAX_TIME_TO_LIVE_AFTER_TIMEOUT * 1000)
