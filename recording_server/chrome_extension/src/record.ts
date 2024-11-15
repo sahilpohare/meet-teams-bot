@@ -1,5 +1,5 @@
 import * as asyncLib from 'async'
-import { ApiService, sleep } from './api'
+import { ApiService } from './api'
 import { SoundStreamer } from './sound_streamer'
 
 const STREAM: MediaStream | null = null

@@ -1,7 +1,7 @@
 import * as record from './record'
 import { SoundStreamer } from './sound_streamer'
 
-import { MeetingProvider, RecordingMode, sleep } from './api'
+import { MeetingProvider, RecordingMode } from './api'
 
 import { ApiService, setDefaultAxios } from './api'
 
@@ -18,8 +18,6 @@ export async function startRecording(
             'LOG',
             'FROM_EXTENSION: ************ Start recording launched. ************',
         )
-        await sleep(1000)
-
         await record.initMediaRecorder(streaming_output, streaming_audio_frequency)
         return await record.startRecording()
     } catch (e) {
