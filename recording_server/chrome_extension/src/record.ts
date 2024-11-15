@@ -5,25 +5,13 @@ import { SoundStreamer } from './sound_streamer'
 const STREAM: MediaStream | null = null
 let RECORDED_CHUNKS: BlobEvent[] = []
 let MEDIA_RECORDER: MediaRecorder // MediaRecorder instance to capture footage
-let HANDLE_STOP_DONE = false
 let CONTEXT: AudioContext | null = null // No streaming_output audio mode
 let THIS_STREAM: MediaStreamAudioSourceNode | null = null // No streaming_output audio mode
 
-export let SESSION: SpokeSession | null = null
+let SESSION: SpokeSession | null = null
 
-export type SpokeSession = {
+type SpokeSession = {
     upload_queue: asyncLib.AsyncQueue<() => Promise<void>>
-}
-
-function newSerialQueue() {
-    return asyncLib.queue(async function (
-        task: () => Promise<void>,
-        done: any,
-    ) {
-        await task()
-        done()
-    },
-    1)
 }
 
 export async function initMediaRecorder(
@@ -78,7 +66,6 @@ export async function initMediaRecorder(
 
                 try {
                     MEDIA_RECORDER.ondataavailable = handleDataAvailable()
-                    MEDIA_RECORDER.onstop = handleStop
                 } catch (e) {
                     console.error('error starting media recorder', e)
                     reject()
@@ -92,7 +79,7 @@ export async function initMediaRecorder(
 export async function startRecording(): Promise<number> {
     const events = new Promise<number>((resolve, reject) => {
         MEDIA_RECORDER.onerror = function (e) {
-            console.error('media recorder error', e)
+            console.error('[startRecording] media recorder error', e)
             reject('Error on MEDIA_RECORDER')
         }
         MEDIA_RECORDER.onstart = function (_e) {
@@ -113,18 +100,44 @@ export async function startRecording(): Promise<number> {
     return await events
 }
 
-export async function stop() {
+export async function stop(): Promise<void> {
     console.log('media recorder stop')
-    MEDIA_RECORDER.stop()
+    const on_stop = new Promise<void>((resolve, reject) => {
+        MEDIA_RECORDER.onstop = async function (_) {
+            await handleChunk(true).catch((e) => {
+                console.error('[handleChunk] Unexpected error:', e)
+                reject()
+            })
+            await waitUntilComplete().catch((e) => {
+                console.error('[waitUntilComplete] Unexpected error:', e)
+                reject()
+            })
+            console.log('[MEDIA_RECORDER.onstop] Promise succesful')
+            resolve()
+        }
+    })
     console.log('unset all stream')
-    unsetAllStream()
+    await unsetAllStream().catch((e) => {
+        console.error('[unsetAllStream] Unexpected error:', e)
+        throw e
+    })
+    MEDIA_RECORDER.stop()
 
-    while (!HANDLE_STOP_DONE) {
-        await sleep(1000)
-    }
+    return await on_stop
 }
 
-export async function waitUntilComplete(kill = false) {
+function newSerialQueue() {
+    return asyncLib.queue(async function (
+        task: () => Promise<void>,
+        done: any,
+    ) {
+        await task()
+        done()
+    },
+    1)
+}
+
+async function waitUntilComplete(kill = false) {
     const spokeSession = SESSION!
 
     console.log('[waitForUpload]'.concat('after patch moment pending'))
@@ -143,16 +156,6 @@ export async function waitUntilComplete(kill = false) {
         await spokeSession.upload_queue.drain()
         console.log('[waitForUpload] after transcribe queue drain')
     }
-}
-
-async function handleStop(this: MediaRecorder, _e: Event) {
-    console.log('[handle stop]')
-    const spokeSession = SESSION!
-    if (spokeSession) {
-        await handleChunk(true)
-    }
-
-    HANDLE_STOP_DONE = true
 }
 
 async function unsetAllStream(): Promise<void> {
@@ -187,7 +190,7 @@ async function handleChunk(isFinal: boolean) {
 async function sendDataChunks(
     spokeSession: SpokeSession,
     file: File,
-    isFinal: boolean,
+    _isFinal: boolean,
 ) {
     try {
         try {

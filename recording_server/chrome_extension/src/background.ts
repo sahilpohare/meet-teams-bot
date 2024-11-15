@@ -50,20 +50,13 @@ export async function start_speakers_observer(
     )
 }
 
-export async function stopMediaRecorder() {
-    await record.stop()
+export async function stopMediaRecorder(): Promise<void> {
+    return await record.stop()
 }
 
 // Stop the Audio Recording
 export async function stopAudioStreaming() {
     SoundStreamer.instance?.stop()
-}
-
-export async function waitForUpload() {
-    await record.waitUntilComplete().catch((e) => {
-        console.error('error in waitUntilComplete', e)
-        throw e
-    })
 }
 
 function setUserAgent(window: Window, userAgent: string) {
@@ -102,8 +95,7 @@ setUserAgent(
 )
 
 const w = window as any
-w.startRecording = startRecording
-w.stopMediaRecorder = stopMediaRecorder
-w.waitForUpload = waitForUpload
-w.stopAudioStreaming = stopAudioStreaming
-w.start_speakers_observer = start_speakers_observer
+w.startRecording = startRecording // Start screen recording
+w.stopMediaRecorder = stopMediaRecorder // stop screen recording
+w.stopAudioStreaming = stopAudioStreaming // Stop audio streaming
+w.start_speakers_observer = start_speakers_observer // Start obs speaker and remoce shitty

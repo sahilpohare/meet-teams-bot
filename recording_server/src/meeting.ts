@@ -437,13 +437,7 @@ export class MeetingHandle extends Console {
     private async stopRecordingInternal() {
         let { page, meetingTimeoutInterval, browser, backgroundPage } =
             this.meeting
-        this.log('before stopMediaRecorder')
-        await backgroundPage!.evaluate(async () => {
-            const w = window as any
-            await w.stopMediaRecorder()
-        })
-
-        // add a last fake speaker to trigger the upload of the last editor ( generates an interval )
+        // Terminate transcript
         await uploadTranscriptTask(
             {
                 name: 'END',
@@ -453,7 +447,20 @@ export class MeetingHandle extends Console {
             } as SpeakerData,
             true,
         )
-        this.log('after stopMediaRecorder')
+        this.log('before stopMediaRecorder')
+        let result: boolean = await backgroundPage!.evaluate(async () => {
+            const w = window as any
+            try {
+                await w.stopMediaRecorder()
+                return true
+            } catch (_e) {
+                return false
+            }
+        })
+        if (!result) {
+            this.error(`Unexpected error when stoping MediaRecorder`)
+        }
+        this.log(`after stopMediaRecorder`)
         try {
             await page!.goto('about:blank')
         } catch (e) {
@@ -470,13 +477,6 @@ export class MeetingHandle extends Console {
         } catch (e) {
             this.error(`Failed to close page: ${e}`)
         }
-
-        this.log('before waitForUpload')
-        await backgroundPage!.evaluate(async () => {
-            const w = window as any
-            await w.waitForUpload()
-        })
-        this.log('after waitForUpload')
 
         await WordsPoster.TRANSCRIBER?.stop().catch((e) => {
             this.error(`Cannot stop Transcriber: ${e}`)

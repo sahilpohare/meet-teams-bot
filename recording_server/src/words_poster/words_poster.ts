@@ -78,6 +78,7 @@ export class WordsPoster extends Console {
 
     // Request the latest transcription and stop the transcriber for good.
     public async stop(): Promise<void> {
+        this.log('stop called')
         this.rebootTimer = setInterval(() => {})
         this.transcribeQueue.push(async () => {
             await WordsPoster.TRANSCRIBER?.transcribe(true)
