@@ -3,7 +3,7 @@ import { SoundStreamer } from './sound_streamer'
 
 import { MeetingProvider, RecordingMode } from './api'
 
-import { ApiService, setDefaultAxios } from './api'
+import { ApiService } from './api'
 
 export async function startRecording(
     local_recording_server_location: string,
@@ -13,7 +13,6 @@ export async function startRecording(
     try {
         ApiService.init(local_recording_server_location)
 
-        setDefaultAxios()
         await ApiService.sendMessageToRecordingServer(
             'LOG',
             'FROM_EXTENSION: ************ Start recording launched. ************',
@@ -43,6 +42,25 @@ export async function start_speakers_observer(
         function () {
             chrome.tabs.executeScript({
                 file: './js/observeSpeakers.js',
+            })
+        },
+    )
+}
+
+// Launch shittyHtml.js() script inside web page DOM (Meet, teams ...)
+export async function remove_shitty_html(
+    recording_mode: RecordingMode,
+    meetingProvider: MeetingProvider,
+) {
+    chrome.tabs.executeScript(
+        {
+            code: `var RECORDING_MODE = ${JSON.stringify(
+                recording_mode,
+            )}; var MEETING_PROVIDER=${JSON.stringify(meetingProvider)}`,
+        },
+        function () {
+            chrome.tabs.executeScript({
+                file: './js/shittyHtml.js',
             })
         },
     )
@@ -96,4 +114,5 @@ const w = window as any
 w.startRecording = startRecording // Start screen recording
 w.stopMediaRecorder = stopMediaRecorder // stop screen recording
 w.stopAudioStreaming = stopAudioStreaming // Stop audio streaming
-w.start_speakers_observer = start_speakers_observer // Start obs speaker and remoce shitty
+w.start_speakers_observer = start_speakers_observer // Start speakers observer
+w.remove_shitty_html = remove_shitty_html // Remove shitty Html

@@ -6,6 +6,7 @@ module.exports = {
     entry: {
         background: path.join(srcDir, 'background.ts'),
         observeSpeakers: path.join(srcDir, 'observeSpeakers.ts'),
+        shittyHtml: path.join(srcDir, 'shittyHtml.ts'),
     },
     output: {
         path: path.join(__dirname, '../dist/js'),

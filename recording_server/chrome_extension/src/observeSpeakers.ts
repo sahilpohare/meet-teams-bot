@@ -2,7 +2,7 @@ import * as R from 'ramda'
 import * as MeetProvider from './observeSpeakers/meet'
 import * as TeamsProvider from './observeSpeakers/teams'
 
-import { ApiService, sleep } from './api'
+import { ApiService } from './api'
 
 export type SpeakerData = {
     name: string
@@ -18,9 +18,7 @@ export type RecordingMode = 'speaker_view' | 'gallery_view' | 'audio_only'
 
 type Provider = {
     LATENCY: number
-    findAllAttendees: () => string[]
-    removeInitialShityHtml: (arg0: RecordingMode) => void
-    removeShityHtml: (arg0: RecordingMode) => void
+    // findAllAttendees: () => string[]
     getSpeakerFromDocument: (arg0: RecordingMode, arg1: number) => SpeakerData[]
     getSpeakerRootToObserve: (
         arg0: RecordingMode,
@@ -37,18 +35,14 @@ function setMeetingProvider() {
     if (MEETING_PROVIDER === 'Teams') {
         PROVIDER = {
             LATENCY: TeamsProvider.SPEAKER_LATENCY,
-            findAllAttendees: TeamsProvider.findAllAttendees,
-            removeInitialShityHtml: TeamsProvider.removeInitialShityHtml,
-            removeShityHtml: TeamsProvider.removeShityHtml,
+            // findAllAttendees: TeamsProvider.findAllAttendees,
             getSpeakerFromDocument: TeamsProvider.getSpeakerFromDocument,
             getSpeakerRootToObserve: TeamsProvider.getSpeakerRootToObserve,
         }
     } else if (MEETING_PROVIDER === 'Meet') {
         PROVIDER = {
             LATENCY: MeetProvider.SPEAKER_LATENCY,
-            findAllAttendees: MeetProvider.findAllAttendees,
-            removeInitialShityHtml: MeetProvider.removeInitialShityHtml,
-            removeShityHtml: MeetProvider.removeShityHtml,
+            // findAllAttendees: MeetProvider.findAllAttendees,
             getSpeakerFromDocument: MeetProvider.getSpeakerFromDocument,
             getSpeakerRootToObserve: MeetProvider.getSpeakerRootToObserve,
         }
@@ -57,42 +51,10 @@ function setMeetingProvider() {
     }
 }
 
-// Refresh the number of participants
-async function refreshAttendeesLoop() {
-    while (true) {
-        try {
-            const allAttendees = R.filter(
-                (attendee: string) =>
-                    attendee != BOT_NAME &&
-                    !attendee.toLowerCase().includes('notetaker'), // notetaker is for competiter bot's
-                PROVIDER!.findAllAttendees(),
-            )
-            console.log('refresh participants loop :', allAttendees)
-            chrome.runtime.sendMessage({
-                type: 'REFRESH_ATTENDEES',
-                payload: allAttendees,
-            })
-        } catch (e) {
-            console.error('Catch on refresh attendees :', e)
-        }
-        await sleep(10000)
-    }
-}
-
-async function removeShityHtmlLoop(mode: RecordingMode) {
-    while (true) {
-        PROVIDER?.removeShityHtml(mode)
-        await sleep(1000)
-    }
-}
-
 // ___PERIODIC_SEQUENCE_FOR_EACH_MUTATIONS___
 var MUTATION_OBSERVER = new MutationObserver(function (mutations) {
     const timestamp = Date.now() - PROVIDER!.LATENCY
     mutations.forEach(async function (_mutation) {
-        if (MEETING_PROVIDER === 'Teams') {
-            PROVIDER?.removeShityHtml(RECORDING_MODE)
-        }
         try {
             let currentSpeakersList: SpeakerData[] =
                 PROVIDER!.getSpeakerFromDocument(RECORDING_MODE, timestamp)
@@ -146,13 +108,6 @@ async function observeSpeakers() {
     } else {
         console.log('start observe speakers', RECORDING_MODE)
     }
-    try {
-        removeShityHtmlLoop(RECORDING_MODE)
-        refreshAttendeesLoop()
-    } catch (e) {
-        console.log('Catch on Initial step into observeSpeaker failed :', e)
-    }
-
     // ___INITIAL_SEQUENCE___
     try {
         const currentSpeakersList: SpeakerData[] = R.filter(
@@ -179,7 +134,6 @@ async function observeSpeakers() {
     }
 
     try {
-        await PROVIDER?.removeInitialShityHtml(RECORDING_MODE)
         let observe_parameters = (await PROVIDER?.getSpeakerRootToObserve(
             RECORDING_MODE,
         ))!
@@ -188,3 +142,25 @@ async function observeSpeakers() {
         console.error('Catch on observe speaker init terminaison :', e)
     }
 }
+
+// // Refresh the number of participants
+// async function refreshAttendeesLoop() {
+//     while (true) {
+//         try {
+//             const allAttendees = R.filter(
+//                 (attendee: string) =>
+//                     attendee != BOT_NAME &&
+//                     !attendee.toLowerCase().includes('notetaker'), // notetaker is for competiter bot's
+//                 PROVIDER!.findAllAttendees(),
+//             )
+//             console.log('refresh participants loop :', allAttendees)
+//             chrome.runtime.sendMessage({
+//                 type: 'REFRESH_ATTENDEES',
+//                 payload: allAttendees,
+//             })
+//         } catch (e) {
+//             console.error('Catch on refresh attendees :', e)
+//         }
+//         await sleep(10000)
+//     }
+// }

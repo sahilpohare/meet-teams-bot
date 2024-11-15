@@ -1,5 +1,4 @@
 import axios from 'axios'
-import * as rax from 'retry-axios'
 
 export type MeetingProvider = 'Zoom' | 'Meet' | 'Teams'
 
@@ -13,47 +12,6 @@ export const sleep = (milliseconds: number) => {
 }
 
 export type RecordingMode = 'speaker_view' | 'gallery_view' | 'audio_only'
-
-export function setDefaultAxios() {
-    // This file set the default config of axios
-    axios.defaults.withCredentials = true
-
-    axios.defaults.raxConfig = {
-        instance: axios,
-        retry: 5, // Number of retry attempts
-        backoffType: 'exponential',
-        noResponseRetries: 2, // Number of retries for no responses
-        retryDelay: 1000, // Delay between each retry in milliseconds
-        httpMethodsToRetry: ['GET', 'HEAD', 'OPTIONS', 'DELETE', 'PUT', 'POST'],
-        statusCodesToRetry: [
-            [100, 199],
-            [400, 499],
-            [500, 599],
-        ],
-        onRetryAttempt,
-    }
-    rax.attach()
-    //Add a response interceptor wich is trigger by after all server response
-}
-
-function onRetryAttempt(err: any) {
-    const cfg = rax.getConfig(err)
-    const response = err.response && err.response.data ? err.response.data : err
-    const request = err.request
-
-    console.log(
-        'Tentative de nouvelle essai #',
-        cfg && cfg.currentRetryAttempt,
-        {
-            url: request.url,
-            method: request.method,
-            params: request.params,
-            headers: request.headers,
-            data: request.data,
-            response: response,
-        },
-    )
-}
 
 export class ApiService {
     private static RecordingServerLocation: string | null = null

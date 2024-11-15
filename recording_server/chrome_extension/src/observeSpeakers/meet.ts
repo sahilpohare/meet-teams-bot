@@ -247,61 +247,10 @@ export function getSpeakerFromDocument(
     }
 }
 
-export async function removeInitialShityHtml(mode: RecordingMode) {
-    let div
-    try {
-        for (div of document.getElementsByTagName('div')) {
-            if (
-                div.clientHeight === 132 &&
-                (div.clientWidth === 235 || div.clientWidth === 234)
-            ) {
-                div.style.display = 'none'
-            }
-        }
-    } catch (e) {}
-    try {
-        for (div of document.getElementsByTagName('div')) {
-            if (div.clientWidth === 360 && div.clientHeight === 326) {
-                div.style.display = 'none'
-            }
-        }
-    } catch (e) {}
-    try {
-        for (div of document.getElementsByTagName('div')) {
-            if (div.clientHeight === 26) {
-                div.style.display = 'none'
-            }
-        }
-    } catch (e) {}
-    try {
-        for (div of document.getElementsByTagName('div')) {
-            if (div.clientHeight === 20) {
-                div.style.display = 'none'
-            }
-        }
-    } catch (e) {}
-    try {
-        let span
-        for (span of document.getElementsByTagName('span')) {
-            if (span.innerText.includes(':')) {
-                span.parentElement.parentElement.style.display = 'none'
-            }
-        }
-    } catch (e) {}
-    try {
-        removeBlackBox()
-    } catch (e) {
-        console.error('Error with removeBlackBox:', e)
-    }
-    try {
-        const politeDivs = document.querySelectorAll('div[aria-live="polite"]')
-        politeDivs.forEach((div) => {
-            ;(div as HTMLElement).style.opacity = '0'
-        })
-    } catch (e) {
-        console.error('Error setting opacity for aria-live="polite" divs:', e)
-    }
+// export function findAllAttendees(): string[] {
+//     let images = document.querySelectorAll('img')
 
+<<<<<<< HEAD
     try {
         const bannerDiv = document.querySelector(
             'div[role="banner"]',
@@ -529,3 +478,28 @@ function applyStylesRecursively(
 
     applyStylesRecursively(element.parentElement, depth - 1)
 }
+=======
+//     let participants = Array.from(images).filter(
+//         (img) => img.clientWidth === 32 && img.clientHeight === 32,
+//     )
+//     const names: string[] = []
+//     // https://www.lifewire.com/change-your-name-on-google-meet-5112077
+//     for (const participant of participants) {
+//         let currentElement: any = participant
+
+//         while (currentElement) {
+//             // Check if this parent has a child span
+//             const span = currentElement.querySelector('span')
+//             if (span) {
+//                 // Found a parent with a child span
+//                 names.push(span.innerText)
+//                 break
+//             }
+
+//             // Move to the next parent
+//             currentElement = currentElement.parentElement
+//         }
+//     }
+//     return names
+// }
+>>>>>>> 65c9b9f83 (Shitty HTML files)
