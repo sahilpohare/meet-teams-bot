@@ -28,7 +28,7 @@ function newSerialQueue() {
 
 export async function initMediaRecorder(
     streaming_output: string | undefined,
-    streaming_audio_frequency: number | undefined,
+    streaming_audio_frequency?: number,
 ): Promise<void> {
     const fps = 30
 

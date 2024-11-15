@@ -7,7 +7,8 @@ import { ApiService, setDefaultAxios } from './api'
 
 export async function startRecording(
     local_recording_server_location: string,
-    streaming_audio_frequency: number | undefined,
+    streaming_output?: string,
+    streaming_audio_frequency?: number,
 ): Promise<number> {
     try {
         ApiService.init(local_recording_server_location)
@@ -18,7 +19,8 @@ export async function startRecording(
             'FROM_EXTENSION: ************ Start recording launched. ************',
         )
         await sleep(1000)
-        await record.initMediaRecorder(local_recording_server_location, streaming_audio_frequency)
+
+        await record.initMediaRecorder(streaming_output, streaming_audio_frequency)
         return await record.startRecording()
     } catch (e) {
         console.log('ERROR while start recording', JSON.stringify(e))
@@ -27,7 +29,7 @@ export async function startRecording(
 }
 
 // Launch observeSpeakers.js() script inside web page DOM (Meet, teams ...)
-export function start_speakers_observer(
+export async function start_speakers_observer(
     recording_mode: RecordingMode,
     bot_name: string,
     meetingProvider: MeetingProvider,

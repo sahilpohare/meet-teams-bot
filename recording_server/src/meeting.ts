@@ -252,7 +252,11 @@ export class MeetingHandle extends Console {
                     async (meuh) => {
                         try {
                             const w = window as any
-                            let res = await w.startRecording(meuh)
+                            let res = await w.startRecording(
+                                meuh.local_recording_server_location,
+                                meuh.streaming_output,
+                                meuh.streaming_audio_frequency,
+                            )
                             return res as number
                         } catch (error) {
                             return error as string
@@ -261,6 +265,7 @@ export class MeetingHandle extends Console {
                     {
                         local_recording_server_location:
                             this.param.local_recording_server_location,
+                        streaming_output: this.param.streaming_output,
                         streaming_audio_frequency:
                             this.param.streaming_audio_frequency,
                     },
@@ -281,7 +286,11 @@ export class MeetingHandle extends Console {
             await this.meeting.backgroundPage.evaluate(
                 async (params) => {
                     const w = window as any
-                    await w.start_speakers_observer(params)
+                    await w.start_speakers_observer(
+                        params.recording_mode,
+                        params.bot_name,
+                        params.meetingProvider,
+                    )
                 },
                 {
                     recording_mode: this.param.recording_mode,
