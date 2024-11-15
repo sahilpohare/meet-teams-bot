@@ -283,6 +283,7 @@ export class MeetingHandle extends Console {
             })
 
             // Start to observe speakers
+            // TODO : Is it good to start observer_speaker witch remove nasty shitty HTML after record ?
             await this.meeting.backgroundPage.evaluate(
                 async (params) => {
                     const w = window as any
