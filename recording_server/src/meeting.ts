@@ -238,6 +238,19 @@ export class MeetingHandle extends Console {
             listenPage(this.meeting.backgroundPage)
             await Events.inCallNotRecording()
 
+            // Start transcoder
+            await TRANSCODER.init(
+                process.env.AWS_S3_BUCKET,
+                this.param.mp4_s3_path,
+            ).catch((e) => {
+                this.error(`Cannot start Transcoder: ${e}`)
+            })
+
+            // Start WordPoster for transcribing
+            await WordsPoster.init(this.param).catch((e) => {
+                this.error(`Cannot start Transcriber: ${e}`)
+            })
+
             // First, remove Shitty Html...
             await this.meeting.backgroundPage.evaluate(
                 async (params) => {
@@ -301,19 +314,6 @@ export class MeetingHandle extends Console {
                     meetingProvider: this.param.meetingProvider,
                 },
             )
-
-            // Start transcoder
-            await TRANSCODER.init(
-                process.env.AWS_S3_BUCKET,
-                this.param.mp4_s3_path,
-            ).catch((e) => {
-                this.error(`Cannot start Transcoder: ${e}`)
-            })
-
-            // Start WordPoster for transcribing
-            await WordsPoster.init(this.param).catch((e) => {
-                this.error(`Cannot start Transcriber: ${e}`)
-            })
             this.log('startRecording called')
             // Send recording confirmation webhook
             await Events.inCallRecording()
