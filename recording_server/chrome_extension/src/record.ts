@@ -4,7 +4,6 @@ import { parameters } from './background'
 import { newSerialQueue } from './queue'
 import { ApiService } from './recordingServerApi'
 import { SoundStreamer } from './sound_streamer'
-import * as State from './state'
 import { Transcriber } from './Transcribe/Transcriber'
 
 const STREAM: MediaStream | null = null
@@ -92,49 +91,34 @@ export async function initMediaRecorder(
     })
 }
 
-export async function startRecording(): Promise<void> {
+export async function startRecording(): Promise<number> {
     await ApiService.sendMessageToRecordingServer('START_TRANSCODER', {
         bucketName: parameters.s3_bucket,
         videoS3Path: parameters.mp4_s3_path,
     })
 
-    MEDIA_RECORDER.onerror = function (e) {
-        console.error('media recorder error', e)
-    }
-    MEDIA_RECORDER.onstart = function (_e) {
-        const now = Date.now()
-        const newSession = {
-            upload_queue: newSerialQueue(),
-            cut_times: [now],
-            start_timestamp: now,
-            transcripts: [],
-            words: [],
+    const events = new Promise<number>((resolve, reject) => {
+        MEDIA_RECORDER.onerror = function (e) {
+            console.error('media recorder error', e)
+            reject('Error on MEDIA_RECORDER')
         }
-        SESSION = newSession
-        START_RECORD_TIMESTAMP = now
-
-        // Launch observeSpeakers.js() script inside web page DOM (Meet, teams ...)
-        function observeSpeakers() {
-            chrome.tabs.executeScript(
-                {
-                    code: `var RECORDING_MODE = ${JSON.stringify(
-                        State.parameters.recording_mode,
-                    )}; var BOT_NAME = ${JSON.stringify(
-                        State.parameters.bot_name,
-                    )}; var MEETING_PROVIDER=${JSON.stringify(
-                        State.parameters.meetingProvider,
-                    )}`,
-                },
-                function () {
-                    chrome.tabs.executeScript({
-                        file: './js/observeSpeakers.js',
-                    })
-                },
-            )
+        MEDIA_RECORDER.onstart = function (_e) {
+            const now = Date.now()
+            const newSession = {
+                upload_queue: newSerialQueue(),
+                cut_times: [now],
+                start_timestamp: now,
+                transcripts: [],
+                words: [],
+            }
+            SESSION = newSession
+            START_RECORD_TIMESTAMP = now
+            resolve(START_RECORD_TIMESTAMP)
         }
-        observeSpeakers()
-    }
+    })
     MEDIA_RECORDER.start(10000)
+
+    return await events
 }
 
 export async function stop() {

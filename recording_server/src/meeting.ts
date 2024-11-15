@@ -23,6 +23,7 @@ import { MeetProvider } from './meeting/meet'
 import { TeamsProvider } from './meeting/teams'
 import { ZoomProvider } from './meeting/zoom'
 import { Console, sleep } from './utils'
+import { uploadTranscriptTask } from './uploadTranscripts'
 
 let _NO_SPEAKER_DETECTED_TIMESTAMP: number | null = null
 export const NO_SPEAKER_DETECTED_TIMESTAMP = {
@@ -114,12 +115,6 @@ export class MeetingHandle extends Console {
     }
     static getBotId(): string {
         return MeetingHandle.instance.param.bot_uuid
-    }
-    static async addSpeaker(speaker: SpeakerData) {
-        await MeetingHandle.instance.meeting.backgroundPage!.evaluate((x) => {
-            const w = window as any
-            return w.addSpeaker(x)
-        }, speaker)
     }
     static stopAudioStreaming() {
         MeetingHandle.instance.meeting.backgroundPage!.evaluate(() => {
@@ -241,16 +236,16 @@ export class MeetingHandle extends Console {
             listenPage(this.meeting.backgroundPage)
             await Events.inCallNotRecording()
 
-            if (
-                (await this.meeting.backgroundPage.evaluate(
+            // Start recording
+            let result: string | number =
+                await this.meeting.backgroundPage.evaluate(
                     async (meuh) => {
                         try {
                             const w = window as any
-                            await w.startRecording(meuh)
-                            return true
+                            let res = await w.startRecording(meuh)
+                            return res as number
                         } catch (error) {
-                            this.error(error)
-                            return false
+                            return error as string
                         }
                     },
                     {
@@ -258,13 +253,21 @@ export class MeetingHandle extends Console {
                         s3_bucket: process.env.AWS_S3_VIDEO_BUCKET,
                         api_server_baseurl: process.env.API_SERVER_BASEURL,
                     },
-                )) === false
-            ) {
+                )
+            if (typeof result === 'number') {
+                this.info(`START_RECORDING_TIMESTAMP = ${result}`)
+                START_RECORDING_TIMESTAMP.set(result)
+            } else {
+                this.error(`Unexpected error: ${result}`)
                 throw new JoinError(JoinErrorCode.Internal)
             }
-
-            START_RECORDING_TIMESTAMP.set(Date.now())
+            // Start to observe speakers
+            await this.meeting.backgroundPage.evaluate(async () => {
+                const w = window as any
+                await w.start_speakers_observer()
+            })
             this.log('startRecording called')
+            // Send recording confirmation webhook
             await Events.inCallRecording()
         } catch (error) {
             await this.cleanEverything()
@@ -407,6 +410,17 @@ export class MeetingHandle extends Console {
             const w = window as any
             await w.stopMediaRecorder()
         })
+
+        // add a last fake speaker to trigger the upload of the last editor ( generates an interval )
+        await uploadTranscriptTask(
+            {
+                name: 'END',
+                id: 0,
+                timestamp: Date.now(),
+                isSpeaking: false,
+            } as SpeakerData,
+            true,
+        )
         this.log('after stopMediaRecorder')
         try {
             await page!.goto('about:blank')

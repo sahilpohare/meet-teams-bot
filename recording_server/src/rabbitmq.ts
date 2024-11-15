@@ -6,7 +6,6 @@ import {
     setSessionInRedis,
 } from './instance'
 
-import axios from 'axios'
 import { Events } from './events'
 import { Logger } from './logger'
 import { MeetingHandle } from './meeting'
@@ -14,6 +13,9 @@ import { Streaming } from './streaming'
 import { MeetingParams, MeetingProvider } from './types'
 
 import { server } from './server'
+
+
+import { Api } from './api/methods'
 
 const NODE_NAME = process.env.NODE_NAME
 
@@ -72,8 +74,8 @@ export class Consumer {
                         let logger = new Logger(meetingParams)
                         await logger.init()
 
-                        axios.defaults.headers.common['Authorization'] =
-                            meetingParams.user_token
+                        new Api(meetingParams)
+
                         let error = null
                         try {
                             console.log("awaiting handler...")

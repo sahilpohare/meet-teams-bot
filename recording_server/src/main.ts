@@ -14,7 +14,7 @@ import { exit } from 'process'
 import { Consumer } from './rabbitmq'
 import { TRANSCODER } from './transcoder'
 import { MeetingParams } from './types'
-import { endMeetingTrampoline } from './api'
+import { Api } from './api/methods'
 
 import { spawn } from 'child_process'
 
@@ -114,11 +114,9 @@ console.log('version 0.0.1')
                 console.log(
                     `${Date.now()} Finalize project && Sending WebHook complete`,
                 )
-                await endMeetingTrampoline(consumeResult.params.bot_uuid).catch(
-                    (e) => {
-                        console.error('error in endMeetingTranpoline', e)
-                    },
-                )
+                await Api.instance.endMeetingTrampoline().catch((e) => {
+                    console.error('error in endMeetingTranpoline', e)
+                })
             }
         } else {
             // Configuring and launching LINUX ZOOM SDK

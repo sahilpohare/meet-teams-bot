@@ -1,26 +1,9 @@
 //! IMPORTANT : That file contains a lot of server dependencies.
-
 import axios from 'axios'
-import {
-    ChangeableTranscript,
-    GetableBot,
-    PostableTranscript,
-    QueryableTranscript,
-    RecognizerWord,
-    Word,
-} from './types'
+import { GetableBot, RecognizerWord, Word } from './types'
 
 export type ExtractPreview = {
     s3_path: string
-}
-
-export async function getBot(bot_uuid: string): Promise<GetableBot> {
-    return (
-        await axios({
-            method: 'GET',
-            url: `/bots/${bot_uuid}`,
-        })
-    ).data
 }
 
 export async function postWords(
@@ -36,26 +19,11 @@ export async function postWords(
     ).data
 }
 
-export async function postTranscript(
-    transcript: PostableTranscript,
-): Promise<QueryableTranscript> {
+export async function getBot(bot_uuid: string): Promise<GetableBot> {
     return (
         await axios({
-            method: 'POST',
-            url: `/bots/transcripts`,
-            data: transcript,
-        })
-    ).data
-}
-
-export async function patchTranscript(
-    transcript: ChangeableTranscript,
-): Promise<QueryableTranscript> {
-    return (
-        await axios({
-            method: 'PATCH',
-            url: `/bots/transcripts`,
-            data: transcript,
+            method: 'GET',
+            url: `/bots/${bot_uuid}`,
         })
     ).data
 }

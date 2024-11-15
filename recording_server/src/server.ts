@@ -25,6 +25,7 @@ import { MeetingHandle } from './meeting'
 import { ZOOM_RECORDING_APPROVAL_STATUS } from './meeting/zoom'
 import { Streaming } from './streaming'
 import { TRANSCODER } from './transcoder'
+import { uploadTranscriptTask } from './uploadTranscripts'
 
 console.log('redis url: ', process.env.REDIS_URL)
 export const clientRedis = redis.createClient({
@@ -155,7 +156,7 @@ export async function server() {
                 )
                 if (active_speaker.name !== CUR_SPEAKER?.name) {
                     // Change of speaker case
-                    await MeetingHandle.addSpeaker(active_speaker)
+                    uploadTranscriptTask(active_speaker, false)
                 } else {
                     if (CUR_SPEAKER!.isSpeaking === false) {
                         // The speaker was no longer speaking
@@ -165,7 +166,7 @@ export async function server() {
                         ) {
                             // Update the information that the speaker has started speaking again.
                             // Make a break between sentences.
-                            await MeetingHandle.addSpeaker(active_speaker)
+                            uploadTranscriptTask(active_speaker, false)
                         }
                     } else {
                         // Speaker is already on speaking : Dont do anything
@@ -208,7 +209,7 @@ export async function server() {
                         ) {
                             // Update the information that the speaker has started speaking again.
                             // Make a break between sentences.
-                            MeetingHandle.addSpeaker(active_speaker)
+                            uploadTranscriptTask(active_speaker, false)
                         }
                     } else {
                         // Speaker is already on speaking : Dont do anything
@@ -219,7 +220,7 @@ export async function server() {
                     const active_speaker = speakers.find(
                         (v) => v.isSpeaking === true,
                     )
-                    MeetingHandle.addSpeaker(active_speaker)
+                    uploadTranscriptTask(active_speaker, false)
                     CUR_SPEAKER = active_speaker
                 }
         }

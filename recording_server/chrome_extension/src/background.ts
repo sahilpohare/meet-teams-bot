@@ -2,13 +2,11 @@ import * as record from './record'
 import { SoundStreamer } from './sound_streamer'
 import * as State from './state'
 
-import { SpokeApiConfig, api, setConfig, sleep } from './api'
+import { SpokeApiConfig, setConfig, sleep } from './api'
 
 import axios from 'axios'
-import { SpeakerData } from './observeSpeakers'
 import { ApiService } from './recordingServerApi'
 import { Transcriber } from './Transcribe/Transcriber'
-import { uploadTranscriptTask } from './uploadTranscripts'
 
 export let ATTENDEES: string[] = []
 
@@ -48,14 +46,6 @@ function setUserAgent(window: Window, userAgent: string) {
     }
 }
 
-// IMPORTANT : For reasons of current compatibility, this function is only called
-// with a single speaker and not an array of multiple speakers. Handling multiple
-// speakers should be implemented at some point.
-async function addSpeaker(speaker: SpeakerData) {
-    // console.log('EXTENSION BACKGROUND PAGE - ADD SPEAKER :', speaker)
-    await uploadTranscriptTask(speaker, false)
-}
-
 setUserAgent(
     window,
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36',
@@ -82,11 +72,9 @@ function addListener() {
     })
 }
 
-// make startRecording accessible from puppeteer
-// Start recording the current tab
 export async function startRecording(
     meetingParams: State.MeetingParams,
-): Promise<void> {
+): Promise<number> {
     try {
         ApiService.init(meetingParams.local_recording_server_location)
         State.addMeetingParams(meetingParams)
@@ -103,28 +91,40 @@ export async function startRecording(
             'FROM_EXTENSION: ************ Start recording launched. ************',
         )
         await sleep(1000)
+
         await record.initMediaRecorder(
             meetingParams.streaming_output,
             meetingParams.streaming_audio_frequency,
         )
-        await record.startRecording()
+        return await record.startRecording()
     } catch (e) {
         console.log('ERROR while start recording', JSON.stringify(e))
+        throw e
     }
+}
+
+// Launch observeSpeakers.js() script inside web page DOM (Meet, teams ...)
+export function start_speakers_observer() {
+    chrome.tabs.executeScript(
+        {
+            code: `var RECORDING_MODE = ${JSON.stringify(
+                State.parameters.recording_mode,
+            )}; var BOT_NAME = ${JSON.stringify(
+                State.parameters.bot_name,
+            )}; var MEETING_PROVIDER=${JSON.stringify(
+                State.parameters.meetingProvider,
+            )}`,
+        },
+        function () {
+            chrome.tabs.executeScript({
+                file: './js/observeSpeakers.js',
+            })
+        },
+    )
 }
 
 export async function stopMediaRecorder() {
     await record.stop()
-    // add a last fake speaker to trigger the upload of the last editor ( generates an interval )
-    await uploadTranscriptTask(
-        {
-            name: 'END',
-            id: 0,
-            timestamp: Date.now(),
-            isSpeaking: false,
-        } as SpeakerData,
-        true,
-    )
 }
 
 // Stop the Audio Recording
@@ -145,10 +145,10 @@ export async function waitForUpload() {
 }
 
 const w = window as any
-w.addSpeaker = addSpeaker
 w.startRecording = startRecording
 w.stopMediaRecorder = stopMediaRecorder
 w.waitForUpload = waitForUpload
 w.stopAudioStreaming = stopAudioStreaming
+w.start_speakers_observer = start_speakers_observer
 
 addListener()
