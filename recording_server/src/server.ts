@@ -156,7 +156,7 @@ export async function server() {
                 )
                 if (active_speaker.name !== CUR_SPEAKER?.name) {
                     // Change of speaker case
-                    uploadTranscriptTask(active_speaker, false)
+                    await uploadTranscriptTask(active_speaker, false)
                 } else {
                     if (CUR_SPEAKER!.isSpeaking === false) {
                         // The speaker was no longer speaking
@@ -166,7 +166,7 @@ export async function server() {
                         ) {
                             // Update the information that the speaker has started speaking again.
                             // Make a break between sentences.
-                            uploadTranscriptTask(active_speaker, false)
+                            await uploadTranscriptTask(active_speaker, false)
                         }
                     } else {
                         // Speaker is already on speaking : Dont do anything
