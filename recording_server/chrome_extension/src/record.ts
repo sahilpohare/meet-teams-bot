@@ -140,21 +140,22 @@ function newSerialQueue() {
 async function waitUntilComplete(kill = false) {
     const spokeSession = SESSION!
 
-    console.log('[waitForUpload]'.concat('after patch moment pending'))
+    console.log('[waitUntilComplete]'.concat('after patch moment pending'))
 
     if (kill) {
-        console.log('[waitForUpload] killing')
+        console.log('[waitUntilComplete] killing')
         spokeSession.upload_queue.kill()
     } else {
         console.log(
-            '[waitForUpload] upload queue',
+            '[waitUntilComplete] upload queue',
             spokeSession.upload_queue.idle(),
         )
         spokeSession.upload_queue.push(async () => {
             return
         })
+        console.log('[waitUntilComplete] before transcribe queue drain')
         await spokeSession.upload_queue.drain()
-        console.log('[waitForUpload] after transcribe queue drain')
+        console.log('[waitUntilComplete] after transcribe queue drain')
     }
 }
 
