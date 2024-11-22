@@ -5,13 +5,32 @@ import { SpeakerData } from './types'
 
 import { START_RECORDING_TIMESTAMP } from './meeting'
 
+import * as asyncLib from 'async'
+
 var LAST_TRANSRIPT: ApiTypes.QueryableTranscript | null = null
 var TRANSCIBER_STOPED: boolean = false
+var TRANSCRIPT_QUEUE = newTranscriptQueue()
+
+function newTranscriptQueue() {
+    return asyncLib.queue(async function (
+        task: () => Promise<void>,
+        done: any,
+    ) {
+        await task()
+        done()
+    }, 1) // One operation at the same time
+}
 
 // IMPORTANT : For reasons of current compatibility, this function is only called
 // with a single speaker and not an array of multiple speakers. Handling multiple
 // speakers should be implemented at some point.
 export async function uploadTranscriptTask(speaker: SpeakerData, end: boolean) {
+    TRANSCRIPT_QUEUE.push(async () => {
+        await upload(speaker, end)
+    })
+}
+
+async function upload(speaker: SpeakerData, end: boolean) {
     if (TRANSCIBER_STOPED) {
         console.info('Transcriber is stoped')
         return
