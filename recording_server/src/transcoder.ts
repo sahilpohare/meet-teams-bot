@@ -57,7 +57,7 @@ class Transcoder extends Console {
             '-b:a',
             '128k',
             '-movflags',
-            '+faststart',
+            '+frag_keyframe+empty_moov',
             '-y',
             this.videoOutputPath,
             '-loglevel',
