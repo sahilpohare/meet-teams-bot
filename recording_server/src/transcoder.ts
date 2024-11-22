@@ -187,6 +187,10 @@ class Transcoder extends Console {
     }
 
     public async uploadChunk(chunk: Buffer): Promise<void> {
+        if (this.transcoder_successfully_stopped) {
+            this.log('Transcoder is in stop state!')
+            return
+        }
         if (!this.ffmpeg_process) {
             throw new Error('Transcoder not initialized')
         }
