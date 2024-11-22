@@ -91,7 +91,7 @@ async function removeShityHtmlLoop(mode: RecordingMode) {
 // ___PERIODIC_SEQUENCE_FOR_EACH_MUTATIONS___
 var MUTATION_OBSERVER = new MutationObserver(function (mutations) {
     const timestamp = Date.now() - PROVIDER!.LATENCY
-    mutations.forEach(function (_mutation) {
+    mutations.forEach(async function (_mutation) {
         if (parameters.meetingProvider === 'Teams') {
             PROVIDER?.removeShityHtml(RECORDING_MODE)
         }
@@ -124,7 +124,7 @@ var MUTATION_OBSERVER = new MutationObserver(function (mutations) {
             }
             // Send data only when a speakers change state is detected
             if (!areMapsEqual(CUR_SPEAKERS, new_speakers)) {
-                ApiService.sendMessageToRecordingServer(
+                await ApiService.sendMessageToRecordingServer(
                     'SPEAKERS',
                     currentSpeakersList,
                 ).catch((e) => {
@@ -167,7 +167,7 @@ async function observeSpeakers() {
 
         if (currentSpeakersList.length > 0) {
             // Send initial active speakers if present
-            ApiService.sendMessageToRecordingServer(
+            await ApiService.sendMessageToRecordingServer(
                 'SPEAKERS',
                 currentSpeakersList,
             ).catch((e) => {

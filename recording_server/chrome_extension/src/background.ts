@@ -51,9 +51,9 @@ function setUserAgent(window: Window, userAgent: string) {
 // IMPORTANT : For reasons of current compatibility, this function is only called
 // with a single speaker and not an array of multiple speakers. Handling multiple
 // speakers should be implemented at some point.
-function addSpeaker(speaker: SpeakerData) {
+async function addSpeaker(speaker: SpeakerData) {
     // console.log('EXTENSION BACKGROUND PAGE - ADD SPEAKER :', speaker)
-    uploadTranscriptTask(speaker, false)
+    await uploadTranscriptTask(speaker, false)
 }
 
 setUserAgent(

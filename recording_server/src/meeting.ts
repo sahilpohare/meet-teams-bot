@@ -115,8 +115,8 @@ export class MeetingHandle extends Console {
     static getBotId(): string {
         return MeetingHandle.instance.param.bot_uuid
     }
-    static addSpeaker(speaker: SpeakerData) {
-        MeetingHandle.instance.meeting.backgroundPage!.evaluate((x) => {
+    static async addSpeaker(speaker: SpeakerData) {
+        await MeetingHandle.instance.meeting.backgroundPage!.evaluate((x) => {
             const w = window as any
             return w.addSpeaker(x)
         }, speaker)

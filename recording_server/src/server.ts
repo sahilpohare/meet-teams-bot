@@ -149,7 +149,7 @@ export async function server() {
                 )
                 if (active_speaker.name !== CUR_SPEAKER?.name) {
                     // Change of speaker case
-                    MeetingHandle.addSpeaker(active_speaker)
+                    await MeetingHandle.addSpeaker(active_speaker)
                 } else {
                     if (CUR_SPEAKER!.isSpeaking === false) {
                         // The speaker was no longer speaking
@@ -159,7 +159,7 @@ export async function server() {
                         ) {
                             // Update the information that the speaker has started speaking again.
                             // Make a break between sentences.
-                            MeetingHandle.addSpeaker(active_speaker)
+                            await MeetingHandle.addSpeaker(active_speaker)
                         }
                     } else {
                         // Speaker is already on speaking : Dont do anything
