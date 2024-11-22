@@ -1,6 +1,6 @@
 import * as asyncLib from 'async'
 import { ApiService } from './api'
-import { SoundStreamer } from './sound_streamer'
+import { SoundStreamer } from './soundStreamer'
 
 const STREAM: MediaStream | null = null
 let RECORDED_CHUNKS: BlobEvent[] = []

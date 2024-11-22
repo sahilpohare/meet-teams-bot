@@ -1,5 +1,5 @@
 import * as record from './record'
-import { SoundStreamer } from './sound_streamer'
+import { SoundStreamer } from './soundStreamer'
 
 import { MeetingProvider, RecordingMode } from './api'
 
