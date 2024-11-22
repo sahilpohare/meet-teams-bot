@@ -68,7 +68,6 @@ export class Consumer {
 
                         let logger = new Logger(meetingParams)
                         await logger.init()
-                        await logger.periodic_logs_update()
 
                         axios.defaults.headers.common['Authorization'] =
                             meetingParams.user_token

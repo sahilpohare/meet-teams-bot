@@ -60,7 +60,7 @@ export function setProtection(enabled: boolean): Promise<void> {
 
 export async function terminateInstance() {
     try {
-        await Logger.instance.upload_log_script()
+        await Logger.instance.upload_log()
     } catch (e) {
         console.error('fail to upload logs: ', e)
     }

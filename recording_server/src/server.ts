@@ -24,6 +24,7 @@ import { MeetingHandle } from './meeting'
 import { ZOOM_RECORDING_APPROVAL_STATUS } from './meeting/zoom'
 import { Streaming } from './streaming'
 import { TRANSCODER } from './transcoder'
+import { Logger } from './logger'
 
 console.log('redis url: ', process.env.REDIS_URL)
 export const clientRedis = redis.createClient({
@@ -33,10 +34,6 @@ clientRedis.on('error', (err) => {
     console.error('Redis error:', err)
 })
 const HOST = '0.0.0.0'
-
-export const SPEAKER_LOG_PATHNAME = '../SeparationSpeakerLog.txt'
-
-console.log(`Speaker log pathname : ${SPEAKER_LOG_PATHNAME}`)
 
 const MEET_ORIGINS = [
     'https://meet.google.com',
@@ -117,7 +114,7 @@ export async function server() {
         Streaming.instance?.send_speaker_state(speakers)
         console.table(speakers)
         let input = JSON.stringify(speakers)
-        await fs.appendFile(SPEAKER_LOG_PATHNAME, `${input}\n`).catch((e) => {
+        await fs.appendFile(Logger.instance.get_speaker_log_directory(), `${input}\n`).catch((e) => {
             console.error(`Cannot append speaker log file ! : ${e}`)
         })
 

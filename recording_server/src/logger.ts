@@ -14,10 +14,8 @@ const execPromise = util.promisify(exec)
 import { Console } from './utils'
 import { MeetingParams } from './types'
 import { Page } from 'puppeteer'
-import { SPEAKER_LOG_PATHNAME } from './server'
 
 const EFS_MOUNT_POINT: string = '/mnt/efs'
-const LOG_UPDATE_INTERVAL: number = 5_000 // ms
 
 export class Logger extends Console {
     public static instance: Logger | null
@@ -47,10 +45,6 @@ export class Logger extends Console {
         })
     }
 
-    public async periodic_logs_update() {
-        setInterval(async () => await this.sync_logs(), LOG_UPDATE_INTERVAL)
-    }
-
     public async screenshot(page: Page, name: string) {
         try {
             const date = new Date()
@@ -65,8 +59,6 @@ export class Logger extends Console {
                 '',
             )}_${date}.jpg`
             await page.screenshot({ path: link })
-            // ___OLD_COPY_TO_S3___
-            // await s3cp(link, link.substring(2))
         } catch (e) {
             this.error(`Failed to take screenshot ${e}`)
         }
@@ -74,6 +66,10 @@ export class Logger extends Console {
 
     public get_video_directory(): string {
         return `${this.destination_dir}/output.mp4`
+    }
+
+    public get_speaker_log_directory(): string {
+        return `${this.destination_dir}/SeparationSpeakerLog.txt`
     }
 
     public async updateGrafanaAgentAddBotUuid() {
@@ -119,8 +115,29 @@ export class Logger extends Console {
             this.error('Cannot remove video : ', e)
         })
     }
-    public async upload_log_script() {
-        await this.sync_logs()
+
+    public async upload_log() {
+        let source_base_log: string = process.env.LOG_FILE
+        let destination_base_log: string = `${this.destination_dir}/logs.txt`
+
+        await fs
+            .readFile(source_base_log, 'utf-8')
+            .catch((e) => {
+                this.error(`Cannot read log file : ${e}`)
+            })
+            .then(async (log) => {
+                if (log) {
+                    await fs.writeFile(destination_base_log, log).catch((e) => {
+                        this.error(`Cannot Update log file : ${e}`)
+                    })
+                }
+            })
+    }
+}
+
+        // ___OLD_COPY_TO_S3___
+        // await s3cp(link, link.substring(2))
+
         // export function uploadLogScript(bot_id: string) {
         //     return new Promise<void>((res, _rej) => {
         //         exec(`upload_log.sh ${bot_id ?? ''}`, (_error, stdout, stderr) => {
@@ -137,10 +154,12 @@ export class Logger extends Console {
         // 	export LOG_FILE_S3=$1
         // fi
         // aws s3 cp "$LOG_FILE" "s3://spoke-log-zoom/$LOG_FILE_S3" --storage-class=ONEZONE_IA
-    }
 
-    public async upload_log() {
-        await this.sync_logs()
+        // ___OLD_UPLOAD_SEPARATION_SPEAKER_FILE_TO_S3
+        // await s3cp(separationLogPath, linkSpeakerSeparationFile).catch((e) {
+        //     console.error('failed to upload speaker file', e)
+        // })
+
         // ___OLD_UPLOAD_LOG_TO_s3___
         // const date = new Date()
         //     .toLocaleDateString('en-US', {
@@ -179,44 +198,3 @@ export class Logger extends Console {
         //         allScreenshotFiles.join(', '),
         //     )}`,
         // )
-    }
-
-    private async sync_logs() {
-        // ___OLD_UPLOAD_SEPARATION_SPEAKER_FILE_TO_S3
-        // await s3cp(separationLogPath, linkSpeakerSeparationFile).catch((e) {
-        //     console.error('failed to upload speaker file', e)
-        // })
-        let source_base_log: string = process.env.LOG_FILE
-        let source_speaker_log: string = SPEAKER_LOG_PATHNAME
-        let destination_base_log: string = `${this.destination_dir}/logs.txt`
-        let destination_speaker_log: string = `${this.destination_dir}/speaker_logs.txt`
-
-        await fs
-            .readFile(source_base_log, 'utf-8')
-            .catch((e) => {
-                this.error(`Cannot read log file : ${e}`)
-            })
-            .then(async (log) => {
-                if (log) {
-                    await fs.writeFile(destination_base_log, log).catch((e) => {
-                        this.error(`Cannot Update log file : ${e}`)
-                    })
-                }
-            })
-
-        await fs
-            .readFile(source_speaker_log, 'utf-8')
-            .catch((e) => {
-                this.warn(`Cannot read speaker_log file : ${e}`)
-            })
-            .then(async (log) => {
-                if (log) {
-                    await fs
-                        .writeFile(destination_speaker_log, log)
-                        .catch((e) => {
-                            this.error(`Cannot Update speaker_log file : ${e}`)
-                        })
-                }
-            })
-    }
-}
