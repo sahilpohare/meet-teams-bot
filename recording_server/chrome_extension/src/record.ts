@@ -76,7 +76,7 @@ export async function initMediaRecorder(
     })
 }
 
-export async function startRecording(): Promise<number> {
+export async function startRecording(chunkDuration: number): Promise<number> {
     const events = new Promise<number>((resolve, reject) => {
         MEDIA_RECORDER.onerror = function (e) {
             console.error('[startRecording] media recorder error', e)
@@ -95,7 +95,7 @@ export async function startRecording(): Promise<number> {
             resolve(start_recording_timestamp)
         }
     })
-    MEDIA_RECORDER.start(10000)
+    MEDIA_RECORDER.start(chunkDuration)
 
     return await events
 }

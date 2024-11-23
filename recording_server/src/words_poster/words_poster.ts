@@ -1,11 +1,10 @@
 import * as asyncLib from 'async'
 
 import { Api } from '../api/methods'
-import { START_RECORDING_TIMESTAMP } from '../meeting'
 import { parseGladia, recognizeGladia } from './providers/gladia'
 import { parseRunPod, recognizeRunPod } from './providers/runpod'
 
-import { sleep, Console, delete_s3_file } from '../utils'
+import { Console, delete_s3_file } from '../utils'
 import { MeetingParams } from '../types'
 import { TRANSCODER } from '../transcoder'
 
@@ -28,11 +27,7 @@ function newTranscribeQueue() {
     }, 10)
 }
 
-// milisseconds transcription chunk duration
-const TRANSCRIPTION_CHUNK_DURATION = 60 * 1000 * 3 // // 3 minutes
-
 // Transcribes an audio stream using the recognizer of the underlying Node server.
-// TODO : 'underlying Node server' ??? I think this comment is bullshit
 export class WordsPoster extends Console {
     static TRANSCRIBER: WordsPoster | undefined
 
@@ -44,10 +39,7 @@ export class WordsPoster extends Console {
     private vocabulary: string[]
 
     private stopped = false
-    private rebootTimer: NodeJS.Timer
     private transcribeQueue: asyncLib.QueueObject<() => void>
-    private wordPosterWorker: Promise<void>
-    private transcriptionOffset: number = 0 // is seconds
 
     // Returns a new `WordsPoster`.
     private constructor(params: MeetingParams) {
@@ -59,10 +51,7 @@ export class WordsPoster extends Console {
         this.user_id = params.user_id
         this.vocabulary = params.vocabulary
 
-        this.rebootTimer = setInterval(() => {}, 60 * 1000)
         this.transcribeQueue = newTranscribeQueue()
-        // Simply not to have undefined properties
-        this.wordPosterWorker = new Promise((resolve) => resolve())
     }
 
     // Initialize and start the transcriber.
@@ -73,67 +62,42 @@ export class WordsPoster extends Console {
             console.error('error creating transcriber', e)
             throw e
         }
-        await WordsPoster.TRANSCRIBER.start()
+    }
+
+    // Request e new Transcribe
+    public async push(timeStart: number, timeEnd: number): Promise<void> {
+        this.transcribeQueue.push(async () => {
+            await WordsPoster.TRANSCRIBER?.transcribe(timeStart, timeEnd)
+        })
     }
 
     // Request the latest transcription and stop the transcriber for good.
     public async stop(): Promise<void> {
         this.log('stop called')
-        this.rebootTimer = setInterval(() => {})
-        this.transcribeQueue.push(async () => {
-            await WordsPoster.TRANSCRIBER?.transcribe(true)
-        })
-    }
-
-    // Ends the transcribing, and destroys resources.
-    // Waits for the workers to finish, and destroys the transcbriber.
-    public async waitUntilComplete(): Promise<void> {
+        if (this.stopped) {
+            this.error('WordPoster already stoped!')
+        }
+        // Wait until complete sequence
+        // Ends the transcribing, and destroys resources.
+        // Waits for the workers to finish, and destroys the transcbriber.
         this.log('before transcribe queue drain')
-        this.transcribeQueue.push(async () => {
-            return
-        })
+        // this.transcribeQueue.push(async () => { // TODO : Is it necessary ?
+        //     return
+        // })
         await this.transcribeQueue.drain()
         this.log('after transcribe queue drain')
 
         this.stopped = true
-
-        await this.wordPosterWorker
+        return new Promise((resolve) => resolve())
     }
 
-    // Check if the transcriber is still active.
-    public is_running(): boolean {
-        return !this.stopped
-    }
-
-    private async start(): Promise<void> {
-        try {
-            if (this.speech_to_text_provider != null) {
-                this.rebootTimer = setInterval(() => {
-                    this.transcribeQueue.push(async () => {
-                        await WordsPoster.TRANSCRIBER?.transcribe(false) // ? => ID undefined, it is okay
-                    })
-                }, TRANSCRIPTION_CHUNK_DURATION)
-            }
-        } catch (e) {
-            this.error('error initializing reboot timer', e)
-            throw e
-        }
-    }
-
-    private async transcribe(final: boolean): Promise<void> {
+    private async transcribe(
+        timeStart: number,
+        timeEnd: number,
+    ): Promise<void> {
         let api = Api.instance
-        let currentOffset = this.transcriptionOffset
-        let newOffset = (Date.now() - START_RECORDING_TIMESTAMP.get()) / 1000
-        const timeStart = currentOffset
-        const timeEnd = final ? -1 : newOffset
         const s3Path = `${this.user_id}/${this.bot_uuid}/${timeStart}-${timeEnd}-record.wav`
-        this.transcriptionOffset = newOffset
-        await sleep(15000)
-        this.log(
-            'ready to do transcription between: ',
-            currentOffset,
-            newOffset,
-        )
+        this.log('ready to do transcription between: ', timeStart, timeEnd)
         try {
             const audioUrl = await TRANSCODER.extractAudio(
                 timeStart,
@@ -152,7 +116,7 @@ export class WordsPoster extends Console {
                         this.vocabulary, // TODO : What to do.
                         this.speech_to_text_api_key,
                     )
-                    words = parseRunPod(res_runpod, currentOffset)
+                    words = parseRunPod(res_runpod, timeStart)
                     break
                 case 'Default':
                 case 'Gladia':
@@ -161,7 +125,7 @@ export class WordsPoster extends Console {
                         this.vocabulary, // TODO : What to do.
                         this.speech_to_text_api_key,
                     )
-                    words = parseGladia(res_gladia, currentOffset)
+                    words = parseGladia(res_gladia, timeStart)
                     break
                 default:
                     this.error(
@@ -187,7 +151,6 @@ export class WordsPoster extends Console {
             } catch (e) {
                 this.error('an error occured deleting audio from S3, ', e)
             }
-            //TODO : Delete audio from S3
         }
     }
 }

@@ -4,7 +4,11 @@ import * as os from 'os'
 import * as path from 'path'
 import { Writable } from 'stream'
 import { Logger } from './logger'
+<<<<<<< HEAD
 import { Console } from './utils'
+=======
+import { WordsPoster } from './words_poster/words_poster'
+>>>>>>> 1ad88dbf0 (Draft no complete : Transcribe into a new way)
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -15,6 +19,9 @@ class Transcoder extends Console {
     private videoS3Path: string
     private webmPath: string
     private transcoder_successfully_stopped: boolean = false
+    private chunkDuration: number // Duration of one uploaded chunk
+    private transcribeDuration: number // Duration of one transcribe to WordsPoster
+    private chunkReceavedCounter: number = 0 // Number of chunks received
     static FFMPEG_CLOSE_TIMEOUT: number = 60_000 // 60 seconds
 
     static EXTRACT_AUDIO_MAX_RETRIES: number = 5
@@ -33,7 +40,12 @@ class Transcoder extends Console {
         }
     }
 
-    public async init(bucketName: string, videoS3Path: string): Promise<void> {
+    public async init(
+        bucketName: string,
+        videoS3Path: string,
+        chunkDuration: number,
+        transcribeDuration: number,
+    ): Promise<void> {
         if (this.ffmpeg_process) {
             this.log('Transcoder already initialized')
             return
@@ -42,6 +54,8 @@ class Transcoder extends Console {
 
         this.bucketName = bucketName
         this.videoS3Path = videoS3Path
+        this.chunkDuration = chunkDuration
+        this.transcribeDuration = transcribeDuration
 
         const ffmpegArgs = [
             '-i',
@@ -186,7 +200,7 @@ class Transcoder extends Console {
         this.transcoder_successfully_stopped = true
     }
 
-    public async uploadChunk(chunk: Buffer): Promise<void> {
+    public async uploadChunk(chunk: Buffer, isFinal: boolean): Promise<void> {
         if (this.transcoder_successfully_stopped) {
             this.log('Transcoder is in stop state!')
             return
@@ -196,8 +210,37 @@ class Transcoder extends Console {
         }
 
         try {
+            this.chunkReceavedCounter += 1
             await this.appendChunkToWebm(chunk)
             this.log('Incoming video data writed appened to webM')
+
+            let chunksPerTranscribe =
+                this.transcribeDuration / this.chunkDuration
+            if (!isFinal) {
+                // Recording is in process...
+                if (this.chunkReceavedCounter % chunksPerTranscribe == 0) {
+                    // Request a transcribe
+                    let timeStart =
+                        (this.chunkReceavedCounter - chunksPerTranscribe) *
+                        this.chunkDuration
+                    let timeEnd = timeStart + this.transcribeDuration
+                    await WordsPoster.TRANSCRIBER?.push(timeStart, timeEnd)
+                }
+            } else {
+                // Recording has stoped
+                let inverse_mod =
+                    chunksPerTranscribe -
+                    (this.chunkReceavedCounter % chunksPerTranscribe)
+                // Request the final transcribe
+                let timeStart =
+                    (this.chunkReceavedCounter +
+                        inverse_mod -
+                        chunksPerTranscribe) *
+                    this.chunkDuration
+                let timeEnd = -1
+                await WordsPoster.TRANSCRIBER?.push(timeStart, timeEnd)
+            }
+
             await this.writeToChildStdin(chunk).then((_) => {
                 this.log('Incoming video data writed into ffmpeg stdin')
             })

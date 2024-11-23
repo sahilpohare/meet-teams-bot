@@ -460,7 +460,7 @@ export async function server() {
         }
 
         try {
-            await TRANSCODER.uploadChunk(req.body)
+            await TRANSCODER.uploadChunk(req.body, false)
             return res
                 .status(200)
                 .json({ message: 'Chunk uploadé avec succès' })

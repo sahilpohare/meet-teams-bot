@@ -61,8 +61,10 @@ export const FIRST_USER_JOINED = {
 const NO_SPEAKER_THRESHOLD = 1000 * 60 * 7 // 7 minutes
 const NO_SPEAKER_DETECTED_TIMEOUT = 1000 * 60 * 15 // 15 minutes
 const RECORDING_TIMEOUT = 3600 * 4 // 4 hours
-// const RECORDING_TIMEOUT = 120 // 2 minutes for tests
 const MAX_TIME_TO_LIVE_AFTER_TIMEOUT = 3600 * 2 // 2 hours
+
+const CHUNK_DURATION: number = 10_000 // 10 seconds for each chunks
+const TRANSCRIBE_DURATION: number = CHUNK_DURATION * 18 // 3 minutes for each transcribe
 
 export class JoinError extends Error {
     constructor(code: JoinErrorCode) {
@@ -242,6 +244,8 @@ export class MeetingHandle extends Console {
             await TRANSCODER.init(
                 process.env.AWS_S3_BUCKET,
                 this.param.mp4_s3_path,
+                CHUNK_DURATION,
+                TRANSCRIBE_DURATION,
             ).catch((e) => {
                 this.error(`Cannot start Transcoder: ${e}`)
             })
@@ -274,6 +278,7 @@ export class MeetingHandle extends Console {
                             const w = window as any
                             let res = await w.startRecording(
                                 meuh.local_recording_server_location,
+                                meuh.chunk_duration,
                                 meuh.streaming_output,
                                 meuh.streaming_audio_frequency,
                             )
@@ -285,6 +290,7 @@ export class MeetingHandle extends Console {
                     {
                         local_recording_server_location:
                             this.param.local_recording_server_location,
+                        chunk_duration: CHUNK_DURATION,
                         streaming_output: this.param.streaming_output,
                         streaming_audio_frequency:
                             this.param.streaming_audio_frequency,
@@ -496,9 +502,6 @@ export class MeetingHandle extends Console {
 
         await WordsPoster.TRANSCRIBER?.stop().catch((e) => {
             this.error(`Cannot stop Transcriber: ${e}`)
-        })
-        await WordsPoster.TRANSCRIBER?.waitUntilComplete().catch((e) => {
-            this.error(`Cannot waitUntilComplete in Transcriber: ${e}`)
         })
         await TRANSCODER.stop().catch((e) => {
             this.error(`Cannot stop Transcoder: ${e}`)

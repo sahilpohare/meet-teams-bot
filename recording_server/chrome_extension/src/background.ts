@@ -7,6 +7,7 @@ import { ApiService } from './api'
 
 export async function startRecording(
     local_recording_server_location: string,
+    chunkDuration: number,
     streaming_output?: string,
     streaming_audio_frequency?: number,
 ): Promise<number> {
@@ -17,8 +18,9 @@ export async function startRecording(
             'LOG',
             'FROM_EXTENSION: ************ Start recording launched. ************',
         )
+
         await record.initMediaRecorder(streaming_output, streaming_audio_frequency)
-        return await record.startRecording()
+        return await record.startRecording(chunkDuration)
     } catch (e) {
         console.log('ERROR while start recording', JSON.stringify(e))
         throw e
