@@ -52,7 +52,7 @@ export class Transcriber {
      * Request the latest transcription and stop the transcriber for good.
      */
     public async stop(): Promise<void> {
-        this.rebootTimer = setInterval(() => {})
+        clearInterval(this.rebootTimer)
         this.transcribeQueue.push(async () => {
             await Transcriber.TRANSCRIBER?.transcribe(true)
         })
