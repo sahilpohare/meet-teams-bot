@@ -2,7 +2,7 @@ import axios from 'axios'
 
 export type MeetingProvider = 'Zoom' | 'Meet' | 'Teams'
 
-type MessageType = 'SPEAKERS' | 'LOG' | 'UPLOAD_CHUNK'
+type MessageType = 'SPEAKERS' | 'LOG' | 'UPLOAD_CHUNK' | 'UPLOAD_CHUNK_FINAL'
 
 // Yes, any is funny :cow:
 type MessagePayload = any
@@ -57,21 +57,30 @@ export class ApiService {
             payload,
             url,
         )
+
+        async function upload_chunk(isFinal: boolean) {
+            let route = !isFinal ? "upload_chunk" : "upload_chunk_final"
+            await axios
+                .post(`${url}transcoder/${route}`, payload, {
+                    headers: {
+                        'Content-Type': 'application/octet-stream', // Or 'video/mp4' based on your video type
+                    },
+                    maxContentLength: 500 * 1024 * 1024, // 500MB limit to match server
+                })
+                .catch((error) => {
+                    console.error(
+                        'Failed to send upload chunk message:',
+                        error,
+                    )
+                })
+        }
+
         switch (messageType) {
             case 'UPLOAD_CHUNK':
-                await axios
-                    .post(`${url}transcoder/upload_chunk`, payload, {
-                        headers: {
-                            'Content-Type': 'application/octet-stream', // Or 'video/mp4' based on your video type
-                        },
-                        maxContentLength: 500 * 1024 * 1024, // 500MB limit to match server
-                    })
-                    .catch((error) => {
-                        console.error(
-                            'Failed to send upload chunk message:',
-                            error,
-                        )
-                    })
+                await upload_chunk(false)
+                break
+            case 'UPLOAD_CHUNK_FINAL':
+                await upload_chunk(true)
                 break
             case 'SPEAKERS':
                 await axios

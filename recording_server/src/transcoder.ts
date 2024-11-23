@@ -218,7 +218,7 @@ class Transcoder extends Console {
                 this.transcribeDuration / this.chunkDuration
             if (!isFinal) {
                 // Recording is in process...
-                if (this.chunkReceavedCounter % chunksPerTranscribe == 0) {
+                if (this.chunkReceavedCounter % chunksPerTranscribe === 0) {
                     // Request a transcribe
                     let timeStart =
                         (this.chunkReceavedCounter - chunksPerTranscribe) *

@@ -191,11 +191,15 @@ async function handleChunk(isFinal: boolean) {
 async function sendDataChunks(
     spokeSession: SpokeSession,
     file: File,
-    _isFinal: boolean,
+    isFinal: boolean,
 ) {
     try {
         try {
-            await ApiService.sendMessageToRecordingServer('UPLOAD_CHUNK', file)
+            if (!isFinal) {
+                await ApiService.sendMessageToRecordingServer('UPLOAD_CHUNK', file)
+            } else {
+                await ApiService.sendMessageToRecordingServer('UPLOAD_CHUNK_FINAL', file)
+            }
         } catch (e) {
             // TODO: handler upload chunk error
             console.log('Error in upload chunk killing')
