@@ -228,13 +228,13 @@ class Transcoder extends Console {
                 }
             } else {
                 // Recording has stoped
-                let inverse_mod =
+                let inverseMod =
                     chunksPerTranscribe -
                     (this.chunkReceavedCounter % chunksPerTranscribe)
                 // Request the final transcribe
                 let timeStart =
                     (this.chunkReceavedCounter +
-                        inverse_mod -
+                        inverseMod -
                         chunksPerTranscribe) *
                     this.chunkDuration
                 let timeEnd = -1
