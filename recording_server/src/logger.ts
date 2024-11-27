@@ -11,9 +11,10 @@ const NODE_NAME = process.env.NODE_NAME
 const util = require('util')
 const execPromise = util.promisify(exec)
 
-import { Console } from './utils'
-import { MeetingParams } from './types'
 import { Page } from 'puppeteer'
+import { s3cp } from './s3'
+import { MeetingParams } from './types'
+import { Console } from './utils'
 
 const EFS_MOUNT_POINT: string = '/mnt/efs'
 
@@ -59,6 +60,13 @@ export class Logger extends Console {
                 '',
             )}_${date}.jpg`
             await page.screenshot({ path: link })
+            await s3cp(
+                link,
+                `${this.bot_uuid}/screenshot_${name.replaceAll(
+                    '/',
+                    '',
+                )}_${date}.jpg`,
+            )
         } catch (e) {
             this.error(`Failed to take screenshot ${e}`)
         }
@@ -135,66 +143,66 @@ export class Logger extends Console {
     }
 }
 
-        // ___OLD_COPY_TO_S3___
-        // await s3cp(link, link.substring(2))
+// ___OLD_COPY_TO_S3___
+// await s3cp(link, link.substring(2))
 
-        // export function uploadLogScript(bot_id: string) {
-        //     return new Promise<void>((res, _rej) => {
-        //         exec(`upload_log.sh ${bot_id ?? ''}`, (_error, stdout, stderr) => {
-        //             console.log(`upload log`, { stdout, stderr })
-        //             res()
-        //         })
-        //     })
-        // }
-        //
-        // #!/bin/bash -x
-        // if [ -z $1 ]; then
-        // 	export LOG_FILE_S3=$NODE_NAME
-        // else
-        // 	export LOG_FILE_S3=$1
-        // fi
-        // aws s3 cp "$LOG_FILE" "s3://spoke-log-zoom/$LOG_FILE_S3" --storage-class=ONEZONE_IA
+// export function uploadLogScript(bot_id: string) {
+//     return new Promise<void>((res, _rej) => {
+//         exec(`upload_log.sh ${bot_id ?? ''}`, (_error, stdout, stderr) => {
+//             console.log(`upload log`, { stdout, stderr })
+//             res()
+//         })
+//     })
+// }
+//
+// #!/bin/bash -x
+// if [ -z $1 ]; then
+// 	export LOG_FILE_S3=$NODE_NAME
+// else
+// 	export LOG_FILE_S3=$1
+// fi
+// aws s3 cp "$LOG_FILE" "s3://spoke-log-zoom/$LOG_FILE_S3" --storage-class=ONEZONE_IA
 
-        // ___OLD_UPLOAD_SEPARATION_SPEAKER_FILE_TO_S3
-        // await s3cp(separationLogPath, linkSpeakerSeparationFile).catch((e) {
-        //     console.error('failed to upload speaker file', e)
-        // })
+// ___OLD_UPLOAD_SEPARATION_SPEAKER_FILE_TO_S3
+// await s3cp(separationLogPath, linkSpeakerSeparationFile).catch((e) {
+//     console.error('failed to upload speaker file', e)
+// })
 
-        // ___OLD_UPLOAD_LOG_TO_s3___
-        // const date = new Date()
-        //     .toLocaleDateString('en-US', {
-        //         year: 'numeric',
-        //         month: 'numeric',
-        //         day: 'numeric',
-        //     })
-        //     .replace(/\//g, '-')
-        // const d = new Date()
-        // const link = `logs/${date}/${user_id}/${bot_id}/${d.getHours()}h${d.getMinutes()}`
-        // await s3cp(process.env.LOG_FILE, link).catch((e) => {
-        //     console.error('failed to upload log', e)
-        // })
+// ___OLD_UPLOAD_LOG_TO_s3___
+// const date = new Date()
+//     .toLocaleDateString('en-US', {
+//         year: 'numeric',
+//         month: 'numeric',
+//         day: 'numeric',
+//     })
+//     .replace(/\//g, '-')
+// const d = new Date()
+// const link = `logs/${date}/${user_id}/${bot_id}/${d.getHours()}h${d.getMinutes()}`
+// await s3cp(process.env.LOG_FILE, link).catch((e) => {
+//     console.error('failed to upload log', e)
+// })
 
-        // ___OLD_SCREENSHOOT_TO_S3_SEQUENCE___
-        // const allScreenshotFiles = []
-        // console.log('get screenshot files')
-        // for await (const f of getFiles('./screenshot')) {
-        //     console.log(f)
-        //     const s3File = `https://${BUCKET_NAME}.s3.amazonaws.com/${f}`
-        //     allScreenshotFiles.push(s3File)
-        // }
+// ___OLD_SCREENSHOOT_TO_S3_SEQUENCE___
+// const allScreenshotFiles = []
+// console.log('get screenshot files')
+// for await (const f of getFiles('./screenshot')) {
+//     console.log(f)
+//     const s3File = `https://${BUCKET_NAME}.s3.amazonaws.com/${f}`
+//     allScreenshotFiles.push(s3File)
+// }
 
-        // ___OLD_N8N_SEQUENCE___
-        // let reqInstance = axios.create({
-        //     headers: {
-        //         Authorization: `Basic YWRtaW46U3Bva2VyMTIzNTgxMzIx`,
-        //     },
-        // })
-        // await reqInstance.get(
-        //     `https://spoke.app.n8n.cloud/webhook/failed_bot?email=${email}&s3_log=${encodeURIComponent(
-        //         s3File,
-        //     )}&s3_separation_log=${encodeURIComponent(
-        //         s3SeparationFile,
-        //     )}&bot_id=${bot_id}&user_id=${user_id}&screenshots=${encodeURIComponent(
-        //         allScreenshotFiles.join(', '),
-        //     )}`,
-        // )
+// ___OLD_N8N_SEQUENCE___
+// let reqInstance = axios.create({
+//     headers: {
+//         Authorization: `Basic YWRtaW46U3Bva2VyMTIzNTgxMzIx`,
+//     },
+// })
+// await reqInstance.get(
+//     `https://spoke.app.n8n.cloud/webhook/failed_bot?email=${email}&s3_log=${encodeURIComponent(
+//         s3File,
+//     )}&s3_separation_log=${encodeURIComponent(
+//         s3SeparationFile,
+//     )}&bot_id=${bot_id}&user_id=${user_id}&screenshots=${encodeURIComponent(
+//         allScreenshotFiles.join(', '),
+//     )}`,
+// )

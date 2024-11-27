@@ -1,6 +1,6 @@
-import { ChildProcess, exec, spawn } from 'child_process'
+import { ChildProcess, spawn } from 'child_process'
 
-export const BUCKET_NAME = 'spoke-log-bot'
+export const BUCKET_NAME = 'meeting-baas-debug '
 
 export async function s3cp(local: string, s3path: string) {
     await new Promise<void>((res, rej) => {
