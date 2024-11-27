@@ -3,8 +3,8 @@ import * as fs from 'fs/promises'
 import * as os from 'os'
 import * as path from 'path'
 import { Writable } from 'stream'
-import { Console } from './utils'
 import { Logger } from './logger'
+import { Console } from './utils'
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -112,12 +112,69 @@ class Transcoder extends Console {
 
         // Wait for the child process to finish
         await new Promise<void>((resolve, reject) => {
-            this.ffmpeg_process!.on('close', (code) => {
+            this.ffmpeg_process!.on('close', async (code) => {
                 this.log(`Process ffmpeg finished with code ${code}`)
+
+                if (code === 0) {
+                    try {
+                        const originalPath = this.videoOutputPath
+                        const tempOutputPath = `${this.videoOutputPath}_temp.mp4`
+
+                        this.log('Starting faststart process...')
+
+                        await new Promise<void>((resolveFF, rejectFF) => {
+                            const fastStartProcess = spawn('ffmpeg', [
+                                '-i',
+                                originalPath,
+                                '-c',
+                                'copy',
+                                '-movflags',
+                                '+faststart',
+                                tempOutputPath,
+                            ])
+
+                            fastStartProcess.stdout.on('data', (data) => {
+                                this.log(`Faststart stdout: ${data}`)
+                            })
+
+                            fastStartProcess.stderr.on('data', (data) => {
+                                this.log(`Faststart stderr: ${data}`)
+                            })
+
+                            fastStartProcess.on(
+                                'close',
+                                async (fastStartCode) => {
+                                    if (fastStartCode === 0) {
+                                        await fs.rename(
+                                            tempOutputPath,
+                                            originalPath,
+                                        )
+                                        this.log(
+                                            'Faststart process completed successfully',
+                                        )
+                                        resolveFF()
+                                    } else {
+                                        this.error(
+                                            `Faststart process failed with code ${fastStartCode}`,
+                                        )
+                                        rejectFF(
+                                            new Error(
+                                                `Faststart process failed with code ${fastStartCode}`,
+                                            ),
+                                        )
+                                    }
+                                },
+                            )
+                        })
+                    } catch (err) {
+                        this.error('Error during faststart process:', err)
+                        throw err
+                    }
+                }
+
                 this.ffmpeg_process = null
                 resolve()
             })
-
             setTimeout(() => {
                 if (this.ffmpeg_process) {
                     this.ffmpeg_process.kill('SIGTERM')
