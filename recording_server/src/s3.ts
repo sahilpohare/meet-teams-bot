@@ -1,10 +1,15 @@
 import { ChildProcess, spawn } from 'child_process'
 
-export const BUCKET_NAME = 'meeting-baas-debug '
+let environ: string = process.env.ENVIRON
+const BUCKET_NAME =
+    environ === 'preprod' ? 'preprod-meeting-baas-debug' : 'meeting-baas-debug'
 
 export async function s3cp(local: string, s3path: string) {
+    const s3Args = process.env.S3_ARGS ? process.env.S3_ARGS.split(' ') : []
+    const args = environ !== 'local' ? [] : s3Args
     await new Promise<void>((res, rej) => {
         const command: ChildProcess = spawn('aws', [
+            ...args,
             's3',
             'cp',
             '--acl',
