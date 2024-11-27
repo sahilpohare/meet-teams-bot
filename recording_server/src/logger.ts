@@ -66,7 +66,9 @@ export class Logger extends Console {
                     '/',
                     '',
                 )}_${date}.jpg`,
-            )
+            ).catch((e) => {
+                this.error(`Failed to upload screenshot to s3 ${e}`)
+            })
         } catch (e) {
             this.error(`Failed to take screenshot ${e}`)
         }
