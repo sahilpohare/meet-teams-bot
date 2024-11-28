@@ -10,8 +10,8 @@ import {
 } from '../types'
 
 import { Page } from 'puppeteer'
-import { sleep } from '../utils'
 import { Logger } from '../logger'
+import { sleep } from '../utils'
 
 export class MeetProvider implements MeetingProviderInterface {
     constructor() {}
@@ -230,7 +230,6 @@ async function findShowEveryOne(
 // if (sendButton) {
 //     sendButton.click();
 // }
-
 async function sendEntryMessage(
     page: Page,
     enterMessage: string,
@@ -240,11 +239,13 @@ async function sendEntryMessage(
     enterMessage = enterMessage.substring(0, 500)
     try {
         await page.click('button[aria-label="Chat with everyone"]')
-        await page.waitForSelector('textarea[placeholder="Send a message"]')
+        await page.waitForSelector(
+            'textarea[placeholder="Send a message"], textarea[aria-label="Send a message to everyone"]',
+        )
 
         let res = await page.evaluate(async (message) => {
             const textarea = document.querySelector(
-                'textarea[placeholder="Send a message"]',
+                'textarea[placeholder="Send a message"], textarea[aria-label="Send a message to everyone"]',
             )
             if (textarea) {
                 ;(textarea as HTMLTextAreaElement).focus()
@@ -259,7 +260,7 @@ async function sendEntryMessage(
 
                 if (sendButton) {
                     if (sendButton.disabled) {
-                        sendButton.disabled = false // Make sure the send button is clickable
+                        sendButton.disabled = false
                     }
                     sendButton.click()
                     console.log('Clicked on send button')
@@ -280,7 +281,6 @@ async function sendEntryMessage(
         return false
     }
 }
-
 async function notAcceptedInMeeting(page: Page): Promise<boolean> {
     try {
         const denied = await page.$$eval('*', (elems) => {

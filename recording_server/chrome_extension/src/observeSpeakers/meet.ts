@@ -302,6 +302,17 @@ export async function removeInitialShityHtml(mode: RecordingMode) {
         console.error('Error setting opacity for aria-live="polite" divs:', e)
     }
 
+    try {
+        const bannerDiv = document.querySelector(
+            'div[role="banner"]',
+        ) as HTMLElement
+        if (bannerDiv) {
+            bannerDiv.style.opacity = '0'
+        }
+    } catch (e) {
+        console.error('Error with banner div:', e)
+    }
+
     if (mode !== 'gallery_view') {
         try {
             const video = document.getElementsByTagName(
@@ -357,7 +368,6 @@ export function removeShityHtml(mode: RecordingMode) {
         } catch (e) {
             console.error('Error with video setup:', e)
         }
-
         try {
             document.getElementsByTagName('video')[1].style.position = 'fixed'
         } catch (e) {
@@ -384,6 +394,16 @@ export function removeShityHtml(mode: RecordingMode) {
             }
         }
     } catch (e) {}
+    try {
+        const bannerDiv = document.querySelector(
+            'div[role="banner"]',
+        ) as HTMLElement
+        if (bannerDiv) {
+            bannerDiv.style.opacity = '0'
+        }
+    } catch (e) {
+        console.error('Error with banner div:', e)
+    }
     try {
         const politeDivs = document.querySelectorAll('div[aria-live="polite"]')
         politeDivs.forEach((div) => {
