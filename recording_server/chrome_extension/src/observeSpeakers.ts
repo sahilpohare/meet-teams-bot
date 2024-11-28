@@ -23,7 +23,7 @@ type Provider = {
     findAllAttendees: () => string[]
     removeInitialShityHtml: (arg0: RecordingMode) => void
     removeShityHtml: (arg0: RecordingMode) => void
-    getSpeakerFromDocument: (arg0: RecordingMode, arg1: number) => SpeakerData[]
+    getSpeakerFromDocument: (arg0: RecordingMode, arg1: number, bot_name: string) => SpeakerData[]
     getSpeakerRootToObserve: (
         arg0: RecordingMode,
     ) => Promise<[Node, MutationObserverInit] | undefined>
@@ -97,13 +97,7 @@ var MUTATION_OBSERVER = new MutationObserver(function (mutations) {
         }
         try {
             let currentSpeakersList: SpeakerData[] =
-                PROVIDER!.getSpeakerFromDocument(RECORDING_MODE, timestamp)
-
-            // BOT_NAME is not a speaker and we havent in Teams so we remove it from meet also
-            //TODO: work on bot speaking detection for speaking bot
-            currentSpeakersList = currentSpeakersList.filter(
-                (speaker) => speaker.name !== BOT_NAME,
-            )
+                PROVIDER!.getSpeakerFromDocument(RECORDING_MODE, timestamp, BOT_NAME)
 
             let new_speakers = new Map(
                 currentSpeakersList.map((elem) => [elem.name, elem.isSpeaking]),
@@ -162,6 +156,7 @@ async function observeSpeakers() {
             PROVIDER!.getSpeakerFromDocument(
                 RECORDING_MODE,
                 Date.now() - PROVIDER!.LATENCY,
+                BOT_NAME
             ),
         )
 

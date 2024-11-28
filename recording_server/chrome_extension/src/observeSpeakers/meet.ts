@@ -89,6 +89,7 @@ export async function getSpeakerRootToObserve(
 export function getSpeakerFromDocument(
     _recordingMode: RecordingMode,
     timestamp: number,
+    _bot_name: string
 ): SpeakerData[] {
     try {
         console.log(

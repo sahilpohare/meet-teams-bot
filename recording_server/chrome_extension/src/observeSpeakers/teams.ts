@@ -41,6 +41,7 @@ function getDocumentRoot(): Document {
 export function getSpeakerFromDocument(
     recordingMode: RecordingMode,
     timestamp: number,
+    bot_name: string,
 ): SpeakerData[] {
     // console.log('[Teams] Starting getSpeakerFromDocument', {
     //     recordingMode,
@@ -77,6 +78,13 @@ export function getSpeakerFromDocument(
 
     removeShityHtml(recordingMode)
 
+    // Add the bot speaker.
+    speakers.push({
+        name: bot_name,
+        id: 0,
+        timestamp,
+        isSpeaking: false,
+    } as SpeakerData)
     console.table(speakers)
     return speakers
 }
