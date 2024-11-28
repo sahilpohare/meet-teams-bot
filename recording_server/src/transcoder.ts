@@ -117,15 +117,14 @@ class Transcoder extends Console {
 
                 if (code === 0) {
                     try {
-                        const originalPath = this.videoOutputPath
                         const tempOutputPath = `${this.videoOutputPath}_temp.mp4`
 
                         this.log('Starting faststart process...')
 
-                        await new Promise<void>((resolveFF, rejectFF) => {
+                        await new Promise<void>((resolve, reject) => {
                             const fastStartProcess = spawn('ffmpeg', [
                                 '-i',
-                                originalPath,
+                                this.videoOutputPath,
                                 '-c',
                                 'copy',
                                 '-movflags',
@@ -140,36 +139,38 @@ class Transcoder extends Console {
                             fastStartProcess.stderr.on('data', (data) => {
                                 this.log(`Faststart stderr: ${data}`)
                             })
-
-                            fastStartProcess.on(
-                                'close',
-                                async (fastStartCode) => {
-                                    if (fastStartCode === 0) {
-                                        await fs.rename(
-                                            tempOutputPath,
-                                            originalPath,
-                                        )
-                                        this.log(
-                                            'Faststart process completed successfully',
-                                        )
-                                        resolveFF()
-                                    } else {
-                                        this.error(
+                            // prettier-ignore
+                            fastStartProcess.on('close',async (fastStartCode) => {
+                                if (fastStartCode === 0) {
+                                    await fs.rename(
+                                        tempOutputPath,
+                                        this.videoOutputPath,
+                                    )
+                                    this.log(
+                                        'Faststart process completed successfully',
+                                    )
+                                    resolve()
+                                } else {
+                                    this.error(
+                                        `Faststart process failed with code ${fastStartCode}`,
+                                    )
+                                    reject(
+                                        new Error(
                                             `Faststart process failed with code ${fastStartCode}`,
-                                        )
-                                        rejectFF(
-                                            new Error(
-                                                `Faststart process failed with code ${fastStartCode}`,
-                                            ),
-                                        )
-                                    }
-                                },
-                            )
+                                        ),
+                                    )
+                                }
+                            })
                         })
                     } catch (err) {
                         this.error('Error during faststart process:', err)
                         throw err
                     }
+                } else {
+                    this.error(`Faststart process failed with code ${code}`)
+                    reject(
+                        new Error(`Faststart process failed with code ${code}`),
+                    )
                 }
 
                 this.ffmpeg_process = null
