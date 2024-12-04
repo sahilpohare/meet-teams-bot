@@ -27,6 +27,16 @@ export async function removeInitialShityHtml(mode: RecordingMode) {
         }
     } catch (e) {}
     try {
+        const bannerDiv = document.querySelector(
+            'div[role="banner"]',
+        ) as HTMLElement
+        if (bannerDiv) {
+            bannerDiv.style.opacity = '0'
+        }
+    } catch (e) {
+        console.error('Error with banner div:', e)
+    }
+    try {
         for (div of document.getElementsByTagName('div')) {
             if (div.clientHeight === 20) {
                 div.style.display = 'none'
@@ -53,6 +63,30 @@ export async function removeInitialShityHtml(mode: RecordingMode) {
         })
     } catch (e) {
         console.error('Error setting opacity for aria-live="polite" divs:', e)
+    }
+
+    // People panel shitty HTML remove
+    let root: any = null
+    while (root == null) {
+        root = (Array as any)
+            .from(document.querySelectorAll('div'))
+            .find((d) => d.innerText === 'People')?.parentElement?.parentElement
+        if (root != null) {
+            try {
+                root.parentElement.style.opacity = 0
+                root.parentElement.parentElement.style.opacity = 0
+                const rootLeft = (Array as any)
+                    .from(document.querySelectorAll('div'))
+                    .find((d) => d.innerText === 'You')
+                rootLeft.parentElement.parentElement.parentElement.parentElement.style.width =
+                    '97vw'
+            } catch (e) {
+                console.error(
+                    '[getSpeakerRootToObserve] on meet error finding You',
+                    e,
+                )
+            }
+        }
     }
 
     if (mode !== 'gallery_view') {
@@ -124,6 +158,16 @@ export function removeShityHtml(mode: RecordingMode) {
     }
 
     try {
+        const bannerDiv = document.querySelector(
+            'div[role="banner"]',
+        ) as HTMLElement
+        if (bannerDiv) {
+            bannerDiv.style.opacity = '0'
+        }
+    } catch (e) {
+        console.error('Error with banner div:', e)
+    }
+    try {
         for (const div of document.getElementsByTagName('div')) {
             if (div.clientHeight === 164 && div.clientWidth === 322) {
                 div.style.display = 'none'
@@ -157,6 +201,30 @@ export function removeShityHtml(mode: RecordingMode) {
         })
     } catch (e) {
         console.error('Error applying opacity:', e)
+    }
+
+    // People panel shitty HTML remove
+    let root: any = null
+    while (root == null) {
+        root = (Array as any)
+            .from(document.querySelectorAll('div'))
+            .find((d) => d.innerText === 'People')?.parentElement?.parentElement
+        if (root != null) {
+            try {
+                root.parentElement.style.opacity = 0
+                root.parentElement.parentElement.style.opacity = 0
+                const rootLeft = (Array as any)
+                    .from(document.querySelectorAll('div'))
+                    .find((d) => d.innerText === 'You')
+                rootLeft.parentElement.parentElement.parentElement.parentElement.style.width =
+                    '97vw'
+            } catch (e) {
+                console.error(
+                    '[getSpeakerRootToObserve] on meet error finding You',
+                    e,
+                )
+            }
+        }
     }
 
     // Add opacity change for 'mood' icons with specific parent background

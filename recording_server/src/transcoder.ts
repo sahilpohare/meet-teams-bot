@@ -4,11 +4,10 @@ import * as os from 'os'
 import * as path from 'path'
 import { Writable } from 'stream'
 import { Logger } from './logger'
-<<<<<<< HEAD
+
 import { Console } from './utils'
-=======
+
 import { WordsPoster } from './words_poster/words_poster'
->>>>>>> 1ad88dbf0 (Draft no complete : Transcribe into a new way)
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -396,43 +395,22 @@ class Transcoder extends Console {
         timeEnd: number,
     ): Promise<void> {
         return new Promise((resolve, reject) => {
-            let ffmpegArgs: string[]
-
-            if (timeEnd === -1) {
-                ffmpegArgs = [
-                    '-i',
-                    this.webmPath,
-                    '-async',
-                    '1',
-                    '-ss',
-                    timeStart.toString(),
-                    '-vn',
-                    '-c:a',
-                    'pcm_s16le',
-                    '-ac',
-                    '1',
-                    '-y',
-                    outputAudioPath,
-                ]
-            } else {
-                ffmpegArgs = [
-                    '-i',
-                    this.webmPath,
-                    '-async',
-                    '1',
-                    '-ss',
-                    timeStart.toString(),
-                    '-to',
-                    timeEnd.toString(),
-                    '-vn',
-                    '-c:a',
-                    'pcm_s16le',
-                    '-ac',
-                    '1',
-                    '-y',
-                    outputAudioPath,
-                ]
-            }
+            const ffmpegArgs = [
+                '-y',
+                '-ss',
+                timeStart.toString(),
+                '-i',
+                this.webmPath,
+                ...(timeEnd !== -1 ? ['-to', timeEnd.toString()] : []),
+                '-vn',
+                '-c:a',
+                'pcm_s16le',
+                '-ac',
+                '1',
+                '-threads',
+                'auto',
+                outputAudioPath,
+            ]
 
             const child = spawn('ffmpeg', ffmpegArgs, {
                 stdio: ['ignore', 'pipe', 'pipe'],

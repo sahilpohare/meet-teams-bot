@@ -196,9 +196,15 @@ async function sendDataChunks(
     try {
         try {
             if (!isFinal) {
-                await ApiService.sendMessageToRecordingServer('UPLOAD_CHUNK', file)
+                await ApiService.sendMessageToRecordingServer(
+                    'UPLOAD_CHUNK',
+                    file,
+                )
             } else {
-                await ApiService.sendMessageToRecordingServer('UPLOAD_CHUNK_FINAL', file)
+                await ApiService.sendMessageToRecordingServer(
+                    'UPLOAD_CHUNK_FINAL',
+                    file,
+                )
             }
         } catch (e) {
             // TODO: handler upload chunk error

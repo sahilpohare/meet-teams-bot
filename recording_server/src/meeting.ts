@@ -66,6 +66,8 @@ const MAX_TIME_TO_LIVE_AFTER_TIMEOUT = 3600 * 2 // 2 hours
 const CHUNK_DURATION: number = 10_000 // 10 seconds for each chunks
 const TRANSCRIBE_DURATION: number = CHUNK_DURATION * 18 // 3 minutes for each transcribe
 
+const FIND_END_MEETING_SLEEP = 250
+
 export class JoinError extends Error {
     constructor(code: JoinErrorCode) {
         super(code)
@@ -120,8 +122,8 @@ export class MeetingHandle extends Console {
     static getBotId(): string {
         return MeetingHandle.instance.param.bot_uuid
     }
-    static stopAudioStreaming() {
-        MeetingHandle.instance.meeting.backgroundPage!.evaluate(() => {
+    static async stopAudioStreaming() {
+        await MeetingHandle.instance.meeting.backgroundPage!.evaluate(() => {
             const w = window as any
             return w.stopAudioStreaming()
         })
@@ -270,6 +272,9 @@ export class MeetingHandle extends Console {
                 },
             )
 
+            // wait 3 secondes
+            await sleep(3000)
+
             // ... then start recording...
             let result: string | number =
                 await this.meeting.backgroundPage.evaluate(
@@ -373,16 +378,15 @@ export class MeetingHandle extends Console {
         this.log('after waitForEndMeeting')
         await Events.callEnded()
 
-        MeetingHandle.stopAudioStreaming()
-        try {
-            await this.stopRecordingInternal()
-        } catch (e) {
+        await MeetingHandle.stopAudioStreaming()
+
+        await this.stopRecordingInternal().catch((e) => {
             this.error(`Failed to stop recording: ${e}`)
-        } finally {
-            this.log('before cleanEverything')
-            await this.cleanEverything()
-            this.log('after cleanEverything')
-        }
+        })
+
+        this.log('before cleanEverything')
+        await this.cleanEverything()
+        this.log('after cleanEverything')
     }
 
     private async waitForEndMeeting() {
@@ -392,34 +396,26 @@ export class MeetingHandle extends Console {
         )
 
         while (MeetingHandle.status.state === 'Recording') {
-            try {
-                if (
-                    await this.provider.findEndMeeting(
+            let now = Date.now()
+            if (
+                await this.provider
+                    .findEndMeeting(
                         this.param,
                         this.meeting.page!,
                         cancelationToken,
                     )
-                ) {
-                    return
-                } else {
-                    console.log('[waiting for end meeting] meeting not ended')
-                    await sleep(1000)
-                }
-            } catch (e) {
-                console.error(
-                    '[waitForEndMeeting] find EndMeeting crashed with error: ',
-                    e,
-                )
-            }
-            let now = Date.now()
-            if (
+                    .catch((e) => {
+                        this.error(`findEndMeeting crashed with error: ${e}`)
+                    })
+            ) {
+                await this.stopRecording('findEndMeeting')
+            } else if (
                 (NUMBER_OF_ATTENDEES.get() === 0 &&
                     START_RECORDING_TIMESTAMP.get() + NO_SPEAKER_THRESHOLD <
                         now) ||
                 (NUMBER_OF_ATTENDEES.get() === 0 && FIRST_USER_JOINED.get())
             ) {
                 await this.stopRecording('no attendees')
-                return
             } else if (
                 START_RECORDING_TIMESTAMP.get() !== null &&
                 START_RECORDING_TIMESTAMP.get() + NO_SPEAKER_THRESHOLD < now &&
@@ -429,15 +425,14 @@ export class MeetingHandle extends Console {
                     now
             ) {
                 await this.stopRecording('no speaker detected timeout')
-                return
             } else {
-                this.log(
-                    '[waiting for end meeting] no speaker detected timestamp',
-                    START_RECORDING_TIMESTAMP.get(),
-                    NO_SPEAKER_DETECTED_TIMESTAMP.get(),
-                )
-                this.log('[waiting for end meeting] meeting not ended')
-                await sleep(1_000)
+                // this.log(
+                //     '[waiting for end meeting] no speaker detected timestamp',
+                //     START_RECORDING_TIMESTAMP.get(),
+                //     NO_SPEAKER_DETECTED_TIMESTAMP.get(),
+                // )
+                // this.log('[waiting for end meeting] meeting not ended')
+                await sleep(FIND_END_MEETING_SLEEP)
             }
         }
     }
@@ -451,6 +446,8 @@ export class MeetingHandle extends Console {
             return
         }
         MeetingHandle.status.state = 'Cleanup'
+        //TODO : Cut the video with the timestamp
+        // EndmeetingTimesatamp = Date.now() - FIND_END_MEETING_SLEEP
         this.log(`Stop recording scheduled`, {
             exit_reason: reason,
         })
