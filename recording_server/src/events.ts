@@ -50,6 +50,7 @@ export class Events extends Console {
             method: 'POST',
             url: this.webhookUrl,
             headers: {
+                'User-Agent': 'meetingbaas/1.0',
                 'x-spoke-api-key': this.apiKey,
             },
             data: {
