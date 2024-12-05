@@ -30,6 +30,7 @@ var CUR_SPEAKERS: Map<string, boolean> = new Map()
 
 setMeetingProvider()
 observeSpeakers()
+checkSpeakers()
 
 function setMeetingProvider() {
     if (MEETING_PROVIDER === 'Teams') {
@@ -51,51 +52,50 @@ function setMeetingProvider() {
     }
 }
 
-// ___PERIODIC_SEQUENCE_FOR_EACH_MUTATIONS___
-var MUTATION_OBSERVER = new MutationObserver(function (mutations) {
-    const timestamp = Date.now() - PROVIDER!.LATENCY
-    mutations.forEach(async function (_mutation) {
-        try {
-            let currentSpeakersList: SpeakerData[] =
-                PROVIDER!.getSpeakerFromDocument(RECORDING_MODE, timestamp)
+async function checkSpeakers() {
+    try {
+        const timestamp = Date.now() - PROVIDER!.LATENCY
+        let currentSpeakersList: SpeakerData[] =
+            PROVIDER!.getSpeakerFromDocument(RECORDING_MODE, timestamp)
 
-            // BOT_NAME is not a speaker and we havent in Teams so we remove it from meet also
-            //TODO: work on bot speaking detection for speaking bot
-            currentSpeakersList = currentSpeakersList.filter(
-                (speaker) => speaker.name !== BOT_NAME,
-            )
+        // BOT_NAME is not a speaker and we havent in Teams so we remove it from meet also
+        //TODO: work on bot speaking detection for speaking bot
+        currentSpeakersList = currentSpeakersList.filter(
+            (speaker) => speaker.name !== BOT_NAME,
+        )
 
-            let new_speakers = new Map(
-                currentSpeakersList.map((elem) => [elem.name, elem.isSpeaking]),
-            )
-            function areMapsEqual<
-                K,
-                V,
-            >(map1: Map<K, V>, map2: Map<K, V>): boolean {
-                if (map1.size !== map2.size) {
+        let new_speakers = new Map(
+            currentSpeakersList.map((elem) => [elem.name, elem.isSpeaking]),
+        )
+        function areMapsEqual<K, V>(map1: Map<K, V>, map2: Map<K, V>): boolean {
+            if (map1.size !== map2.size) {
+                return false
+            }
+            for (let [key, value] of map1) {
+                if (!map2.has(key) || map2.get(key) !== value) {
                     return false
                 }
-                for (let [key, value] of map1) {
-                    if (!map2.has(key) || map2.get(key) !== value) {
-                        return false
-                    }
-                }
-                return true
             }
-            // Send data only when a speakers change state is detected
-            if (!areMapsEqual(CUR_SPEAKERS, new_speakers)) {
-                await ApiService.sendMessageToRecordingServer(
-                    'SPEAKERS',
-                    currentSpeakersList,
-                ).catch((e) => {
-                    console.error('Catch on send currentSpeakersList :', e)
-                })
-                CUR_SPEAKERS = new_speakers
-            }
-        } catch (e) {
-            console.error('Catch on MutationObserver :', e)
+            return true
         }
-    })
+        // Send data only when a speakers change state is detected
+        if (!areMapsEqual(CUR_SPEAKERS, new_speakers)) {
+            await ApiService.sendMessageToRecordingServer(
+                'SPEAKERS',
+                currentSpeakersList,
+            ).catch((e) => {
+                console.error('Catch on send currentSpeakersList :', e)
+            })
+            CUR_SPEAKERS = new_speakers
+        }
+    } catch (e) {
+        console.error('Catch on MutationObserver :', e)
+    }
+}
+
+// ___PERIODIC_SEQUENCE_FOR_EACH_MUTATIONS___
+var MUTATION_OBSERVER = new MutationObserver(function (mutations) {
+    mutations.forEach(() => checkSpeakers())
 })
 
 // Observe Speakers mutation

@@ -398,6 +398,14 @@ export class MeetingHandle {
 
         while (MeetingHandle.status.state === 'Recording') {
             let now = Date.now()
+            // console.log(
+            //     'number of attendees',
+            //     NUMBER_OF_ATTENDEES.get(),
+            //     'no speaker ',
+            //     NO_SPEAKER_THRESHOLD < now,
+            //     'FIRST_USER_JOINED',
+            //     FIRST_USER_JOINED.get(),
+            // )
             if (
                 await this.provider
                     .findEndMeeting(
@@ -409,7 +417,7 @@ export class MeetingHandle {
                         console.error(`findEndMeeting crashed with error: ${e}`)
                     })
             ) {
-                await this.stopRecording('findEndMeeting')
+                await this.stopRecording('Bot removed')
             } else if (
                 (NUMBER_OF_ATTENDEES.get() === 0 &&
                     START_RECORDING_TIMESTAMP.get() + NO_SPEAKER_THRESHOLD <

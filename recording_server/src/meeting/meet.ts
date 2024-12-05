@@ -134,14 +134,11 @@ export class MeetProvider implements MeetingProviderInterface {
         cancellationToken: CancellationToken,
     ): Promise<boolean> {
         try {
-            if (await findEndMeeting(meetingParams, page, cancellationToken)) {
-                return true
-            }
-            //console.log('[findendmeeting]  false')
+            return await removedFromMeeting(page)
         } catch (e) {
-            console.log('[findendmeeting]  error', e)
+            console.error('[findendmeeting] error', e)
+            return false
         }
-        return false
     }
 }
 
@@ -179,9 +176,6 @@ async function findShowEveryOne(
         if (cancelCheck()) {
             throw new JoinError(JoinErrorCode.TimeoutWaitingToStart)
         }
-        // if (await notAcceptedInMeeting(page)) {
-        //     throw new JoinError(JoinErrorCode.BotNotAccepted)
-        // }
         try {
             if (await notAcceptedInMeeting(page)) {
                 console.log('Bot not accepted, exiting meeting')
@@ -194,28 +188,13 @@ async function findShowEveryOne(
             }
             console.error('Unexpected error:', error)
         }
-        //TODO: check if bot is removed from meeting
-        // if (await removedFromMeeting(page)) {
-        //     throw new JoinError(JoinErrorCode.BotRemoved)
-        // }
         if (showEveryOneFound === false) {
             await sleep(1000)
         }
         i++
     }
 }
-// var textarea = document.querySelector(
-//     'textarea[placeholder="Send a message"]',
-// )
-// textarea.focus()
-// textarea.value = enter_message
-// var icons = document.querySelectorAll('i')
-// var sendIcon = Array.from(icons).find((icon) => icon.textContent === 'send')
-// var sendButton = sendIcon ? sendIcon.closest('button') : null
 
-// if (sendButton) {
-//     sendButton.click();
-// }
 async function sendEntryMessage(
     page: Page,
     enterMessage: string,
@@ -311,22 +290,6 @@ async function removedFromMeeting(page: Page): Promise<boolean> {
         }
         return false
     })
-}
-
-async function findEndMeeting(
-    meetingParams: MeetingParams,
-    page: Page,
-    cancellationToken: CancellationToken,
-): Promise<boolean> {
-    try {
-        if (await removedFromMeeting(page)) {
-            console.log('removedFromMeeting')
-            return true
-        }
-    } catch (e) {
-        console.error(e)
-    }
-    return false
 }
 
 async function clickDismiss(page: Page): Promise<boolean> {

@@ -114,6 +114,13 @@ export class TeamsProvider implements MeetingProviderInterface {
             if (botNotAccepted) {
                 throw new JoinError(JoinErrorCode.BotNotAccepted)
             }
+            // const clickSuccess = (
+            //     await Promise.all([
+            //         clickWithInnerText(page, 'button', 'View', 2, false),
+            //         clickWithInnerText(page, 'button', 'React', 2, false),
+            //     ])
+            // ).some((result) => result)
+
             const clickSuccess = await clickWithInnerText(
                 page,
                 'button',
@@ -249,14 +256,14 @@ export async function innerTextWithSelector(
             continueButton = await page.evaluate(
                 (selector, i, message) => {
                     let elements
-                    if (i % 2 === 0) {
-                        const iframe = document.querySelectorAll('iframe')[0]
-                        const iframeDocument =
+                    const iframe = document.querySelectorAll('iframe')[0]
+
+                    if (i % 2 === 0 && iframe) {
+                        const docInIframe =
                             iframe.contentDocument ||
                             iframe.contentWindow.document
-
                         elements = Array.from(
-                            iframeDocument.querySelectorAll(selector),
+                            docInIframe.querySelectorAll(selector),
                         )
                     } else {
                         elements = Array.from(
@@ -282,12 +289,11 @@ export async function innerTextWithSelector(
             }
             continueButton = false
         }
-        await sleep(200 + i * 100) //sleep increase each time
+        await sleep(200)
         console.log(
             `element with selector ${selector} clicked:`,
             continueButton,
         )
-        i += 1
     }
     return continueButton
 }
@@ -349,7 +355,6 @@ export async function clickWithInnerText(
     cancelCheck?: () => boolean,
 ): Promise<boolean> {
     let i = 0
-    iterations = iterations
     let continueButton = false
     if (!(await ensurePageLoaded(page))) {
         console.error('Page is not fully loaded at the start.');
@@ -371,6 +376,7 @@ export async function clickWithInnerText(
             continueButton = await page.evaluate(
                 (innerText, htmlType, i, click) => {
                     let elements
+                    const iframe = document.querySelectorAll('iframe')[0]
 
                     var iframes = document.querySelectorAll('iframe')
                     console.log('iframes : ', iframes)
@@ -395,18 +401,10 @@ export async function clickWithInnerText(
                         )
                     }
 
-                    console.log('elements : ', elements)
                     for (const e of elements) {
                         let elem = e as any
-                        console.log(
-                            'elem inner text for: ',
-                            htmlType,
-                            elem.innerText,
-                        )
                         if (elem.innerText === innerText) {
-                            if (click) {
-                                elem.click()
-                            }
+                            if (click) elem.click()
                             return true
                         }
                     }
@@ -475,7 +473,7 @@ async function focusInput(
                 console.log('input not focused, retrying')
             }
         } catch (e) {}
-        await sleep(200 + i * 100)
+        await sleep(500)
     }
     return null
 }

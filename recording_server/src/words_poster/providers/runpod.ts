@@ -1,6 +1,6 @@
 import axios from 'axios'
-import { RecognizerWord } from '../words_poster'
 import { sleep } from '../../utils'
+import { RecognizerWord } from '../words_poster'
 
 const RUNPOD_API_KEY = 'B1EC90VQNXMASRD9QJJAALGOS0YL73JEMKZQ92IJ'
 const API_URL = 'https://api.runpod.ai/v2/oq0i26ut0lom1h'
@@ -58,13 +58,13 @@ export async function recognizeRunPod(
             'content-type': 'application/json',
         },
     })
-    console.log(response.data)
+    console.log('RunPod response:', response.data)
     let status: RunPodTranscriptionStatus = response.data
     while (status.status !== 'COMPLETED' && status.status !== 'FAILED') {
         await sleep(5000)
         status = await checkStatus(status.id)
     }
-    console.log(status)
+
     // Transform or process the response as needed here
     return status.output!
 }
@@ -97,6 +97,6 @@ async function checkStatus(id: string) {
         },
     })
 
-    console.log(response.data)
+    console.log('RunPod check status:', response.data)
     return response.data
 }

@@ -127,7 +127,8 @@ export async function server() {
 
         // Set the number of attendees in the meeting
         NUMBER_OF_ATTENDEES.set(speakers.length)
-
+        NUMBER_OF_ATTENDEES.get() > 0 && FIRST_USER_JOINED.set(true)
+        console.log('NUMBER_OF_ATTENDEES', NUMBER_OF_ATTENDEES.get())
         // Count the number of active speakers;
         // an active speaker is a speaker who is currently speaking.
 
@@ -149,7 +150,7 @@ export async function server() {
                 break
             case 1:
                 NO_SPEAKER_DETECTED_TIMESTAMP.set(null)
-                FIRST_USER_JOINED.set(true)
+
                 // Only one speaker is detected
                 const active_speaker = speakers.find(
                     (v) => v.isSpeaking === true,

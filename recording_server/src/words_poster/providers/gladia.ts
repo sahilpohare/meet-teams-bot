@@ -74,7 +74,7 @@ export async function recognizeGladia(
         throw axios_response
     }
     let response: TranscribeRequestResponse = axios_response.data
-    console.log(response)
+    console.log('Gladia response:', response)
     let result: GladiaResult
     while (true) {
         await sleep(TRANSCRIPTION_WAIT_TIME)
@@ -88,7 +88,7 @@ export async function recognizeGladia(
         }
         console.log('Waiting for Gladia transcription completion')
     }
-    console.log(result)
+    console.log('Gladia result:', result)
     return result
 }
 

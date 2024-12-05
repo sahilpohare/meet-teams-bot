@@ -59,14 +59,72 @@ const baseLogger = pino({
     },
 })
 
+function formatTable(data: any): string {
+    if (!Array.isArray(data) && typeof data !== 'object') {
+        return String(data)
+    }
+
+    const array = Array.isArray(data) ? data : [data]
+    if (array.length === 0) return ''
+
+    const headers = new Set<string>()
+    array.forEach((item) =>
+        Object.keys(item).forEach((key) => headers.add(key)),
+    )
+    const cols = Array.from(headers)
+
+    const lines = [
+        cols,
+        cols.map(() => '-'.repeat(15)),
+        ...array.map((item) =>
+            cols.map((col) => String(item[col] ?? '').substring(0, 15)),
+        ),
+    ]
+
+    const colWidths = cols.map((_, i) =>
+        Math.max(...lines.map((line) => line[i].length)),
+    )
+
+    return (
+        '\n' +
+        lines
+            .map(
+                (line) =>
+                    '│ ' +
+                    line.map((val, i) => val.padEnd(colWidths[i])).join(' │ ') +
+                    ' │',
+            )
+            .join('\n')
+    )
+}
+
 // Add caller information to logs
 export const logger = caller(baseLogger, {
     relativeTo: join(__dirname, '..', '..', 'src'),
     stackAdjustment: 1,
 })
 
+console.table = (data: any) => {
+    logger.info(formatTable(data))
+}
+
 const formatArgs = (msg: string, args: any[]) =>
-    msg + ' ' + args.map((arg) => JSON.stringify(arg)).join(' ')
+    msg +
+    ' ' +
+    args
+        .map((arg) => {
+            if (arg === null) return 'null'
+            if (arg === undefined) return 'undefined'
+            if (typeof arg === 'object') {
+                try {
+                    return JSON.stringify(arg, null, 2)
+                } catch (e) {
+                    return String(arg)
+                }
+            }
+            return String(arg)
+        })
+        .join(' ')
 
 export let rawConsoleLog = console.log
 export let rawConsoleInfo = console.info
