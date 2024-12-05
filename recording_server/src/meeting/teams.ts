@@ -77,7 +77,7 @@ export class TeamsProvider implements MeetingProviderInterface {
             const clickSuccess = await clickWithInnerText(
                 page,
                 'button',
-                'View',
+                'React',
                 2,
                 false,
             )
@@ -89,9 +89,13 @@ export class TeamsProvider implements MeetingProviderInterface {
             }
             await sleep(2000)
         }
-        if (meetingParams.recording_mode !== 'gallery_view') {
-            await clickWithInnerText(page, 'button', 'View', 10)
-            await clickWithInnerText(page, 'div', 'Speaker', 20)
+        if (await clickWithInnerText(page, 'button', 'View', 2, false)) {
+            if (meetingParams.recording_mode !== 'gallery_view') {
+                await clickWithInnerText(page, 'button', 'View', 10)
+                await clickWithInnerText(page, 'div', 'Speaker', 20)
+            }
+        } else {
+            console.warn('New light interface Teams')
         }
     }
 
