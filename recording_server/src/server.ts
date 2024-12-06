@@ -1,4 +1,4 @@
-import * as express from 'express'
+import express from 'express'
 import * as fs from 'fs/promises'
 import * as redis from 'redis'
 
@@ -20,11 +20,11 @@ import {
 
 import { unlinkSync } from 'fs'
 import { PORT } from './instance'
+import { Logger } from './logger'
 import { MeetingHandle } from './meeting'
 import { ZOOM_RECORDING_APPROVAL_STATUS } from './meeting/zoom'
 import { Streaming } from './streaming'
 import { TRANSCODER } from './transcoder'
-import { Logger } from './logger'
 
 console.log('redis url: ', process.env.REDIS_URL)
 export const clientRedis = redis.createClient({
@@ -114,9 +114,14 @@ export async function server() {
         Streaming.instance?.send_speaker_state(speakers)
         console.table(speakers)
         let input = JSON.stringify(speakers)
-        await fs.appendFile(Logger.instance.get_speaker_log_directory(), `${input}\n`).catch((e) => {
-            console.error(`Cannot append speaker log file ! : ${e}`)
-        })
+        await fs
+            .appendFile(
+                Logger.instance.get_speaker_log_directory(),
+                `${input}\n`,
+            )
+            .catch((e) => {
+                console.error(`Cannot append speaker log file ! : ${e}`)
+            })
 
         // Set the number of attendees in the meeting
         NUMBER_OF_ATTENDEES.set(speakers.length)

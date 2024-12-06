@@ -1,4 +1,3 @@
-import * as jsdom from 'jsdom'
 import * as puppeteer from 'puppeteer'
 
 import { JoinError, JoinErrorCode } from '../meeting'
@@ -9,8 +8,9 @@ import {
 } from '../types'
 
 import { Page } from 'puppeteer'
-import { sleep } from '../utils'
 import { Logger } from '../logger'
+import { parseMeetingUrlFromJoinInfos } from '../urlParser/teamsUrlParser'
+import { sleep } from '../utils'
 
 export class TeamsProvider implements MeetingProviderInterface {
     constructor() {}
@@ -153,27 +153,6 @@ async function typeBotName(
             console.error('failed to type bot name', e)
         }
     }
-}
-function parseMeetingUrlFromJoinInfos(joinInfo: string) {
-    // Parse the HTML string with jsdom
-    const { JSDOM } = jsdom
-    const dom = new JSDOM(joinInfo)
-
-    // Use the document object as you would in a browser
-    const document = dom.window.document
-    const meetingLinkTag = document.querySelector(
-        'a[href*="teams.live.com/meet"]',
-    )
-
-    // Extract the href attribute, which is the meeting URL
-    const meetingUrl = meetingLinkTag
-        ? meetingLinkTag.getAttribute('href')
-        : null
-
-    if (meetingUrl == null) {
-        throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
-    }
-    return meetingUrl
 }
 
 export async function innerTextWithSelector(
