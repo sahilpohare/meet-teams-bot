@@ -22,20 +22,9 @@ export function parseMeetingUrlFromJoinInfos(
 
         const url = new URL(meeting_url)
 
-        // Handle teams.live.com URLs
+        // Reject teams.live.com URLs
         if (url.hostname.includes('teams.live.com')) {
-            const meetPath = url.pathname.split('/')
-            const meetId = meetPath[meetPath.length - 1]
-            const params = url.searchParams.toString()
-
-            if (!meetId || meetId === '') {
-                throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
-            }
-
-            return {
-                meetingId: `https://teams.live.com/_#/meet/${meetId}?${params}?anon=true`,
-                password: '',
-            }
+            throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
         }
 
         // Handle teams.microsoft.com URLs

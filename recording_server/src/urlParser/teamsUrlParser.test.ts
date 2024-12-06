@@ -19,20 +19,17 @@ describe('Teams URL Parser', () => {
         )
     })
 
-    describe('Teams Live URLs', () => {
+    describe('Teams Live URLs (Not Supported)', () => {
         const liveUrls = [
             'https://teams.live.com/meet/9356969621606?p=08ogAWeCL73fVssuEK',
             'https://teams.live.com/meet/9339528342593?p=VGZGxvTVLIyZ81WauE',
             'https://teams.live.com/meet/9314184555833?p=00ewkGrA1OJD7Id1NR',
         ]
 
-        test.each(liveUrls)('should parse Teams Live URL: %s', (url) => {
-            const result = parseMeetingUrlFromJoinInfos(url)
-            expect(result.meetingId).toBe(
-                url.replace('teams.live.com/', 'teams.live.com/_#/') +
-                    '?anon=true',
-            )
-            expect(result.password).toBe('')
+        test.each(liveUrls)('should reject Teams Live URL: %s', (url) => {
+            expect(() => {
+                parseMeetingUrlFromJoinInfos(url)
+            }).toThrow(JoinError)
         })
     })
 
