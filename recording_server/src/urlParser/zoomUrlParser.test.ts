@@ -161,4 +161,105 @@ describe('Zoom URL Parser', () => {
             ).rejects.toThrow(JoinError)
         })
     })
+    describe('Additional URL Formats', () => {
+        describe('Web Client/PWA URLs', () => {
+            const webClientTests = [
+                {
+                    name: 'basic web client URL',
+                    url: 'https://app.zoom.us/wc/79642156509/',
+                    expected: {
+                        meetingId: '79642156509',
+                        password: '',
+                    },
+                },
+                {
+                    name: 'PWA URL with password',
+                    url: 'https://app.zoom.us/wc/79642156509/start?fromPWA=1&pwd=tJO3lY9HeH80y1mQw354RMsXzFilgW.1',
+                    expected: {
+                        meetingId: '79642156509',
+                        password: 'tJO3lY9HeH80y1mQw354RMsXzFilgW.1',
+                    },
+                },
+                {
+                    name: 'PWA URL without password',
+                    url: 'https://app.zoom.us/wc/98110585089/start?fromPWA=1',
+                    expected: {
+                        meetingId: '98110585089',
+                        password: '',
+                    },
+                },
+            ]
+
+            test.each(webClientTests)(
+                'should parse $name correctly',
+                async ({ url, expected }) => {
+                    const result = await parseMeetingUrlFromJoinInfos(
+                        mockBrowser,
+                        url,
+                    )
+                    expect(result).toEqual(expected)
+                },
+            )
+        })
+
+        describe('Personal Meeting Room URLs', () => {
+            const pmrTests = [
+                {
+                    name: 'basic PMR URL',
+                    url: 'https://zoom.us/my/voelker.ai',
+                    expected: {
+                        meetingId: 'voelker.ai',
+                        password: '',
+                    },
+                },
+                {
+                    name: 'subdomain PMR URL',
+                    url: 'https://turing.zoom.us/my/marco.santos.turing',
+                    expected: {
+                        meetingId: 'marco.santos.turing',
+                        password: '',
+                    },
+                },
+            ]
+
+            test.each(pmrTests)(
+                'should parse $name correctly',
+                async ({ url, expected }) => {
+                    const result = await parseMeetingUrlFromJoinInfos(
+                        mockBrowser,
+                        url,
+                    )
+                    expect(result).toEqual(expected)
+                },
+            )
+        })
+
+        describe('Special Password Formats', () => {
+            it('should parse URL-encoded password params', async () => {
+                const url =
+                    'https://zoom.us/j/5165671036?pwd%3DaHkyUy9xcjBDczlDY3NOSCtXMlhMQT09&sa=D&source=calendar'
+                const result = await parseMeetingUrlFromJoinInfos(
+                    mockBrowser,
+                    url,
+                )
+                expect(result).toEqual({
+                    meetingId: '5165671036',
+                    password: 'aHkyUy9xcjBDczlDY3NOSCtXMlhMQT09',
+                })
+            })
+
+            it('should parse password appended without parentheses', async () => {
+                const url =
+                    'https://us06web.zoom.us/j/3290230144?pwd=esnQHAW0JYGE3jUbNQjkTjZmeNs6FQ.1Passcode: 497810'
+                const result = await parseMeetingUrlFromJoinInfos(
+                    mockBrowser,
+                    url,
+                )
+                expect(result).toEqual({
+                    meetingId: '3290230144',
+                    password: '497810',
+                })
+            })
+        })
+    })
 })

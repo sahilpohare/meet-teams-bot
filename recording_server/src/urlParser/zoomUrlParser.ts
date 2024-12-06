@@ -1,5 +1,3 @@
-// src/urlParser/zoomUrlParser.ts
-
 import { Browser } from 'puppeteer'
 import { JoinError, JoinErrorCode } from '../meeting'
 
@@ -44,6 +42,12 @@ async function parseGoogleRedirectUrl(
 function parseDirectUrl(meeting_url: string): ZoomUrlComponents {
     const components = parseZoomComponents(meeting_url)
 
+    // If it's a PMR or a URL with passcode in text, we accept it directly
+    if (meeting_url.includes('/my/') || meeting_url.includes('Passcode:')) {
+        return components
+    }
+
+    // Otherwise, we check that the ID is numeric
     if (!(/^\d+$/.test(components.meetingId) || components.meetingId === '')) {
         throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
     }
@@ -70,35 +74,75 @@ async function parseDynamicUrl(
     }
 }
 
-function parseZoomComponents(url_string: string): ZoomUrlComponents {
-    // Gérer les URL de redirection Google
-    if (url_string.startsWith('https://www.google.com/url?')) {
-        const googleUrl = new URL(url_string)
-        url_string = googleUrl.searchParams.get('q') || url_string
+function extractPasscodeFromText(text: string): string {
+    // Handle formats with or without parentheses
+    const passcodeMatch = text.match(
+        /(?:\()?(?:Passcode|Password):\s*(\d+)(?:\))?/i,
+    )
+    if (passcodeMatch) {
+        return passcodeMatch[1]
     }
+    return ''
+}
 
-    // Séparer l'URL du mot de passe
-    const urlPasswordSplit = url_string.split(/(\(Password:|[\s(]Passcode:)/i)
-    const urlPart = urlPasswordSplit[0].trim()
+function parseZoomComponents(url_string: string): ZoomUrlComponents {
+    // First extract the passcode if it's present in the text
+    const passcode = extractPasscodeFromText(url_string)
+
+    // Clean the URL from the passcode text parts
+    const cleanUrlMatch = url_string.match(/^(https:\/\/[^(\s]+)/)
+    if (!cleanUrlMatch) {
+        throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
+    }
+    const cleanUrl = cleanUrlMatch[1]
 
     let url: URL
     try {
-        url = new URL(urlPart)
+        url = new URL(cleanUrl)
     } catch (e) {
         throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
     }
 
-    const params = url.searchParams
-    const meetingId = url.pathname.split('/')[2]
+    // Handle Personal Meeting Rooms
+    if (url.pathname.includes('/my/')) {
+        const pmrId = url.pathname.split('/my/')[1]
+        return {
+            meetingId: pmrId,
+            password: passcode,
+        }
+    }
 
-    let password = params.get('pwd') || '' // Valeur par défaut vide au lieu de undefined
-    if (urlPasswordSplit.length > 1) {
-        const passwordPart = urlPasswordSplit.slice(1).join('')
-        const passwordMatch = passwordPart.match(
-            /(Password|Passcode):\s*(.*?)\)/i,
-        )
-        if (passwordMatch) {
-            password = passwordMatch[2]
+    // Handle web client URLs
+    if (url.pathname.includes('/wc/')) {
+        const meetingId = url.pathname.split('/wc/')[1].split('/')[0]
+        const password = url.searchParams.get('pwd') || passcode
+        return { meetingId, password }
+    }
+
+    // Extract the meeting ID by cleaning non-numeric characters
+    let meetingId = ''
+    if (url.pathname.includes('/j/')) {
+        meetingId = url.pathname.split('/j/')[1].split('/')[0]
+    } else {
+        meetingId = url.pathname.split('/')[2] || ''
+    }
+
+    // Clean the meeting ID from non-numeric characters
+    meetingId = meetingId.replace(/[^\d]/g, '')
+
+    // Handle the password
+    let password = passcode
+
+    // If no passcode found, look in the URL parameters
+    if (!password && url.searchParams.has('pwd')) {
+        password = decodeURIComponent(url.searchParams.get('pwd') || '')
+    }
+
+    // Handle encoded passwords
+    if (!password && url_string.includes('pwd%3D')) {
+        const pwdMatch = url_string.match(/pwd%3D([^&]+)/)
+        if (pwdMatch) {
+            password = decodeURIComponent(pwdMatch[1])
         }
     }
 

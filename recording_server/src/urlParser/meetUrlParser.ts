@@ -8,34 +8,38 @@ export interface MeetUrlComponents {
 export async function parseMeetingUrlFromJoinInfos(
     meeting_url: string,
 ): Promise<MeetUrlComponents> {
-    if (meeting_url.startsWith('meet')) {
-        meeting_url = `https://${meeting_url}`
+    let cleanUrl = meeting_url.trim()
+    cleanUrl = cleanUrl.replace(/^"(.*)"$/, '$1')
+
+    // Handle URLs starting with just "meet"
+    if (cleanUrl.startsWith('meet.')) {
+        cleanUrl = `https://${cleanUrl}`
     }
 
-    const urlSplitted = meeting_url.split(/\s+/)
-    const strictRegex =
-        /^https:\/\/meet\.google\.com\/[a-z]{3}-[a-z]{4}-[a-z]{3}(\?.*)?$/
+    const urlSplitted = cleanUrl.split(/\s+/)
+    const meetCodeRegex =
+        /meet\.google\.com\/([a-z]{3}-[a-z]{4}-[a-z]{3})((?:\?.*)?$)/
 
     try {
-        const meetUrl = urlSplitted.find((s) => s.startsWith('https://meet'))
-        if (!meetUrl || !strictRegex.test(meetUrl)) {
+        const meetUrl = urlSplitted.find((s) => s.includes('meet.google.com'))
+        if (!meetUrl) {
             throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
         }
 
+        const match = meetUrl.match(meetCodeRegex)
+        if (!match) {
+            throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
+        }
+
+        // Reconstruct the URL in standard format
+        const [, meetCode, queryParams = ''] = match
+        const standardUrl = `https://meet.google.com/${meetCode}${queryParams}`
+
         return {
-            meetingId: meetUrl,
-            password: '', // Meet doesn't use a password
+            meetingId: standardUrl,
+            password: '',
         }
     } catch (error) {
         throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
     }
-}
-
-export function isMeetUrl(url: string): boolean {
-    return url.includes('meet.google.com')
-}
-
-export function extractMeetCode(url: string): string | null {
-    const match = url.match(/meet\.google\.com\/([a-z]{3}-[a-z]{4}-[a-z]{3})/)
-    return match ? match[1] : null
 }

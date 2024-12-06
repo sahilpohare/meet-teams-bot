@@ -1,11 +1,5 @@
-// src/urlParser/meetUrlParser.test.ts
-
 import { JoinError } from '../meeting'
-import {
-    extractMeetCode,
-    isMeetUrl,
-    parseMeetingUrlFromJoinInfos,
-} from './meetUrlParser'
+import { parseMeetingUrlFromJoinInfos } from './meetUrlParser'
 
 describe('Meet URL Parser', () => {
     describe('Valid URLs', () => {
@@ -30,6 +24,66 @@ describe('Meet URL Parser', () => {
             {
                 name: 'Meet URL without https',
                 url: 'meet.google.com/abc-defg-hij',
+                expected: {
+                    meetingId: 'https://meet.google.com/abc-defg-hij',
+                    password: '',
+                },
+            },
+            {
+                name: 'Meet URL with multiple query parameters',
+                url: 'https://meet.google.com/abc-defg-hij?authuser=0&hs=178',
+                expected: {
+                    meetingId:
+                        'https://meet.google.com/abc-defg-hij?authuser=0&hs=178',
+                    password: '',
+                },
+            },
+            {
+                name: 'Meet URL with www subdomain',
+                url: 'https://www.meet.google.com/abc-defg-hij',
+                expected: {
+                    meetingId: 'https://meet.google.com/abc-defg-hij',
+                    password: '',
+                },
+            },
+            {
+                name: 'Meet URL with special characters in query params',
+                url: 'https://meet.google.com/abc-defg-hij?authuser=test%40gmail.com',
+                expected: {
+                    meetingId:
+                        'https://meet.google.com/abc-defg-hij?authuser=test%40gmail.com',
+                    password: '',
+                },
+            },
+            {
+                name: 'Meet URL with multiple query parameters',
+                url: 'https://meet.google.com/abc-defg-hij?authuser=0&hs=178',
+                expected: {
+                    meetingId:
+                        'https://meet.google.com/abc-defg-hij?authuser=0&hs=178',
+                    password: '',
+                },
+            },
+            {
+                name: 'Meet URL with encoded characters in query',
+                url: 'https://meet.google.com/abc-defg-hij?authuser=test%40gmail.com',
+                expected: {
+                    meetingId:
+                        'https://meet.google.com/abc-defg-hij?authuser=test%40gmail.com',
+                    password: '',
+                },
+            },
+            {
+                name: 'Meet URL with accidental prefix',
+                url: 'jhttps://meet.google.com/abc-defg-hij',
+                expected: {
+                    meetingId: 'https://meet.google.com/abc-defg-hij',
+                    password: '',
+                },
+            },
+            {
+                name: 'Meet URL with quotes',
+                url: '"https://meet.google.com/abc-defg-hij"',
                 expected: {
                     meetingId: 'https://meet.google.com/abc-defg-hij',
                     password: '',
@@ -74,28 +128,6 @@ describe('Meet URL Parser', () => {
             await expect(parseMeetingUrlFromJoinInfos(url)).rejects.toThrow(
                 JoinError,
             )
-        })
-    })
-
-    describe('Utility Functions', () => {
-        describe('isMeetUrl', () => {
-            it('should identify Meet URLs correctly', () => {
-                expect(isMeetUrl('https://meet.google.com/abc-defg-hij')).toBe(
-                    true,
-                )
-                expect(isMeetUrl('https://zoom.us/j/123456')).toBe(false)
-            })
-        })
-
-        describe('extractMeetCode', () => {
-            it('should extract Meet codes correctly', () => {
-                expect(
-                    extractMeetCode('https://meet.google.com/abc-defg-hij'),
-                ).toBe('abc-defg-hij')
-                expect(extractMeetCode('https://meet.google.com/invalid')).toBe(
-                    null,
-                )
-            })
         })
     })
 })
