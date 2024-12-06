@@ -2,36 +2,128 @@ import { JoinError } from '../meeting'
 import { parseMeetingUrlFromJoinInfos } from './teamsUrlParser'
 
 describe('Teams URL Parser', () => {
-    it('should parse valid Teams URL', () => {
-        const validUrl =
-            'https://teams.microsoft.com/l/meetup-join/19%3ameeting_OTNlNmVmZGItN2IzMC00MjQ4LThiNTAtZjBkMGI5NTFlNTA2%40thread.v2/0?context=%7b%22Tid%22%3a%2204c4b853-a523-4daa-b2cb-5ad547a87465%22%7d'
+    describe('Standard Teams Microsoft URLs', () => {
+        const standardUrls = [
+            'https://teams.microsoft.com/l/meetup-join/19%3ameeting_MjM0OTEwZmEtMGU1Yi00MjA4LTgwNmUtZDUzYWY3YWE2MmZj%40thread.v2/0?context=%7b%22Tid%22%3a%228dd08955-18a8-4cd7-8017-5f997f4d47af%22%2c%22Oid%22%3a%220fab73dc-0c6c-4780-9032-1c19b5a545c3%22%7d',
+            'https://teams.microsoft.com/l/meetup-join/19%3ameeting_OWIwY2ZhYzQtMGVjMC00ZTE4LTgwMzctMDU0MzBmMzg2ZDJl%40thread.v2/0?context=%7b%22Tid%22%3a%228dd08955-18a8-4cd7-8017-5f997f4d47af%22%7d',
+            'https://teams.microsoft.com/l/meetup-join/19:meeting_MDYyNDgzMmQtODg2Ni00MjBmLTk4YTAtZjYwMTQ0MGNiMmNl@thread.v2/0?context=%7B%22Tid%22:%222dbdd394-741d-4914-9993-ea4584a95749%22%7D',
+        ]
 
-        expect(() => {
-            parseMeetingUrlFromJoinInfos(validUrl)
-        }).not.toThrow()
+        test.each(standardUrls)(
+            'should parse standard Teams URL: %s',
+            (url) => {
+                const result = parseMeetingUrlFromJoinInfos(url)
+                expect(result.meetingId).toBe(url + '&anon=true')
+                expect(result.password).toBe('')
+            },
+        )
     })
 
-    it('should reject invalid URL', () => {
-        const invalidUrl = 'https://invalid-url.com/meeting'
+    describe('Teams Live URLs', () => {
+        const liveUrls = [
+            'https://teams.live.com/meet/9356969621606?p=08ogAWeCL73fVssuEK',
+            'https://teams.live.com/meet/9339528342593?p=VGZGxvTVLIyZ81WauE',
+            'https://teams.live.com/meet/9314184555833?p=00ewkGrA1OJD7Id1NR',
+        ]
 
-        expect(() => {
-            parseMeetingUrlFromJoinInfos(invalidUrl)
-        }).toThrow(JoinError)
+        test.each(liveUrls)('should parse Teams Live URL: %s', (url) => {
+            const result = parseMeetingUrlFromJoinInfos(url)
+            expect(result.meetingId).toBe(
+                url.replace('teams.live.com/', 'teams.live.com/_#/') +
+                    '?anon=true',
+            )
+            expect(result.password).toBe('')
+        })
     })
 
-    it('should reject non-Teams URL', () => {
-        const nonTeamsUrl = 'https://microsoft.com/meeting'
+    describe('Teams Launcher URLs', () => {
+        const launcherUrls = [
+            'https://teams.microsoft.com/dl/launcher/launcher.html?url=%2F_%23%2Fl%2Fmeetup-join%2F19%3Ameeting_YTQxZDliNzQtYzlmMS00OTZhLWE1MzQtNDUzYjhjYzU1ZTVk%40thread.v2%2F0%3Fcontext%3D%257b%2522Tid%2522%253a%25220deb691f-902d-4dea-8026-5a790862fede%2522%252c%2522Oid%2522%253a%25222d56fa49-dfef-4eca-82e9-5b2802766c02%2522%257d%26anon%3Dtrue',
+            'https://teams.microsoft.com/dl/launcher/launcher.html?url=%2F_%23%2Fl%2Fmeetup-join%2F19%3Ameeting_OWQxZDc4MzYtN2NhMC00MjZkLWI5NmEtYWZkMmNjNjQ1Y2Rm%40thread.v2%2F0%3Fcontext',
+        ]
 
-        expect(() => {
-            parseMeetingUrlFromJoinInfos(nonTeamsUrl)
-        }).toThrow(JoinError)
+        test.each(launcherUrls)(
+            'should parse Teams Launcher URL: %s',
+            (url) => {
+                const result = parseMeetingUrlFromJoinInfos(url)
+                expect(result.meetingId).toBe(url + '&anon=true')
+                expect(result.password).toBe('')
+            },
+        )
     })
 
-    it('should handle malformed URL', () => {
-        const malformedUrl = 'not-a-url'
+    describe('Teams TACV2 URLs', () => {
+        const tacv2Urls = [
+            'https://teams.microsoft.com/l/meetup-join/19:alTrvfJlXitdMLLxjio8rfnHDhKWaZ3_M-EwK5ewWHg1@thread.tacv2/1730831739131?context=%7B%22Tid%22:%221eba988e-f725-4323-976e-38aaba6ee3a3%22%7D',
+            'https://teams.microsoft.com/l/meetup-join/19:alTrvfJlXitdMLLxjio8rfnHDhKWaZ3_M-EwK5ewWHg1@thread.tacv2/1731342990116?context=%7BTid:1eba988e-f725-4323-976e-38aaba6ee3a3,Oid:2f8f4d50-3e1b-41ea-99fe-4361ba60ada5%7D',
+        ]
 
-        expect(() => {
-            parseMeetingUrlFromJoinInfos(malformedUrl)
-        }).toThrow(JoinError)
+        test.each(tacv2Urls)('should parse TACV2 URL: %s', (url) => {
+            const result = parseMeetingUrlFromJoinInfos(url)
+            expect(result.meetingId).toBe(url + '&anon=true')
+            expect(result.password).toBe('')
+        })
+    })
+
+    describe('Teams URLs with Custom Subdomains', () => {
+        const subdomainUrls = [
+            'https://us02web.teams.microsoft.com/l/meetup-join/19:meeting_123@thread.v2/0',
+            'https://us06web.teams.microsoft.com/l/meetup-join/19:meeting_456@thread.v2/0',
+        ]
+
+        test.each(subdomainUrls)('should parse subdomain URL: %s', (url) => {
+            const result = parseMeetingUrlFromJoinInfos(url)
+            expect(result.meetingId).toBe(url + '&anon=true')
+            expect(result.password).toBe('')
+        })
+    })
+
+    describe('Invalid URLs', () => {
+        const invalidUrls = [
+            'https://not-teams.com/meeting',
+            'https://teams.zoom.us/j/123456',
+            'not-a-url',
+            'https://teams.com/invalid-format',
+            '',
+        ]
+
+        test.each(invalidUrls)('should reject invalid URL: %s', (url) => {
+            expect(() => {
+                parseMeetingUrlFromJoinInfos(url)
+            }).toThrow(JoinError)
+        })
+    })
+
+    describe('Encoded URLs', () => {
+        const encodedUrls = [
+            encodeURI(
+                'https://teams.microsoft.com/l/meetup-join/19:meeting_123@thread.v2/0',
+            ),
+            encodeURIComponent(
+                'https://teams.microsoft.com/l/meetup-join/19:meeting_456@thread.v2/0',
+            ),
+        ]
+
+        test.each(encodedUrls)('should handle encoded URL: %s', (url) => {
+            const result = parseMeetingUrlFromJoinInfos(url)
+            expect(result).toBeDefined()
+            expect(result.password).toBe('')
+        })
+    })
+
+    describe('Google Redirect URLs', () => {
+        const googleUrls = [
+            'https://www.google.com/url?q=https://teams.microsoft.com/l/meetup-join/19%3ameeting_OTUzODNjNmEtNjIwMC00MzkxLWExYjktNWMyMDY2NTE3Yzhk%40thread.v2/0',
+            'https://www.google.com/url?q=https://teams.microsoft.com/l/meetup-join/19%3ameeting_NjVhZDgyYjQtZDE2NC00ZDI4LWI3Y2EtN2Y4Zjg3ODQwNzc2%40thread.v2/0',
+        ]
+
+        test.each(googleUrls)(
+            'should handle Google redirect URL: %s',
+            (url) => {
+                const result = parseMeetingUrlFromJoinInfos(url)
+                expect(result).toBeDefined()
+                expect(result.password).toBe('')
+            },
+        )
     })
 })

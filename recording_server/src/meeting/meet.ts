@@ -1,5 +1,4 @@
 import * as puppeteer from 'puppeteer'
-import * as R from 'ramda'
 
 import { JoinError, JoinErrorCode } from '../meeting'
 import {
@@ -11,26 +10,13 @@ import {
 
 import { Page } from 'puppeteer'
 import { Logger } from '../logger'
+import { parseMeetingUrlFromJoinInfos } from '../urlParser/meetUrlParser'
 import { sleep } from '../utils'
 
 export class MeetProvider implements MeetingProviderInterface {
     constructor() {}
     async parseMeetingUrl(browser: puppeteer.Browser, meeting_url: string) {
-        if (meeting_url.startsWith('meet')) {
-            meeting_url = `https://${meeting_url}`
-        }
-        const urlSplitted = meeting_url.split(/\s+/)
-        const strictRegex =
-            /^https:\/\/meet\.google\.com\/[a-z]{3}-[a-z]{4}-[a-z]{3}(\?.*)?$/
-
-        if (!strictRegex.test(meeting_url)) {
-            throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
-        }
-        const url = R.find((s) => s.startsWith('https://meet'), urlSplitted)
-        if (url == null) {
-            throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
-        }
-        return { meetingId: url, password: '' }
+        return parseMeetingUrlFromJoinInfos(meeting_url)
     }
     getMeetingLink(
         meeting_id: string,

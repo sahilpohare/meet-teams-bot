@@ -1,60 +1,69 @@
 import { JoinError, JoinErrorCode } from '../meeting'
 
 export interface TeamsUrlComponents {
-    threadId: string
-    tenantId?: string
-    organizerId?: string
+    meetingId: string
+    password: string
 }
 
-export function parseMeetingUrlFromJoinInfos(joinInfo: string): string {
+export function parseMeetingUrlFromJoinInfos(
+    meeting_url: string,
+): TeamsUrlComponents {
     try {
-        const url = new URL(joinInfo)
-
-        if (!url.hostname.includes('teams.microsoft.com')) {
-            throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
+        // Handle Google redirect URLs first
+        if (meeting_url.startsWith('https://www.google.com/url')) {
+            const url = new URL(meeting_url)
+            meeting_url = url.searchParams.get('q') || meeting_url
         }
 
-        const components = parseTeamsUrlComponents(url)
-
-        if (!components?.threadId) {
-            throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
+        // For fully encoded URLs, decode once
+        if (meeting_url.startsWith('https%3A')) {
+            meeting_url = decodeURIComponent(meeting_url)
         }
 
-        return joinInfo
-    } catch (error) {
-        // Ne pas utiliser console.error ici
-        if (error instanceof JoinError) {
-            throw error
-        }
-        throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
-    }
-}
+        const url = new URL(meeting_url)
 
-function parseTeamsUrlComponents(url: URL): TeamsUrlComponents {
-    try {
-        const threadMatch = url.pathname.match(
-            /19%3ameeting_(.+?)%40thread\.v2/,
-        )
-        const threadId = threadMatch ? threadMatch[1] : ''
+        // Handle teams.live.com URLs
+        if (url.hostname.includes('teams.live.com')) {
+            const meetPath = url.pathname.split('/')
+            const meetId = meetPath[meetPath.length - 1]
+            const params = url.searchParams.toString()
 
-        const params = new URLSearchParams(url.search)
-        const context = params.get('context')
+            if (!meetId || meetId === '') {
+                throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
+            }
 
-        let tenantId = ''
-        let organizerId = ''
-
-        if (context) {
-            try {
-                const contextObj = JSON.parse(decodeURIComponent(context))
-                tenantId = contextObj.Tid || ''
-                organizerId = contextObj.Oid || ''
-            } catch {
-                // Ignorer les erreurs de parsing JSON
+            return {
+                meetingId: `https://teams.live.com/_#/meet/${meetId}?${params}?anon=true`,
+                password: '',
             }
         }
 
-        return { threadId, tenantId, organizerId }
-    } catch {
-        return { threadId: '' }
+        // Handle teams.microsoft.com URLs
+        if (url.hostname.includes('teams.microsoft.com')) {
+            // Handle launcher URLs
+            if (url.pathname.includes('/dl/launcher/launcher.html')) {
+                return {
+                    meetingId: meeting_url + '&anon=true',
+                    password: '',
+                }
+            }
+
+            // For standard and TACV2 URLs
+            if (
+                !meeting_url.includes('thread.v2') &&
+                !meeting_url.includes('thread.tacv2')
+            ) {
+                throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
+            }
+
+            return {
+                meetingId: meeting_url + '&anon=true',
+                password: '',
+            }
+        }
+
+        throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
+    } catch (error) {
+        throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
     }
 }
