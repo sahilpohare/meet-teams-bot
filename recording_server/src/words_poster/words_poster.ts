@@ -80,9 +80,10 @@ export class WordsPoster {
         // Ends the transcribing, and destroys resources.
         // Waits for the workers to finish, and destroys the transcbriber.
         console.log('before transcribe queue drain')
-        // this.transcribeQueue.push(async () => { // TODO : Is it necessary ?
-        //     return
-        // })
+        this.transcribeQueue.push(async () => {
+            // It's necessary to do that, don't know why but don't remove it.
+            return
+        })
         await this.transcribeQueue.drain()
         console.log('after transcribe queue drain')
 

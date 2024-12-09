@@ -134,10 +134,13 @@ export class MeetProvider implements MeetingProviderInterface {
         cancellationToken: CancellationToken,
     ): Promise<boolean> {
         try {
-            return await removedFromMeeting(page)
-        } catch (e) {
-            console.error('[findendmeeting] error', e)
-            return false
+            if (!page.isClosed()) {
+                return await removedFromMeeting(page);
+            }
+            return true;
+        } catch {
+            console.log('error in findEndMeeting')
+            return true;
         }
     }
 }
@@ -277,19 +280,26 @@ async function notAcceptedInMeeting(page: Page): Promise<boolean> {
 }
 
 async function removedFromMeeting(page: Page): Promise<boolean> {
-    return await page.$$eval('*', (elems) => {
-        for (const e of elems) {
-            let elem = e as any
-            // console.log(elem.innerText)
-            if (
-                elem.innerText === "You've been removed from the meeting" ||
-                elem.innerText === 'The call ended because everyone left'
-            ) {
-                return true
-            }
-        }
-        return false
-    })
+    try {
+        const result = await Promise.race([
+            page.$$eval('*', (elems) => {
+                for (const e of elems) {
+                    const text = (e as HTMLElement).innerText;
+                    if (text?.includes("You've been removed") || 
+                        text?.includes("The call ended") ||
+                        text?.includes("Return to home")) {
+                        return true;
+                    }
+                }
+                return false;
+            }),
+            new Promise((_, reject) => setTimeout(() => reject('Timeout'), 5000))
+        ]);
+        return !!result;
+    } catch (error) {
+        console.error('Timeout or error in removedFromMeeting:', error);
+        return true; // En cas de timeout, considérer comme terminé
+    }
 }
 
 async function clickDismiss(page: Page): Promise<boolean> {

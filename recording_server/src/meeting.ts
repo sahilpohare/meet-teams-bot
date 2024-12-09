@@ -416,6 +416,7 @@ export class MeetingHandle {
                         console.error(`findEndMeeting crashed with error: ${e}`)
                     })
             ) {
+                console.log('findEndMeeting triggered')
                 await this.stopRecording('Bot removed')
             } else if (
                 (NUMBER_OF_ATTENDEES.get() === 0 &&
@@ -446,6 +447,7 @@ export class MeetingHandle {
     }
 
     public async stopRecording(reason: string) {
+        console.log('stopRecording called')
         if (MeetingHandle.status.state !== 'Recording') {
             console.error(
                 `Can't exit meeting, the meeting is not in recording state`,
