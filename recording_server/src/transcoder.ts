@@ -222,10 +222,13 @@ class Transcoder {
                     await WordsPoster.TRANSCRIBER?.push(timeStart, timeEnd)
                 }
             } else {
-                // Recording has stoped
+                // Recording has stopped.
                 let inverseMod =
                     chunksPerTranscribe -
                     (this.chunkReceavedCounter % chunksPerTranscribe)
+                if (inverseMod === 18) {
+                    inverseMod = 0
+                }
                 // Request the final transcribe
                 let timeStart =
                     (this.chunkReceavedCounter +
