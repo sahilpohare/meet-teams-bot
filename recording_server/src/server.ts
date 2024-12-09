@@ -114,14 +114,9 @@ export async function server() {
         Streaming.instance?.send_speaker_state(speakers)
         console.table(speakers)
         let input = JSON.stringify(speakers)
-        await fs
-            .appendFile(
-                Logger.instance.get_speaker_log_directory(),
-                `${input}\n`,
-            )
-            .catch((e) => {
-                console.error(`Cannot append speaker log file ! : ${e}`)
-            })
+        await fs.appendFile(Logger.instance.get_speaker_log_directory(), `${input}\n`).catch((e) => {
+            console.error(`Cannot append speaker log file ! : ${e}`)
+        })
 
         // Set the number of attendees in the meeting
         NUMBER_OF_ATTENDEES.set(speakers.length)
