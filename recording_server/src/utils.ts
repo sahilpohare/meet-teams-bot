@@ -4,22 +4,6 @@ export function sleep(ms: number) {
     return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-export class Console {
-    constructor() {}
-    protected log(...args: any[]): void {
-        console.log(`[${this.constructor.name}]`, ...args)
-    }
-    protected info(...args: any[]): void {
-        console.info(`[${this.constructor.name}]`, ...args)
-    }
-    protected warn(...args: any[]): void {
-        console.warn(`[${this.constructor.name}]`, ...args)
-    }
-    protected error(...args: any[]): void {
-        console.error(`[${this.constructor.name}]`, ...args)
-    }
-}
-
 export async function delete_s3_file(s3Path: string, bucketName: string) {
     try {
         await deleteFromS3(bucketName, s3Path)

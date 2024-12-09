@@ -4,7 +4,7 @@ import { Api } from '../api/methods'
 import { parseGladia, recognizeGladia } from './providers/gladia'
 import { parseRunPod, recognizeRunPod } from './providers/runpod'
 
-import { Console, delete_s3_file } from '../utils'
+import { delete_s3_file } from '../utils'
 import { MeetingParams } from '../types'
 import { TRANSCODER } from '../transcoder'
 
@@ -28,7 +28,7 @@ function newTranscribeQueue() {
 }
 
 // Transcribes an audio stream using the recognizer of the underlying Node server.
-export class WordsPoster extends Console {
+export class WordsPoster {
     static TRANSCRIBER: WordsPoster | undefined
 
     private bot_uuid: string
@@ -43,7 +43,6 @@ export class WordsPoster extends Console {
 
     // Returns a new `WordsPoster`.
     private constructor(params: MeetingParams) {
-        super()
         this.bot_uuid = params.bot_uuid
         this.speech_to_text_provider = params.speech_to_text_provider
         this.speech_to_text_api_key = params.speech_to_text_api_key
@@ -73,19 +72,19 @@ export class WordsPoster extends Console {
 
     // Request the latest transcription and stop the transcriber for good.
     public async stop(): Promise<void> {
-        this.log('stop called')
+        console.log('stop called')
         if (this.stopped) {
-            this.error('WordPoster already stoped!')
+            console.error('WordPoster already stoped!')
         }
         // Wait until complete sequence
         // Ends the transcribing, and destroys resources.
         // Waits for the workers to finish, and destroys the transcbriber.
-        this.log('before transcribe queue drain')
+        console.log('before transcribe queue drain')
         // this.transcribeQueue.push(async () => { // TODO : Is it necessary ?
         //     return
         // })
         await this.transcribeQueue.drain()
-        this.log('after transcribe queue drain')
+        console.log('after transcribe queue drain')
 
         this.stopped = true
         return new Promise((resolve) => resolve())
@@ -97,7 +96,7 @@ export class WordsPoster extends Console {
     ): Promise<void> {
         let api = Api.instance
         const s3Path = `${this.user_id}/${this.bot_uuid}/${timeStart}-${timeEnd}-record.wav`
-        this.log('ready to do transcription between: ', timeStart, timeEnd)
+        console.log('ready to do transcription between: ', timeStart, timeEnd)
         try {
             const audioUrl = await TRANSCODER.extractAudio(
                 timeStart,
@@ -105,7 +104,7 @@ export class WordsPoster extends Console {
                 this.s3_bucket,
                 s3Path,
             )
-            this.log(audioUrl)
+            console.log(audioUrl)
 
             let words: RecognizerWord[]
             switch (this.speech_to_text_provider) {
@@ -128,28 +127,28 @@ export class WordsPoster extends Console {
                     words = parseGladia(res_gladia, timeStart)
                     break
                 default:
-                    this.error(
+                    console.error(
                         'Unknown Transcription Provider !',
                         this.speech_to_text_provider,
                     )
                     words = new Array()
             }
-            this.log('[onResult] ')
+            console.log('[onResult] ')
             const bot = await api.getBot().catch((e) => {
-                this.error('Failed to get bot :', e)
+                console.error('Failed to get bot :', e)
                 throw e
             })
             await api.postWords(words, bot.bot.id).catch((e) => {
-                this.error('Failed to post words :', e)
+                console.error('Failed to post words :', e)
                 throw e
             })
         } catch (e) {
-            this.error('an error occured calling transcriber, ', e)
+            console.error('an error occured calling transcriber, ', e)
         } finally {
             try {
                 await delete_s3_file(s3Path, this.s3_bucket)
             } catch (e) {
-                this.error('an error occured deleting audio from S3, ', e)
+                console.error('an error occured deleting audio from S3, ', e)
             }
         }
     }

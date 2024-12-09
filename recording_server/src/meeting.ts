@@ -378,7 +378,6 @@ export class MeetingHandle {
         console.log('after waitForEndMeeting')
         await Events.callEnded()
 
-
         await MeetingHandle.stopAudioStreaming()
 
         await this.stopRecordingInternal().catch((e) => {
@@ -505,7 +504,6 @@ export class MeetingHandle {
         } catch (e) {
             console.error(`Failed to close page: ${e}`)
         }
-
 
         await WordsPoster.TRANSCRIBER?.stop().catch((e) => {
             console.error(`Cannot stop Transcriber: ${e}`)

@@ -7,15 +7,14 @@ import { MeetingParams } from '../types'
 import { Console } from '../utils'
 import { RecognizerWord } from '../words_poster/words_poster'
 
-export class Api extends Console {
+export class Api {
     public static instance: Api | null = null // Singleton class
 
     private bot_uuid: string
 
     constructor(params: MeetingParams) {
-        super()
         if (Api.instance instanceof Api) {
-            this.error(
+            console.error(
                 'Class is singleton, constructor cannot be called multiple times.',
             )
             return Api.instance
@@ -56,14 +55,18 @@ export class Api extends Console {
             err.response && err.response.data ? err.response.data : err
         const request = err.request
 
-        this.log('Attempt of a new trial #', cfg && cfg.currentRetryAttempt, {
-            url: request.url,
-            method: request.method,
-            params: request.params,
-            headers: request.headers,
-            data: request.data,
-            response: response,
-        })
+        console.log(
+            'Attempt of a new trial #',
+            cfg && cfg.currentRetryAttempt,
+            {
+                url: request.url,
+                method: request.method,
+                params: request.params,
+                headers: request.headers,
+                data: request.data,
+                response: response,
+            },
+        )
     }
 
     // Finalize bot structure into BDD and send webhook
