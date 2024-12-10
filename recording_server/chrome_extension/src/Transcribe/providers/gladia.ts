@@ -96,10 +96,9 @@ export function parseGladia(
 ): RecognizerWord[] {
     return findWords(apiResponse.result).map((w: GladiaWordWithTimestamp) => {
         return {
-            type: 'text',
-            value: w.word.trim(),
-            ts: w.start + offset,
-            end_ts: w.end + offset,
+            text: w.word.trim(),
+            start_time: w.start + offset,
+            end_time: w.end + offset,
             // confidence: w.confidence,
             // IMPORTANT : The server doesn't seem to interpret things correctly if we return the actual confidence,
             // which is less than 1.

@@ -48,13 +48,11 @@ export type MeetingProvider = 'Zoom' | 'Meet' | 'Teams'
 
 /** Output word of the `Recognizer`. */
 export type RecognizerWord = {
-    /** The type. */
-    type: string
     /** The word recognized. */
-    value: string
+    text: string
     /** Start timestamp (in seconds). */
-    ts: number /** End timestamp (in seconds). */
-    end_ts: number
+    start_time: number /** End timestamp (in seconds). */
+    end_time: number
     /** Confidence ([0.0, 1.0]). */
     confidence: number
 }
