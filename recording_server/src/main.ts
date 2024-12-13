@@ -146,7 +146,6 @@ async function handleErrorInStartRecording(error: Error, data: MeetingParams) {
         await meetingBotStartRecordFailed(
             data.meeting_url,
             data.bot_uuid,
-            data.event?.id,
             error instanceof JoinError ? error.message : JoinErrorCode.Internal,
         )
     } catch (e) {
@@ -160,12 +159,10 @@ async function handleErrorInStartRecording(error: Error, data: MeetingParams) {
 export async function meetingBotStartRecordFailed(
     meetingLink: string,
     bot_uuid: string,
-    eventId?: number,
-    message?: string,
+    message: string,
 ): Promise<void> {
     let meetingParams = {
         meeting_url: meetingLink,
-        event_id: eventId,
         message,
     }
     await axios({
