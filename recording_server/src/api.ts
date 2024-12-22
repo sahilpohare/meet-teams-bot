@@ -10,6 +10,9 @@ export async function endMeetingTrampoline(bot_uuid: string) {
         params: {
             bot_uuid,
         },
+        data: {
+            diarization_v2: false,
+        }
     })
     return resp.data
 }
