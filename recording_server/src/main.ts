@@ -37,10 +37,13 @@ console.log('version 0.0.1')
         axios.defaults.withCredentials = true
 
         // trigger system cache in order to decrease latency when first bot come
-        await triggerCache().catch((e) => {
-            console.error(`Failed to trigger cache: ${e}`)
-            throw e
-        })
+        let environ: string = process.env.ENVIRON
+        if (environ !== 'local') {
+            await triggerCache().catch((e) => {
+                console.error(`Failed to trigger cache: ${e}`)
+                throw e
+            })
+        }
 
         await clientRedis.connect().catch((e) => {
             console.error(`Fail to connect to redis: ${e}`)
