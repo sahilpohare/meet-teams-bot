@@ -12,7 +12,7 @@ export async function endMeetingTrampoline(bot_uuid: string) {
         },
         data: {
             diarization_v2: false,
-        }
+        },
     })
     return resp.data
 }

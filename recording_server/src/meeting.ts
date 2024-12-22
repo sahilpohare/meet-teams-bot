@@ -129,16 +129,6 @@ export class MeetingHandle extends Console {
     }
     constructor(meetingParams: MeetingParams) {
         super()
-        function detectMeetingProvider(url: string): MeetingProvider {
-            if (url.includes('https://teams')) {
-                return 'Teams'
-            } else if (url.includes('https://meet')) {
-                return 'Meet'
-            } else {
-                return 'Zoom'
-            }
-        }
-
         function newMeetingProvider(
             meetingProvider: MeetingProvider,
         ): MeetingProviderInterface {
@@ -152,9 +142,6 @@ export class MeetingHandle extends Console {
         }
         this.log(
             '************ meetingParams meeting_url!!!',
-            meetingParams.meeting_url,
-        )
-        meetingParams.meetingProvider = detectMeetingProvider(
             meetingParams.meeting_url,
         )
         this.provider = newMeetingProvider(meetingParams.meetingProvider)

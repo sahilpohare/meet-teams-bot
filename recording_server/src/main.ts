@@ -84,7 +84,7 @@ console.log('version 0.0.1')
             ).catch((e) => {
                 console.error('error in handleErrorInStartRecording', e)
             })
-        } else {
+        } else if (consumeResult.params.meetingProvider !== 'Zoom') {
             // Assuming that recording is active at this point
             let meeting_succesful = await MeetingHandle.instance
                 .recordMeetingToEnd()
@@ -114,6 +114,8 @@ console.log('version 0.0.1')
                     },
                 )
             }
+        } else {
+            // ZOOM part... TODO
         }
 
         await delSessionInRedis(consumeResult.params.session_id).catch((e) => {

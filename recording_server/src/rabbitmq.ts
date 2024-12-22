@@ -10,7 +10,7 @@ import { Events } from './events'
 import { Logger } from './logger'
 import { MeetingHandle } from './meeting'
 import { Streaming } from './streaming'
-import { MeetingParams } from './types'
+import { MeetingParams, MeetingProvider } from './types'
 import axios from 'axios'
 
 import { promises as fs } from 'fs'
@@ -125,11 +125,28 @@ export class Consumer {
             console.error('fail to set session in redis: ', e)
         }
         console.log('after set session in redis')
-        MeetingHandle.init(data)
 
-        Events.init(data)
-        await Events.joiningCall()
+        data.meetingProvider = detectMeetingProvider(data.meeting_url)
+        if (data.meetingProvider === 'Zoom') {
+            // Nothing special to do here for Zoom : TODO
+            return
+        } else {
+            MeetingHandle.init(data)
 
-        await MeetingHandle.instance.startRecordMeeting()
+            Events.init(data)
+            await Events.joiningCall()
+
+            await MeetingHandle.instance.startRecordMeeting()
+        }
+    }
+}
+
+function detectMeetingProvider(url: string): MeetingProvider {
+    if (url.includes('https://teams')) {
+        return 'Teams'
+    } else if (url.includes('https://meet')) {
+        return 'Meet'
+    } else {
+        return 'Zoom'
     }
 }
