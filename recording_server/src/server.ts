@@ -552,10 +552,13 @@ export async function server() {
         const { s3Path, bucketName } = req.body
 
         function deleteFromS3(
-            bucketName: string,
+            _bucketName: string,
             s3Path: string,
         ): Promise<void> {
             return new Promise((resolve, reject) => {
+                // TODO : Given _bucketName is completly bullshit here !!! FUCK IT !
+                let bucketName: string = process.env.AWS_S3_TEMPORARY_AUDIO_BUCKET;
+
                 const s3FullPath = `s3://${bucketName}/${s3Path}`
 
                 const awsCommand = spawn('aws', ['s3', 'rm', s3FullPath])

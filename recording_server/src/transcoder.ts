@@ -286,12 +286,14 @@ class Transcoder extends Console {
     public async extractAudio(
         timeStart: number,
         timeEnd: number,
-        bucketName: string,
+        _bucketName: string,
         s3Path: string,
     ): Promise<string> {
         if (!this.ffmpeg_process) {
             throw new Error('Transcoder not initialized')
         }
+        // TODO : Given _bucketName is completly bullshit here !!! FUCK IT !
+        let bucketName: string = process.env.AWS_S3_TEMPORARY_AUDIO_BUCKET;
 
         const outputAudioPath = path.join(
             os.tmpdir(),
