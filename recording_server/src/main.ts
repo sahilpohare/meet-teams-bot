@@ -18,7 +18,8 @@ import { endMeetingTrampoline } from './api'
 
 import { spawn } from 'child_process'
 
-const ZOOM_SDK_EXECUTABLE_PATHNAME = './target/debug/client'
+const ZOOM_SDK_DEBUG_EXECUTABLE_PATHNAME = './target/debug/client'
+const ZOOM_SDK_RELEASE_EXECUTABLE_PATHNAME = './target/release/client'
 const ZOOM_SDK_LIBRARY_PATH = './zoom-sdk-linux-rs/zoom-meeting-sdk-linux'
 const ZOOM_SDK_RELATIVE_DIRECTORY = '../zoom'
 
@@ -135,7 +136,9 @@ console.log('version 0.0.1')
                     console.log('Executing client...')
 
                     const clientProcess = spawn(
-                        ZOOM_SDK_EXECUTABLE_PATHNAME,
+                        environ === 'local'
+                            ? ZOOM_SDK_DEBUG_EXECUTABLE_PATHNAME
+                            : ZOOM_SDK_RELEASE_EXECUTABLE_PATHNAME,
                         [],
                         {
                             env: process.env,

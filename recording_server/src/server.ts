@@ -557,7 +557,8 @@ export async function server() {
         ): Promise<void> {
             return new Promise((resolve, reject) => {
                 // TODO : Given _bucketName is completly bullshit here !!! FUCK IT !
-                let bucketName: string = process.env.AWS_S3_TEMPORARY_AUDIO_BUCKET;
+                let bucketName: string =
+                    process.env.AWS_S3_TEMPORARY_AUDIO_BUCKET
 
                 const s3FullPath = `s3://${bucketName}/${s3Path}`
 
