@@ -161,7 +161,9 @@ console.log('version 0.0.1')
                     console.error('Error while loading Zoom: ', error)
                 }
             }
-            await runClient(consumeResult.params)
+            await runClient(consumeResult.params).catch((e) => {
+                console.error(`Promise rejected : ${e}`)
+            })
         }
 
         await delSessionInRedis(consumeResult.params.session_id).catch((e) => {
