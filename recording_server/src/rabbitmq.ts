@@ -13,7 +13,7 @@ import { Streaming } from './streaming'
 import { MeetingParams, MeetingProvider } from './types'
 import axios from 'axios'
 
-import { promises as fs } from 'fs'
+import { server } from './server'
 
 const NODE_NAME = process.env.NODE_NAME
 
@@ -96,14 +96,6 @@ export class Consumer {
 
     // throw error if start recoridng fail
     static async handleStartRecord(data: MeetingParams) {
-        if (data.streaming_input || data.streaming_output) {
-            new Streaming(
-                data.streaming_input,
-                data.streaming_output,
-                data.streaming_audio_frequency,
-                data.bot_uuid,
-            )
-        }
         await Logger.instance.updateGrafanaAgentAddBotUuid()
 
         console.log('####### DATA #######', data)
@@ -128,9 +120,23 @@ export class Consumer {
 
         data.meetingProvider = detectMeetingProvider(data.meeting_url)
         if (data.meetingProvider === 'Zoom') {
-            // Nothing special to do here for Zoom : TODO
+            // Nothing special to do here for Zoom
             return
         } else {
+            await server().catch((e) => {
+                console.error(`Fail to start server: ${e}`)
+                throw e
+            })
+            if (data.streaming_input || data.streaming_output) {
+                new Streaming(
+                    data.streaming_input,
+                    data.streaming_output,
+                    data.streaming_audio_frequency,
+                    data.bot_uuid,
+                )
+            }
+            console.log('Server started succesfully')
+
             MeetingHandle.init(data)
 
             Events.init(data)

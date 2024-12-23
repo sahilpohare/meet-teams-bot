@@ -6,7 +6,7 @@ import {
 } from './instance'
 import { JoinError, JoinErrorCode, MeetingHandle } from './meeting'
 import { getCachedExtensionId, getExtensionId, openBrowser } from './puppeteer'
-import { clientRedis, server } from './server'
+import { clientRedis } from './server'
 
 import axios from 'axios'
 import { exit } from 'process'
@@ -15,6 +15,12 @@ import { Consumer } from './rabbitmq'
 import { TRANSCODER } from './transcoder'
 import { MeetingParams } from './types'
 import { endMeetingTrampoline } from './api'
+
+import { spawn } from 'child_process'
+
+const ZOOM_SDK_EXECUTABLE_PATHNAME = './target/debug/client'
+const ZOOM_SDK_LIBRARY_PATH = './zoom-sdk-linux-rs/zoom-meeting-sdk-linux'
+const ZOOM_SDK_RELATIVE_DIRECTORY = '../zoom'
 
 const originalError = console.error
 console.error = (...args: any[]) => {
@@ -49,12 +55,6 @@ console.log('version 0.0.1')
             console.error(`Fail to connect to redis: ${e}`)
             throw e
         })
-
-        await server().catch((e) => {
-            console.error(`Fail to start server: ${e}`)
-            throw e
-        })
-        console.log('Server started succesfully')
 
         const consumer = await Consumer.init().catch((e) => {
             console.error(`Fail to init consumer: ${e}`)
@@ -118,7 +118,47 @@ console.log('version 0.0.1')
                 )
             }
         } else {
-            // ZOOM part... TODO
+            // Configuring and launching LINUX ZOOM SDK
+            console.log('Current Directory :', process.cwd())
+            process.chdir(ZOOM_SDK_RELATIVE_DIRECTORY)
+            console.log('Switching to :', process.cwd())
+
+            const libraryPath = ZOOM_SDK_LIBRARY_PATH
+            process.env.LD_LIBRARY_PATH = `${libraryPath}:${process.env.LD_LIBRARY_PATH || ''}`
+            console.log(
+                'LD_LIBRARY_PATH :',
+                process.env.LD_LIBRARY_PATH || 'Undefined',
+            )
+
+            async function runClient(params: MeetingParams) {
+                try {
+                    console.log('Executing client...')
+
+                    const clientProcess = spawn(
+                        ZOOM_SDK_EXECUTABLE_PATHNAME,
+                        [],
+                        {
+                            env: process.env,
+                            stdio: ['pipe', 'inherit', 'inherit'],
+                        },
+                    )
+
+                    clientProcess.stdin?.write(JSON.stringify(params))
+                    clientProcess.stdin?.end()
+
+                    const exitCode = await new Promise<number>(
+                        (resolve, reject) => {
+                            clientProcess.on('close', resolve)
+                            clientProcess.on('error', reject)
+                        },
+                    )
+
+                    console.log(`Process terminated with code: ${exitCode}`)
+                } catch (error) {
+                    console.error('Error while loading Zoom: ', error)
+                }
+            }
+            await runClient(consumeResult.params)
         }
 
         await delSessionInRedis(consumeResult.params.session_id).catch((e) => {
