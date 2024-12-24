@@ -139,7 +139,9 @@ console.log('version 0.0.1')
                         environ === 'local'
                             ? ZOOM_SDK_DEBUG_EXECUTABLE_PATHNAME
                             : ZOOM_SDK_RELEASE_EXECUTABLE_PATHNAME,
-                        [],
+                        process.argv[2]?.includes('--zoom-no-recursive-env')
+                            ? ['--no-recursive-env']
+                            : [],
                         {
                             env: process.env,
                             stdio: ['pipe', 'inherit', 'inherit'],

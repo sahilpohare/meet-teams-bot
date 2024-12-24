@@ -159,6 +159,8 @@ export class SoundContext extends MediaContext {
 // Video events into camera device
 //
 // https://github.com/umlaeute/v4l2loopback
+// Add user to video group for accessing video device
+// sudo usermod -a -G video ubuntu
 //
 // ___COMMON_ISSUE___ After many attempts or a long time
 // [video4linux2,v4l2 @ 0x5581ac5f8ac0] ioctl(VIDIOC_G_FMT): Invalid argument
