@@ -23,6 +23,7 @@ export type SpokeSession = {
 
 export async function initMediaRecorder(
     streaming_output: string | undefined,
+    streaming_audio_frequency: number | undefined,
 ): Promise<void> {
     const fps = 30
 
@@ -46,7 +47,10 @@ export async function initMediaRecorder(
 
                 if (streaming_output) {
                     new SoundStreamer()
-                    SoundStreamer.instance.start(stream)
+                    SoundStreamer.instance.start(
+                        stream,
+                        streaming_audio_frequency,
+                    )
                 } else {
                     CONTEXT = new AudioContext()
                     THIS_STREAM = CONTEXT!.createMediaStreamSource(stream)

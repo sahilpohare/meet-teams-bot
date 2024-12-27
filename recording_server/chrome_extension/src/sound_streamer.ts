@@ -1,5 +1,5 @@
 const LOCAL_WEBSOCKET_URL: string = 'ws://localhost:8081'
-const FREQUENCY: number = 24000 // 24khz sample frequency
+const DEFAULT_SAMPLE_RATE: number = 24_000 // 24khz sample frequency
 const BUFFER_SIZE: number = 256 // Assuming chunks of 62.5 ms
 
 export class SoundStreamer {
@@ -7,6 +7,7 @@ export class SoundStreamer {
 
     private ws: WebSocket
     private processor: ScriptProcessorNode | null = null
+    private streaming_audio_frequency: number = DEFAULT_SAMPLE_RATE
 
     constructor() {
         console.info(this.constructor.name, 'Constructor called')
@@ -27,11 +28,17 @@ export class SoundStreamer {
         SoundStreamer.instance = this
     }
 
-    public start(stream: MediaStream) {
+    public start(
+        stream: MediaStream,
+        streaming_audio_frequency: number | undefined,
+    ) {
         console.info(this.constructor.name, ': Starting audio capture')
+        if (streaming_audio_frequency) {
+            this.streaming_audio_frequency = streaming_audio_frequency
+        }
 
         const audioContext = new AudioContext({
-            sampleRate: FREQUENCY,
+            sampleRate: this.streaming_audio_frequency,
         })
 
         const source = audioContext.createMediaStreamSource(stream)

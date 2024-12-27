@@ -7,7 +7,7 @@ import { SoundContext } from './media_context'
 import { Console } from './utils'
 
 const EXTENSION_WEBSOCKET_PORT: number = 8081
-const SAMPLE_RATE: number = 24_000
+const DEFAULT_SAMPLE_RATE: number = 24_000
 
 export class Streaming extends Console {
     public static instance: Streaming | null
@@ -18,13 +18,18 @@ export class Streaming extends Console {
     > | null
     private output_ws: WebSocket | null = null // May be used as dual channel, input and output
     private input_ws: WebSocket | null = null
+    private sample_rate: number = DEFAULT_SAMPLE_RATE
 
     constructor(
         input: string | undefined,
         output: string | undefined,
+        sample_rate: number | undefined,
         bot_id: string,
     ) {
         super()
+        if (sample_rate) {
+            this.sample_rate = sample_rate
+        }
         if (output) {
             this.info(`output = ${output}`)
             this.extension_ws = new WebSocket.Server({
@@ -117,7 +122,7 @@ export class Streaming extends Console {
     }
     // Inject audio stream into microphone
     private play_incoming_audio_chunks = (input_ws: WebSocket) => {
-        new SoundContext(SAMPLE_RATE)
+        new SoundContext(this.sample_rate)
         let stdin = SoundContext.instance.play_stdin()
         let audio_stream = this.createAudioStreamFromWebSocket(input_ws)
         audio_stream.on('data', (chunk) => {

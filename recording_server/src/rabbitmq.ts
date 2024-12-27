@@ -100,6 +100,7 @@ export class Consumer {
             new Streaming(
                 data.streaming_input,
                 data.streaming_output,
+                data.streaming_audio_frequency,
                 data.bot_uuid,
             )
         }

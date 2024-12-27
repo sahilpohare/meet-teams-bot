@@ -103,7 +103,10 @@ export async function startRecording(
             'FROM_EXTENSION: ************ Start recording launched. ************',
         )
         await sleep(1000)
-        await record.initMediaRecorder(meetingParams.streaming_output)
+        await record.initMediaRecorder(
+            meetingParams.streaming_output,
+            meetingParams.streaming_audio_frequency,
+        )
         await record.startRecording()
     } catch (e) {
         console.log('ERROR while start recording', JSON.stringify(e))

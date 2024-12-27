@@ -19,6 +19,7 @@ export type MeetingParams = {
     speech_to_text_api_key?: string
     streaming_input?: string
     streaming_output?: string
+    streaming_audio_frequency?: number
     bot_uuid: string
     s3_bucket: string
     mp4_s3_path: string
