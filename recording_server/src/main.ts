@@ -10,7 +10,7 @@ import { clientRedis } from './server'
 
 import axios from 'axios'
 import { exit } from 'process'
-import { generateBranding } from './branding'
+// import { generateBranding } from './branding'
 import { Consumer } from './rabbitmq'
 import { TRANSCODER } from './transcoder'
 import { MeetingParams } from './types'
@@ -228,11 +228,13 @@ export async function meetingBotStartRecordFailed(
 /// open the browser a first time to speed up the next openings
 async function triggerCache() {
     const extensionId = await getCachedExtensionId()
-    const [chrome, chromium] = await Promise.all([
+    const [chrome, _chromium] = await Promise.all([
         openBrowser(extensionId, false, false),
-        openBrowser(extensionId, true, false),
-        generateBranding('cache').wait,
+        null,
+        null
+        // openBrowser(extensionId, true, false),
+        // generateBranding('cache').wait,
     ])
     await chrome.browser.close()
-    await chromium.browser.close()
+    // await chromium.browser.close()
 }
