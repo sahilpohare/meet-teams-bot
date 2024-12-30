@@ -1,6 +1,6 @@
 import * as fs from 'fs'
 
-import { dirname, join } from 'path'
+import { join } from 'path'
 import { Browser, ConsoleMessage, Page } from 'puppeteer'
 
 import puppeteer from 'puppeteer-extra'
@@ -293,9 +293,8 @@ async function tryOpenBrowser(
         defaultViewport: null,
     }
 
-    if (!useChromium) {
+
         launchOptions.executablePath = GOOGLE_CHROME_EXECUTABLE_PATH
-    }
 
     const browser = await puppeteer.launch(launchOptions)
 
