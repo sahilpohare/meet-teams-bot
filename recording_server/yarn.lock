@@ -3085,7 +3085,7 @@ punycode@1.3.2:
   resolved "https://registry.npmjs.org/punycode/-/punycode-1.3.2.tgz"
   integrity sha512-RofWgt/7fL5wP1Y7fxE7/EmTLzQVnB0ycyibJ0OOHIlJqTNzglYFxVwETOcIoJqJmpDXJ9xImDv+Fq34F/d4Dw==
 
-puppeteer-core@19.2.2:
+puppeteer-core@*, puppeteer-core@19.2.2:
   version "19.2.2"
   resolved "https://registry.npmjs.org/puppeteer-core/-/puppeteer-core-19.2.2.tgz"
   integrity sha512-faojf+1pZ/tHXSr4x1q+9MVd9FrL3rpdbC0w7qN7MNClMoLuCvMbpR4vzcjoiJYgclt1n+SOPUOmHQViTw6frw==
@@ -3101,14 +3101,14 @@ puppeteer-core@19.2.2:
     unbzip2-stream "1.4.3"
     ws "8.10.0"
 
-puppeteer-extra-plugin-stealth@2.9.0:
-  version "2.9.0"
-  resolved "https://registry.npmjs.org/puppeteer-extra-plugin-stealth/-/puppeteer-extra-plugin-stealth-2.9.0.tgz"
-  integrity sha512-erZ9lkIcOkfYmLPP2jv2AiqvNBFhQJinWJhcm40pqSjwJTsZXHsTARUyRCsBYEEBvNIs3Wz3E0zVlTRc4IJ6Hg==
+puppeteer-extra-plugin-stealth@2.11.2:
+  version "2.11.2"
+  resolved "https://registry.npmjs.org/puppeteer-extra-plugin-stealth/-/puppeteer-extra-plugin-stealth-2.11.2.tgz"
+  integrity sha512-bUemM5XmTj9i2ZerBzsk2AN5is0wHMNE6K0hXBzBXOzP5m5G3Wl0RHhiqKeHToe/uIH8AoZiGhc1tCkLZQPKTQ==
   dependencies:
     debug "^4.1.1"
-    puppeteer-extra-plugin "^3.2.0"
-    puppeteer-extra-plugin-user-preferences "^2.3.1"
+    puppeteer-extra-plugin "^3.2.3"
+    puppeteer-extra-plugin-user-preferences "^2.4.1"
 
 puppeteer-extra-plugin-user-data-dir@^2.4.1:
   version "2.4.1"
@@ -3120,7 +3120,7 @@ puppeteer-extra-plugin-user-data-dir@^2.4.1:
     puppeteer-extra-plugin "^3.2.3"
     rimraf "^3.0.2"
 
-puppeteer-extra-plugin-user-preferences@^2.3.1:
+puppeteer-extra-plugin-user-preferences@^2.4.1:
   version "2.4.1"
   resolved "https://registry.npmjs.org/puppeteer-extra-plugin-user-preferences/-/puppeteer-extra-plugin-user-preferences-2.4.1.tgz"
   integrity sha512-i1oAZxRbc1bk8MZufKCruCEC3CCafO9RKMkkodZltI4OqibLFXF3tj6HZ4LZ9C5vCXZjYcDWazgtY69mnmrQ9A==
@@ -3130,7 +3130,7 @@ puppeteer-extra-plugin-user-preferences@^2.3.1:
     puppeteer-extra-plugin "^3.2.3"
     puppeteer-extra-plugin-user-data-dir "^2.4.1"
 
-puppeteer-extra-plugin@^3.2.0, puppeteer-extra-plugin@^3.2.3:
+puppeteer-extra-plugin@^3.2.3:
   version "3.2.3"
   resolved "https://registry.npmjs.org/puppeteer-extra-plugin/-/puppeteer-extra-plugin-3.2.3.tgz"
   integrity sha512-6RNy0e6pH8vaS3akPIKGg28xcryKscczt4wIl0ePciZENGE2yoaQJNd17UiEbdmh5/6WW6dPcfRWT9lxBwCi2Q==
@@ -3139,13 +3139,12 @@ puppeteer-extra-plugin@^3.2.0, puppeteer-extra-plugin@^3.2.3:
     debug "^4.1.1"
     merge-deep "^3.0.1"
 
-puppeteer-extra@*, puppeteer-extra@3.2.3:
-  version "3.2.3"
-  resolved "https://registry.npmjs.org/puppeteer-extra/-/puppeteer-extra-3.2.3.tgz"
-  integrity sha512-CnSN9yIedbAbS8WmRybaDHJLf6goRk+VYM/kbH6i/+EMadCaAeh2O+1/mFUMN2LbkbDNAp2Vd/UwrTVCHjTxyg==
+puppeteer-extra@*, puppeteer-extra@3.3.6:
+  version "3.3.6"
+  resolved "https://registry.npmjs.org/puppeteer-extra/-/puppeteer-extra-3.3.6.tgz"
+  integrity sha512-rsLBE/6mMxAjlLd06LuGacrukP2bqbzKCLzV1vrhHFavqQE/taQ2UXv3H5P0Ls7nsrASa+6x3bDbXHpqMwq+7A==
   dependencies:
     "@types/debug" "^4.1.0"
-    "@types/puppeteer" "*"
     debug "^4.1.1"
     deepmerge "^4.2.2"
 
