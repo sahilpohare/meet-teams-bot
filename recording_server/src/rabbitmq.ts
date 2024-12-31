@@ -58,14 +58,17 @@ export class Consumer {
         return new Promise((resolve, reject) => {
             this.channel
                 .consume(Consumer.QUEUE_NAME, async (message) => {
+                    console.log(`consume message : ${message}`)
                     if (message !== null) {
                         // configure rabbit increase timeout or timeout max < rabbitmq message timeout
+                        console.log('canceling channel')
                         await this.channel.cancel(message.fields.consumerTag)
 
                         const meetingParams = JSON.parse(
                             message.content.toString(),
                         ) as MeetingParams
 
+                        console.log('initializing logger')
                         let logger = new Logger(meetingParams)
                         await logger.init()
 
@@ -73,11 +76,14 @@ export class Consumer {
                             meetingParams.user_token
                         let error = null
                         try {
+                            console.log("awaiting handler...")
                             await handler(meetingParams)
                         } catch (e) {
+                            console.error("error while awaiting handler")
                             error = e
                         }
                         // TODO: retry in rabbitmq
+                        console.log('ACK rabbutMQ')
                         this.channel.ack(message)
                         resolve({ params: meetingParams, error: error })
                     } else {
@@ -96,6 +102,7 @@ export class Consumer {
 
     // throw error if start recoridng fail
     static async handleStartRecord(data: MeetingParams) {
+        console.log('handleStartRecord')
         await Logger.instance.updateGrafanaAgentAddBotUuid()
 
         console.log('####### DATA #######', data)

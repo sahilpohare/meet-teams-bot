@@ -45,8 +45,7 @@ console.log('version 0.0.1')
 
         // trigger system cache in order to decrease latency when first bot come
         let environ: string = process.env.ENVIRON
-        let lock_instance = process.env.LOCK_INSTANCE_AT_STARTUP
-        if (environ !== 'local' && lock_instance !== 'true' ) {
+        if (environ !== 'local' && !LOCK_INSTANCE_AT_STARTUP) {
             await triggerCache().catch((e) => {
                 console.error(`Failed to trigger cache: ${e}`)
                 throw e
