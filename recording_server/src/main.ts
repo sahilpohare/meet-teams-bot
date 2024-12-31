@@ -45,18 +45,21 @@ console.log('version 0.0.1')
 
         // trigger system cache in order to decrease latency when first bot come
         let environ: string = process.env.ENVIRON
-        if (environ !== 'local') {
+        let lock_instance = process.env.LOCK_INSTANCE_AT_STARTUP
+        if (environ !== 'local' && lock_instance !== 'true' ) {
             await triggerCache().catch((e) => {
                 console.error(`Failed to trigger cache: ${e}`)
                 throw e
             })
         }
 
+        console.log("Before REDIS.connect()")
         await clientRedis.connect().catch((e) => {
             console.error(`Fail to connect to redis: ${e}`)
             throw e
         })
 
+        console.log("Before RABBIT.connect()")
         const consumer = await Consumer.init().catch((e) => {
             console.error(`Fail to init consumer: ${e}`)
             throw e
