@@ -1,6 +1,6 @@
 import * as fs from 'fs'
 
-import { dirname, join } from 'path'
+import { join } from 'path'
 import { Browser, ConsoleMessage, Page } from 'puppeteer'
 
 import puppeteer from 'puppeteer-extra'
@@ -174,20 +174,10 @@ async function tryGetExtensionId() {
             '--no-sandbox',
             '--disable-setuid-sandbox',
             `--load-extension=${pathToExtension}`,
-
             '--autoplay-policy=no-user-gesture-required',
+            `--disable-extensions-except=${pathToExtension}`,
             '--remote-debugging-address=0.0.0.0',
             '--remote-debugging-port=9222',
-            '--disable-default-apps',
-            '--disable-client-side-phishing-detection',
-            '--disable-background-timer-throttling',
-            '--disable-dev-shm-usage',
-            `--disable-extensions-except=${pathToExtension}`,
-            `--enable-features=SharedArrayBuffer`,
-
-            // '--use-fake-ui-for-media-stream',
-            // '--use-fake-device-for-media-stream',
-            // '--use-file-for-fake-video-capture=/Users/vcombey/Downloads/example.y4m',
         ],
         executablePath: GOOGLE_CHROME_EXECUTABLE_PATH,
         headless: false,
@@ -195,25 +185,46 @@ async function tryGetExtensionId() {
         defaultViewport: null,
     })
 
-    await reload_extension(browser)
+    try {
+        await reload_extension(browser)
 
-    const targets = browser.targets()
-    console.log(targets)
+        const page = await browser.newPage()
+        await page.goto('chrome://extensions/')
+        await new Promise((resolve) => setTimeout(resolve, 500))
 
-    // Hang infinitely
-    // await new Promise(() => {});
+        const targets = await browser.targets()
 
-    const extensionTarget = targets.find((target) => {
-        const _targetInfo = (target as any)._targetInfo
-        return (
-            _targetInfo.title === EXTENSION_NAME &&
-            _targetInfo.type === 'background_page'
-        )
-    })
-    const extensionUrl = extensionTarget.url()
-    const [, , extensionId] = extensionUrl.split('/')
-    await browser.close()
-    return extensionId
+        // With CDP
+        console.log('Trying CDP')
+        for (const target of targets) {
+            try {
+                const session = await target.createCDPSession()
+                const result = await session.send('Target.getTargetInfo')
+                console.log('CDP info:', result)
+
+                const targetUrl = result?.targetInfo?.url
+                const targetTitle = result?.targetInfo?.title
+
+                if (targetUrl?.startsWith('chrome-extension://') && 
+                    targetTitle === EXTENSION_NAME) {
+                    const extensionId = targetUrl.split('/')[2]
+                    console.log('Found extension ID via CDP:', extensionId)
+                    await browser.close()
+                    return extensionId
+                }
+                await session.detach()
+            } catch (e) {
+                console.log('CDP error:', e)
+            }
+        }
+        throw new Error('Could not find extension ID')
+    } catch (error) {
+        console.error('Error in tryGetExtensionId:', error)
+        if (browser) {
+            await browser.close()
+        }
+        throw error
+    }
 }
 
 export async function openBrowser(
@@ -293,9 +304,7 @@ async function tryOpenBrowser(
         defaultViewport: null,
     }
 
-    if (!useChromium) {
-        launchOptions.executablePath = GOOGLE_CHROME_EXECUTABLE_PATH
-    }
+    launchOptions.executablePath = GOOGLE_CHROME_EXECUTABLE_PATH
 
     const browser = await puppeteer.launch(launchOptions)
 
@@ -328,25 +337,27 @@ async function tryOpenBrowser(
 
 // This function is a hack because we cannot get extension without reloading it in moderns browsers
 async function reload_extension(browser: Browser) {
-    const page = await browser.newPage()
-    await page.goto('chrome://extensions/')
+    try {
+        const page = await browser.newPage()
+        await page.goto('chrome://extensions/', { waitUntil: 'networkidle0' })
+        await new Promise((resolve) => setTimeout(resolve, 500))
 
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    // <cr-icon-button id="dev-reload-button"
-    //     class="icon-refresh no-overlap"
-    //     aria-label="Reload"
-    //     aria-describedby="a11yAssociation"
-    //     aria-disabled="false"
-    //     role="button"
-    //     tabindex="0">
-    // </cr-icon-button>
-    // Traditional methods of clicking on an object don't work here.
-    // So we generate a manual mouse click at specific coordinates.
-    const X_RELOAD_BUTTON = 540
-    const Y_RELOAD_BUTTON = 220
-    await page.mouse.click(X_RELOAD_BUTTON, Y_RELOAD_BUTTON, {
-        button: 'left',
-        clickCount: 1,
-    })
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+        // first try
+        await page.evaluate(() => {
+            const reloadButtons = document.querySelectorAll(
+                'cr-icon-button[id="dev-reload-button"]',
+            )
+            reloadButtons.forEach((button) => (button as HTMLElement).click())
+        })
+        // second try with mouse click
+        const X_RELOAD_BUTTON = 540
+        const Y_RELOAD_BUTTON = 220
+        await page.mouse.click(X_RELOAD_BUTTON, Y_RELOAD_BUTTON, {
+            button: 'left',
+            clickCount: 1,
+        })
+        await new Promise((resolve) => setTimeout(resolve, 500))
+    } catch (e) {
+        console.log('Error in reload_extension:', e)
+    }
 }
