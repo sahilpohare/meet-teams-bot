@@ -1,6 +1,5 @@
-import { RecordingMode, SpeakerData } from '../observeSpeakers'
-
 import { sleep } from '../api'
+import { RecordingMode, SpeakerData } from '../observeSpeakers'
 
 export const SPEAKER_LATENCY = 1500 // ms
 
@@ -42,33 +41,71 @@ export function getSpeakerFromDocument(
     recordingMode: RecordingMode,
     timestamp: number,
 ): SpeakerData[] {
-    // console.log('[Teams] Starting getSpeakerFromDocument', {
-    //     recordingMode,
-    // })
     const documentRoot = getDocumentRoot()
-    const speakerElements = documentRoot.querySelectorAll(
+
+    // old and new teams
+    const oldInterfaceElements = documentRoot.querySelectorAll(
         '[data-cid="calling-participant-stream"]',
     )
-    // console.log('[Teams] Found speaker elements:', speakerElements.length)
+    const newInterfaceElements = documentRoot.querySelectorAll(
+        '[data-stream-type="Video"]',
+    )
+
+    // use the interface with participants
+    const speakerElements =
+        oldInterfaceElements.length > 0
+            ? oldInterfaceElements
+            : newInterfaceElements
+
     const speakers = Array.from(speakerElements)
         .map((element) => {
-            // can create errors if speaker has a "," in his name
-            const name = getParticipantName(element)
-            if (name !== '') {
-                if (element.getAttribute('aria-label')?.includes(', muted,')) {
-                    // muted speakers can not be speaking, this is a security
-                    return {
-                        name,
-                        id: 0,
-                        timestamp,
-                        isSpeaking: false,
+            if (element.hasAttribute('data-cid')) {
+                // old teams
+                const name = getParticipantName(element)
+                if (name !== '') {
+                    if (
+                        element.getAttribute('aria-label')?.includes(', muted,')
+                    ) {
+                        return {
+                            name,
+                            id: 0,
+                            timestamp,
+                            isSpeaking: false,
+                        }
+                    } else {
+                        return {
+                            name,
+                            id: 0,
+                            timestamp,
+                            isSpeaking: checkIfSpeaking(element as HTMLElement),
+                        }
                     }
-                } else {
+                }
+            } else {
+                // new teams
+                const name = element.getAttribute('data-tid')
+                if (name) {
+                    const micPath = element.querySelector(
+                        'g.ui-icon__outline path',
+                    )
+                    const isMuted =
+                        micPath?.getAttribute('d')?.startsWith('M12 5v4.879') ||
+                        false
+                    const voiceLevelIndicator = element.querySelector(
+                        '[data-tid="voice-level-stream-outline"]',
+                    )
+                    const isSpeaking =
+                        voiceLevelIndicator && !isMuted
+                            ? checkElementAndPseudo(
+                                  voiceLevelIndicator as HTMLElement,
+                              )
+                            : false
+
                     return {
                         name,
                         id: 0,
                         timestamp,
-                        isSpeaking: checkIfSpeaking(element as HTMLElement),
+                        isSpeaking,
                     }
                 }
             }
@@ -82,7 +119,7 @@ export function getSpeakerFromDocument(
 }
 
 function checkIfSpeaking(element: HTMLElement): boolean {
-    let isSpeaking = checkElementAndPseudo(element)
+    let isSpeaking: boolean = checkElementAndPseudo(element)
     if (!isSpeaking) {
         element.querySelectorAll('*').forEach((child) => {
             if (checkElementAndPseudo(child as HTMLElement)) {
@@ -98,22 +135,25 @@ function checkElementAndPseudo(el: HTMLElement): boolean {
     const beforeStyle = window.getComputedStyle(el, '::before')
     const afterStyle = window.getComputedStyle(el, '::after')
 
+    // old teams
     if (el.getAttribute('data-tid') === 'participant-speaker-ring') {
-        console.log('participant-speaker-ring', parseFloat(style.opacity) === 1)
         return parseFloat(style.opacity) === 1
     }
-    console.log(
-        'isBlueish(style.borderColor)',
-        isBlueish(style.borderColor) ||
-            isBlueish(beforeStyle.borderColor) ||
-            isBlueish(afterStyle.borderColor),
-        'style :',
-        style.borderColor,
-        'beforeStyle :',
-        beforeStyle.borderColor,
-        'afterStyle :',
-        afterStyle.borderColor,
-    )
+
+    // new teams
+    if (el.getAttribute('data-tid') === 'voice-level-stream-outline') {
+        // check the presence of the stable class
+        const hasVdiFrameClass = el.classList.contains('vdi-frame-occlusion')
+        const borderOpacity = parseFloat(beforeStyle.opacity)
+        const borderColor =
+            beforeStyle.borderColor || beforeStyle.borderTopColor
+
+        return (
+            hasVdiFrameClass || (isBlueish(borderColor) && borderOpacity === 1)
+        )
+    }
+
+    // general border blue check for both interfaces
     return (
         (isBlueish(style.borderColor) && parseFloat(style.opacity) === 1) ||
         (isBlueish(beforeStyle.borderColor) &&
@@ -162,8 +202,8 @@ function isBlueish(color: string): boolean {
 }
 
 function getParticipantName(name: Element): string {
-    const nameBlackList: string[] = ['Content shared by', 'Leaving...']
-    const toSplitOn: string[] = [
+    const nameBlackList = ['Content shared by', 'Leaving...']
+    const toSplitOn = [
         ', video is on,',
         ', muted,',
         ', Context menu is available',
@@ -175,32 +215,47 @@ function getParticipantName(name: Element): string {
     const ariaLabel = name.getAttribute('aria-label') || ''
     let result: string = ariaLabel
 
-    // Vérifie si le label contient des éléments de la blacklist
     for (const blackListed of nameBlackList) {
         if (ariaLabel.includes(blackListed)) {
-            return '' // Retourne une chaîne vide si un élément blacklisté est trouvé
+            return ''
         }
     }
 
-    // Divise le label basé sur les motifs spécifiés et garde la première partie
     for (const splitTerm of toSplitOn) {
         result = result.split(splitTerm)[0]
     }
 
-    return result // Retourne le résultat final après toutes les divisions
+    return result
 }
 
 export function findAllAttendees(): string[] {
-    // console.log('[Teams] Starting findAllAttendees')
-    const documentRoot = getDocumentRoot()
-    const attendeeElements = documentRoot.querySelectorAll(
+    // old and new teams
+    const oldInterfaceContainers = document.querySelectorAll(
         '[data-cid="calling-participant-stream"]',
     )
-    // get attendees, do not take into account empty attendees
-    const attendees = Array.from(attendeeElements)
-        .map((el) => getParticipantName(el))
-        .filter(Boolean)
-    // console.log('[Teams] Found attendees:', attendees)
+    const newInterfaceContainers = document.querySelectorAll(
+        '[data-stream-type="Video"]',
+    )
+
+    // use the interface with participants
+    const participantContainers =
+        oldInterfaceContainers.length > 0
+            ? oldInterfaceContainers
+            : newInterfaceContainers
+
+    // get the names
+    const attendees = Array.from(participantContainers)
+        .map((el) => {
+            if (el.hasAttribute('data-cid')) {
+                // old teams
+                return getParticipantName(el)
+            } else {
+                // new teams
+                return el.getAttribute('data-tid') || ''
+            }
+        })
+        .filter(Boolean) // filter empty values
+
     return attendees
 }
 
@@ -261,7 +316,7 @@ export function removeShityHtml(mode: RecordingMode) {
     }
 
     try {
-        let hiddenDivs = 0
+        let hiddenDivs: number = 0
         documentRoot.querySelectorAll('div').forEach((div) => {
             if (div.clientHeight === 137 && div.clientWidth === 245) {
                 div.style.opacity = '0'

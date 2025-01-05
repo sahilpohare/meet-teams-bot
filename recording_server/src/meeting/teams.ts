@@ -59,14 +59,29 @@ export class TeamsProvider implements MeetingProviderInterface {
 
         await clickWithInnerText(page, 'button', 'Continue on this browser', 5)
 
-        await clickWithInnerText(
-            page,
-            'button',
-            'Continue without audio or video',
-            20,
-        )
-        await typeBotName(page, meetingParams.bot_name, 20)
-        await clickWithInnerText(page, 'button', 'Join now', 20)
+        // check if the join button is present
+        const hasJoinButton = await page.evaluate(() => {
+            const pageText = document.body.innerText.toLowerCase();
+            return pageText.includes('join');
+        });
+        
+        // if the join button is present, go directly to the bot name and join
+        if (hasJoinButton) {
+        console.log('NEW INTERFACE !!!!!!!!!')
+            await typeBotName(page, meetingParams.bot_name, 20)
+            await handlePermissionDialog(page);
+            await activateCamera(page);
+            await clickWithInnerText(page, 'button', 'Join now', 20)
+        } else {
+            await clickWithInnerText(
+                page,
+                'button',
+                'Continue without audio or video',
+                10,
+            )
+            await typeBotName(page, meetingParams.bot_name, 20)
+            await clickWithInnerText(page, 'button', 'Join now', 20)
+        }   
         await Logger.instance.screenshot(page, `afterjoinnow`)
 
         while (true) {
@@ -118,7 +133,7 @@ async function typeBotName(
         try {
             await focusInput(INPUT_BOT, page, 2)
             await page.keyboard.type(botName, { delay: 100 })
-            botnameTyped = await getInput(INPUT_BOT, page, 2)
+            botnameTyped = await focusInput(INPUT_BOT, page, 2)
             if (botnameTyped != null && botnameTyped != '') {
                 console.log(`botname typed`)
                 return
@@ -169,7 +184,6 @@ export async function innerTextWithSelector(
                 message,
             )
         } catch (e) {
-            console.error('failed to find button', e)
         }
         await sleep(1000)
         console.log(
@@ -224,7 +238,7 @@ export async function clickWithSelector(
                 i,
             )
         } catch (e) {
-            console.error('failed to find button', e)
+           
         }
         await sleep(1000)
         console.log(
@@ -297,7 +311,7 @@ export async function clickWithInnerText(
                 click,
             )
         } catch (e) {
-            console.error('failed to find button')
+           
         }
         await sleep(1000)
         console.log(`${innerText} clicked:`, continueButton)
@@ -311,7 +325,7 @@ async function focusInput(
     input: string,
     page: puppeteer.Page,
     iterations: number,
-) {
+): Promise<string | null> {
     for (let i = 0; i < iterations; i++) {
         try {
             const focused = await page.evaluate(
@@ -326,65 +340,14 @@ async function focusInput(
                         elements = Array.from(
                             iframeDocument.querySelectorAll(selector),
                         )
-                        console.log('search iframes', elements)
-                        console.log('search inside iframe')
                     } else {
                         elements = Array.from(
                             document.querySelectorAll(selector),
                         )
-                        console.log('search document', elements)
                     }
 
                     for (const elem of elements) {
                         ;(elem as any).focus()
-                        return true
-                    }
-                    return false
-                },
-                input,
-                i,
-            )
-            if (focused) {
-                return
-            } else {
-                console.log('input not focused, retrying')
-            }
-        } catch (e) {
-            console.error('Failed to focus input', e)
-        }
-        await sleep(1000)
-    }
-}
-
-async function getInput(
-    input: string,
-    page: puppeteer.Page,
-    iterations: number,
-): Promise<string | null> {
-    for (let i = 0; i < iterations; i++) {
-        try {
-            const botName = await page.evaluate(
-                (selector, i) => {
-                    let elements
-
-                    if (i % 2 === 0) {
-                        const iframe = document.querySelectorAll('iframe')[0]
-                        const iframeDocument =
-                            iframe.contentDocument ||
-                            iframe.contentWindow.document
-                        elements = Array.from(
-                            iframeDocument.querySelectorAll(selector),
-                        )
-                        console.log('search iframes', elements)
-                        console.log('search inside iframe')
-                    } else {
-                        elements = Array.from(
-                            document.querySelectorAll(selector),
-                        )
-                        console.log('search document', elements)
-                    }
-
-                    for (const elem of elements) {
                         return elem.value
                     }
                     return null
@@ -392,18 +355,19 @@ async function getInput(
                 input,
                 i,
             )
-            if (botName != null) {
-                return botName
+            if (focused != null) {
+                return focused
             } else {
                 console.log('input not focused, retrying')
             }
         } catch (e) {
-            console.error('Failed to focus input', e)
         }
         await sleep(1000)
     }
     return null
 }
+
+
 
 async function checkPageForText(
     page: Page,
@@ -450,4 +414,50 @@ async function isBotNotAccepted(page: Page): Promise<boolean> {
         'Sorry, but you were denied access to the meeting.',
         'Bot not accepted:',
     )
+}
+
+
+async function handlePermissionDialog(page: puppeteer.Page): Promise<void> {
+    console.log('handling permission dialog')
+    try {
+        // Utilise clickWithInnerText pour cliquer sur le bouton OK
+        const clicked = await clickWithInnerText(page, 'button', 'OK', 5);
+        if (clicked) {
+            console.log('Permission dialog handled successfully');
+        } else {
+            console.log('No permission dialog found or failed to click OK');
+        }
+    } catch (error) {
+        console.error('Failed to handle permission dialog:', error);
+    }
+}
+
+async function activateCamera(page: puppeteer.Page): Promise<void> {
+  
+    console.log('activating camera');
+    try {
+        // D'abord vérifier si le message "Your camera is turned off" est présent
+        const hasCameraOffText = await page.evaluate(() => {
+            return Array.from(document.querySelectorAll('span')).some(span => 
+                span.textContent === "Your camera is turned off"
+            );
+        });
+
+        if (hasCameraOffText) {
+            // Utiliser clickWithInnerText pour cliquer sur le bouton de la caméra
+            // Chercher le bouton avec le titre "Camera"
+            const clicked = await clickWithInnerText(page, 'button', 'Camera', 5);
+            
+            if (clicked) {
+                console.log('Camera button clicked successfully');
+                await page.waitForTimeout(1000);
+            } else {
+                console.log('Failed to find or click camera button');
+            }
+        } else {
+            console.log('Camera is already on or text not found');
+        }
+    } catch (error) {
+        console.error('Failed to activate camera:', error);
+    }
 }
