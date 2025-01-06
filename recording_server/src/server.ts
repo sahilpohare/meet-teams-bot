@@ -40,7 +40,6 @@ const MEET_ORIGINS = [
     'https://meet.googleapis.com',
     'https://meetings.googleapis.com',
     'https://teams.microsoft.com',
-    'https://teams.live.com',
 ]
 async function getAllowedOrigins(): Promise<string[]> {
     return [
