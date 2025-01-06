@@ -2,7 +2,7 @@ import axios from 'axios'
 import { RecognizerWord, sleep } from '../../api'
 import { parameters } from '../../background'
 
-// const GLADIA_API_KEY = '8b82f7ea-c1c8-4e3d-abc3-18af0fce1f03'
+const GLADIA_API_KEY = '8b82f7ea-c1c8-4e3d-abc3-18af0fce1f03'
 const API_URL = 'https://api.gladia.io/v2/transcription'
 const CREATED_HTML_CODE = 201
 const DONE_HTML_CODE = 200
@@ -54,7 +54,9 @@ export async function recognizeGladia(
         enable_code_switching: false,
         detect_language: true,
     }
-    const api_key = parameters.speech_to_text_api_key!
+    const api_key = parameters.speech_to_text_api_key
+        ? parameters.speech_to_text_api_key
+        : GLADIA_API_KEY
     console.log('Requesting Gladia transcription', api_key)
     let axios_response = await axios.post(`${API_URL}`, requestBody, {
         headers: {

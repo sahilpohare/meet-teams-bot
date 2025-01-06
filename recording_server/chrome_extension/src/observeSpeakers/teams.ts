@@ -165,7 +165,7 @@ function checkElementAndPseudo(el: HTMLElement): boolean {
     const style = window.getComputedStyle(el)
     const beforeStyle = window.getComputedStyle(el, '::before')
     const afterStyle = window.getComputedStyle(el, '::after')
-    const borderStyle = window.getComputedStyle(el)  // live platform
+    const borderStyle = window.getComputedStyle(el) // live platform
 
     // old teams
     if (el.getAttribute('data-tid') === 'participant-speaker-ring') {
@@ -175,16 +175,24 @@ function checkElementAndPseudo(el: HTMLElement): boolean {
     // new teams & live platform
     if (el.getAttribute('data-tid') === 'voice-level-stream-outline') {
         const hasVdiFrameClass = el.classList.contains('vdi-frame-occlusion')
-        const borderOpacity = parseFloat(beforeStyle.opacity) || parseFloat(borderStyle.opacity)
-        const borderColor = beforeStyle.borderColor || beforeStyle.borderTopColor || borderStyle.borderColor
+        const borderOpacity =
+            parseFloat(beforeStyle.opacity) || parseFloat(borderStyle.opacity)
+        const borderColor =
+            beforeStyle.borderColor ||
+            beforeStyle.borderTopColor ||
+            borderStyle.borderColor
 
-        return hasVdiFrameClass || (isBlueish(borderColor) && borderOpacity === 1)
+        return (
+            hasVdiFrameClass || (isBlueish(borderColor) && borderOpacity === 1)
+        )
     }
 
     return (
         (isBlueish(style.borderColor) && parseFloat(style.opacity) === 1) ||
-        (isBlueish(beforeStyle.borderColor) && parseFloat(beforeStyle.opacity) === 1) ||
-        (isBlueish(afterStyle.borderColor) && parseFloat(afterStyle.opacity) === 1)
+        (isBlueish(beforeStyle.borderColor) &&
+            parseFloat(beforeStyle.opacity) === 1) ||
+        (isBlueish(afterStyle.borderColor) &&
+            parseFloat(afterStyle.opacity) === 1)
     )
 }
 

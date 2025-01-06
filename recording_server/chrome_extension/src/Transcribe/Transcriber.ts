@@ -130,13 +130,13 @@ export class Transcriber {
             let words: RecognizerWord[]
             switch (parameters.speech_to_text_provider) {
                 case 'Runpod':
-                case 'Default':
                     let res_runpod = await recognizeRunPod(
                         audioUrl,
                         parameters.vocabulary, // TODO : Envisager utiliser sur meeting baas.
                     )
                     words = parseRunPod(res_runpod, currentOffset)
                     break
+                case 'Default':
                 case 'Gladia':
                     let res_gladia = await recognizeGladia(
                         audioUrl,
