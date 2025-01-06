@@ -50,12 +50,16 @@ export function getSpeakerFromDocument(
     const newInterfaceElements = documentRoot.querySelectorAll(
         '[data-stream-type="Video"]',
     )
+    // new teams live
+    const liveElements = documentRoot.querySelectorAll('[data-tid="menur1j"]')
 
     // use the interface with participants
     const speakerElements =
         oldInterfaceElements.length > 0
             ? oldInterfaceElements
-            : newInterfaceElements
+            : newInterfaceElements.length > 0
+            ? newInterfaceElements
+            : liveElements
 
     const speakers = Array.from(speakerElements)
         .map((element) => {
@@ -80,6 +84,33 @@ export function getSpeakerFromDocument(
                             isSpeaking: checkIfSpeaking(element as HTMLElement),
                         }
                     }
+                }
+            } else if (
+                element.hasAttribute('data-tid') &&
+                element.getAttribute('data-tid') === 'menur1j'
+            ) {
+                //live platform: Handle live platform
+                const name =
+                    element.getAttribute('aria-label')?.split(',')[0] || ''
+                const micIcon = element.querySelector(
+                    '[data-cid="roster-participant-muted"]',
+                )
+                const isMuted = micIcon ? true : false
+                const voiceLevelIndicator = element.querySelector(
+                    '[data-tid="voice-level-stream-outline"]',
+                )
+                const isSpeaking =
+                    !isMuted && voiceLevelIndicator
+                        ? checkElementAndPseudo(
+                              voiceLevelIndicator as HTMLElement,
+                          )
+                        : false
+
+                return {
+                    name,
+                    id: 0,
+                    timestamp,
+                    isSpeaking,
                 }
             } else {
                 // new teams
@@ -134,32 +165,26 @@ function checkElementAndPseudo(el: HTMLElement): boolean {
     const style = window.getComputedStyle(el)
     const beforeStyle = window.getComputedStyle(el, '::before')
     const afterStyle = window.getComputedStyle(el, '::after')
+    const borderStyle = window.getComputedStyle(el)  // live platform
 
     // old teams
     if (el.getAttribute('data-tid') === 'participant-speaker-ring') {
         return parseFloat(style.opacity) === 1
     }
 
-    // new teams
+    // new teams & live platform
     if (el.getAttribute('data-tid') === 'voice-level-stream-outline') {
-        // check the presence of the stable class
         const hasVdiFrameClass = el.classList.contains('vdi-frame-occlusion')
-        const borderOpacity = parseFloat(beforeStyle.opacity)
-        const borderColor =
-            beforeStyle.borderColor || beforeStyle.borderTopColor
+        const borderOpacity = parseFloat(beforeStyle.opacity) || parseFloat(borderStyle.opacity)
+        const borderColor = beforeStyle.borderColor || beforeStyle.borderTopColor || borderStyle.borderColor
 
-        return (
-            hasVdiFrameClass || (isBlueish(borderColor) && borderOpacity === 1)
-        )
+        return hasVdiFrameClass || (isBlueish(borderColor) && borderOpacity === 1)
     }
 
-    // general border blue check for both interfaces
     return (
         (isBlueish(style.borderColor) && parseFloat(style.opacity) === 1) ||
-        (isBlueish(beforeStyle.borderColor) &&
-            parseFloat(beforeStyle.opacity) === 1) ||
-        (isBlueish(afterStyle.borderColor) &&
-            parseFloat(afterStyle.opacity) === 1)
+        (isBlueish(beforeStyle.borderColor) && parseFloat(beforeStyle.opacity) === 1) ||
+        (isBlueish(afterStyle.borderColor) && parseFloat(afterStyle.opacity) === 1)
     )
 }
 
