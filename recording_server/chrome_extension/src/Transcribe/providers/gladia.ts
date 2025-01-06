@@ -110,7 +110,9 @@ export function parseGladia(
 }
 
 async function getResult(id: string): Promise<GladiaResult> {
-    const api_key = parameters.speech_to_text_api_key!
+    const api_key = parameters.speech_to_text_api_key
+        ? parameters.speech_to_text_api_key
+        : GLADIA_API_KEY
     const axios_response = await axios.get(`${API_URL}/${id}`, {
         headers: {
             accept: 'application/json',
