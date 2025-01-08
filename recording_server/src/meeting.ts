@@ -154,6 +154,11 @@ export class MeetingHandle extends Console {
         }
         this.param.local_recording_server_location =
             LOCAL_RECORDING_SERVER_LOCATION
+        // TODO : Remove that when we will develop gallery_view
+        this.param.recording_mode =
+            this.param.recording_mode == 'gallery_view'
+                ? 'speaker_view'
+                : this.param.recording_mode
     }
 
     public async startRecordMeeting() {
