@@ -19,18 +19,49 @@ describe('Teams URL Parser', () => {
         )
     })
 
-    describe('Teams Live URLs (Not Supported)', () => {
+    describe('Teams Live URLs', () => {
         const liveUrls = [
             'https://teams.live.com/meet/9356969621606?p=08ogAWeCL73fVssuEK',
             'https://teams.live.com/meet/9339528342593?p=VGZGxvTVLIyZ81WauE',
             'https://teams.live.com/meet/9314184555833?p=00ewkGrA1OJD7Id1NR',
         ]
 
-        test.each(liveUrls)('should reject Teams Live URL: %s', (url) => {
-            expect(() => {
-                parseMeetingUrlFromJoinInfos(url)
-            }).toThrow(JoinError)
+        test.each(liveUrls)('should parse Teams Live URL: %s', (url) => {
+            const result = parseMeetingUrlFromJoinInfos(url)
+            expect(result.meetingId).toBe(url)
+            expect(result.password).toBe(new URL(url).searchParams.get('p'))
         })
+    })
+
+    describe('Teams Microsoft URLs with Query Parameters', () => {
+        const urlsWithParams = [
+            'https://teams.microsoft.com/l/meetup-join/19:meeting_123@thread.v2/0?context=123',
+            'https://teams.microsoft.com/l/meetup-join/19:meeting_456@thread.v2/0?param=value',
+        ]
+
+        test.each(urlsWithParams)('should parse URL with params: %s', (url) => {
+            const result = parseMeetingUrlFromJoinInfos(url)
+            expect(result.meetingId).toBe(`${url}&anon=true`)
+            expect(result.password).toBe('')
+        })
+    })
+
+    describe('Teams Launcher URLs', () => {
+        const launcherUrls = [
+            'https://teams.microsoft.com/dl/launcher/launcher.html?url=%2F_%23%2Fl%2Fmeetup-join%2F19%3Ameeting_YTQxZDliNzQtYzlmMS00OTZhLWE1MzQtNDUzYjhjYzU1ZTVk%40thread.v2%2F0%3Fcontext%3D%257b%2522Tid%2522%253a%25220deb691f-902d-4dea-8026-5a790862fede%2522%252c%2522Oid%2522%253a%25222d56fa49-dfef-4eca-82e9-5b2802766c02%2522%257d%26anon%3Dtrue',
+            'https://teams.microsoft.com/dl/launcher/launcher.html?url=%2F_%23%2Fl%2Fmeetup-join%2F19%3Ameeting_OWQxZDc4MzYtN2NhMC00MjZkLWI5NmEtYWZkMmNjNjQ1Y2Rm%40thread.v2%2F0%3Fcontext',
+        ]
+
+        test.each(launcherUrls)(
+            'should parse Teams Launcher URL: %s',
+            (url) => {
+                const result = parseMeetingUrlFromJoinInfos(url)
+                expect(result.meetingId).toBe(
+                    url + (url.includes('?') ? '&' : '?') + 'anon=true',
+                )
+                expect(result.password).toBe('')
+            },
+        )
     })
 
     describe('Teams Launcher URLs', () => {
@@ -70,7 +101,7 @@ describe('Teams URL Parser', () => {
 
         test.each(subdomainUrls)('should parse subdomain URL: %s', (url) => {
             const result = parseMeetingUrlFromJoinInfos(url)
-            expect(result.meetingId).toBe(url + '&anon=true')
+            expect(result.meetingId).toBe(`${url}?anon=true`)
             expect(result.password).toBe('')
         })
     })
