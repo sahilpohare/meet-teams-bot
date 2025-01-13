@@ -140,22 +140,28 @@ export class Streaming extends Console {
         const stream = new Readable({
             read() {},
         })
-
+        let hasLoggedError = false
         input_ws.on('message', (message: RawData) => {
             if (message instanceof Buffer) {
-                this.log(`incoming buffer : ${message.byteLength}`)
                 const uint8Array = new Uint8Array(message)
-                const s16Array = new Int16Array(uint8Array.buffer)
-
-                // Convert s16Array to f32Array
-                const f32Array = new Float32Array(s16Array.length)
-                for (let i = 0; i < s16Array.length; i++) {
-                    f32Array[i] = s16Array[i] / 32768
+                try {
+                    const s16Array = new Int16Array(uint8Array.buffer)
+                    // Convert s16Array to f32Array
+                    const f32Array = new Float32Array(s16Array.length)
+                    for (let i = 0; i < s16Array.length; i++) {
+                        f32Array[i] = s16Array[i] / 32768
+                    }
+                    // Push data into the steam
+                    const buffer = Buffer.from(f32Array.buffer)
+                    stream.push(buffer)
+                } catch (error) {
+                    if (!hasLoggedError) {
+                        console.error(
+                            `Error processing audio chunk: Buffer length ${uint8Array.length} is not valid for Int16Array conversion`,
+                        )
+                        hasLoggedError = true
+                    }
                 }
-
-                // Push data into the steam
-                const buffer = Buffer.from(f32Array.buffer)
-                stream.push(buffer)
             }
         })
 
