@@ -59,31 +59,7 @@ export class TeamsProvider implements MeetingProviderInterface {
 
         await clickWithInnerText(page, 'button', 'Continue on this browser', 5)
 
-        const NewInterface =
-            (await Promise.race([
-                (async () => {
-                    const hasJoinButton = await clickWithInnerText(
-                        page,
-                        'button',
-                        'Join now',
-                        600,
-                        false,
-                    )
-                    console.log('hasJoinButton', hasJoinButton)
-                    return hasJoinButton ? true : undefined
-                })(),
-                (async () => {
-                    const hasContinueButton = await clickWithInnerText(
-                        page,
-                        'button',
-                        'Continue without audio or video',
-                        600,
-                        true,
-                    )
-                    console.log('hasContinueButton', hasContinueButton)
-                    return hasContinueButton ? false : undefined
-                })(),
-            ])) ?? false
+        const NewInterface = await tryFindInterface(page);
 
 
         await clickWithInnerText(page, 'button', 'Join now', 300, false)
@@ -305,6 +281,32 @@ export async function clickWithSelector(
         i += 1
     }
     return continueButton
+}
+
+async function tryFindInterface(page: puppeteer.Page): Promise<boolean> {
+    const controller = new AbortController();
+    const signal = controller.signal;
+
+    try {
+        const result = await Promise.race([
+            clickWithInnerText(page, 'button', 'Join now', 600, false, () => signal.aborted),
+            clickWithInnerText(page, 'button', 'Continue without audio or video', 600, true, () => signal.aborted)
+        ]);
+        
+        // Annule l'autre recherche dès qu'on a un résultat
+        controller.abort();
+        
+        if (result === true) {
+            console.log('Found Join now interface');
+            return true;
+        } else {
+            console.log('Found Continue without audio/video interface');
+            return false;
+        }
+    } catch (error) {
+        console.error('Error detecting interface:', error);
+        return false;
+    }
 }
 
 export async function clickWithInnerText(
