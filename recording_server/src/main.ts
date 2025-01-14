@@ -142,8 +142,8 @@ console.log('version 0.0.1')
                             ? ZOOM_SDK_DEBUG_EXECUTABLE_PATHNAME
                             : ZOOM_SDK_RELEASE_EXECUTABLE_PATHNAME,
                         process.argv[2]?.includes('--zoom-no-recursive-env')
-                            ? ['--no-recursive-env', '--pulse']
-                            : ['--pulse'],
+                            ? ['--no-recursive-env', '--no-stdout', '--pulse']
+                            : ['--no-stdout', '--pulse'],
                         {
                             env: process.env,
                             stdio: ['pipe', 'inherit', 'inherit'],
