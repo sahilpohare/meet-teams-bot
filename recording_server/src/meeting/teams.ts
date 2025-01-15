@@ -63,15 +63,13 @@ export class TeamsProvider implements MeetingProviderInterface {
 
 
         await clickWithInnerText(page, 'button', 'Join now', 300, false)
-        await Logger.instance.screenshot(page, `joinNowFound`)
+
         if (NewInterface) {
-            console.log('NEW INTERFACE !!!!!!!!!')
+            console.log('⚠️ NEW INTERFACE ⚠️')
             await handlePermissionDialog(page)
             await activateCamera(page)
         }
-        await Logger.instance.screenshot(page, `beforetypebotname`)
         await typeBotName(page, meetingParams.bot_name, 20)
-        await Logger.instance.screenshot(page, `aftertypebotname`)
         await clickWithInnerText(page, 'button', 'Join now', 20)
 
         await Logger.instance.screenshot(page, `afterjoinnow`)
@@ -94,7 +92,7 @@ export class TeamsProvider implements MeetingProviderInterface {
             if (clickSuccess) {
                 break
             }
-            await sleep(2000)
+            await sleep(500) 
         }
         if (await clickWithInnerText(page, 'button', 'View', 2, false)) {
             if (meetingParams.recording_mode !== 'gallery_view') {
@@ -457,13 +455,15 @@ async function checkPageForText(
 
 async function isRemovedFromTheMeeting(page: Page): Promise<boolean> {
     // if no leave button, then the bot has been removed from the meeting
-    if (!(await clickWithInnerText(page, 'button', 'Leave', 4, false))) {
+    if (!(await clickWithInnerText(page, 'button', 'Raise', 4, false))) {
         console.log('no leave button found, Bot removed from the meeting')
         return true
     } else {
         return false
     }
 }
+
+
 
 async function isBotNotAccepted(page: Page): Promise<boolean> {
     return checkPageForText(

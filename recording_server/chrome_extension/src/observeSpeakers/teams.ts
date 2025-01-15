@@ -318,6 +318,20 @@ export async function removeInitialShityHtml(mode: RecordingMode) {
     } catch (e) {
         // console.error('[Teams] Error in insert before style', e)
     }
+
+     // Ajout du nouveau sélecteur
+     try {
+        const mainArea = documentRoot.querySelector(
+            'div[data-tid="app-layout-area--main"]'
+        )
+        
+        if (mainArea instanceof HTMLElement) {
+            mainArea.style.height = '100vh'
+            mainArea.style.width = '100vw'
+        }
+    } catch (e) {
+        // console.error('[Teams] Failed to modify main area', e)
+    }
 }
 
 export function removeShityHtml(mode: RecordingMode) {
@@ -351,5 +365,19 @@ export function removeShityHtml(mode: RecordingMode) {
         // console.log('Teams] Hidden', hiddenDivs, 'additional elements')
     } catch (e) {
         // console.error('[Teams] Error in remove additional elements', e)
+    }
+
+     // Ajout du nouveau sélecteur
+     try {
+        const mainArea = documentRoot.querySelector(
+            'div[data-tid="app-layout-area--main"]'
+        )
+        
+        if (mainArea instanceof HTMLElement) {
+            mainArea.style.height = '100vh'
+            mainArea.style.width = '100vw'
+        }
+    } catch (e) {
+        // console.error('[Teams] Failed to modify main area', e)
     }
 }
