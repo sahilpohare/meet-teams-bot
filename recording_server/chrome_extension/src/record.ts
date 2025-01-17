@@ -4,8 +4,8 @@ import { parameters } from './background'
 import { newSerialQueue } from './queue'
 import { ApiService } from './recordingServerApi'
 import { SoundStreamer } from './sound_streamer'
-import { Transcriber } from './Transcribe/Transcriber'
 import * as State from './state'
+import { Transcriber } from './Transcribe/Transcriber'
 
 const STREAM: MediaStream | null = null
 let RECORDED_CHUNKS: BlobEvent[] = []
@@ -36,6 +36,10 @@ export async function initMediaRecorder(
                     mandatory: {
                         chromeMediaSource: 'tab',
                         maxFrameRate: fps,
+                        minWidth: 1280,
+                        minHeight: 720,
+                        maxWidth: 1280,
+                        maxHeight: 720,
                     },
                 },
             },
