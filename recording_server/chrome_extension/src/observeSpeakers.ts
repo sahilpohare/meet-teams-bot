@@ -6,10 +6,6 @@ import { sleep } from './api'
 import { ApiService } from './recordingServerApi'
 import { parameters } from './state'
 
-
-
-
-
 export type SpeakerData = {
     name: string
     id: number

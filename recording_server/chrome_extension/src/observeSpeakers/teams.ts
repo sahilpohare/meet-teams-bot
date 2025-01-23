@@ -176,19 +176,34 @@ function checkElementAndPseudo(el: HTMLElement): boolean {
     }
 
     // New teams
-    if (el.getAttribute('data-tid') === 'voice-level-stream-outline' && el.closest('[data-stream-type="Video"]')) {
+    if (
+        el.getAttribute('data-tid') === 'voice-level-stream-outline' &&
+        el.closest('[data-stream-type="Video"]')
+    ) {
         const hasVdiFrameClass = el.classList.contains('vdi-frame-occlusion')
-        const borderColor = beforeStyle.borderColor || beforeStyle.borderTopColor
+        const borderColor =
+            beforeStyle.borderColor || beforeStyle.borderTopColor
         const borderOpacity = parseFloat(beforeStyle.opacity)
-        return hasVdiFrameClass || (isBlueish(borderColor) && borderOpacity === 1)
+        return (
+            hasVdiFrameClass || (isBlueish(borderColor) && borderOpacity === 1)
+        )
     }
 
     // Live platform
-    if (el.getAttribute('data-tid') === 'voice-level-stream-outline' && el.closest('[data-tid="menur1j"]')) {
+    if (
+        el.getAttribute('data-tid') === 'voice-level-stream-outline' &&
+        el.closest('[data-tid="menur1j"]')
+    ) {
         const hasVdiFrameClass = el.classList.contains('vdi-frame-occlusion')
-        const borderOpacity = parseFloat(beforeStyle.opacity) || parseFloat(borderStyle.opacity)
-        const borderColor = beforeStyle.borderColor || beforeStyle.borderTopColor || borderStyle.borderColor
-        return hasVdiFrameClass || (isBlueish(borderColor) && borderOpacity === 1)
+        const borderOpacity =
+            parseFloat(beforeStyle.opacity) || parseFloat(borderStyle.opacity)
+        const borderColor =
+            beforeStyle.borderColor ||
+            beforeStyle.borderTopColor ||
+            borderStyle.borderColor
+        return (
+            hasVdiFrameClass || (isBlueish(borderColor) && borderOpacity === 1)
+        )
     }
 
     return false
@@ -325,12 +340,12 @@ export async function removeInitialShityHtml(mode: RecordingMode) {
         // console.error('[Teams] Error in insert before style', e)
     }
 
-     // Ajout du nouveau sélecteur
-     try {
+    // Ajout du nouveau sélecteur
+    try {
         const mainArea = documentRoot.querySelector(
-            'div[data-tid="app-layout-area--main"]'
+            'div[data-tid="app-layout-area--main"]',
         )
-        
+
         if (mainArea instanceof HTMLElement) {
             mainArea.style.height = '100vh'
             mainArea.style.width = '100vw'
@@ -373,12 +388,12 @@ export function removeShityHtml(mode: RecordingMode) {
         // console.error('[Teams] Error in remove additional elements', e)
     }
 
-     // Ajout du nouveau sélecteur
-     try {
+    // Ajout du nouveau sélecteur
+    try {
         const mainArea = documentRoot.querySelector(
-            'div[data-tid="app-layout-area--main"]'
+            'div[data-tid="app-layout-area--main"]',
         )
-        
+
         if (mainArea instanceof HTMLElement) {
             mainArea.style.height = '100vh'
             mainArea.style.width = '100vw'

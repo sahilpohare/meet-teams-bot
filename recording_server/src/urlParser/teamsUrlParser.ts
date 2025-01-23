@@ -34,15 +34,18 @@ export function parseMeetingUrlFromJoinInfos(
             }
             return {
                 meetingId: meeting_url,
-                password: url.searchParams.get('p') || ''
+                password: url.searchParams.get('p') || '',
             }
         }
 
         // Handle teams.microsoft.com URLs
         if (url.hostname.includes('teams.microsoft.com')) {
             return {
-                meetingId: meeting_url + (meeting_url.includes('?') ? '&' : '?') + 'anon=true',
-                password: ''
+                meetingId:
+                    meeting_url +
+                    (meeting_url.includes('?') ? '&' : '?') +
+                    'anon=true',
+                password: '',
             }
         }
 

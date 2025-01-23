@@ -205,8 +205,10 @@ async function tryGetExtensionId() {
                 const targetUrl = result?.targetInfo?.url
                 const targetTitle = result?.targetInfo?.title
 
-                if (targetUrl?.startsWith('chrome-extension://') && 
-                    targetTitle === EXTENSION_NAME) {
+                if (
+                    targetUrl?.startsWith('chrome-extension://') &&
+                    targetTitle === EXTENSION_NAME
+                ) {
                     const extensionId = targetUrl.split('/')[2]
                     console.log('Found extension ID via CDP:', extensionId)
                     await browser.close()

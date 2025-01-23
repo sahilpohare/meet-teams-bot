@@ -52,13 +52,13 @@ console.log('version 0.0.1')
             })
         }
 
-        console.log("Before REDIS.connect()")
+        console.log('Before REDIS.connect()')
         await clientRedis.connect().catch((e) => {
             console.error(`Fail to connect to redis: ${e}`)
             throw e
         })
 
-        console.log("Before RABBIT.connect()")
+        console.log('Before RABBIT.connect()')
         const consumer = await Consumer.init().catch((e) => {
             console.error(`Fail to init consumer: ${e}`)
             throw e
@@ -233,7 +233,7 @@ async function triggerCache() {
     const [chrome, _chromium] = await Promise.all([
         openBrowser(extensionId, false, false),
         null,
-        null
+        null,
         // openBrowser(extensionId, true, false),
         // generateBranding('cache').wait,
     ])
