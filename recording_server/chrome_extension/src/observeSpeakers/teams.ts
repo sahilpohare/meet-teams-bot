@@ -191,7 +191,8 @@ function checkElementAndPseudo(el: HTMLElement): boolean {
 
     // Live platform
     if (
-        el.getAttribute('data-tid') === 'voice-level-stream-outline' && window.location.href.includes('live')
+        el.getAttribute('data-tid') === 'voice-level-stream-outline' &&
+        window.location.href.includes('live')
     ) {
         const hasVdiFrameClass = el.classList.contains('vdi-frame-occlusion')
         const borderOpacity =

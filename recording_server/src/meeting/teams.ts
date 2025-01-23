@@ -56,6 +56,7 @@ export class TeamsProvider implements MeetingProviderInterface {
         meetingParams: MeetingParams,
     ): Promise<void> {
         console.log('joining meeting', cancelCheck)
+        await ensurePageLoaded(page)
 
         try {
             await clickWithInnerText(
@@ -133,14 +134,12 @@ export class TeamsProvider implements MeetingProviderInterface {
         }
 
         try {
-            if (await clickWithInnerText(page, 'button', 'View', 2, false)) {
+            if (await clickWithInnerText(page, 'button', 'View', 10, false)) {
                 if (meetingParams.recording_mode !== 'gallery_view') {
                     await clickWithInnerText(page, 'button', 'View', 10)
                     await clickWithInnerText(page, 'div', 'Speaker', 20)
                 }
-            } else {
-                console.warn('New light interface Teams')
-            }
+            } 
         } catch (e) {
             console.error('Error handling "View" or "Speaker" mode:', e)
         }
@@ -160,6 +159,8 @@ async function typeBotName(
     botName: string,
     iterations: number,
 ): Promise<boolean> {
+    await ensurePageLoaded(page)
+
     console.log('Starting to type bot name...')
     const methodSetValue = async () => {
         const focused = await focusInput(INPUT_BOT, page, 2)
@@ -227,6 +228,7 @@ async function checkInputValue(
     page: puppeteer.Page,
     selector: string,
 ): Promise<string | null> {
+    await ensurePageLoaded(page)
     return await page.evaluate((sel) => {
         const input = document.querySelector(sel) as HTMLInputElement
         return input ? input.value : null
@@ -240,6 +242,8 @@ export async function innerTextWithSelector(
 ): Promise<boolean> {
     let i = 0
     let continueButton = false
+    await ensurePageLoaded(page)
+
     while (!continueButton && i < iterations) {
         try {
             continueButton = await page.evaluate(
@@ -291,9 +295,10 @@ export async function innerTextWithSelector(
 async function tryFindInterface(page: puppeteer.Page): Promise<boolean> {
     const controller = new AbortController()
     const signal = controller.signal
+    await ensurePageLoaded(page)
 
     try {
-        const result = await Promise.race([
+        await Promise.race([
             clickWithInnerText(
                 page,
                 'button',
@@ -346,13 +351,23 @@ export async function clickWithInnerText(
     let i = 0
     iterations = iterations
     let continueButton = false
-
+    if (!(await ensurePageLoaded(page))) {
+        console.error('Page is not fully loaded at the start.');
+        return false;
+    }
     while (
         !continueButton &&
         (iterations == null || i < iterations) &&
         !cancelCheck?.()
     ) {
         try {
+            if (i % 5 === 0) { // Toutes les 5 itérations
+                const isPageLoaded = await ensurePageLoaded(page);
+                if (!isPageLoaded) {
+                    console.error('Page seems frozen or not responding.');
+                    return false; // Stop si la page ne répond plus
+                }
+            }
             continueButton = await page.evaluate(
                 (innerText, htmlType, i, click) => {
                     let elements
@@ -495,12 +510,22 @@ async function checkPageForText(
 }
 
 async function isRemovedFromTheMeeting(page: Page): Promise<boolean> {
-    // if no leave button, then the bot has been removed from the meeting
-    if (!(await clickWithInnerText(page, 'button', 'Raise', 4, false))) {
-        console.log('no leave button found, Bot removed from the meeting')
-        return true
-    } else {
-        return false
+    try {
+        // Vérifie que la page est toujours chargée
+        if(!await ensurePageLoaded(page)){
+            return true
+        }
+        // Vérifie si le bouton "Raise" est présent
+        const buttonExists = await clickWithInnerText(page, 'button', 'Raise', 4, false);
+
+        if (!buttonExists) {
+            console.log('no leave button found, Bot removed from the meeting');
+            return true;
+        }
+        return false;
+    } catch (error) {
+        console.error('Error while checking meeting status:', error);
+        return false; // Retourne false en cas d’erreur
     }
 }
 
@@ -558,5 +583,17 @@ async function activateCamera(page: puppeteer.Page): Promise<void> {
         }
     } catch (error) {
         console.error('Failed to activate camera:', error)
+    }
+}
+async function ensurePageLoaded(page: puppeteer.Page, timeout = 15000): Promise<boolean> {
+    try {
+        await page.waitForFunction(
+            () => document.readyState === 'complete',
+            { timeout }
+        );
+        return true;
+    } catch (error) {
+        console.error('Failed to ensure page is loaded:', error);
+        return false; // Permet aux appels en amont de décider quoi faire
     }
 }
