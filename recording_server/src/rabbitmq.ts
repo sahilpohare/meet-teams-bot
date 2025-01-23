@@ -64,7 +64,6 @@ export class Consumer {
                             const meetingParams = JSON.parse(
                                 message.content.toString(),
                             ) as MeetingParams
-                           
 
                             console.log('initializing logger')
                             let logger = new Logger(meetingParams)
@@ -98,7 +97,7 @@ export class Consumer {
                                 this.channel.reject(message, false)
                             } else {
                                 // other errors - retry
-                                this.channel.reject(message, true) // requeue
+                                this.channel.reject(message, true) // true is for requeue
                             }
                             reject(e)
                         }

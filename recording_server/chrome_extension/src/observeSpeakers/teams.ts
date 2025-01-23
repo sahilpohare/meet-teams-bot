@@ -3,6 +3,9 @@ import { RecordingMode, SpeakerData } from '../observeSpeakers'
 
 export const SPEAKER_LATENCY = 1500 // ms
 
+// DANS LA NOUVELLE INTERFACE:
+// data-class-name-list="bkg_MymaBCIcQp8Wp0Fbot,bkg_PhilippeDrion,bkg_AragornUnverified," => y en a qu'un seul
+
 export async function getSpeakerRootToObserve(
     _recordingMode: RecordingMode,
 ): Promise<[Node, MutationObserverInit] | undefined> {
@@ -164,28 +167,31 @@ function checkIfSpeaking(element: HTMLElement): boolean {
 function checkElementAndPseudo(el: HTMLElement): boolean {
     const style = window.getComputedStyle(el)
     const beforeStyle = window.getComputedStyle(el, '::before')
-    const afterStyle = window.getComputedStyle(el, '::after')
-    const borderStyle = window.getComputedStyle(el)  // live platform
+    // const afterStyle = window.getComputedStyle(el, '::after')
+    const borderStyle = window.getComputedStyle(el)
 
-    // old teams
+    // Old teams
     if (el.getAttribute('data-tid') === 'participant-speaker-ring') {
         return parseFloat(style.opacity) === 1
     }
 
-    // new teams & live platform
-    if (el.getAttribute('data-tid') === 'voice-level-stream-outline') {
+    // New teams
+    if (el.getAttribute('data-tid') === 'voice-level-stream-outline' && el.closest('[data-stream-type="Video"]')) {
         const hasVdiFrameClass = el.classList.contains('vdi-frame-occlusion')
-        const borderOpacity = parseFloat(beforeStyle.opacity) || parseFloat(borderStyle.opacity)
-        const borderColor = beforeStyle.borderColor || beforeStyle.borderTopColor || borderStyle.borderColor
-
+        const borderColor = beforeStyle.borderColor || beforeStyle.borderTopColor
+        const borderOpacity = parseFloat(beforeStyle.opacity)
         return hasVdiFrameClass || (isBlueish(borderColor) && borderOpacity === 1)
     }
 
-    return (
-        (isBlueish(style.borderColor) && parseFloat(style.opacity) === 1) ||
-        (isBlueish(beforeStyle.borderColor) && parseFloat(beforeStyle.opacity) === 1) ||
-        (isBlueish(afterStyle.borderColor) && parseFloat(afterStyle.opacity) === 1)
-    )
+    // Live platform
+    if (el.getAttribute('data-tid') === 'voice-level-stream-outline' && el.closest('[data-tid="menur1j"]')) {
+        const hasVdiFrameClass = el.classList.contains('vdi-frame-occlusion')
+        const borderOpacity = parseFloat(beforeStyle.opacity) || parseFloat(borderStyle.opacity)
+        const borderColor = beforeStyle.borderColor || beforeStyle.borderTopColor || borderStyle.borderColor
+        return hasVdiFrameClass || (isBlueish(borderColor) && borderOpacity === 1)
+    }
+
+    return false
 }
 
 function isBlueish(color: string): boolean {
