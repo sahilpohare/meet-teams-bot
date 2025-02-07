@@ -37,7 +37,7 @@ export class Consumer {
         const channel = await connection.createChannel()
 
         console.log('declaring queue: ', Consumer.QUEUE_NAME)
-        channel.prefetch(Consumer.PREFETCH_COUNT, false)
+        channel.prefetch(Consumer.PREFETCH_COUNT)
 
         return new Consumer(channel)
     }
@@ -60,58 +60,42 @@ export class Consumer {
                 .consume(Consumer.QUEUE_NAME, async (message) => {
                     console.log(`consume message : ${message}`)
                     if (message !== null) {
+                        // configure rabbit increase timeout or timeout max < rabbitmq message timeout
+                        console.log('canceling channel')
+                        await this.channel.cancel(message.fields.consumerTag)
+
+                        const meetingParams = JSON.parse(
+                            message.content.toString(),
+                        ) as MeetingParams
+
+                        console.log('initializing logger')
+                        let logger = new Logger(meetingParams)
+                        await logger.init()
+
+                        axios.defaults.headers.common['Authorization'] =
+                            meetingParams.user_token
+                        let error = null
                         try {
-                            const meetingParams = JSON.parse(
-                                message.content.toString(),
-                            ) as MeetingParams
-
-                            console.log('initializing logger')
-                            let logger = new Logger(meetingParams)
-                            await logger.init()
-
-                            axios.defaults.headers.common['Authorization'] =
-                                meetingParams.user_token
-                            let error = null
-                            try {
-                                console.log('awaiting handler...')
-                                await handler(meetingParams)
-                            } catch (e) {
-                                console.error('error while awaiting handler')
-                                error = e
-                            }
-                            // Firstly ack the message
-                            console.log('ACK rabbutMQ')
-                            this.channel.ack(message)
-
-                            // Then cancel the consumer
-                            console.log('canceling channel')
-                            await this.channel.cancel(
-                                message.fields.consumerTag,
-                            )
-
-                            resolve({ params: meetingParams, error: error })
+                            console.log("awaiting handler...")
+                            await handler(meetingParams)
                         } catch (e) {
-                            console.error('Error processing message', e)
-                            if (e instanceof SyntaxError) {
-                                //parse error
-                                this.channel.reject(message, false)
-                            } else {
-                                // other errors - retry
-                                this.channel.reject(message, true) // true is for requeue
-                            }
-                            reject(e)
+                            console.error("error while awaiting handler")
+                            error = e
                         }
+                        // TODO: retry in rabbitmq
+                        console.log('ACK rabbutMQ')
+                        this.channel.ack(message)
+                        resolve({ params: meetingParams, error: error })
                     } else {
                         console.log('Consumer cancelled by server')
-                        reject(new Error('Consumer cancelled by server'))
+                        reject() // TODO errors
                     }
                 })
                 .then((consumer) => {
                     console.log('consumer started: ', consumer.consumerTag)
                 })
                 .catch((e) => {
-                    console.error('Failed to start consumer:', e)
-                    reject(new Error(`Failed to start consumer: ${e.message}`))
+                    reject() // TODO errors
                 })
         })
     }
