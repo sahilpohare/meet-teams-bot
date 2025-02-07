@@ -34,8 +34,8 @@ export async function removeInitialShityHtml(mode: RecordingMode) {
     } catch (e) {
         // console.error('[Teams] Error in insert before style', e)
     }
-     // Add for new interface
-     try {
+    // Add for new interface
+    try {
         const mainArea = documentRoot.querySelector(
             'div[data-tid="app-layout-area--main"]',
         )

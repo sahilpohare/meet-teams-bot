@@ -19,7 +19,10 @@ export async function startRecording(
             'FROM_EXTENSION: ************ Start recording launched. ************',
         )
 
-        await record.initMediaRecorder(streaming_output, streaming_audio_frequency)
+        await record.initMediaRecorder(
+            streaming_output,
+            streaming_audio_frequency,
+        )
         return await record.startRecording(chunkDuration)
     } catch (e) {
         console.log('ERROR while start recording', JSON.stringify(e))

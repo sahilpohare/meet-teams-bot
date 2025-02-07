@@ -24,10 +24,9 @@ export class Streaming {
         sample_rate: number | undefined,
         bot_id: string,
     ) {
-
         if (sample_rate) {
             this.sample_rate = sample_rate
-            }
+        }
         if (output) {
             console.log(`output = ${output}`)
             this.extension_ws = new WebSocket.Server({

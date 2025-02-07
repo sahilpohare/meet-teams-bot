@@ -146,7 +146,7 @@ export class TeamsProvider implements MeetingProviderInterface {
                     await clickWithInnerText(page, 'button', 'View', 10)
                     await clickWithInnerText(page, 'div', 'Speaker', 20)
                 }
-            } 
+            }
         } catch (e) {
             console.error('Error handling "View" or "Speaker" mode:', e)
         }
@@ -357,8 +357,8 @@ export async function clickWithInnerText(
     let i = 0
     let continueButton = false
     if (!(await ensurePageLoaded(page))) {
-        console.error('Page is not fully loaded at the start.');
-        return false;
+        console.error('Page is not fully loaded at the start.')
+        return false
     }
     while (
         !continueButton &&
@@ -366,11 +366,12 @@ export async function clickWithInnerText(
         !cancelCheck?.()
     ) {
         try {
-            if (i % 5 === 0) { // Toutes les 5 itérations
-                const isPageLoaded = await ensurePageLoaded(page);
+            if (i % 5 === 0) {
+                // Toutes les 5 itérations
+                const isPageLoaded = await ensurePageLoaded(page)
                 if (!isPageLoaded) {
-                    console.error('Page seems frozen or not responding.');
-                    return false; // Stop si la page ne répond plus
+                    console.error('Page seems frozen or not responding.')
+                    return false // Stop si la page ne répond plus
                 }
             }
             continueButton = await page.evaluate(
@@ -510,20 +511,26 @@ async function checkPageForText(
 async function isRemovedFromTheMeeting(page: Page): Promise<boolean> {
     try {
         // Vérifie que la page est toujours chargée
-        if(!await ensurePageLoaded(page)){
+        if (!(await ensurePageLoaded(page))) {
             return true
         }
         // Vérifie si le bouton "Raise" est présent
-        const buttonExists = await clickWithInnerText(page, 'button', 'Raise', 4, false);
+        const buttonExists = await clickWithInnerText(
+            page,
+            'button',
+            'Raise',
+            4,
+            false,
+        )
 
         if (!buttonExists) {
-            console.log('no leave button found, Bot removed from the meeting');
-            return true;
+            console.log('no leave button found, Bot removed from the meeting')
+            return true
         }
-        return false;
+        return false
     } catch (error) {
-        console.error('Error while checking meeting status:', error);
-        return false; // Retourne false en cas d’erreur
+        console.error('Error while checking meeting status:', error)
+        return false // Retourne false en cas d’erreur
     }
 }
 
@@ -583,15 +590,17 @@ async function activateCamera(page: puppeteer.Page): Promise<void> {
         console.error('Failed to activate camera:', error)
     }
 }
-async function ensurePageLoaded(page: puppeteer.Page, timeout = 15000): Promise<boolean> {
+async function ensurePageLoaded(
+    page: puppeteer.Page,
+    timeout = 15000,
+): Promise<boolean> {
     try {
-        await page.waitForFunction(
-            () => document.readyState === 'complete',
-            { timeout }
-        );
-        return true;
+        await page.waitForFunction(() => document.readyState === 'complete', {
+            timeout,
+        })
+        return true
     } catch (error) {
-        console.error('Failed to ensure page is loaded:', error);
-        return false; // Permet aux appels en amont de décider quoi faire
+        console.error('Failed to ensure page is loaded:', error)
+        return false // Permet aux appels en amont de décider quoi faire
     }
 }

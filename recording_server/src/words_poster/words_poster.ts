@@ -108,7 +108,6 @@ export class WordsPoster {
             let words: RecognizerWord[]
             switch (this.speech_to_text_provider) {
                 case 'Runpod':
-
                     let res_runpod = await recognizeRunPod(
                         audioUrl,
                         this.vocabulary, // TODO : What to do.

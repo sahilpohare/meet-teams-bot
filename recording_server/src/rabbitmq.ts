@@ -14,7 +14,6 @@ import { MeetingParams, MeetingProvider } from './types'
 
 import { server } from './server'
 
-
 import { Api } from './api/methods'
 
 const NODE_NAME = process.env.NODE_NAME
@@ -78,10 +77,10 @@ export class Consumer {
 
                         let error = null
                         try {
-                            console.log("awaiting handler...")
+                            console.log('awaiting handler...')
                             await handler(meetingParams)
                         } catch (e) {
-                            console.error("error while awaiting handler")
+                            console.error('error while awaiting handler')
                             error = e
                         }
                         // TODO: retry in rabbitmq

@@ -59,7 +59,7 @@ export class ApiService {
         )
 
         async function upload_chunk(isFinal: boolean) {
-            let route = !isFinal ? "upload_chunk" : "upload_chunk_final"
+            let route = !isFinal ? 'upload_chunk' : 'upload_chunk_final'
             await axios
                 .post(`${url}transcoder/${route}`, payload, {
                     headers: {
@@ -68,10 +68,7 @@ export class ApiService {
                     maxContentLength: 500 * 1024 * 1024, // 500MB limit to match server
                 })
                 .catch((error) => {
-                    console.error(
-                        'Failed to send upload chunk message:',
-                        error,
-                    )
+                    console.error('Failed to send upload chunk message:', error)
                 })
         }
 

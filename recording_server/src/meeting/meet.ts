@@ -135,12 +135,12 @@ export class MeetProvider implements MeetingProviderInterface {
     ): Promise<boolean> {
         try {
             if (!page.isClosed()) {
-                return await removedFromMeeting(page);
+                return await removedFromMeeting(page)
             }
-            return true;
+            return true
         } catch {
             console.log('error in findEndMeeting')
-            return true;
+            return true
         }
     }
 }
@@ -284,21 +284,25 @@ async function removedFromMeeting(page: Page): Promise<boolean> {
         const result = await Promise.race([
             page.$$eval('*', (elems) => {
                 for (const e of elems) {
-                    const text = (e as HTMLElement).innerText;
-                    if (text?.includes("You've been removed") || 
-                        text?.includes("The call ended") ||
-                        text?.includes("Return to home")) {
-                        return true;
+                    const text = (e as HTMLElement).innerText
+                    if (
+                        text?.includes("You've been removed") ||
+                        text?.includes('The call ended') ||
+                        text?.includes('Return to home')
+                    ) {
+                        return true
                     }
                 }
-                return false;
+                return false
             }),
-            new Promise((_, reject) => setTimeout(() => reject('Timeout'), 5000))
-        ]);
-        return !!result;
+            new Promise((_, reject) =>
+                setTimeout(() => reject('Timeout'), 5000),
+            ),
+        ])
+        return !!result
     } catch (error) {
-        console.error('Timeout or error in removedFromMeeting:', error);
-        return true; // En cas de timeout, considérer comme terminé
+        console.error('Timeout or error in removedFromMeeting:', error)
+        return true // En cas de timeout, considérer comme terminé
     }
 }
 
