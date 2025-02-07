@@ -102,10 +102,6 @@ export function parseGladia(
             text: w.word.trim(),
             start_time: w.start + offset,
             end_time: w.end + offset,
-            // confidence: w.confidence,
-            // IMPORTANT : The server doesn't seem to interpret things correctly if we return the actual confidence,
-            // which is less than 1.
-            confidence: 1,
         } as RecognizerWord
     })
 }

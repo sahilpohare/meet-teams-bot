@@ -4,17 +4,15 @@ import { Api } from '../api/methods'
 import { parseGladia, recognizeGladia } from './providers/gladia'
 import { parseRunPod, recognizeRunPod } from './providers/runpod'
 
-import { delete_s3_file } from '../utils'
-import { MeetingParams } from '../types'
 import { TRANSCODER } from '../transcoder'
+import { MeetingParams } from '../types'
+import { delete_s3_file } from '../utils'
 
 // Output word of the `Recognizer`.
 export type RecognizerWord = {
-    type: string
-    value: string // Word
-    ts: number // Start timestamp (in seconds)
-    end_ts: number // End timestamp (in seconds)
-    confidence: number // Confidence ([0.0, 1.0])
+    text: string
+    start_time: number
+    end_time: number
 }
 
 function newTranscribeQueue() {

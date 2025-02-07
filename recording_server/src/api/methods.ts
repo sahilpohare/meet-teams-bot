@@ -4,7 +4,7 @@ import * as rax from 'retry-axios'
 import { ApiTypes } from './types'
 
 import { MeetingParams } from '../types'
-import { Console } from '../utils'
+
 import { RecognizerWord } from '../words_poster/words_poster'
 
 export class Api {
