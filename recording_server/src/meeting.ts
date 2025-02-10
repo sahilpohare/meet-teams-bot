@@ -243,7 +243,7 @@ export class MeetingHandle {
 
             // Start transcoder
             await TRANSCODER.init(
-                process.env.AWS_S3_BUCKET,
+                process.env.AWS_S3_VIDEO_BUCKET,
                 this.param.mp4_s3_path,
                 CHUNK_DURATION,
                 TRANSCRIBE_DURATION,

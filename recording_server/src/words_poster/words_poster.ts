@@ -44,7 +44,7 @@ export class WordsPoster {
         this.bot_uuid = params.bot_uuid
         this.speech_to_text_provider = params.speech_to_text_provider
         this.speech_to_text_api_key = params.speech_to_text_api_key
-        this.s3_bucket = process.env.AWS_S3_BUCKET
+        this.s3_bucket = process.env.AWS_S3_TEMPORARY_AUDIO_BUCKET
         this.user_id = params.user_id
         this.vocabulary = params.vocabulary
 
