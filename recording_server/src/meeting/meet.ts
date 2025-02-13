@@ -279,30 +279,60 @@ async function notAcceptedInMeeting(page: Page): Promise<boolean> {
     }
 }
 
+//TODO: if someone join the meeting the bot leave the meeting
 async function removedFromMeeting(page: Page): Promise<boolean> {
     try {
-        const result = await Promise.race([
-            page.$$eval('*', (elems) => {
-                for (const e of elems) {
-                    const text = (e as HTMLElement).innerText
-                    if (
-                        text?.includes("You've been removed") ||
-                        text?.includes('The call ended') ||
-                        text?.includes('Return to home')
-                    ) {
-                        return true
+        const REMOVAL_MESSAGES = [
+            "You've been removed",
+            'The call ended', 
+            'Return to home',
+            "You've been removed from the meeting"
+        ];
+        const RETRY_DELAY = 500;
+
+        const checkForRemoval = async () => {
+            return await page.evaluate((messages) => {
+                const elements = document.querySelectorAll('*');
+                
+                for (const element of elements) {
+                    const text = element.textContent || '';
+                    
+                    // Still in meeting if we see 'Leave call'
+                    if (text.includes('Leave call')) {
+                        console.log('Leave call found, still in meeting')
+                        return false;
+                    }
+
+                    // Check for any removal messages
+                    if (messages.some(msg => text.includes(msg))) {
+                        console.log('Removal message found, removed bot')
+                        return true;
                     }
                 }
-                return false
-            }),
-            new Promise((_, reject) =>
-                setTimeout(() => reject('Timeout'), 5000),
-            ),
-        ])
-        return !!result
+                return false;
+            }, REMOVAL_MESSAGES);
+        };
+
+        // First check
+        const firstCheck = await checkForRemoval();
+        if (firstCheck) {
+            return true;
+        }
+
+        // Wait and do second check
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+        return await checkForRemoval();
+
     } catch (error) {
-        console.error('Timeout or error in removedFromMeeting:', error)
-        return true // En cas de timeout, considérer comme terminé
+        console.error('Error in removedFromMeeting:', error);
+        if (error instanceof Error) {
+            console.error('Error details:', {
+                name: error.name,
+                message: error.message,
+                stack: error.stack
+            });
+        }
+        return false;
     }
 }
 

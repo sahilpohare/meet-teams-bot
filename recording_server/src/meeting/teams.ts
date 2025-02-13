@@ -592,7 +592,7 @@ async function activateCamera(page: puppeteer.Page): Promise<void> {
 }
 async function ensurePageLoaded(
     page: puppeteer.Page,
-    timeout = 15000,
+    timeout = 20000,
 ): Promise<boolean> {
     try {
         await page.waitForFunction(() => document.readyState === 'complete', {
@@ -601,6 +601,6 @@ async function ensurePageLoaded(
         return true
     } catch (error) {
         console.error('Failed to ensure page is loaded:', error)
-        return false // Permet aux appels en amont de décider quoi faire
+        throw new Error('Page failed to load in time')
     }
 }

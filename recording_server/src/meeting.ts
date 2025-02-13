@@ -66,6 +66,8 @@ const MAX_TIME_TO_LIVE_AFTER_TIMEOUT = 3600 * 2 // 2 hours
 const CHUNK_DURATION: number = 10_000 // 10 seconds for each chunks
 const TRANSCRIBE_DURATION: number = CHUNK_DURATION * 18 // 3 minutes for each transcribe
 
+const MAX_RETRIES = 3
+
 const FIND_END_MEETING_SLEEP = 250
 
 export class JoinError extends Error {
@@ -161,28 +163,32 @@ export class MeetingHandle {
                 : this.param.recording_mode
     }
 
-    public async startRecordMeeting() {
-        try {
-            if (this.param.bot_branding) {
-                this.brandingGenerateProcess = generateBranding(
-                    this.param.bot_name,
-                    this.param.custom_branding_bot_path,
-                )
-                await this.brandingGenerateProcess.wait
-                playBranding()
-            }
+    public async startRecordMeeting(maxRetries = MAX_RETRIES) {
+        let joinSuccess = false
 
+        // Étape 1: Setup initial (branding)
+        if (this.param.bot_branding) {
+            this.brandingGenerateProcess = generateBranding(
+                this.param.bot_name,
+                this.param.custom_branding_bot_path,
+            )
+            await this.brandingGenerateProcess.wait
+            playBranding()
+        }
+
+        try {
+            // Étape 2: Setup du browser
             const extensionId = await getCachedExtensionId()
             const { browser, backgroundPage } = await openBrowser(
                 extensionId,
                 false,
-                // this.param.meetingProvider === 'Zoom',
                 false,
             )
             this.meeting.browser = browser
             this.meeting.backgroundPage = backgroundPage
             console.log('Extension found', { extensionId })
 
+            // Étape 3: Récupération des infos de la réunion
             const { meetingId, password } = await this.provider.parseMeetingUrl(
                 this.meeting.browser,
                 this.param.meeting_url,
@@ -198,50 +204,74 @@ export class MeetingHandle {
             )
             console.log('Meeting link found', { meetingLink })
 
-            this.meeting.page = await this.provider.openMeetingPage(
-                this.meeting.browser,
-                meetingLink,
-                this.param.streaming_input,
-            )
-            console.log('meeting page opened')
+            // Étape 4: Partie avec retries
+            for (
+                let attempt = 0;
+                attempt < maxRetries && !joinSuccess;
+                attempt++
+            ) {
+                try {
+                    // Ouvrir la page de la réunion
+                    this.meeting.page = await this.provider.openMeetingPage(
+                        this.meeting.browser,
+                        meetingLink,
+                        this.param.streaming_input,
+                    )
+                    console.log('meeting page opened')
 
-            this.meeting.meetingTimeoutInterval = setTimeout(
-                () => {
-                    MeetingHandle.instance?.meetingTimeout()
-                },
-                RECORDING_TIMEOUT * 1000, // 4 hours in ms
-            )
+                    // Configurer le timeout de la réunion
+                    this.meeting.meetingTimeoutInterval = setTimeout(() => {
+                        MeetingHandle.instance?.meetingTimeout()
+                    }, RECORDING_TIMEOUT * 1000)
 
-            await Events.inWaitingRoom()
+                    await Events.inWaitingRoom()
 
-            const waintingRoomToken = new CancellationToken(
-                this.param.automatic_leave.waiting_room_timeout,
-            )
-            console.log(
-                'waitingroom timeout',
-                this.param.automatic_leave.waiting_room_timeout,
-            )
-            try {
-                await this.provider.joinMeeting(
-                    this.meeting.page,
-                    () => {
-                        return (
-                            MeetingHandle.status.state !== 'Recording' ||
-                            waintingRoomToken.isCancellationRequested
-                        )
-                    },
-                    this.param,
-                )
-                console.log('meeting page joined')
-            } catch (error) {
-                console.error(error)
-                throw error
+                    // Tentative de rejoindre la réunion
+                    const waintingRoomToken = new CancellationToken(
+                        this.param.automatic_leave.waiting_room_timeout,
+                    )
+                    console.log(
+                        'waitingroom timeout',
+                        this.param.automatic_leave.waiting_room_timeout,
+                    )
+
+                    await this.provider.joinMeeting(
+                        this.meeting.page,
+                        () => {
+                            return (
+                                MeetingHandle.status.state !== 'Recording' ||
+                                waintingRoomToken.isCancellationRequested
+                            )
+                        },
+                        this.param,
+                    )
+                    console.log('meeting page joined')
+                    joinSuccess = true
+                } catch (error) {
+                    console.error(`Attempt ${attempt + 1} failed:`, error)
+                    if (this.meeting.page) {
+                        await this.meeting.page
+                            .close()
+                            .catch((e) =>
+                                console.error('Error closing page:', e),
+                            )
+                    }
+
+                    if (attempt === maxRetries - 1) throw error
+                    console.log(`Retrying... (${attempt + 1}/${maxRetries})`)
+                    await sleep(2000)
+                }
             }
 
+            if (!joinSuccess) {
+                throw new Error('Failed to join meeting after all retries')
+            }
+
+            // Étape 5: Setup de l'enregistrement
             listenPage(this.meeting.backgroundPage)
             await Events.inCallNotRecording()
 
-            // Start transcoder
+            // Démarrage du transcoder
             await TRANSCODER.init(
                 process.env.AWS_S3_VIDEO_BUCKET,
                 this.param.mp4_s3_path,
@@ -251,12 +281,12 @@ export class MeetingHandle {
                 console.error(`Cannot start Transcoder: ${e}`)
             })
 
-            // Start WordPoster for transcribing
+            // Démarrage du WordPoster
             await WordsPoster.init(this.param).catch((e) => {
                 console.error(`Cannot start Transcriber: ${e}`)
             })
 
-            // First, remove Shitty Html...
+            // Nettoyage du HTML
             await this.meeting.backgroundPage.evaluate(
                 async (params) => {
                     const w = window as any
@@ -271,10 +301,9 @@ export class MeetingHandle {
                 },
             )
 
-            // wait 3 secondes
             await sleep(3000)
 
-            // ... then start recording...
+            // Démarrage de l'enregistrement
             let result: string | number =
                 await this.meeting.backgroundPage.evaluate(
                     async (meuh) => {
@@ -301,6 +330,7 @@ export class MeetingHandle {
                             this.param.streaming_audio_frequency,
                     },
                 )
+
             if (typeof result === 'number') {
                 console.info(`START_RECORDING_TIMESTAMP = ${result}`)
                 START_RECORDING_TIMESTAMP.set(result)
@@ -309,7 +339,7 @@ export class MeetingHandle {
                 throw new JoinError(JoinErrorCode.Internal)
             }
 
-            // ... and finally, start to observe speakers
+            // Démarrage de l'observation des speakers
             await this.meeting.backgroundPage.evaluate(
                 async (params) => {
                     const w = window as any
@@ -325,9 +355,10 @@ export class MeetingHandle {
                     meetingProvider: this.param.meetingProvider,
                 },
             )
+
             console.log('startRecording called')
-            // Send recording confirmation webhook
             await Events.inCallRecording()
+            return // Succès !
         } catch (error) {
             await this.cleanEverything()
             MeetingHandle.status.error = error
@@ -464,9 +495,10 @@ export class MeetingHandle {
     }
 
     private async stopRecordingInternal() {
-        let { page, meetingTimeoutInterval, browser, backgroundPage } =
+        const { page, meetingTimeoutInterval, browser, backgroundPage } =
             this.meeting
-        // Terminate transcript
+
+        // 1. D'abord terminer la transcription
         await uploadTranscriptTask(
             {
                 name: 'END',
@@ -476,8 +508,10 @@ export class MeetingHandle {
             } as SpeakerData,
             true,
         )
+
+        // 2. Arrêter l'enregistrement média
         console.log('before stopMediaRecorder')
-        let result: boolean = await backgroundPage!.evaluate(async () => {
+        const result: boolean = await backgroundPage!.evaluate(async () => {
             const w = window as any
             try {
                 await w.stopMediaRecorder()
@@ -486,42 +520,76 @@ export class MeetingHandle {
                 return false
             }
         })
+
         if (!result) {
-            console.error(`Unexpected error when stoping MediaRecorder`)
+            console.error(`Unexpected error when stopping MediaRecorder`)
         }
         console.log(`after stopMediaRecorder`)
-        try {
-            await page!.goto('about:blank')
-        } catch (e) {
-            console.error(e)
-        }
 
+        // 3. Arrêter la transcription et le transcodage de manière séquentielle
         try {
-            clearTimeout(meetingTimeoutInterval!)
+            await WordsPoster.TRANSCRIBER?.stop()
+            console.log('Transcriber stopped successfully')
         } catch (e) {
-            console.error(e)
-        }
-        try {
-            await page!.close()
-        } catch (e) {
-            console.error(`Failed to close page: ${e}`)
-        }
-
-        await WordsPoster.TRANSCRIBER?.stop().catch((e) => {
             console.error(`Cannot stop Transcriber: ${e}`)
-        })
-        await TRANSCODER.stop().catch((e) => {
-            console.error(`Cannot stop Transcoder: ${e}`)
-        })
+        }
 
         try {
-            removeListenPage(backgroundPage!)
-            await backgroundPage!.close()
-            await sleep(1)
-            await browser!.close()
+            await TRANSCODER.stop()
+            console.log('Transcoder stopped successfully')
         } catch (e) {
-            console.error(`Failed to close browser: ${e}`)
+            console.error(`Cannot stop Transcoder: ${e}`)
         }
+
+        // 4. Nettoyer le navigateur simplement
+        if (meetingTimeoutInterval) {
+            clearTimeout(meetingTimeoutInterval)
+        }
+
+        // Fermer les pages sans attendre - le browser.close() s'en chargera
+        if (page) {
+            try {
+                // Ne pas naviguer vers about:blank, fermer directement
+                await page.close({ runBeforeUnload: false }).catch(() => {})
+            } catch (e) {
+                console.error(`Failed to close main page: ${e}`)
+            }
+        }
+
+        if (backgroundPage) {
+            try {
+                removeListenPage(backgroundPage)
+                await backgroundPage
+                    .close({ runBeforeUnload: false })
+                    .catch(() => {})
+            } catch (e) {
+                console.error(`Failed to close background page: ${e}`)
+            }
+        }
+
+        // Fermer le navigateur avec un timeout
+        if (browser) {
+            try {
+                await Promise.race([
+                    browser.close(),
+                    new Promise((_, reject) =>
+                        setTimeout(() => reject('Browser close timeout'), 5000),
+                    ),
+                ])
+                console.log('Browser closed successfully')
+            } catch (e) {
+                console.error(`Failed to close browser: ${e}`)
+                // Forcer la fermeture du processus du navigateur si nécessaire
+                try {
+                    if (browser.process() != null) {
+                        browser.process()?.kill('SIGKILL')
+                    }
+                } catch (killError) {
+                    console.error('Failed to kill browser process:', killError)
+                }
+            }
+        }
+
         console.log('Meeting successfully terminated')
     }
 
