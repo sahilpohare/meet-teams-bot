@@ -205,11 +205,7 @@ export class MeetingHandle {
             console.log('Meeting link found', { meetingLink })
 
             // Étape 4: Partie avec retries
-            for (
-                let attempt = 0;
-                attempt < maxRetries && !joinSuccess;
-                attempt++
-            ) {
+            for (let attempt = 0; attempt < maxRetries && !joinSuccess; attempt++) {
                 try {
                     // Ouvrir la page de la réunion
                     this.meeting.page = await this.provider.openMeetingPage(
@@ -218,14 +214,14 @@ export class MeetingHandle {
                         this.param.streaming_input,
                     )
                     console.log('meeting page opened')
-
+            
                     // Configurer le timeout de la réunion
                     this.meeting.meetingTimeoutInterval = setTimeout(() => {
                         MeetingHandle.instance?.meetingTimeout()
                     }, RECORDING_TIMEOUT * 1000)
-
+            
                     await Events.inWaitingRoom()
-
+            
                     // Tentative de rejoindre la réunion
                     const waintingRoomToken = new CancellationToken(
                         this.param.automatic_leave.waiting_room_timeout,
@@ -234,7 +230,7 @@ export class MeetingHandle {
                         'waitingroom timeout',
                         this.param.automatic_leave.waiting_room_timeout,
                     )
-
+            
                     await this.provider.joinMeeting(
                         this.meeting.page,
                         () => {
@@ -249,14 +245,23 @@ export class MeetingHandle {
                     joinSuccess = true
                 } catch (error) {
                     console.error(`Attempt ${attempt + 1} failed:`, error)
+                    
+                    // Si c'est BotNotAccepted, on propage l'erreur immédiatement
+                    if (error instanceof JoinError && error.message === JoinErrorCode.BotNotAccepted) {
+                        if (this.meeting.page) {
+                            await this.meeting.page
+                                .close()
+                                .catch((e) => console.error('Error closing page:', e))
+                        }
+                        throw error;
+                    }
+            
                     if (this.meeting.page) {
                         await this.meeting.page
                             .close()
-                            .catch((e) =>
-                                console.error('Error closing page:', e),
-                            )
+                            .catch((e) => console.error('Error closing page:', e))
                     }
-
+            
                     if (attempt === maxRetries - 1) throw error
                     console.log(`Retrying... (${attempt + 1}/${maxRetries})`)
                     await sleep(2000)
@@ -495,104 +500,76 @@ export class MeetingHandle {
     }
 
     private async stopRecordingInternal() {
-        const { page, meetingTimeoutInterval, browser, backgroundPage } =
-            this.meeting
-
-        // 1. D'abord terminer la transcription
-        await uploadTranscriptTask(
-            {
-                name: 'END',
-                id: 0,
-                timestamp: Date.now(),
-                isSpeaking: false,
-            } as SpeakerData,
-            true,
-        )
-
-        // 2. Arrêter l'enregistrement média
-        console.log('before stopMediaRecorder')
-        const result: boolean = await backgroundPage!.evaluate(async () => {
-            const w = window as any
+        const { page, meetingTimeoutInterval, browser, backgroundPage } = this.meeting;
+    
+        // Regrouper les opérations qui peuvent être parallélisées
+        const cleanupPromises = [];
+    
+        // 1. Upload transcript (doit rester en premier)
+        await uploadTranscriptTask({
+            name: 'END',
+            id: 0,
+            timestamp: Date.now(),
+            isSpeaking: false,
+        } as SpeakerData, true);
+    
+        // 2. Arrêter l'enregistrement média (doit rester après upload)
+        await backgroundPage!.evaluate(async () => {
+            const w = window as any;
             try {
-                await w.stopMediaRecorder()
-                return true
+                await w.stopMediaRecorder();
+                return true;
             } catch (_e) {
-                return false
+                return false;
             }
-        })
-
-        if (!result) {
-            console.error(`Unexpected error when stopping MediaRecorder`)
-        }
-        console.log(`after stopMediaRecorder`)
-
-        // 3. Arrêter la transcription et le transcodage de manière séquentielle
-        try {
-            await WordsPoster.TRANSCRIBER?.stop()
-            console.log('Transcriber stopped successfully')
-        } catch (e) {
-            console.error(`Cannot stop Transcriber: ${e}`)
-        }
-
-        try {
-            await TRANSCODER.stop()
-            console.log('Transcoder stopped successfully')
-        } catch (e) {
-            console.error(`Cannot stop Transcoder: ${e}`)
-        }
-
-        // 4. Nettoyer le navigateur simplement
+        });
+    
+        // 3. Paralléliser le reste des opérations
         if (meetingTimeoutInterval) {
-            clearTimeout(meetingTimeoutInterval)
+            clearTimeout(meetingTimeoutInterval);
         }
-
-        // Fermer les pages sans attendre - le browser.close() s'en chargera
+    
+        // Arrêter transcription et transcodage en parallèle
+        cleanupPromises.push(
+            WordsPoster.TRANSCRIBER?.stop().catch(e => console.error(`Cannot stop Transcriber: ${e}`)),
+            TRANSCODER.stop().catch(e => console.error(`Cannot stop Transcoder: ${e}`))
+        );
+    
+        // Fermer les pages en parallèle
         if (page) {
-            try {
-                // Ne pas naviguer vers about:blank, fermer directement
-                await page.close({ runBeforeUnload: false }).catch(() => {})
-            } catch (e) {
-                console.error(`Failed to close main page: ${e}`)
-            }
+            cleanupPromises.push(
+                page.close({ runBeforeUnload: false }).catch(e => console.error(`Failed to close main page: ${e}`))
+            );
         }
-
+    
         if (backgroundPage) {
-            try {
-                removeListenPage(backgroundPage)
-                await backgroundPage
-                    .close({ runBeforeUnload: false })
-                    .catch(() => {})
-            } catch (e) {
-                console.error(`Failed to close background page: ${e}`)
-            }
+            removeListenPage(backgroundPage);
+            cleanupPromises.push(
+                backgroundPage.close({ runBeforeUnload: false }).catch(e => console.error(`Failed to close background page: ${e}`))
+            );
         }
-
-        // Fermer le navigateur avec un timeout
+    
+        // Attendre que toutes les opérations de nettoyage soient terminées
+        await Promise.all(cleanupPromises);
+    
+        // Fermer le navigateur en dernier avec un timeout plus court
         if (browser) {
             try {
                 await Promise.race([
                     browser.close(),
-                    new Promise((_, reject) =>
-                        setTimeout(() => reject('Browser close timeout'), 5000),
-                    ),
-                ])
-                console.log('Browser closed successfully')
+                    new Promise((_, reject) => setTimeout(() => reject('Browser close timeout'), 2000)),
+                ]);
             } catch (e) {
-                console.error(`Failed to close browser: ${e}`)
-                // Forcer la fermeture du processus du navigateur si nécessaire
-                try {
-                    if (browser.process() != null) {
-                        browser.process()?.kill('SIGKILL')
-                    }
-                } catch (killError) {
-                    console.error('Failed to kill browser process:', killError)
+                console.error(`Failed to close browser: ${e}`);
+                if (browser.process() != null) {
+                    browser.process()?.kill('SIGKILL');
                 }
             }
         }
-
-        console.log('Meeting successfully terminated')
+    
+        console.log('Meeting successfully terminated');
     }
-
+    
     private meetingTimeout() {
         console.log('stopping meeting timeout reason')
         try {

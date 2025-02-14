@@ -6,7 +6,7 @@ const GLADIA_API_KEY = '8b82f7ea-c1c8-4e3d-abc3-18af0fce1f03'
 const API_URL = 'https://api.gladia.io/v2/transcription'
 const CREATED_HTML_CODE = 201
 const DONE_HTML_CODE = 200
-const TRANSCRIPTION_WAIT_TIME = 5_000
+const TRANSCRIPTION_WAIT_TIME = 20_000
 
 // {
 //     "id": "4c50f1e8-1b3a-44c7-9b5b-96ab9104782b",

@@ -1,17 +1,17 @@
-import * as puppeteer from 'puppeteer'
+import * as puppeteer from 'puppeteer';
 
-import { JoinError, JoinErrorCode } from '../meeting'
+import { JoinError, JoinErrorCode } from '../meeting';
 import {
     CancellationToken,
     MeetingParams,
     MeetingProviderInterface,
     RecordingMode,
-} from '../types'
+} from '../types';
 
-import { Page } from 'puppeteer'
-import { Logger } from '../logger'
-import { parseMeetingUrlFromJoinInfos } from '../urlParser/meetUrlParser'
-import { sleep } from '../utils'
+import { Page } from 'puppeteer';
+import { Logger } from '../logger';
+import { parseMeetingUrlFromJoinInfos } from '../urlParser/meetUrlParser';
+import { sleep } from '../utils';
 
 export class MeetProvider implements MeetingProviderInterface {
     constructor() {}
@@ -135,15 +135,48 @@ export class MeetProvider implements MeetingProviderInterface {
     ): Promise<boolean> {
         try {
             if (!page.isClosed()) {
-                return await removedFromMeeting(page)
+                try {
+                    const result = await Promise.race([
+                        (async () => {
+                            // Sélectionner tous les éléments
+                            const elements = await page.$$('*');
+                            
+                            // Vérifier chaque élément
+                            for (const element of elements) {
+                                try {
+                                    const text = await element.evaluate(el => (el as HTMLElement).innerText);
+                                    if (text?.includes("You've been removed") ||
+                                        text?.includes('The call ended') ||
+                                        text?.includes('Return to home')) {
+                                        return true;
+                                    }
+                                } catch (e) {
+                                    // Ignorer les erreurs par élément
+                                    continue;
+                                }
+                            }
+                            return false;
+                        })(),
+                        new Promise((_, reject) =>
+                            setTimeout(() => reject('Timeout'), 10000),
+                        ),
+                    ]);
+                    return !!result;
+                } catch (error) {
+                    console.error('Timeout or error in findEndMeeting:', error);
+                    return true; // En cas de timeout, considérer comme terminé
+                }
             }
-            return true
-        } catch {
-            console.log('error in findEndMeeting')
-            return true
+            return true;
+        } catch (error) {
+            console.log('Error in findEndMeeting:', error);
+            return true;
         }
     }
 }
+
+
+
 
 async function findShowEveryOne(
     page: puppeteer.Page,
