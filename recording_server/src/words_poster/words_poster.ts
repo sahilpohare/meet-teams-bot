@@ -107,15 +107,6 @@ export class WordsPoster {
 
             let words: RecognizerWord[]
             switch (this.speech_to_text_provider) {
-                case 'Runpod':
-                    let res_runpod = await recognizeRunPod(
-                        audioUrl,
-                        this.vocabulary, // TODO : What to do.
-                        this.speech_to_text_api_key,
-                    )
-                    words = parseRunPod(res_runpod, timeStart)
-                    break
-                case 'Default':
                 case 'Gladia':
                     let res_gladia = await recognizeGladia(
                         audioUrl,
@@ -124,6 +115,16 @@ export class WordsPoster {
                     )
                     words = parseGladia(res_gladia, timeStart)
                     break
+                case 'Default':
+                case 'Runpod':
+                    let res_runpod = await recognizeRunPod(
+                        audioUrl,
+                        this.vocabulary, // TODO : What to do.
+                        this.speech_to_text_api_key,
+                    )
+                    words = parseRunPod(res_runpod, timeStart)
+                    break
+
                 default:
                     console.error(
                         'Unknown Transcription Provider !',
