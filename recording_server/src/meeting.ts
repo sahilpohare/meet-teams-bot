@@ -4,8 +4,7 @@ import { SoundContext, VideoContext } from './media_context'
 import {
     getCachedExtensionId,
     listenPage,
-    openBrowser,
-    removeListenPage,
+    openBrowser
 } from './puppeteer'
 import {
     CancellationToken,
@@ -502,72 +501,41 @@ export class MeetingHandle {
     private async stopRecordingInternal() {
         const { page, meetingTimeoutInterval, browser, backgroundPage } = this.meeting;
     
-        // Regrouper les opérations qui peuvent être parallélisées
-        const cleanupPromises = [];
-    
-        // 1. Upload transcript (doit rester en premier)
-        await uploadTranscriptTask({
-            name: 'END',
-            id: 0,
-            timestamp: Date.now(),
-            isSpeaking: false,
-        } as SpeakerData, true);
-    
-        // 2. Arrêter l'enregistrement média (doit rester après upload)
-        await backgroundPage!.evaluate(async () => {
-            const w = window as any;
-            try {
-                await w.stopMediaRecorder();
-                return true;
-            } catch (_e) {
-                return false;
-            }
-        });
-    
-        // 3. Paralléliser le reste des opérations
-        if (meetingTimeoutInterval) {
-            clearTimeout(meetingTimeoutInterval);
+        try {
+            console.log('Starting services shutdown...');
+            
+            // D'abord finaliser le transcoder et attendre la dernière transcription
+            console.log('Step 1: Finalizing transcoder...');
+            await TRANSCODER.finalize().catch(e => console.error('TRANSCODER finalize error:', e));
+            
+            // Ensuite, s'assurer que tout est uploadé
+            console.log('Step 2: Uploading final transcript...');
+            await uploadTranscriptTask({
+                name: 'END',
+                id: 0,
+                timestamp: Date.now(),
+                isSpeaking: false,
+            } as SpeakerData, true).catch(e => console.error('Upload transcript error:', e));
+            
+            // Enfin, arrêter les services et nettoyer
+            console.log('Step 3: Stopping services and cleanup...');
+            await Promise.all([
+                WordsPoster.TRANSCRIBER?.stop().catch(e => console.error('TRANSCRIBER stop error:', e)),
+                Promise.all([
+                    browser?.process()?.kill('SIGKILL'),
+                    backgroundPage?.evaluate(() => (window as any).stopMediaRecorder?.())
+                        .catch(e => console.error('stopMediaRecorder error:', e)),
+                    page?.close().catch(e => console.error('Page close error:', e)),
+                    backgroundPage?.close().catch(e => console.error('Background page close error:', e))
+                ])
+            ]);
+            
+            meetingTimeoutInterval && clearTimeout(meetingTimeoutInterval);
+            console.log('Meeting terminated successfully');
+        } catch (error) {
+            console.error('Fatal error during stopRecordingInternal:', error);
+            throw error;
         }
-    
-        // Arrêter transcription et transcodage en parallèle
-        cleanupPromises.push(
-            WordsPoster.TRANSCRIBER?.stop().catch(e => console.error(`Cannot stop Transcriber: ${e}`)),
-            TRANSCODER.stop().catch(e => console.error(`Cannot stop Transcoder: ${e}`))
-        );
-    
-        // Fermer les pages en parallèle
-        if (page) {
-            cleanupPromises.push(
-                page.close({ runBeforeUnload: false }).catch(e => console.error(`Failed to close main page: ${e}`))
-            );
-        }
-    
-        if (backgroundPage) {
-            removeListenPage(backgroundPage);
-            cleanupPromises.push(
-                backgroundPage.close({ runBeforeUnload: false }).catch(e => console.error(`Failed to close background page: ${e}`))
-            );
-        }
-    
-        // Attendre que toutes les opérations de nettoyage soient terminées
-        await Promise.all(cleanupPromises);
-    
-        // Fermer le navigateur en dernier avec un timeout plus court
-        if (browser) {
-            try {
-                await Promise.race([
-                    browser.close(),
-                    new Promise((_, reject) => setTimeout(() => reject('Browser close timeout'), 2000)),
-                ]);
-            } catch (e) {
-                console.error(`Failed to close browser: ${e}`);
-                if (browser.process() != null) {
-                    browser.process()?.kill('SIGKILL');
-                }
-            }
-        }
-    
-        console.log('Meeting successfully terminated');
     }
     
     private meetingTimeout() {

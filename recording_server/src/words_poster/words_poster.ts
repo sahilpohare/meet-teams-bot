@@ -94,8 +94,19 @@ export class WordsPoster {
         timeEnd: number,
     ): Promise<void> {
         let api = Api.instance
+
+        if (timeEnd <= timeStart) {
+            console.error('Invalid time range:', { timeStart, timeEnd })
+            return
+        }
+
         const s3Path = `${this.user_id}/${this.bot_uuid}/${timeStart}-${timeEnd}-record.wav`
-        console.log('ready to do transcription between: ', timeStart, timeEnd)
+        console.log('Transcribing segment:', {
+            timeStart,
+            timeEnd,
+            duration: timeEnd - timeStart,
+        })
+
         try {
             const audioUrl = await TRANSCODER.extractAudio(
                 timeStart,
@@ -103,19 +114,8 @@ export class WordsPoster {
                 this.s3_bucket,
                 s3Path,
             )
-            console.log(audioUrl)
-
             let words: RecognizerWord[]
             switch (this.speech_to_text_provider) {
-                case 'Gladia':
-                    let res_gladia = await recognizeGladia(
-                        audioUrl,
-                        this.vocabulary, // TODO : What to do.
-                        this.speech_to_text_api_key,
-                    )
-                    words = parseGladia(res_gladia, timeStart)
-                    break
-                case 'Default':
                 case 'Runpod':
                     let res_runpod = await recognizeRunPod(
                         audioUrl,
@@ -123,6 +123,15 @@ export class WordsPoster {
                         this.speech_to_text_api_key,
                     )
                     words = parseRunPod(res_runpod, timeStart)
+                    break
+                case 'Default':
+                case 'Gladia':
+                    let res_gladia = await recognizeGladia(
+                        audioUrl,
+                        this.vocabulary, // TODO : What to do.
+                        this.speech_to_text_api_key,
+                    )
+                    words = parseGladia(res_gladia, timeStart)
                     break
 
                 default:

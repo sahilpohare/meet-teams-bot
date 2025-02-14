@@ -20,12 +20,16 @@ class Transcoder {
     private transcribeDuration: number // Duration of one transcribe to WordsPoster
     private chunkReceavedCounter: number = 0 // Number of chunks received
     static FFMPEG_CLOSE_TIMEOUT: number = 60_000 // 60 seconds
+    private originalWebmPath: string;  // Chemin du fichier en cours d'écriture
+    private finalizedWebmPath: string | null = null;  // Chemin du fichier finali
+    private currentTranscriptionPromises: Array<Promise<void> | undefined> = [];
 
     static EXTRACT_AUDIO_MAX_RETRIES: number = 5
     static EXTRACT_AUDIO_RETRY_DELAY: number = 10_000 // 10 seconds
 
     constructor() {
-        this.webmPath = path.join(os.tmpdir(), 'output.webm')
+        this.originalWebmPath = path.join(os.tmpdir(), 'output.webm');
+        this.webmPath = this.originalWebmPath;
 
         // Set a new empty webm file for voice transcription
         const fs = require('fs')
@@ -102,7 +106,21 @@ class Transcoder {
         })
     }
 
+    public async finalize(): Promise<void> {
+        console.log('Transcoder finalization started');
+        console.log(`Number of pending transcriptions: ${this.currentTranscriptionPromises.length}`);
+        // D'abord attendre toutes les transcriptions en cours
+        await Promise.all(this.currentTranscriptionPromises);
+        console.log('All transcriptions completed, sending final chunk...');
+        // Puis envoyer le dernier chunk
+        await this.uploadChunk(Buffer.alloc(0), true);
+        // Enfin arrêter
+        await this.stop();
+        console.log('Transcoder finalization completed');
+    }
+
     public async stop(): Promise<void> {
+        console.log('Stop called - Starting stop sequence')
         if (this.transcoder_successfully_stopped) {
             console.log('Transcoder already stopped')
             return
@@ -194,59 +212,86 @@ class Transcoder {
         })
         this.transcoder_successfully_stopped = true
     }
-
+    private async finalizeWebm(): Promise<string> {
+        console.log('Finalizing WebM - Starting...');
+        // Créer une nouvelle copie à chaque fois
+        this.finalizedWebmPath = `${this.originalWebmPath}_final_${Date.now()}`;
+        console.log(`Copying WebM from ${this.originalWebmPath} to ${this.finalizedWebmPath}`);
+        await fs.stat(this.originalWebmPath).then(stats => {
+            console.log(`Original WebM size: ${stats.size} bytes`);
+        });
+        await fs.copyFile(this.originalWebmPath, this.finalizedWebmPath);
+        await fs.stat(this.finalizedWebmPath).then(stats => {
+            console.log(`Finalized WebM size: ${stats.size} bytes`);
+        });
+        console.log('Finalizing WebM - Complete');
+        return this.finalizedWebmPath;
+    }
+    
     public async uploadChunk(chunk: Buffer, isFinal: boolean): Promise<void> {
+        console.log(`=== uploadChunk start (isFinal: ${isFinal}, size: ${chunk.length}) ===`);
         if (this.transcoder_successfully_stopped) {
-            console.log('Transcoder is in stop state!')
-            return
+            console.log('Transcoder is in stop state!');
+            return;
         }
-        if (!this.ffmpeg_process) {
-            throw new Error('Transcoder not initialized')
-        }
-
+    
         try {
-            this.chunkReceavedCounter += 1
-            await this.appendChunkToWebm(chunk)
-            console.log('Incoming video data writed appened to webM')
+            if (isFinal && chunk.length === 0) {
+                console.log('Processing final empty chunk');
+                console.log('Waiting for file stability...');
+                await Promise.all(this.currentTranscriptionPromises);
+                console.log('All pending transcriptions completed');
 
-            let chunksPerTranscribe =
-                this.transcribeDuration / this.chunkDuration
-            if (!isFinal) {
-                // Recording is in process...
-                if (this.chunkReceavedCounter % chunksPerTranscribe === 0) {
-                    // Request a transcribe
-                    let timeStart =
-                        (this.chunkReceavedCounter - chunksPerTranscribe) *
-                        this.chunkDuration
-                    let timeEnd = timeStart + this.transcribeDuration
-                    await WordsPoster.TRANSCRIBER?.push(timeStart, timeEnd)
-                }
-            } else {
-                // Recording has stopped.
-                let inverseMod =
-                    chunksPerTranscribe -
-                    (this.chunkReceavedCounter % chunksPerTranscribe)
-                if (inverseMod === 18) {
-                    inverseMod = 0
-                }
-                // Request the final transcribe
-                let timeStart =
-                    (this.chunkReceavedCounter +
-                        inverseMod -
-                        chunksPerTranscribe) *
-                    this.chunkDuration
-                let timeEnd = -1
-                await WordsPoster.TRANSCRIBER?.push(timeStart, timeEnd)
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                const webmPath = await this.finalizeWebm();
+                console.log(`Using finalized WebM at: ${webmPath}`);
+                
+                const chunksPerTranscribe = this.transcribeDuration / this.chunkDuration;
+                const lastCompleteSegment = Math.floor((this.chunkReceavedCounter - 1) / chunksPerTranscribe) * chunksPerTranscribe;
+                const timeStart = lastCompleteSegment * this.chunkDuration;
+                const timeEnd = this.chunkReceavedCounter * this.chunkDuration;
+                
+                console.log('Final transcription info:', {
+                    chunksPerTranscribe,
+                    chunkReceavedCounter: this.chunkReceavedCounter,
+                    lastCompleteSegment,
+                    timeStart,
+                    timeEnd,
+                    duration: timeEnd - timeStart
+                });
+                
+                console.log(`Pushing final transcription: ${timeStart}ms to ${timeEnd}ms`);
+                await WordsPoster.TRANSCRIBER?.push(timeStart, timeEnd);
+                console.log('Final transcription pushed');
+                return;
             }
-            await this.writeToChildStdin(chunk).then((_) => {
-                console.log('Incoming video data writed into ffmpeg stdin')
-            })
+    
+            this.chunkReceavedCounter++;
+            console.log(`Processing regular chunk #${this.chunkReceavedCounter}`);
+            await this.appendChunkToWebm(chunk);
+            await this.writeToChildStdin(chunk);
+    
+            const chunksPerTranscribe = this.transcribeDuration / this.chunkDuration;
+            console.log('Regular chunk info:', {
+                chunkReceavedCounter: this.chunkReceavedCounter,
+                chunksPerTranscribe,
+                modulo: this.chunkReceavedCounter % chunksPerTranscribe
+            });
+    
+            if (this.chunkReceavedCounter % chunksPerTranscribe === 0) {
+                const timeStart = (this.chunkReceavedCounter - chunksPerTranscribe) * this.chunkDuration;
+                const timeEnd = timeStart + this.transcribeDuration;
+                console.log(`Pushing regular transcription: ${timeStart}ms to ${timeEnd}ms`);
+                const transcriptionPromise = WordsPoster.TRANSCRIBER?.push(timeStart, timeEnd);
+                this.currentTranscriptionPromises.push(transcriptionPromise);
+                console.log('Regular transcription pushed');
+            }
         } catch (err) {
-            console.error(
-                'Error writing the chunk in ffmpeg or adding it to the WebM file:',
-                err,
-            )
-            throw err
+            console.error('Error in uploadChunk:', err);
+            throw err;
+        } finally {
+            console.log('=== uploadChunk end ===');
         }
     }
 
@@ -387,76 +432,133 @@ class Transcoder {
         )
     }
 
-    private runExtractAudio(
+    private async runExtractAudio(
         outputAudioPath: string,
         timeStart: number,
         timeEnd: number,
     ): Promise<void> {
-        return new Promise((resolve, reject) => {
-            const ffmpegArgs = [
-                '-y',
-                '-ss',
-                timeStart.toString(),
-                '-i',
-                this.webmPath,
-                ...(timeEnd !== -1 ? ['-to', timeEnd.toString()] : []),
-                '-vn',
-                '-c:a',
-                'pcm_s16le',
-                '-ac',
-                '1',
-                '-threads',
-                'auto',
-                outputAudioPath,
-            ]
-
-            const child = spawn('ffmpeg', ffmpegArgs, {
-                stdio: ['ignore', 'pipe', 'pipe'],
-            })
-
-            let output = ''
-
-            child.stdout.on('data', (data) => {
-                output += data.toString()
-            })
-
-            child.stderr.on('data', (data) => {
-                output += data.toString()
-            })
-
-            child.on('close', async (code) => {
-                if (code === 0) {
-                    resolve()
-                } else {
-                    console.error('Sortie ffmpeg:', output)
-                    if (output.includes('File ended prematurely at pos.')) {
-                        try {
-                            await fs.unlink(outputAudioPath)
-                            console.log(
-                                'Output file deleted due to premature termination',
-                            )
-                        } catch (err) {
-                            console.error(
-                                'Error deleting the output file:',
-                                err,
-                            )
-                        }
-                        reject(new Error('The file terminated prematurely'))
-                    } else {
-                        reject(
-                            new Error(
-                                `Audio extraction failed with code ${code}`,
-                            ),
-                        )
+        console.log('=== Starting Audio Extraction Process ===');
+        console.log(`Parameters: timeStart=${timeStart}ms, timeEnd=${timeEnd}ms`);
+        console.log(`Target output: ${outputAudioPath}`);
+    
+        const webmToExtract = await this.finalizeWebm();
+        console.log(`Using WebM file: ${webmToExtract}`);
+        
+        const tempFullWav = `${outputAudioPath}_full.wav`;
+        console.log(`Temporary full WAV will be: ${tempFullWav}`);
+        
+        return new Promise(async (resolve, reject) => {
+            try {
+                // 1. Extraction complète en WAV
+                console.log('Step 1: Extracting full audio to WAV');
+                const fullExtractionArgs = [
+                    '-y',
+                    '-i', webmToExtract,
+                    '-vn',
+                    '-c:a', 'pcm_s16le',
+                    '-ac', '1',
+                    tempFullWav
+                ] as string[];
+                
+                console.log('Running full extraction command:', fullExtractionArgs.join(' '));
+                
+                await new Promise<void>((resolveExtract, rejectExtract) => {
+                    const child = spawn('ffmpeg', fullExtractionArgs);
+                    
+                    let extractOutput = '';
+                    
+                    if (child.stderr) {
+                        child.stderr.on('data', (data) => {
+                            const output = data.toString();
+                            extractOutput += output;
+                            console.log('Full Extraction FFmpeg:', output);
+                        });
                     }
+    
+                    child.on('close', async (code) => {
+                        if (code === 0) {
+                            try {
+                                const stats = await fs.stat(tempFullWav);
+                                console.log(`Full WAV extraction complete. File size: ${stats.size} bytes`);
+                                resolveExtract();
+                            } catch (err) {
+                                console.error('Error checking full WAV:', err);
+                                rejectExtract(new Error('Full WAV verification failed'));
+                            }
+                        } else {
+                            console.error(`Full extraction failed with code ${code}`);
+                            console.error('Full extraction output:', extractOutput);
+                            rejectExtract(new Error(`Full extraction failed with code ${code}`));
+                        }
+                    });
+                });
+    
+                // 2. Découpage du segment
+                console.log('Step 2: Trimming WAV to requested segment');
+                const trimArgs = [
+                    '-y',
+                    '-i', tempFullWav,
+                    '-ss', (timeStart / 1000).toString(),
+                    '-t', ((timeEnd - timeStart) / 1000).toString(),
+                    '-c', 'copy',
+                    outputAudioPath
+                ] as string[];
+    
+                console.log('Running trim command:', trimArgs.join(' '));
+    
+                await new Promise<void>((resolveTrim, rejectTrim) => {
+                    const child = spawn('ffmpeg', trimArgs);
+                    
+                    let trimOutput = '';
+                    
+                    if (child.stderr) {
+                        child.stderr.on('data', (data) => {
+                            const output = data.toString();
+                            trimOutput += output;
+                            console.log('Trim FFmpeg:', output);
+                        });
+                    }
+    
+                    child.on('close', async (code) => {
+                        if (code === 0) {
+                            try {
+                                const stats = await fs.stat(outputAudioPath);
+                                console.log(`Trim complete. Final file size: ${stats.size} bytes`);
+                                resolveTrim();
+                            } catch (err) {
+                                console.error('Error checking trimmed WAV:', err);
+                                rejectTrim(new Error('Trimmed WAV verification failed'));
+                            }
+                        } else {
+                            console.error(`Trim failed with code ${code}`);
+                            console.error('Trim output:', trimOutput);
+                            rejectTrim(new Error(`Trim failed with code ${code}`));
+                        }
+                    });
+                });
+    
+                console.log('Both steps completed successfully');
+                resolve();
+    
+            } catch (err) {
+                console.error('Error in audio extraction process:', err);
+                reject(err);
+            } finally {
+                // Nettoyage
+                console.log('Cleaning up temporary files...');
+                try {
+                    await fs.unlink(tempFullWav);
+                    console.log(`Temporary file ${tempFullWav} deleted`);
+                } catch (err) {
+                    console.error('Error cleaning up temp WAV:', err);
                 }
-            })
-        })
+            }
+        });
     }
 
     private async appendChunkToWebm(chunk: Buffer): Promise<void> {
         try {
-            await fs.appendFile(this.webmPath, new Uint8Array(chunk))
+            await fs.appendFile(this.originalWebmPath, new Uint8Array(chunk));
             console.log('Chunk successfully added to the WebM file')
         } catch (err) {
             console.error('Error adding chunk to the WebM file:', err)
