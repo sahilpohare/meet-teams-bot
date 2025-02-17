@@ -595,37 +595,36 @@ export class MeetingHandle {
         try {
             console.log('Starting recording shutdown sequence...')
 
-            // Étape 1: Arrêter l'enregistreur et fermer les pages
-            console.log('Step 1: Stopping media recorder and closing pages...')
-            await Promise.all([
-                browser?.process()?.kill('SIGKILL'),
-                backgroundPage
-                    ?.evaluate(() => (window as any).stopMediaRecorder?.())
-                    .catch((e) => console.error('stopMediaRecorder error:', e)),
-                page
-                    ?.close()
-                    .catch((e) => console.error('Page close error:', e)),
-                backgroundPage
-                    ?.close()
-                    .catch((e) =>
-                        console.error('Background page close error:', e),
-                    ),
-            ])
+            // Étape 1: Arrêter d'abord le media recorder - c'est le plus important
+            console.log('Step 1: Stopping media recorder...')
+            try {
+                await backgroundPage?.evaluate(() => (window as any).stopMediaRecorder?.())
+            } catch (e) {
+                console.error('stopMediaRecorder error:', e)
+            }
 
-            // Étape 2: Envoyer un dernier chunk vide avec isFinal=true
+            // Étape 2: Envoyer le chunk final vide au transcoder
             console.log('Step 2: Sending final empty chunk to transcoder...')
             await TRANSCODER.uploadChunk(Buffer.alloc(0), true).catch((e) =>
                 console.error('Final chunk upload error:', e),
             )
 
-            // Étape 3: Attendre que le transcoder termine son traitement et uploade la vidéo
-            console.log('Step 3: Stopping transcoder and uploading video...')
+            // Étape 3: Kill brutal du navigateur et des pages
+            console.log('Step 3: Force closing browser...')
+            try {
+                browser?.process()?.kill('SIGKILL')
+            } catch (e) {
+                console.error('Browser kill error:', e)
+            }
+
+            // Étape 4: Arrêter que le transcoder termine son traitement et uploade la vidéo
+            console.log('Step 4: Stopping transcoder and uploading video...')
             await TRANSCODER.stop().catch((e) =>
                 console.error('TRANSCODER stop error:', e),
             )
 
-            // Étape 4: Upload de la dernière transcription
-            console.log('Step 4: Uploading final transcript...')
+            // Étape 5: Upload de la dernière transcription
+            console.log('Step 5: Uploading final transcript...')
             await uploadTranscriptTask(
                 {
                     name: 'END',
@@ -636,12 +635,11 @@ export class MeetingHandle {
                 true,
             ).catch((e) => console.error('Upload transcript error:', e))
 
-            // Étape 5: Arrêt du transcriber et nettoyage final
-            console.log('Step 5: Final cleanup...')
+            // Étape 6: Arrêt du transcriber et nettoyage final
+            console.log('Step 6: Final cleanup...')
             await WordsPoster.TRANSCRIBER?.stop().catch((e) =>
                 console.error('TRANSCRIBER stop error:', e),
             )
-
             meetingTimeoutInterval && clearTimeout(meetingTimeoutInterval)
             console.log('Meeting terminated successfully')
         } catch (error) {

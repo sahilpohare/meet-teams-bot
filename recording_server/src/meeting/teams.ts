@@ -56,7 +56,14 @@ export class TeamsProvider implements MeetingProviderInterface {
         meetingParams: MeetingParams,
     ): Promise<void> {
         console.log('joining meeting', cancelCheck)
-        await ensurePageLoaded(page)
+        
+        try {
+            await ensurePageLoaded(page)
+        } catch (error) {
+            console.error('Page load failed:', error)
+            // On throw une Error simple (pas JoinError) pour que meeting.ts fasse un retry
+            throw new Error('Page failed to load - retrying')
+        }
 
         try {
             await clickWithInnerText(
@@ -345,7 +352,7 @@ async function tryFindInterface(page: puppeteer.Page): Promise<boolean> {
         }
     } catch (error) {
         console.error('Error detecting interface:', error)
-        return false
+        throw new Error('RetryableError: Interface detection failed')
     }
 }
 
@@ -533,7 +540,7 @@ async function isRemovedFromTheMeeting(page: Page): Promise<boolean> {
         return false
     } catch (error) {
         console.error('Error while checking meeting status:', error)
-        return false // Retourne false en cas d’erreur
+        return false // Retourne false en cas d'erreur
     }
 }
 
@@ -604,6 +611,7 @@ async function ensurePageLoaded(
         return true
     } catch (error) {
         console.error('Failed to ensure page is loaded:', error)
-        throw new Error('Page failed to load in time')
+        // Propager l'erreur de timeout pour retry
+        throw new Error('RetryableError: Page load timeout')
     }
 }
