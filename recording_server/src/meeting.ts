@@ -57,7 +57,6 @@ export const FIRST_USER_JOINED = {
 const NO_SPEAKER_THRESHOLD = 1000 * 60 * 7 // 7 minutes
 const NO_SPEAKER_DETECTED_TIMEOUT = 1000 * 60 * 15 // 15 minutes
 const RECORDING_TIMEOUT = 3600 * 4 // 4 hours
-const MAX_TIME_TO_LIVE_AFTER_TIMEOUT = 3600 * 2 // 2 hours
 
 const CHUNK_DURATION: number = 10_000 // 10 seconds for each chunks
 const TRANSCRIBE_DURATION: number = CHUNK_DURATION * 18 // 3 minutes for each transcribe
@@ -277,7 +276,7 @@ export class MeetingHandle {
                     // Configuration du timeout du meeting avant de commencer
                     this.meeting.meetingTimeoutInterval = setTimeout(() => {
                         MeetingHandle.instance?.meetingTimeout()
-                    }, RECORDING_TIMEOUT * 1000)
+                    }, RECORDING_TIMEOUT)
 
                     Events.inWaitingRoom()
 
@@ -582,8 +581,6 @@ export class MeetingHandle {
             reason,
         })
 
-        // On ne vérifie plus si l'état est "Recording"
-        // car on peut avoir besoin d'arrêter le meeting dans d'autres états
         MeetingHandle.status.state = 'Cleanup'
         console.log(`Stop recording scheduled`, {
             exit_reason: reason,
@@ -655,16 +652,7 @@ export class MeetingHandle {
 
     private async meetingTimeout() {
         console.log('Meeting timeout reached, initiating shutdown...')
-        try {
-            await this.stopRecording('timeout')
-            await this.cleanEverything()
-        } catch (e) {
-            console.error('Error during meeting timeout cleanup:', e)
-        }
-        // Forcer l'arrêt du processus après un délai
-        setTimeout(() => {
-            console.log('Force killing process after timeout...')
-            process.exit(0)
-        }, MAX_TIME_TO_LIVE_AFTER_TIMEOUT * 1000)
+        MeetingHandle.status.state = 'Cleanup'
+        await this.recordMeetingToEnd()
     }
 }
