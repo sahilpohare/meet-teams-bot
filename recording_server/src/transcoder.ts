@@ -56,8 +56,7 @@ class Transcoder {
         this.transcribeDuration = transcribeDuration
 
         // Obtenir le dossier temporaire pour les frames
-        const framesDir = FrameAnalyzer.getInstance().getFramesDirectory()
-        await fs.mkdir(framesDir, { recursive: true })
+        const framesDir = await FrameAnalyzer.getInstance().getFramesDirectory()
         
         const frameAnalyzer = FrameAnalyzer.getInstance();
         const tempFramePath = path.join(framesDir, 'temp_frame.jpg');
