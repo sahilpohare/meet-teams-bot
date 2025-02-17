@@ -56,7 +56,7 @@ export const FIRST_USER_JOINED = {
 
 const NO_SPEAKER_THRESHOLD = 1000 * 60 * 7 // 7 minutes
 const NO_SPEAKER_DETECTED_TIMEOUT = 1000 * 60 * 15 // 15 minutes
-const RECORDING_TIMEOUT = 3600 * 4 // 4 hours
+const RECORDING_TIMEOUT = 3600 * 4 * 1000 // 4 hours
 
 const CHUNK_DURATION: number = 10_000 // 10 seconds for each chunks
 const TRANSCRIBE_DURATION: number = CHUNK_DURATION * 18 // 3 minutes for each transcribe
