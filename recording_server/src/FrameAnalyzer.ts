@@ -1,7 +1,9 @@
 import * as fs from 'fs/promises';
+import * as os from 'os';
 import * as path from 'path';
 import { createWorker } from 'tesseract.js';
 import { Logger } from './logger';
+import { sleep } from './utils';
 
 interface FrameResult {
     timestamp: number;
@@ -13,6 +15,8 @@ export class FrameAnalyzer {
     private worker: Tesseract.Worker | null = null;
     private isInitialized: boolean = false;
     private framesOcrResults: FrameResult[] = [];
+    private isProcessing: boolean = false;
+    private workerError: boolean = false;
 
     private constructor() {}
 
@@ -28,55 +32,112 @@ export class FrameAnalyzer {
 
         console.log('Initializing Frame Analyzer...');
         try {
-            this.worker = await createWorker('eng');
-            this.isInitialized = true;
-            console.log('Frame Analyzer initialized successfully');
+            this.worker = await createWorker('eng').catch(err => {
+                console.error('Failed to create Tesseract worker:', err);
+                return null;
+            });
+            
+            if (this.worker) {
+                this.isInitialized = true;
+                this.workerError = false;
+                console.log('Frame Analyzer initialized successfully');
+            } else {
+                console.log('Frame Analyzer will run in degraded mode (no OCR)');
+                this.workerError = true;
+            }
         } catch (error) {
             console.error('Failed to initialize Frame Analyzer:', error);
-            throw error;
+            this.workerError = true;
+            // Ne pas propager l'erreur
         }
     }
 
+    private async waitForFile(filePath: string, maxAttempts: number = 5): Promise<boolean> {
+        for (let i = 0; i < maxAttempts; i++) {
+            try {
+                const stats = await fs.stat(filePath);
+                if (stats.size > 0) {
+                    return true;
+                }
+                console.log(`File exists but empty, attempt ${i + 1}/${maxAttempts}`);
+            } catch (err) {
+                console.log(`Waiting for file, attempt ${i + 1}/${maxAttempts}`);
+            }
+            await sleep(100);
+        }
+        return false;
+    }
+
     public async processNewFrame(filePath: string, timestamp: number): Promise<void> {
-        if (!this.worker) {
-            console.error('Frame Analyzer not initialized');
+        // Si on a eu une erreur avec le worker, on skip silencieusement
+        if (this.workerError) {
+            try {
+                await fs.unlink(filePath).catch(() => {});
+            } catch (err) {}
             return;
         }
-    
-        try {
-            console.log(`Processing frame from ${timestamp}`);
-    
-            console.log('Processing frame from:', filePath);
-            // Vérifier si le fichier existe avant de le traiter
+
+        if (!this.worker || !this.isInitialized) {
+            console.log('OCR not available, skipping frame');
             try {
-                await fs.access(filePath);
-            } catch (err) {
-                console.error(`File does not exist: ${filePath}`);
+                await fs.unlink(filePath).catch(() => {});
+            } catch (err) {}
+            return;
+        }
+
+        if (this.isProcessing) {
+            console.log('Already processing a frame, skipping...');
+            try {
+                await fs.unlink(filePath).catch(() => {});
+            } catch (err) {}
+            return;
+        }
+
+        this.isProcessing = true;
+
+        try {
+            const fileReady = await this.waitForFile(filePath);
+            if (!fileReady) {
+                console.log('File not ready, skipping frame');
                 return;
             }
-    
-            const { data: { text } } = await this.worker.recognize(filePath);
-            
-            // Stocker le résultat
-            this.framesOcrResults.push({
-                timestamp,
-                text: text || ''
-            });
-            console.log('OCR results:', this.framesOcrResults);
-    
-            // Ne garder que les 10 derniers résultats (configurable)
-            if (this.framesOcrResults.length > 10) {
-                this.framesOcrResults.shift();
+
+            const imageBuffer = await fs.readFile(filePath);
+            if (imageBuffer.length === 0) {
+                console.log('Empty image, skipping');
+                return;
             }
-    
-            // Supprimer immédiatement le fichier après l'OCR
-            await fs.unlink(filePath);
-            console.log(`Frame processed and deleted: ${filePath}`);
+
+            try {
+                const { data: { text } } = await this.worker.recognize(imageBuffer);
+                
+                this.framesOcrResults.push({
+                    timestamp,
+                    text: text || ''
+                });
+
+                if (this.framesOcrResults.length > 10) {
+                    this.framesOcrResults.shift();
+                }
+
+                console.log(`Frame processed successfully, text length: ${(text || '').length}`);
+            } catch (ocrError) {
+                console.error('OCR failed for frame:', ocrError);
+                // Ne pas propager l'erreur OCR
+            }
+
         } catch (error) {
-            console.error(`Error processing frame ${filePath}:`, error);
+            console.error('Error in frame processing:', error);
+            // Ne pas propager l'erreur
+        } finally {
+            // Toujours essayer de nettoyer le fichier
+            try {
+                await fs.unlink(filePath).catch(() => {});
+            } catch (err) {}
+            
+            this.isProcessing = false;
         }
     }
-    
 
     public getLastFrameText(): string | null {
         if (this.framesOcrResults.length === 0) {
@@ -89,29 +150,30 @@ export class FrameAnalyzer {
         return [...this.framesOcrResults];
     }
 
-    public async getFramesDirectory(): Promise<string> {
-        if (!Logger.instance) {
-            throw new Error('Logger not initialized');
-        }
-        
-        const framesDir = path.join(path.dirname(Logger.instance.get_video_directory()), 'frames');
-        
+    public getFramesDirectory(): string {
         try {
-            await fs.mkdir(framesDir, { recursive: true });
-        } catch (error) {
-            console.error('Failed to create frames directory:', error);
+            if (!Logger.instance) {
+                return path.join(os.tmpdir(), 'frames');
+            }
+            return path.join(path.dirname(Logger.instance.get_video_directory()), 'frames');
+        } catch (err) {
+            return path.join(os.tmpdir(), 'frames');
         }
-    
-        return framesDir;
     }
 
     public async cleanup(): Promise<void> {
-        if (this.worker) {
-            await this.worker.terminate();
-            this.worker = null;
+        try {
+            if (this.worker && !this.workerError) {
+                await this.worker.terminate().catch(() => {});
+            }
+        } catch (err) {
+            console.error('Error during worker cleanup:', err);
         }
+        
+        this.worker = null;
         this.isInitialized = false;
         this.framesOcrResults = [];
+        this.workerError = false;
         console.log('Frame Analyzer cleaned up');
     }
 }
