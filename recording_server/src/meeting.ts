@@ -1,11 +1,7 @@
 import { BrandingHandle, generateBranding, playBranding } from './branding'
 import { LOCAL_RECORDING_SERVER_LOCATION, delSessionInRedis } from './instance'
 import { SoundContext, VideoContext } from './media_context'
-import {
-    getCachedExtensionId,
-    listenPage,
-    openBrowser
-} from './puppeteer'
+import { getCachedExtensionId, listenPage, openBrowser } from './puppeteer'
 import {
     CancellationToken,
     Meeting,
@@ -16,6 +12,7 @@ import {
     SpeakerData,
 } from './types'
 
+import { Page } from 'puppeteer'
 import { Events } from './events'
 import { Logger } from './logger'
 import { MeetProvider } from './meeting/meet'
@@ -203,67 +200,164 @@ export class MeetingHandle {
             )
             console.log('Meeting link found', { meetingLink })
 
-            // Étape 4: Partie avec retries
-            for (let attempt = 0; attempt < maxRetries && !joinSuccess; attempt++) {
+            async function handleWaitingRoom(
+                page: Page,
+                provider: MeetingProviderInterface,
+                params: MeetingParams,
+            ): Promise<void> {
+                let timeoutHandle: NodeJS.Timeout
+
+                const waitingRoomPromise = new Promise<void>(
+                    (resolve, reject) => {
+                        const timeoutInMs =
+                            params.automatic_leave.waiting_room_timeout * 1000
+                        console.log(
+                            `Setting waiting room timeout to ${timeoutInMs}ms`,
+                        )
+
+                        timeoutHandle = setTimeout(() => {
+                            reject(
+                                new JoinError(
+                                    JoinErrorCode.TimeoutWaitingToStart,
+                                ),
+                            )
+                        }, timeoutInMs)
+
+                        provider
+                            .joinMeeting(
+                                page,
+                                () =>
+                                    MeetingHandle.status.state !== 'Recording',
+                                params,
+                            )
+                            .then(() => {
+                                clearTimeout(timeoutHandle)
+                                resolve()
+                            })
+                            .catch((error) => {
+                                clearTimeout(timeoutHandle)
+                                if (error instanceof JoinError) {
+                                    if (
+                                        error.message ===
+                                        JoinErrorCode.BotNotAccepted
+                                    ) {
+                                        console.log(
+                                            'Bot not accepted detected...',
+                                        )
+                                    }
+                                    reject(error)
+                                } else {
+                                    console.error(
+                                        'Join meeting failed (will retry):',
+                                        error,
+                                    )
+                                    reject(new Error('RetryableError'))
+                                }
+                            })
+                    },
+                )
+
+                return waitingRoomPromise
+            }
+
+            // Dans la boucle de retry de startRecordMeeting
+            for (
+                let attempt = 0;
+                attempt < maxRetries && !joinSuccess;
+                attempt++
+            ) {
                 try {
-                    // Ouvrir la page de la réunion
                     this.meeting.page = await this.provider.openMeetingPage(
                         this.meeting.browser,
                         meetingLink,
                         this.param.streaming_input,
                     )
                     console.log('meeting page opened')
-            
-                    // Configurer le timeout de la réunion
+
+                    // Configuration du timeout du meeting avant de commencer
                     this.meeting.meetingTimeoutInterval = setTimeout(() => {
                         MeetingHandle.instance?.meetingTimeout()
                     }, RECORDING_TIMEOUT * 1000)
-            
-                    await Events.inWaitingRoom()
-            
-                    // Tentative de rejoindre la réunion
-                    const waintingRoomToken = new CancellationToken(
-                        this.param.automatic_leave.waiting_room_timeout,
-                    )
-                    console.log(
-                        'waitingroom timeout',
-                        this.param.automatic_leave.waiting_room_timeout,
-                    )
-            
-                    await this.provider.joinMeeting(
-                        this.meeting.page,
-                        () => {
-                            return (
-                                MeetingHandle.status.state !== 'Recording' ||
-                                waintingRoomToken.isCancellationRequested
-                            )
-                        },
-                        this.param,
-                    )
-                    console.log('meeting page joined')
-                    joinSuccess = true
-                } catch (error) {
-                    console.error(`Attempt ${attempt + 1} failed:`, error)
-                    
-                    // Si c'est BotNotAccepted, on propage l'erreur immédiatement
-                    if (error instanceof JoinError && error.message === JoinErrorCode.BotNotAccepted) {
+
+                    Events.inWaitingRoom()
+
+                    try {
+                        await handleWaitingRoom(
+                            this.meeting.page,
+                            this.provider,
+                            this.param,
+                        )
+                        joinSuccess = true
+                    } catch (error) {
+                        console.error(
+                            `Attempt ${attempt + 1} failed with error:`,
+                            error instanceof JoinError ? error.message : error,
+                        )
+
+                        if (error instanceof JoinError) {
+                            if (
+                                error.message === JoinErrorCode.BotNotAccepted
+                            ) {
+                                console.log(
+                                    'Bot not accepted, initiating shutdown sequence...',
+                                )
+                                MeetingHandle.status.state = 'Recording'
+
+                                await this.stopRecording('bot not accepted')
+                                await this.cleanEverything()
+                                throw error
+                            }
+                            if (
+                                error.message ===
+                                JoinErrorCode.TimeoutWaitingToStart
+                            ) {
+                                console.log(
+                                    'Waiting room timeout, initiating shutdown sequence...',
+                                )
+                                MeetingHandle.status.state = 'Recording'
+                                await this.stopRecording('waiting room timeout')
+                                await this.cleanEverything()
+                                throw error
+                            }
+                        }
+
+                        // En cas d'erreur, nettoyer le timeout du meeting
+                        clearTimeout(this.meeting.meetingTimeoutInterval)
+
                         if (this.meeting.page) {
                             await this.meeting.page
                                 .close()
-                                .catch((e) => console.error('Error closing page:', e))
+                                .catch((e) =>
+                                    console.error('Error closing page:', e),
+                                )
                         }
-                        throw error;
+
+                        if (attempt === maxRetries - 1) {
+                            await this.cleanEverything()
+                            throw error
+                        }
+
+                        console.log(
+                            `Retrying... (${attempt + 1}/${maxRetries})`,
+                        )
+                        await sleep(2000)
                     }
-            
-                    if (this.meeting.page) {
-                        await this.meeting.page
-                            .close()
-                            .catch((e) => console.error('Error closing page:', e))
+                } catch (error) {
+                    // Nettoyer le timeout en cas d'erreur non gérée
+                    clearTimeout(this.meeting.meetingTimeoutInterval)
+
+                    if (error instanceof JoinError) {
+                        throw error
                     }
-            
-                    if (attempt === maxRetries - 1) throw error
-                    console.log(`Retrying... (${attempt + 1}/${maxRetries})`)
-                    await sleep(2000)
+
+                    console.error(
+                        `Error in retry loop (attempt ${attempt + 1}):`,
+                        error,
+                    )
+                    if (attempt === maxRetries - 1) {
+                        await this.cleanEverything()
+                        throw error
+                    }
                 }
             }
 
@@ -364,6 +458,7 @@ export class MeetingHandle {
             await Events.inCallRecording()
             return // Succès !
         } catch (error) {
+            await new Promise((resolve) => setTimeout(resolve, 2000))
             await this.cleanEverything()
             MeetingHandle.status.error = error
             throw error
@@ -482,90 +577,93 @@ export class MeetingHandle {
     }
 
     public async stopRecording(reason: string) {
-        console.log('stopRecording called')
-        if (MeetingHandle.status.state !== 'Recording') {
-            console.error(
-                `Can't exit meeting, the meeting is not in recording state`,
-                { status: MeetingHandle.status.state, exit_reason: reason },
-            )
-            return
-        }
+        console.log('stopRecording called', {
+            currentState: MeetingHandle.status.state,
+            reason,
+        })
+
+        // On ne vérifie plus si l'état est "Recording"
+        // car on peut avoir besoin d'arrêter le meeting dans d'autres états
         MeetingHandle.status.state = 'Cleanup'
-        //TODO : Cut the video with the timestamp
-        // EndmeetingTimesatamp = Date.now() - FIND_END_MEETING_SLEEP
         console.log(`Stop recording scheduled`, {
             exit_reason: reason,
+            newState: MeetingHandle.status.state,
         })
     }
 
     private async stopRecordingInternal() {
-        const { page, meetingTimeoutInterval, browser, backgroundPage } = this.meeting;
-    
+        const { page, meetingTimeoutInterval, browser, backgroundPage } =
+            this.meeting
+
         try {
-            console.log('Starting recording shutdown sequence...');
-            
+            console.log('Starting recording shutdown sequence...')
+
             // Étape 1: Arrêter l'enregistreur et fermer les pages
-            console.log('Step 1: Stopping media recorder and closing pages...');
+            console.log('Step 1: Stopping media recorder and closing pages...')
             await Promise.all([
                 browser?.process()?.kill('SIGKILL'),
-                backgroundPage?.evaluate(() => (window as any).stopMediaRecorder?.())
-                    .catch(e => console.error('stopMediaRecorder error:', e)),
-                page?.close().catch(e => console.error('Page close error:', e)),
-                backgroundPage?.close().catch(e => console.error('Background page close error:', e))
-            ]);
-    
+                backgroundPage
+                    ?.evaluate(() => (window as any).stopMediaRecorder?.())
+                    .catch((e) => console.error('stopMediaRecorder error:', e)),
+                page
+                    ?.close()
+                    .catch((e) => console.error('Page close error:', e)),
+                backgroundPage
+                    ?.close()
+                    .catch((e) =>
+                        console.error('Background page close error:', e),
+                    ),
+            ])
+
             // Étape 2: Envoyer un dernier chunk vide avec isFinal=true
-            console.log('Step 2: Sending final empty chunk to transcoder...');
-            await TRANSCODER.uploadChunk(Buffer.alloc(0), true)
-                .catch(e => console.error('Final chunk upload error:', e));
-    
+            console.log('Step 2: Sending final empty chunk to transcoder...')
+            await TRANSCODER.uploadChunk(Buffer.alloc(0), true).catch((e) =>
+                console.error('Final chunk upload error:', e),
+            )
+
             // Étape 3: Attendre que le transcoder termine son traitement et uploade la vidéo
-            console.log('Step 3: Stopping transcoder and uploading video...');
-            await TRANSCODER.stop()
-                .catch(e => console.error('TRANSCODER stop error:', e));
-    
+            console.log('Step 3: Stopping transcoder and uploading video...')
+            await TRANSCODER.stop().catch((e) =>
+                console.error('TRANSCODER stop error:', e),
+            )
+
             // Étape 4: Upload de la dernière transcription
-            console.log('Step 4: Uploading final transcript...');
-            await uploadTranscriptTask({
-                name: 'END',
-                id: 0,
-                timestamp: Date.now(),
-                isSpeaking: false,
-            } as SpeakerData, true).catch(e => console.error('Upload transcript error:', e));
-    
+            console.log('Step 4: Uploading final transcript...')
+            await uploadTranscriptTask(
+                {
+                    name: 'END',
+                    id: 0,
+                    timestamp: Date.now(),
+                    isSpeaking: false,
+                } as SpeakerData,
+                true,
+            ).catch((e) => console.error('Upload transcript error:', e))
+
             // Étape 5: Arrêt du transcriber et nettoyage final
-            console.log('Step 5: Final cleanup...');
-            await WordsPoster.TRANSCRIBER?.stop()
-                .catch(e => console.error('TRANSCRIBER stop error:', e));
-    
-            meetingTimeoutInterval && clearTimeout(meetingTimeoutInterval);
-            console.log('Meeting terminated successfully');
+            console.log('Step 5: Final cleanup...')
+            await WordsPoster.TRANSCRIBER?.stop().catch((e) =>
+                console.error('TRANSCRIBER stop error:', e),
+            )
+
+            meetingTimeoutInterval && clearTimeout(meetingTimeoutInterval)
+            console.log('Meeting terminated successfully')
         } catch (error) {
-            console.error('Fatal error during stopRecordingInternal:', error);
-            throw error;
+            console.error('Fatal error during stopRecordingInternal:', error)
+            throw error
         }
     }
-    
-    private meetingTimeout() {
-        console.log('stopping meeting timeout reason')
+
+    private async meetingTimeout() {
+        console.log('Meeting timeout reached, initiating shutdown...')
         try {
-            this.stopRecording('timeout')
+            await this.stopRecording('timeout')
+            await this.cleanEverything()
         } catch (e) {
-            console.error(e)
+            console.error('Error during meeting timeout cleanup:', e)
         }
-        setTimeout(async () => {
-            console.log('killing process')
-            //TODO : appeler clean everything
-            try {
-                await Logger.instance
-                    .upload_log
-                    // this.param.user_id,
-                    // this.param.email,
-                    // this.param.bot_uuid,
-                    ()
-            } catch (e) {
-                console.error(e)
-            }
+        // Forcer l'arrêt du processus après un délai
+        setTimeout(() => {
+            console.log('Force killing process after timeout...')
             process.exit(0)
         }, MAX_TIME_TO_LIVE_AFTER_TIMEOUT * 1000)
     }

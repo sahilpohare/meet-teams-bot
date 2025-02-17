@@ -16,24 +16,24 @@ export class Events {
         )
     }
 
-    static async joiningCall() {
-        await Events.EVENTS?.send('joining_call')
+    static joiningCall() {
+        Events.EVENTS?.send('joining_call')
     }
 
-    static async inWaitingRoom() {
-        await Events.EVENTS?.send('in_waiting_room')
+    static inWaitingRoom() {
+        Events.EVENTS?.send('in_waiting_room')
     }
 
-    static async inCallNotRecording() {
-        await Events.EVENTS?.send('in_call_not_recording')
+    static inCallNotRecording() {
+        Events.EVENTS?.send('in_call_not_recording')
     }
 
-    static async inCallRecording() {
-        await Events.EVENTS?.send('in_call_recording')
+    static inCallRecording() {
+        Events.EVENTS?.send('in_call_recording')
     }
 
-    static async callEnded() {
-        await Events.EVENTS?.send('call_ended')
+    static callEnded() {
+        Events.EVENTS?.send('call_ended')
     }
 
     private constructor(
@@ -42,13 +42,15 @@ export class Events {
         private webhookUrl: string,
     ) {}
 
-    private async send(code: string) {
+    private send(code: string) {
+        // Non-blocking axios call
         axios({
             method: 'POST',
             url: this.webhookUrl,
+            timeout: 5000, // 5 secondes de timeout
             headers: {
                 'User-Agent': 'meetingbaas/1.0',
-                'x-spoke-api-key': this.apiKey,
+                'x-meeting-baas-api-key': this.apiKey,
             },
             data: {
                 event: 'bot.status_change',
@@ -62,15 +64,20 @@ export class Events {
             },
         })
             .then(() => {
-                console.log('Event sended', code, this.botId, this.webhookUrl)
-            })
-            .catch((_e) => {
-                console.error(
-                    'Unable to send event',
+                console.log(
+                    'Event sent successfully:',
                     code,
                     this.botId,
                     this.webhookUrl,
-                    // e,
+                )
+            })
+            .catch((error) => {
+                console.error(
+                    'Unable to send event:',
+                    code,
+                    this.botId,
+                    this.webhookUrl,
+                    error.message,
                 )
             })
     }

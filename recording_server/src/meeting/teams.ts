@@ -91,12 +91,15 @@ export class TeamsProvider implements MeetingProviderInterface {
                 await handlePermissionDialog(page)
                 await activateCamera(page)
             } catch (e) {
-                console.error(
-                    'Error handling permissions or activating camera:',
+                console.warn(
+                    'Failed to handle camera and permissions, continuing anyway:',
                     e,
                 )
+                // On ajoute un délai pour laisser le temps à l'interface de se stabiliser
+                await sleep(2000)
             }
         }
+
         try {
             await typeBotName(page, meetingParams.bot_name, 20)
             await clickWithInnerText(page, 'button', 'Join now', 20)

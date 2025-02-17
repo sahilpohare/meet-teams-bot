@@ -143,19 +143,26 @@ export class MeetProvider implements MeetingProviderInterface {
         try {
             if (!page.isClosed()) {
                 try {
-                    const elements = await page.$$('*');
+                    const elements = await page.$$('*')
                     for (const element of elements) {
-                        const text = await element.evaluate(el => (el as HTMLElement).innerText);
-                        if (text?.includes("You've been removed") ||
+                        const text = await element.evaluate(
+                            (el) => (el as HTMLElement).innerText,
+                        )
+                        if (
+                            text?.includes("You've been removed") ||
                             text?.includes('The call ended') ||
                             text?.includes('Return to home') ||
-                            text?.includes("The call ended")) {
-                            console.log('End meeting detected through page content:', text);
-                            return true;
+                            text?.includes('The call ended')
+                        ) {
+                            console.log(
+                                'End meeting detected through page content:',
+                                text,
+                            )
+                            return true
                         }
                     }
                 } catch (e) {
-                    console.log('Page access failed, falling back to OCR');
+                    console.log('Page access failed, falling back to OCR')
                 }
             }
             console.log('OCR, trying to find end meeting')
@@ -289,7 +296,10 @@ async function notAcceptedInMeeting(page: Page): Promise<boolean> {
             for (const e of elems) {
                 let elem = e as HTMLElement
                 if (elem.innerText && typeof elem.innerText === 'string') {
-                    if (elem.innerText.includes('denied') || elem.innerText.includes("You can't join")) {
+                    if (
+                        elem.innerText.includes('denied') ||
+                        elem.innerText.includes("You can't join")
+                    ) {
                         console.log('XXXXXXXXXXXXXXXXXX User has denied entry')
                         return true
                     }

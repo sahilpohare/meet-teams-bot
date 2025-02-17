@@ -198,12 +198,21 @@ logger.info('version 0.0.1')
         if (consumeResult.error) {
             // Assuming Recording does not start at this point
             // So there are not video to upload. Just send webhook failure
-            console.error('error in start meeting', consumeResult.error)
+            console.error(
+                'error in start meeting:',
+                consumeResult.error instanceof JoinError
+                    ? consumeResult.error.message
+                    : consumeResult.error,
+            )
+
             await handleErrorInStartRecording(
                 consumeResult.error,
                 consumeResult.params,
             ).catch((e) => {
-                console.error('error in handleErrorInStartRecording', e)
+                console.error(
+                    'error in handleErrorInStartRecording:',
+                    e instanceof JoinError ? e.message : e,
+                )
             })
         } else if (consumeResult.params.meetingProvider !== 'Zoom') {
             // Assuming that recording is active at this point
@@ -302,42 +311,46 @@ logger.info('version 0.0.1')
 
 async function handleErrorInStartRecording(error: Error, data: MeetingParams) {
     if (error instanceof JoinError) {
-        console.error('a join error occured while starting recording', error)
+        console.error('a join error occurred while starting recording', error)
     } else {
         console.error(
-            'an internal error occured while starting recording',
+            'an internal error occurred while starting recording',
             error,
         )
     }
-    try {
-        await meetingBotStartRecordFailed(
-            data.meeting_url,
-            data.bot_uuid,
-            error instanceof JoinError ? error.message : JoinErrorCode.Internal,
-        )
-    } catch (e) {
-        console.error(
-            `error in handleErrorInStartRecording, terminating instance`,
-            e,
-        )
-    }
+
+    // Non-blocking call pour notifier l'erreur
+    meetingBotStartRecordFailed(
+        data.meeting_url,
+        data.bot_uuid,
+        error instanceof JoinError ? error.message : JoinErrorCode.Internal,
+    ).catch((e) => {
+        console.error('Failed to send error notification:', e)
+    })
 }
 
-export async function meetingBotStartRecordFailed(
+export function meetingBotStartRecordFailed(
     meetingLink: string,
     bot_uuid: string,
     message: string,
 ): Promise<void> {
-    let meetingParams = {
-        meeting_url: meetingLink,
+    console.log('Notifying failed recording attempt:', {
+        meetingLink,
+        bot_uuid,
         message,
-    }
-    await axios({
+    })
+
+    return axios({
         method: 'POST',
         url: `/bots/start_record_failed`,
-        data: meetingParams,
+        timeout: 10000,
+        data: { meeting_url: meetingLink, message },
         params: { bot_uuid },
     })
+        .then(() => {}) // Convertit explicitement en Promise<void>
+        .catch((error) => {
+            console.error('Failed to notify recording failure:', error.message)
+        })
 }
 
 /// open the browser a first time to speed up the next openings
