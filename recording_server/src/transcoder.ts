@@ -1,5 +1,4 @@
 import { ChildProcess, spawn } from 'child_process';
-import * as fsSync from 'fs';
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
@@ -55,66 +54,71 @@ class Transcoder {
         this.chunkDuration = chunkDuration
         this.transcribeDuration = transcribeDuration
 
-        // Obtenir le dossier temporaire pour les frames
-        const framesDir = await FrameAnalyzer.getInstance().getFramesDirectory()
-        
-        const frameAnalyzer = FrameAnalyzer.getInstance();
-        const tempFramePath = path.join(framesDir, 'temp_frame.jpg');
+        // Séparation en deux processus FFmpeg distincts
+        try {
+            // Premier processus FFmpeg pour la vidéo principale
+            const mainFfmpegArgs = [
+                '-i',
+                'pipe:0',
+                '-c:v',
+                'copy',
+                '-c:a',
+                'aac',
+                '-b:a',
+                '128k',
+                '-movflags',
+                '+frag_keyframe+empty_moov',
+                '-y',
+                this.videoOutputPath,
+                '-loglevel',
+                'verbose',
+            ]
 
-        const ffmpegArgs = [
-            '-i',
-            'pipe:0',
-            // Output 1: Vidéo principale
-            '-map', '0:v',
-            '-c:v',
-            'copy',
-            '-map', '0:a',
-            '-c:a',
-            'aac',
-            '-b:a',
-            '128k',
-            '-movflags',
-            '+frag_keyframe+empty_moov',
-            '-y',
-            this.videoOutputPath,
-            // Output 2: Frame unique pour l'OCR
-            '-map', '0:v',
-            '-vf',
-            'fps=1/2,scale=480:270',  // Une frame par seconde, résolution réduite à 480x270
-            '-update', '1',  // Écraser le même fichier
-            tempFramePath,
-            '-loglevel',
-            'verbose',
-        ]
+            console.log('Launching main FFmpeg process with args:', mainFfmpegArgs.join(' '))
+            this.ffmpeg_process = spawn('ffmpeg', mainFfmpegArgs, {
+                stdio: ['pipe', 'inherit', 'inherit'],
+            })
 
-        console.log('Launching FFmpeg with args:', ffmpegArgs.join(' '))
-        
-        this.ffmpeg_process = spawn('ffmpeg', ffmpegArgs, {
-            stdio: ['pipe', 'inherit', 'inherit'],
-        })
+            // Gérer les erreurs du processus principal
+            this.ffmpeg_process.on('error', (err) => {
+                console.error('Main FFmpeg process error:', err)
+            })
 
-        // Surveiller le fichier temporaire pour l'OCR
-        const watcher = fsSync.watch(framesDir, async (eventType, filename) => {
-            if (eventType === 'change' && filename === 'temp_frame.jpg') {
-                const timestamp = Date.now();
-                try {
-                    // Créer une copie du fichier pour l'OCR
-                    const copyPath = path.join(framesDir, `frame_${timestamp}.jpg`);
-                    await fs.copyFile(tempFramePath, copyPath);
-                    // Traiter la frame avec l'OCR
-                    await frameAnalyzer.processNewFrame(copyPath, timestamp);
-                } catch (error) {
-                    console.error('Error processing frame:', error);
-                }
+            // Processus séparé pour les frames (en arrière-plan)
+            try {
+                const frameAnalyzer = FrameAnalyzer.getInstance()
+                const framesDir = frameAnalyzer.getFramesDirectory()
+                
+                const frameProcess = spawn('ffmpeg', [
+                    '-i',
+                    this.webmPath,  // Lire depuis le fichier WebM
+                    '-vf',
+                    'fps=1/2',
+                    '-update',
+                    '1',
+                    '-y',
+                    path.join(framesDir, 'temp_frame.jpg')
+                ], {
+                    stdio: 'ignore',  // Ignorer toutes les sorties
+                    detached: true    // Processus détaché
+                })
+
+                // Ne pas attendre ce processus
+                frameProcess.unref()
+
+                // Gérer les erreurs silencieusement
+                frameProcess.on('error', (err) => {
+                    console.log('Frame extraction process error (non-critical):', err)
+                })
+            } catch (frameErr) {
+                console.log('Frame extraction setup failed (non-critical):', frameErr)
             }
-        });
 
-        // Nettoyer le watcher quand le processus se termine
-        this.ffmpeg_process.on('close', () => {
-            watcher.close();
-        });
-
-        console.log('FFmpeg command launched successfully with frame monitoring')
+            console.log('FFmpeg processes launched successfully')
+        } catch (error) {
+            console.error('Error in transcoder initialization:', error)
+            throw error // On ne propage que les erreurs critiques
+        }
         return
     }
 
