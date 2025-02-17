@@ -1,20 +1,27 @@
-import * as puppeteer from 'puppeteer';
+import * as puppeteer from 'puppeteer'
 
-import { JoinError, JoinErrorCode } from '../meeting';
+import { JoinError, JoinErrorCode } from '../meeting'
 import {
     CancellationToken,
     MeetingParams,
     MeetingProviderInterface,
     RecordingMode,
-} from '../types';
+} from '../types'
 
-import { Page } from 'puppeteer';
-import { Logger } from '../logger';
-import { parseMeetingUrlFromJoinInfos } from '../urlParser/meetUrlParser';
-import { sleep } from '../utils';
+import { Page } from 'puppeteer'
+import { FrameAnalyzer } from '../FrameAnalyzer'
+import { Logger } from '../logger'
+import { parseMeetingUrlFromJoinInfos } from '../urlParser/meetUrlParser'
+import { sleep } from '../utils'
 
 export class MeetProvider implements MeetingProviderInterface {
-    constructor() {}
+    private frameAnalyzer: FrameAnalyzer
+
+    constructor() {
+        this.frameAnalyzer = FrameAnalyzer.getInstance()
+        this.frameAnalyzer.initialize().catch(console.error)
+    }
+
     async parseMeetingUrl(browser: puppeteer.Browser, meeting_url: string) {
         return parseMeetingUrlFromJoinInfos(meeting_url)
     }
@@ -136,47 +143,40 @@ export class MeetProvider implements MeetingProviderInterface {
         try {
             if (!page.isClosed()) {
                 try {
-                    const result = await Promise.race([
-                        (async () => {
-                            // Sélectionner tous les éléments
-                            const elements = await page.$$('*');
-                            
-                            // Vérifier chaque élément
-                            for (const element of elements) {
-                                try {
-                                    const text = await element.evaluate(el => (el as HTMLElement).innerText);
-                                    if (text?.includes("You've been removed") ||
-                                        text?.includes('The call ended') ||
-                                        text?.includes('Return to home')) {
-                                        return true;
-                                    }
-                                } catch (e) {
-                                    // Ignorer les erreurs par élément
-                                    continue;
-                                }
-                            }
-                            return false;
-                        })(),
-                        new Promise((_, reject) =>
-                            setTimeout(() => reject('Timeout'), 10000),
-                        ),
-                    ]);
-                    return !!result;
-                } catch (error) {
-                    console.error('Timeout or error in findEndMeeting:', error);
-                    return true; // En cas de timeout, considérer comme terminé
+                    const elements = await page.$$('*');
+                    for (const element of elements) {
+                        const text = await element.evaluate(el => (el as HTMLElement).innerText);
+                        if (text?.includes("You've been removed") ||
+                            text?.includes('The call ended') ||
+                            text?.includes('Return to home')) {
+                            console.log('End meeting detected through page content:', text);
+                            return true;
+                        }
+                    }
+                } catch (e) {
+                    console.log('Page access failed, falling back to OCR');
                 }
             }
-            return true;
+            console.log('OCR, trying to find end meeting')
+            // Si la page n'est pas accessible, utiliser l'OCR
+            const frameAnalyzer = FrameAnalyzer.getInstance()
+
+            const lastText = frameAnalyzer.getLastFrameText()
+            if (
+                lastText?.includes("You've been removed") ||
+                lastText?.includes('The call ended') ||
+                lastText?.includes('Return to home')
+            ) {
+                console.log('End meeting detected through OCR:', lastText)
+                return true
+            }
+            return false
         } catch (error) {
-            console.log('Error in findEndMeeting:', error);
-            return true;
+            console.error('Error in findEndMeeting:', error)
+            return false
         }
     }
 }
-
-
-
 
 async function findShowEveryOne(
     page: puppeteer.Page,
@@ -317,55 +317,54 @@ async function removedFromMeeting(page: Page): Promise<boolean> {
     try {
         const REMOVAL_MESSAGES = [
             "You've been removed",
-            'The call ended', 
+            'The call ended',
             'Return to home',
-            "You've been removed from the meeting"
-        ];
-        const RETRY_DELAY = 500;
+            "You've been removed from the meeting",
+        ]
+        const RETRY_DELAY = 500
 
         const checkForRemoval = async () => {
             return await page.evaluate((messages) => {
-                const elements = document.querySelectorAll('*');
-                
+                const elements = document.querySelectorAll('*')
+
                 for (const element of elements) {
-                    const text = element.textContent || '';
-                    
+                    const text = element.textContent || ''
+
                     // Still in meeting if we see 'Leave call'
                     if (text.includes('Leave call')) {
                         console.log('Leave call found, still in meeting')
-                        return false;
+                        return false
                     }
 
                     // Check for any removal messages
-                    if (messages.some(msg => text.includes(msg))) {
+                    if (messages.some((msg) => text.includes(msg))) {
                         console.log('Removal message found, removed bot')
-                        return true;
+                        return true
                     }
                 }
-                return false;
-            }, REMOVAL_MESSAGES);
-        };
+                return false
+            }, REMOVAL_MESSAGES)
+        }
 
         // First check
-        const firstCheck = await checkForRemoval();
+        const firstCheck = await checkForRemoval()
         if (firstCheck) {
-            return true;
+            return true
         }
 
         // Wait and do second check
-        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
-        return await checkForRemoval();
-
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY))
+        return await checkForRemoval()
     } catch (error) {
-        console.error('Error in removedFromMeeting:', error);
+        console.error('Error in removedFromMeeting:', error)
         if (error instanceof Error) {
             console.error('Error details:', {
                 name: error.name,
                 message: error.message,
-                stack: error.stack
-            });
+                stack: error.stack,
+            })
         }
-        return false;
+        return false
     }
 }
 

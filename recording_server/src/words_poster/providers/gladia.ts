@@ -41,6 +41,31 @@ type GladiaWordWithTimestamp = {
     confidence: number
 }
 
+
+type GladiaWord = {
+    word: string;
+    start: number;
+    end: number;
+    confidence: number;
+}
+
+type GladiaUtterance = {
+    text: string;
+    language: string;
+    start: number;
+    end: number;
+    confidence: number;
+    channel: number;
+    words: GladiaWord[];
+}
+
+type GladiaTranscription = {
+    languages: string[];
+    utterances: GladiaUtterance[];
+    full_transcript: string;
+}
+
+
 // Get Gladia raw Transcipt
 export async function recognizeGladia(
     audioUrl: string,
@@ -88,23 +113,30 @@ export async function recognizeGladia(
         }
         console.log('Waiting for Gladia transcription completion')
     }
-    console.log('Gladia result:', result)
     return result
 }
 
 // Parse the result from Gladia to extract all the words with their corresponding timestamps.
-export function parseGladia(
-    apiResponse: GladiaResult,
-    offset: number,
-): RecognizerWord[] {
-    return findWords(apiResponse.result).map((w: GladiaWordWithTimestamp) => {
-        return {
+export function parseGladia(apiResponse: GladiaResult, offset: number): RecognizerWord[] {
+    console.log('Starting parseGladia with offset:', offset);
+    // Passer apiResponse au lieu de apiResponse.result
+    const words = findWords(apiResponse);
+    console.log('Found raw words:', words);
+    
+    const recognizerWords = words.map((w: GladiaWordWithTimestamp) => {
+        const word = {
             text: w.word.trim(),
             start_time: w.start + offset,
             end_time: w.end + offset,
-        } as RecognizerWord
-    })
+        } as RecognizerWord;
+        console.log('Transformed word:', word);
+        return word;
+    });
+    
+    console.log('Final recognizer words:', recognizerWords);
+    return recognizerWords;
 }
+
 
 async function getResult(
     id: string,
@@ -128,24 +160,32 @@ async function getResult(
 
 // Find all occurrences of 'words' recursively and push the word sub-elements.
 function findWords(obj: GladiaResult): GladiaWordWithTimestamp[] {
-    let results: GladiaWordWithTimestamp[] = new Array()
+    console.log('Processing Gladia result:', JSON.stringify(obj, null, 2));
+    
+    if (!obj?.result?.transcription?.utterances) {
+        console.warn('No utterances found in Gladia result');
+        return [];
+    }
 
-    function recurse(currentObj: any) {
-        if (Array.isArray(currentObj)) {
-            currentObj.forEach((item) => recurse(item))
-        } else if (typeof currentObj === 'object' && currentObj !== null) {
-            for (const key in currentObj) {
-                if (key === 'words') {
-                    let v: GladiaWordWithTimestamp[] = currentObj[key]
-                    v.forEach((elem) => {
-                        results.push(elem)
-                    })
-                } else {
-                    recurse(currentObj[key])
-                }
+    const words: GladiaWordWithTimestamp[] = [];
+    const utterances = obj.result.transcription.utterances;
+    
+    for (const utterance of utterances) {
+        console.log(`Processing utterance: "${utterance.text}" with ${utterance.words.length} words`);
+        
+        for (const word of utterance.words) {
+            const cleanWord = word.word.trim();
+            if (cleanWord) {
+                words.push({
+                    word: cleanWord,
+                    start: word.start,
+                    end: word.end,
+                    confidence: word.confidence
+                });
             }
         }
     }
-    recurse(obj)
-    return results
+
+    console.log(`Found ${words.length} total words`);
+    return words;
 }

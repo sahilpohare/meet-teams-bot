@@ -502,34 +502,42 @@ export class MeetingHandle {
         const { page, meetingTimeoutInterval, browser, backgroundPage } = this.meeting;
     
         try {
-            console.log('Starting services shutdown...');
+            console.log('Starting recording shutdown sequence...');
             
-            // D'abord finaliser le transcoder et attendre la dernière transcription
-            console.log('Step 1: Finalizing transcoder...');
-            await TRANSCODER.finalize().catch(e => console.error('TRANSCODER finalize error:', e));
-            
-            // Ensuite, s'assurer que tout est uploadé
-            console.log('Step 2: Uploading final transcript...');
+            // Étape 1: Arrêter l'enregistreur et fermer les pages
+            console.log('Step 1: Stopping media recorder and closing pages...');
+            await Promise.all([
+                browser?.process()?.kill('SIGKILL'),
+                backgroundPage?.evaluate(() => (window as any).stopMediaRecorder?.())
+                    .catch(e => console.error('stopMediaRecorder error:', e)),
+                page?.close().catch(e => console.error('Page close error:', e)),
+                backgroundPage?.close().catch(e => console.error('Background page close error:', e))
+            ]);
+    
+            // Étape 2: Envoyer un dernier chunk vide avec isFinal=true
+            console.log('Step 2: Sending final empty chunk to transcoder...');
+            await TRANSCODER.uploadChunk(Buffer.alloc(0), true)
+                .catch(e => console.error('Final chunk upload error:', e));
+    
+            // Étape 3: Attendre que le transcoder termine son traitement et uploade la vidéo
+            console.log('Step 3: Stopping transcoder and uploading video...');
+            await TRANSCODER.stop()
+                .catch(e => console.error('TRANSCODER stop error:', e));
+    
+            // Étape 4: Upload de la dernière transcription
+            console.log('Step 4: Uploading final transcript...');
             await uploadTranscriptTask({
                 name: 'END',
                 id: 0,
                 timestamp: Date.now(),
                 isSpeaking: false,
             } as SpeakerData, true).catch(e => console.error('Upload transcript error:', e));
-            
-            // Enfin, arrêter les services et nettoyer
-            console.log('Step 3: Stopping services and cleanup...');
-            await Promise.all([
-                WordsPoster.TRANSCRIBER?.stop().catch(e => console.error('TRANSCRIBER stop error:', e)),
-                Promise.all([
-                    browser?.process()?.kill('SIGKILL'),
-                    backgroundPage?.evaluate(() => (window as any).stopMediaRecorder?.())
-                        .catch(e => console.error('stopMediaRecorder error:', e)),
-                    page?.close().catch(e => console.error('Page close error:', e)),
-                    backgroundPage?.close().catch(e => console.error('Background page close error:', e))
-                ])
-            ]);
-            
+    
+            // Étape 5: Arrêt du transcriber et nettoyage final
+            console.log('Step 5: Final cleanup...');
+            await WordsPoster.TRANSCRIBER?.stop()
+                .catch(e => console.error('TRANSCRIBER stop error:', e));
+    
             meetingTimeoutInterval && clearTimeout(meetingTimeoutInterval);
             console.log('Meeting terminated successfully');
         } catch (error) {

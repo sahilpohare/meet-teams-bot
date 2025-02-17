@@ -63,8 +63,31 @@ export class WordsPoster {
 
     // Request e new Transcribe
     public async push(timeStart: number, timeEnd: number): Promise<void> {
-        this.transcribeQueue.push(async () => {
-            await WordsPoster.TRANSCRIBER?.transcribe(timeStart, timeEnd)
+        console.log(
+            `[WordsPoster] Queuing transcription task ${timeStart}-${timeEnd}`,
+        )
+        return new Promise((resolve, reject) => {
+            this.transcribeQueue.push(async () => {
+                console.log(
+                    `[WordsPoster] Starting transcription ${timeStart}-${timeEnd}`,
+                )
+                try {
+                    await WordsPoster.TRANSCRIBER?.transcribe(
+                        timeStart,
+                        timeEnd,
+                    )
+                    console.log(
+                        `[WordsPoster] Transcription completed ${timeStart}-${timeEnd}`,
+                    )
+                    resolve()
+                } catch (error) {
+                    console.error(
+                        `[WordsPoster] Transcription failed ${timeStart}-${timeEnd}:`,
+                        error,
+                    )
+                    reject(error)
+                }
+            })
         })
     }
 
@@ -74,89 +97,97 @@ export class WordsPoster {
         if (this.stopped) {
             console.error('WordPoster already stoped!')
         }
-        // Wait until complete sequence
-        // Ends the transcribing, and destroys resources.
-        // Waits for the workers to finish, and destroys the transcbriber.
+
+        console.log('[WordsPoster] Waiting for queue to drain...')
+        console.log(
+            `[WordsPoster] Queue length: ${this.transcribeQueue.length()}`,
+        )
         console.log('before transcribe queue drain')
         this.transcribeQueue.push(async () => {
             // It's necessary to do that, don't know why but don't remove it.
             return
         })
+
+        // Wait until complete sequence
+        // Ends the transcribing, and destroys resources.
+        // Waits for the workers to finish, and destroys the transcbriber.
         await this.transcribeQueue.drain()
-        console.log('after transcribe queue drain')
+        console.log('[WordsPoster] Queue drained')
 
         this.stopped = true
         return new Promise((resolve) => resolve())
     }
-
     private async transcribe(
         timeStart: number,
         timeEnd: number,
     ): Promise<void> {
         let api = Api.instance
-
-        if (timeEnd <= timeStart) {
-            console.error('Invalid time range:', { timeStart, timeEnd })
-            return
-        }
-
+        console.log(
+            `[WordsPoster] Begin transcription process ${timeStart}-${timeEnd}`,
+        )
         const s3Path = `${this.user_id}/${this.bot_uuid}/${timeStart}-${timeEnd}-record.wav`
-        console.log('Transcribing segment:', {
-            timeStart,
-            timeEnd,
-            duration: timeEnd - timeStart,
-        })
 
         try {
+            // Extraction audio
             const audioUrl = await TRANSCODER.extractAudio(
                 timeStart,
                 timeEnd,
                 this.s3_bucket,
                 s3Path,
             )
+
+            // Transcription
             let words: RecognizerWord[]
             switch (this.speech_to_text_provider) {
                 case 'Runpod':
-                    let res_runpod = await recognizeRunPod(
+                    const res_runpod = await recognizeRunPod(
                         audioUrl,
-                        this.vocabulary, // TODO : What to do.
+                        this.vocabulary,
                         this.speech_to_text_api_key,
                     )
-                    words = parseRunPod(res_runpod, timeStart)
+                    words = parseRunPod(res_runpod, timeStart/1000)
                     break
                 case 'Default':
                 case 'Gladia':
-                    let res_gladia = await recognizeGladia(
+                    const res_gladia = await recognizeGladia(
                         audioUrl,
-                        this.vocabulary, // TODO : What to do.
+                        this.vocabulary,
                         this.speech_to_text_api_key,
                     )
-                    words = parseGladia(res_gladia, timeStart)
+                    words = parseGladia(res_gladia, timeStart/1000)
                     break
-
                 default:
-                    console.error(
-                        'Unknown Transcription Provider !',
-                        this.speech_to_text_provider,
+                    throw new Error(
+                        `Unknown provider: ${this.speech_to_text_provider}`,
                     )
-                    words = new Array()
             }
-            console.log('[onResult] ')
-            const bot = await api.getBot().catch((e) => {
-                console.error('Failed to get bot :', e)
-                throw e
-            })
-            await api.postWords(words, bot.bot.id).catch((e) => {
-                console.error('Failed to post words :', e)
-                throw e
-            })
-        } catch (e) {
-            console.error('an error occured calling transcriber, ', e)
+
+            // Post to DB
+            const bot = await api.getBot()
+            console.log(
+                `[WordsPoster] Got transcription with ${words.length} words for ${timeStart}-${timeEnd}`,
+            )
+            await api.postWords(words, bot.bot.id)
+            console.log(
+                `[WordsPoster] Successfully saved words to DB ${timeStart}-${timeEnd}`,
+            )
+        } catch (error) {
+            console.error(
+                `[WordsPoster] Error in transcription process ${timeStart}-${timeEnd}:`,
+                error,
+            )
+            throw error // Propagate l'erreur pour que la queue la voie
         } finally {
             try {
                 await delete_s3_file(s3Path, this.s3_bucket)
-            } catch (e) {
-                console.error('an error occured deleting audio from S3, ', e)
+                console.log(
+                    `[WordsPoster] Cleaned up S3 file for ${timeStart}-${timeEnd}`,
+                )
+            } catch (error) {
+                console.error(
+                    `[WordsPoster] Failed to cleanup S3 for ${timeStart}-${timeEnd}:`,
+                    error,
+                )
             }
         }
     }
