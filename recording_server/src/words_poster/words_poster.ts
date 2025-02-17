@@ -145,7 +145,7 @@ export class WordsPoster {
                         this.vocabulary,
                         this.speech_to_text_api_key,
                     )
-                    words = parseRunPod(res_runpod, timeStart/1000)
+                    words = parseRunPod(res_runpod, timeStart / 1000)
                     break
                 case 'Default':
                 case 'Gladia':
@@ -154,7 +154,7 @@ export class WordsPoster {
                         this.vocabulary,
                         this.speech_to_text_api_key,
                     )
-                    words = parseGladia(res_gladia, timeStart/1000)
+                    words = parseGladia(res_gladia, timeStart / 1000)
                     break
                 default:
                     throw new Error(

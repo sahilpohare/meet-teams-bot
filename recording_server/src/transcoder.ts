@@ -1,12 +1,12 @@
-import { ChildProcess, spawn } from 'child_process';
-import * as fs from 'fs/promises';
-import * as os from 'os';
-import * as path from 'path';
-import { Writable } from 'stream';
-import { Logger } from './logger';
+import { ChildProcess, spawn } from 'child_process'
+import * as fs from 'fs/promises'
+import * as os from 'os'
+import * as path from 'path'
+import { Writable } from 'stream'
+import { Logger } from './logger'
 
-import { FrameAnalyzer } from './FrameAnalyzer';
-import { WordsPoster } from './words_poster/words_poster';
+import { FrameAnalyzer } from './FrameAnalyzer'
+import { WordsPoster } from './words_poster/words_poster'
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -74,7 +74,10 @@ class Transcoder {
                 'verbose',
             ]
 
-            console.log('Launching main FFmpeg process with args:', mainFfmpegArgs.join(' '))
+            console.log(
+                'Launching main FFmpeg process with args:',
+                mainFfmpegArgs.join(' '),
+            )
             this.ffmpeg_process = spawn('ffmpeg', mainFfmpegArgs, {
                 stdio: ['pipe', 'inherit', 'inherit'],
             })
@@ -88,30 +91,40 @@ class Transcoder {
             try {
                 const frameAnalyzer = FrameAnalyzer.getInstance()
                 const framesDir = frameAnalyzer.getFramesDirectory()
-                
-                const frameProcess = spawn('ffmpeg', [
-                    '-i',
-                    this.webmPath,  // Lire depuis le fichier WebM
-                    '-vf',
-                    'fps=1/2',
-                    '-update',
-                    '1',
-                    '-y',
-                    path.join(framesDir, 'temp_frame.jpg')
-                ], {
-                    stdio: 'ignore',  // Ignorer toutes les sorties
-                    detached: true    // Processus détaché
-                })
+
+                const frameProcess = spawn(
+                    'ffmpeg',
+                    [
+                        '-i',
+                        this.webmPath, // Lire depuis le fichier WebM
+                        '-vf',
+                        'fps=1/2',
+                        '-update',
+                        '1',
+                        '-y',
+                        path.join(framesDir, 'temp_frame.jpg'),
+                    ],
+                    {
+                        stdio: 'ignore', // Ignorer toutes les sorties
+                        detached: true, // Processus détaché
+                    },
+                )
 
                 // Ne pas attendre ce processus
                 frameProcess.unref()
 
                 // Gérer les erreurs silencieusement
                 frameProcess.on('error', (err) => {
-                    console.log('Frame extraction process error (non-critical):', err)
+                    console.log(
+                        'Frame extraction process error (non-critical):',
+                        err,
+                    )
                 })
             } catch (frameErr) {
-                console.log('Frame extraction setup failed (non-critical):', frameErr)
+                console.log(
+                    'Frame extraction setup failed (non-critical):',
+                    frameErr,
+                )
             }
 
             console.log('FFmpeg processes launched successfully')
