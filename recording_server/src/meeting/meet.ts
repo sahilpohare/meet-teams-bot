@@ -148,7 +148,8 @@ export class MeetProvider implements MeetingProviderInterface {
                         const text = await element.evaluate(el => (el as HTMLElement).innerText);
                         if (text?.includes("You've been removed") ||
                             text?.includes('The call ended') ||
-                            text?.includes('Return to home')) {
+                            text?.includes('Return to home') ||
+                            text?.includes("The call ended")) {
                             console.log('End meeting detected through page content:', text);
                             return true;
                         }
@@ -288,7 +289,7 @@ async function notAcceptedInMeeting(page: Page): Promise<boolean> {
             for (const e of elems) {
                 let elem = e as HTMLElement
                 if (elem.innerText && typeof elem.innerText === 'string') {
-                    if (elem.innerText.includes('denied')) {
+                    if (elem.innerText.includes('denied') || elem.innerText.includes("You can't join")) {
                         console.log('XXXXXXXXXXXXXXXXXX User has denied entry')
                         return true
                     }
