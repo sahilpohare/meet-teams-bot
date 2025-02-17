@@ -56,7 +56,7 @@ export class TeamsProvider implements MeetingProviderInterface {
         meetingParams: MeetingParams,
     ): Promise<void> {
         console.log('joining meeting', cancelCheck)
-        
+
         try {
             await ensurePageLoaded(page)
         } catch (error) {

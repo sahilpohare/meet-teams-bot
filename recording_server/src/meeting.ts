@@ -13,6 +13,8 @@ import {
 } from './types'
 
 import { Page } from 'puppeteer'
+
+import { Api } from './api/methods'
 import { Events } from './events'
 import { Logger } from './logger'
 import { MeetProvider } from './meeting/meet'
@@ -259,7 +261,7 @@ export class MeetingHandle {
                 return waitingRoomPromise
             }
 
-            // Dans la boucle de retry de startRecordMeeting
+            // boucle de retry de startRecordMeeting
             for (
                 let attempt = 0;
                 attempt < maxRetries && !joinSuccess;
@@ -295,26 +297,25 @@ export class MeetingHandle {
 
                         if (error instanceof JoinError) {
                             if (
-                                error.message === JoinErrorCode.BotNotAccepted
-                            ) {
-                                console.log(
-                                    'Bot not accepted, initiating shutdown sequence...',
-                                )
-                                MeetingHandle.status.state = 'Recording'
-
-                                await this.stopRecording('bot not accepted')
-                                await this.cleanEverything()
-                                throw error
-                            }
-                            if (
                                 error.message ===
-                                JoinErrorCode.TimeoutWaitingToStart
+                                    JoinErrorCode.BotNotAccepted ||
+                                error.message ===
+                                    JoinErrorCode.TimeoutWaitingToStart
                             ) {
                                 console.log(
-                                    'Waiting room timeout, initiating shutdown sequence...',
+                                    `${error.message}, initiating shutdown sequence...`,
                                 )
-                                MeetingHandle.status.state = 'Recording'
-                                await this.stopRecording('waiting room timeout')
+                                MeetingHandle.status.state = 'Cleanup'
+                                // On notifie juste le backend via Events et endMeetingTrampoline
+                                await Events.callEnded()
+                                await Api.instance
+                                    .endMeetingTrampoline()
+                                    .catch((e) => {
+                                        console.error(
+                                            'error in endMeetingTranpoline',
+                                            e,
+                                        )
+                                    })
                                 await this.cleanEverything()
                                 throw error
                             }
@@ -342,7 +343,6 @@ export class MeetingHandle {
                         await sleep(2000)
                     }
                 } catch (error) {
-                    // Nettoyer le timeout en cas d'erreur non gérée
                     clearTimeout(this.meeting.meetingTimeoutInterval)
 
                     if (error instanceof JoinError) {
@@ -586,42 +586,43 @@ export class MeetingHandle {
             exit_reason: reason,
             newState: MeetingHandle.status.state,
         })
+
+        await this.stopRecordingInternal().catch((e) => {
+            console.error(`Failed to stop recording: ${e}`)
+        })
+
+        await this.cleanEverything()
     }
 
     private async stopRecordingInternal() {
-        const { page, meetingTimeoutInterval, browser, backgroundPage } =
-            this.meeting
-
         try {
             console.log('Starting recording shutdown sequence...')
 
-            // Étape 1: Arrêter d'abord le media recorder - c'est le plus important
+            // Étape 1: Arrêter d'abord le media recorder
             console.log('Step 1: Stopping media recorder...')
             try {
-                await backgroundPage?.evaluate(() => (window as any).stopMediaRecorder?.())
+                await this.meeting.backgroundPage?.evaluate(() =>
+                    (window as any).stopMediaRecorder?.(),
+                )
             } catch (e) {
                 console.error('stopMediaRecorder error:', e)
             }
 
             // Étape 2: Envoyer le chunk final vide au transcoder
             console.log('Step 2: Sending final empty chunk to transcoder...')
-            await TRANSCODER.uploadChunk(Buffer.alloc(0), true).catch((e) =>
-                console.error('Final chunk upload error:', e),
-            )
+            await TRANSCODER.uploadChunk(Buffer.alloc(0), true)
 
             // Étape 3: Kill brutal du navigateur et des pages
             console.log('Step 3: Force closing browser...')
             try {
-                browser?.process()?.kill('SIGKILL')
+                this.meeting.browser?.process()?.kill('SIGKILL')
             } catch (e) {
                 console.error('Browser kill error:', e)
             }
 
-            // Étape 4: Arrêter que le transcoder termine son traitement et uploade la vidéo
+            // Étape 4: Arrêter que le transcoder termine son traitement
             console.log('Step 4: Stopping transcoder and uploading video...')
-            await TRANSCODER.stop().catch((e) =>
-                console.error('TRANSCODER stop error:', e),
-            )
+            await TRANSCODER.stop()
 
             // Étape 5: Upload de la dernière transcription
             console.log('Step 5: Uploading final transcript...')
@@ -633,14 +634,20 @@ export class MeetingHandle {
                     isSpeaking: false,
                 } as SpeakerData,
                 true,
-            ).catch((e) => console.error('Upload transcript error:', e))
-
-            // Étape 6: Arrêt du transcriber et nettoyage final
-            console.log('Step 6: Final cleanup...')
-            await WordsPoster.TRANSCRIBER?.stop().catch((e) =>
-                console.error('TRANSCRIBER stop error:', e),
             )
-            meetingTimeoutInterval && clearTimeout(meetingTimeoutInterval)
+
+            // Étape 6: Notifying backend of meeting end...
+            console.log('Step 6: Notifying backend of meeting end...')
+            await Events.callEnded()
+            await Api.instance.endMeetingTrampoline().catch((e) => {
+                console.error('error in endMeetingTranpoline', e)
+            })
+
+            // Étape finale: Arrêt du transcriber
+            console.log('Step 7: Final cleanup...')
+            await WordsPoster.TRANSCRIBER?.stop()
+            this.meeting.meetingTimeoutInterval &&
+                clearTimeout(this.meeting.meetingTimeoutInterval)
             console.log('Meeting terminated successfully')
         } catch (error) {
             console.error('Fatal error during stopRecordingInternal:', error)
