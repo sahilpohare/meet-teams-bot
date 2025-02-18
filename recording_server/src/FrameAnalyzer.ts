@@ -163,22 +163,33 @@ export class FrameAnalyzer {
 
     public async getFramesDirectory(): Promise<string> {
         try {
-            const framesDir = !Logger.instance
-                ? path.join(os.tmpdir(), 'frames')
-                : path.join(
-                      path.dirname(Logger.instance.get_video_directory()),
-                      'frames',
-                  )
+            // Récupérer le chemin de base de la vidéo
+            const videoDir = Logger.instance?.get_video_directory();
+            console.log('Video directory:', videoDir);
 
-            // Create the frames directory if it doesn't exist
-            await fs.mkdir(framesDir, { recursive: true })
+            // Construire le chemin pour les frames
+            const framesDir = videoDir 
+                ? path.join(path.dirname(videoDir), 'frames')
+                : path.join(os.tmpdir(), 'frames');
+            
+            console.log('Frames will be written to:', framesDir);
 
-            return framesDir
+            // Créer le répertoire si nécessaire
+            await fs.mkdir(framesDir, { recursive: true });
+
+            // Vérifier que le répertoire existe et est accessible
+            const stats = await fs.stat(framesDir);
+            console.log('Frames directory stats:', {
+                path: framesDir,
+                mode: stats.mode.toString(8),
+                uid: stats.uid,
+                gid: stats.gid
+            });
+
+            return framesDir;
         } catch (err) {
-            const defaultFramesDir = path.join(os.tmpdir(), 'frames')
-            // Create the default frames directory if it doesn't exist
-            await fs.mkdir(defaultFramesDir, { recursive: true })
-            return defaultFramesDir
+            console.error('Error in getFramesDirectory:', err);
+            throw err;
         }
     }
 

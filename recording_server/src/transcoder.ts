@@ -87,44 +87,53 @@ class Transcoder {
                 console.error('Main FFmpeg process error:', err)
             })
 
-            // Processus séparé pour les frames (en arrière-plan)
+            // Processus séparé pour les frames
             try {
                 const frameAnalyzer = FrameAnalyzer.getInstance()
-                const framesDir = frameAnalyzer.getFramesDirectory()
+                const framesDir = await frameAnalyzer.getFramesDirectory()
+                console.log(`Using frames directory: ${framesDir}`)
 
                 const frameProcess = spawn(
                     'ffmpeg',
                     [
                         '-i',
-                        this.webmPath, // Lire depuis le fichier WebM
+                        this.webmPath,
                         '-vf',
                         'fps=1/2',
                         '-update',
                         '1',
+                        '-atomic_writing',
+                        '1',
                         '-y',
-                        path.join(await framesDir, 'temp_frame.jpg'),
+                        path.join(framesDir, 'temp_frame.jpg'),
                     ],
                     {
-                        stdio: 'ignore', // Ignorer toutes les sorties
-                        detached: true, // Processus détaché
+                        stdio: ['ignore', 'pipe', 'pipe'], // Changé pour capturer la sortie
                     },
                 )
 
-                // Ne pas attendre ce processus
+                // Capture des logs pour le debug
+                frameProcess.stdout?.on('data', (data) => {
+                    console.log('Frame FFmpeg stdout:', data.toString())
+                })
+
+                frameProcess.stderr?.on('data', (data) => {
+                    console.log('Frame FFmpeg stderr:', data.toString())
+                })
+
+                frameProcess.on('error', (err) => {
+                    console.error('Frame extraction process error:', err)
+                })
+
+                frameProcess.on('exit', (code) => {
+                    console.log(`Frame extraction process exited with code ${code}`)
+                })
+
+                // S'assurer que le processus continue en arrière-plan
                 frameProcess.unref()
 
-                // Gérer les erreurs silencieusement
-                frameProcess.on('error', (err) => {
-                    console.log(
-                        'Frame extraction process error (non-critical):',
-                        err,
-                    )
-                })
             } catch (frameErr) {
-                console.log(
-                    'Frame extraction setup failed (non-critical):',
-                    frameErr,
-                )
+                console.error('Frame extraction setup failed:', frameErr)
             }
 
             console.log('FFmpeg processes launched successfully')

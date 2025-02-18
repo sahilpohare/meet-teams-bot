@@ -67,6 +67,17 @@ export function getSpeakerFromDocument(
     timestamp: number,
 ): SpeakerData[] {
     try {
+        // Vérifier si la page est accessible/valide
+        const documentState = document.readyState;
+        const isPageEmpty = document.body.innerHTML.trim() === '';
+        
+        if (documentState !== 'complete' || isPageEmpty) {
+            console.log('[getSpeakerFromDocument] Page is frozen or empty');
+            // Retourner un tableau vide pour indiquer qu'il n'y a plus de speakers
+            // Cela déclenchera la condition de fin dans waitForEndMeeting
+            return [];
+        }
+
         console.log(
             '[getSpeakerFromDocument] - Starting participant detection...',
         )
@@ -80,6 +91,11 @@ export function getSpeakerFromDocument(
             '[getSpeakerFromDocument] - Found participants items:',
             participantItems.length,
         )
+
+        if (!participantItems || participantItems.length === 0) {
+            console.log('[getSpeakerFromDocument] No participants found - possible end of meeting');
+            return [];
+        }
 
         // Map to store unique participants with their speaking status
         const uniqueParticipants = new Map<
@@ -219,6 +235,7 @@ export function getSpeakerFromDocument(
             '[getSpeakerFromDocument] - Error in getSpeakerFromDocument:',
             e,
         )
+        // En cas d'erreur, on considère qu'il n'y a plus de speakers
         return []
     }
 }
