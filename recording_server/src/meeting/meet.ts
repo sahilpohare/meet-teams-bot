@@ -1,3 +1,4 @@
+import * as fs from 'fs/promises'
 import * as puppeteer from 'puppeteer'
 
 import { JoinError, JoinErrorCode } from '../meeting'
@@ -141,7 +142,40 @@ export class MeetProvider implements MeetingProviderInterface {
         cancellationToken: CancellationToken,
     ): Promise<boolean> {
         try {
+            // Vérifier si la page est gelée
+            let isPageFrozen = false;
+            try {
+                await Promise.race([
+                    page.evaluate(() => document.readyState),
+                    new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Page freeze timeout')), 30000)
+                    )
+                ])
+            } catch (e) {
+                console.log('Page appears to be frozen for 30 seconds')
+                isPageFrozen = true;
+            }
 
+            // Si la page est gelée, vérifier s'il y a des frames
+            if (isPageFrozen) {
+                const frameAnalyzer = FrameAnalyzer.getInstance()
+                const framesDir = await frameAnalyzer.getFramesDirectory()
+                
+                try {
+                    const files = await fs.readdir(framesDir)
+                    const hasFrames = files.some(file => file.endsWith('.jpg'))
+                    
+                    if (!hasFrames) {
+                        console.log('Page is frozen and no frames detected - meeting likely failed to start recording')
+                        return true
+                    }
+                } catch (e) {
+                    console.log('Failed to read frames directory, assuming no frames exist')
+                    return true
+                }
+            }
+
+            // Le reste des vérifications normales
             if (!page.isClosed()) {
                 try {
                     const elements = await page.$$('*')
@@ -166,10 +200,10 @@ export class MeetProvider implements MeetingProviderInterface {
                     console.log('Page access failed, falling back to OCR')
                 }
             }
-            console.log('OCR, trying to find end meeting')
-            // Si la page n'est pas accessible, utiliser l'OCR
-            const frameAnalyzer = FrameAnalyzer.getInstance()
 
+            // Vérification OCR
+            console.log('OCR, trying to find end meeting')
+            const frameAnalyzer = FrameAnalyzer.getInstance()
             const lastText = frameAnalyzer.getLastFrameText()
             if (
                 lastText?.includes("You've been removed") ||

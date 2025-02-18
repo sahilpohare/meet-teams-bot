@@ -16,7 +16,6 @@ import { Page } from 'puppeteer'
 
 import { Events } from './events'
 import { Logger } from './logger'
-import { meetingBotStartRecordFailed } from './main'
 import { MeetProvider } from './meeting/meet'
 import { TeamsProvider } from './meeting/teams'
 import { ZoomProvider } from './meeting/zoom'
@@ -306,14 +305,7 @@ export class MeetingHandle {
                                     `${error.message}, initiating shutdown sequence...`,
                                 )
                                 MeetingHandle.status.state = 'Cleanup'
-                                // On notifie juste le backend via Events et endMeetingTrampoline
-                                await meetingBotStartRecordFailed(
-                                    this.param.meeting_url,
-                                    this.param.bot_uuid,
-                                    error.message
-                                ).catch((e) => {
-                                    console.error('Failed to send error notification:', e)
-                                })
+
                                 await this.cleanEverything()
                                 throw error
                             }
@@ -364,97 +356,115 @@ export class MeetingHandle {
 
             // Étape 5: Setup de l'enregistrement
             listenPage(this.meeting.backgroundPage)
-            await Events.inCallNotRecording()
+            
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => {
+                    reject(new Error('Timeout: Recording sequence took more than 30 seconds'));
+                }, 30000);
+            });
 
-            // Démarrage du transcoder
-            await TRANSCODER.init(
-                process.env.AWS_S3_VIDEO_BUCKET,
-                this.param.mp4_s3_path,
-                CHUNK_DURATION,
-                TRANSCRIBE_DURATION,
-            ).catch((e) => {
-                console.error(`Cannot start Transcoder: ${e}`)
-            })
+            const recordingSequence = async () => {
+                await Events.inCallNotRecording()
+
+                // Démarrage du transcoder
+                await TRANSCODER.init(
+                    process.env.AWS_S3_VIDEO_BUCKET,
+                    this.param.mp4_s3_path,
+                    CHUNK_DURATION,
+                    TRANSCRIBE_DURATION,
+                ).catch((e) => {
+                    console.error(`Cannot start Transcoder: ${e}`)
+                })
 
             // Démarrage du WordPoster
             await WordsPoster.init(this.param).catch((e) => {
                 console.error(`Cannot start Transcriber: ${e}`)
             })
 
-            // Nettoyage du HTML
-            await this.meeting.backgroundPage.evaluate(
-                async (params) => {
-                    const w = window as any
-                    await w.remove_shitty_html(
-                        params.recording_mode,
-                        params.meetingProvider,
-                    )
-                },
-                {
-                    recording_mode: this.param.recording_mode,
-                    meetingProvider: this.param.meetingProvider,
-                },
-            )
-
-            await sleep(3000)
-
-            // Démarrage de l'enregistrement
-            let result: string | number =
+                // Nettoyage du HTML
                 await this.meeting.backgroundPage.evaluate(
-                    async (meuh) => {
-                        try {
-                            const w = window as any
-                            let res = await w.startRecording(
-                                meuh.local_recording_server_location,
-                                meuh.chunk_duration,
-                                meuh.streaming_output,
-                                meuh.streaming_audio_frequency,
-                            )
-                            return res as number
-                        } catch (error) {
-                            console.error(error)
-                            return error as string
-                        }
+                    async (params) => {
+                        const w = window as any
+                        await w.remove_shitty_html(
+                            params.recording_mode,
+                            params.meetingProvider,
+                        )
                     },
                     {
-                        local_recording_server_location:
-                            this.param.local_recording_server_location,
-                        chunk_duration: CHUNK_DURATION,
-                        streaming_output: this.param.streaming_output,
-                        streaming_audio_frequency:
-                            this.param.streaming_audio_frequency,
+                        recording_mode: this.param.recording_mode,
+                        meetingProvider: this.param.meetingProvider,
                     },
                 )
 
-            if (typeof result === 'number') {
-                console.info(`START_RECORDING_TIMESTAMP = ${result}`)
-                START_RECORDING_TIMESTAMP.set(result)
-            } else {
-                console.error(`Unexpected error: ${result}`)
-                throw new JoinError(JoinErrorCode.Internal)
+                await sleep(3000)
+
+                // Démarrage de l'enregistrement
+                let result: string | number =
+                    await this.meeting.backgroundPage.evaluate(
+                        async (meuh) => {
+                            try {
+                                const w = window as any
+                                let res = await w.startRecording(
+                                    meuh.local_recording_server_location,
+                                    meuh.chunk_duration,
+                                    meuh.streaming_output,
+                                    meuh.streaming_audio_frequency,
+                                )
+                                return res as number
+                            } catch (error) {
+                                console.error(error)
+                                return error as string
+                            }
+                        },
+                        {
+                            local_recording_server_location:
+                                this.param.local_recording_server_location,
+                            chunk_duration: CHUNK_DURATION,
+                            streaming_output: this.param.streaming_output,
+                            streaming_audio_frequency:
+                                this.param.streaming_audio_frequency,
+                        },
+                    )
+
+                if (typeof result === 'number') {
+                    console.info(`START_RECORDING_TIMESTAMP = ${result}`)
+                    START_RECORDING_TIMESTAMP.set(result)
+                } else {
+                    console.error(`Unexpected error: ${result}`)
+                    throw new JoinError(JoinErrorCode.Internal)
+                }
+
+                // Démarrage de l'observation des speakers
+                await this.meeting.backgroundPage.evaluate(
+                    async (params) => {
+                        const w = window as any
+                        await w.start_speakers_observer(
+                            params.recording_mode,
+                            params.bot_name,
+                            params.meetingProvider,
+                        )
+                    },
+                    {
+                        recording_mode: this.param.recording_mode,
+                        bot_name: this.param.bot_name,
+                        meetingProvider: this.param.meetingProvider,
+                    },
+                )
+
+                console.log('startRecording called')
+                
+                await Events.inCallRecording()
+                return // Succès !
             }
 
-            // Démarrage de l'observation des speakers
-            await this.meeting.backgroundPage.evaluate(
-                async (params) => {
-                    const w = window as any
-                    await w.start_speakers_observer(
-                        params.recording_mode,
-                        params.bot_name,
-                        params.meetingProvider,
-                    )
-                },
-                {
-                    recording_mode: this.param.recording_mode,
-                    bot_name: this.param.bot_name,
-                    meetingProvider: this.param.meetingProvider,
-                },
-            )
-
-            console.log('startRecording called')
-            
-            await Events.inCallRecording()
-            return // Succès !
+            try {
+                await Promise.race([recordingSequence(), timeoutPromise])
+            } catch (error) {
+                await new Promise((resolve) => setTimeout(resolve, 2000))
+                await this.cleanEverything()
+                MeetingHandle.status.error = error
+                throw error
+            }
         } catch (error) {
             await new Promise((resolve) => setTimeout(resolve, 2000))
             await this.cleanEverything()
