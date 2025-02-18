@@ -14,9 +14,9 @@ import {
 
 import { Page } from 'puppeteer'
 
-import { Api } from './api/methods'
 import { Events } from './events'
 import { Logger } from './logger'
+import { meetingBotStartRecordFailed } from './main'
 import { MeetProvider } from './meeting/meet'
 import { TeamsProvider } from './meeting/teams'
 import { ZoomProvider } from './meeting/zoom'
@@ -307,15 +307,13 @@ export class MeetingHandle {
                                 )
                                 MeetingHandle.status.state = 'Cleanup'
                                 // On notifie juste le backend via Events et endMeetingTrampoline
-                                await Events.callEnded()
-                                await Api.instance
-                                    .endMeetingTrampoline()
-                                    .catch((e) => {
-                                        console.error(
-                                            'error in endMeetingTranpoline',
-                                            e,
-                                        )
-                                    })
+                                await meetingBotStartRecordFailed(
+                                    this.param.meeting_url,
+                                    this.param.bot_uuid,
+                                    error.message
+                                ).catch((e) => {
+                                    console.error('Failed to send error notification:', e)
+                                })
                                 await this.cleanEverything()
                                 throw error
                             }
@@ -454,6 +452,7 @@ export class MeetingHandle {
             )
 
             console.log('startRecording called')
+            
             await Events.inCallRecording()
             return // Succès !
         } catch (error) {
@@ -635,13 +634,6 @@ export class MeetingHandle {
                 } as SpeakerData,
                 true,
             )
-
-            // Étape 6: Notifying backend of meeting end...
-            console.log('Step 6: Notifying backend of meeting end...')
-            await Events.callEnded()
-            await Api.instance.endMeetingTrampoline().catch((e) => {
-                console.error('error in endMeetingTranpoline', e)
-            })
 
             // Étape finale: Arrêt du transcriber
             console.log('Step 7: Final cleanup...')

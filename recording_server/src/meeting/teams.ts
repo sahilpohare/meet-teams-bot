@@ -166,6 +166,7 @@ export class TeamsProvider implements MeetingProviderInterface {
         _meetingParams: MeetingParams,
         page: Page,
         _cancellationToken: CancellationToken,
+        isRecording?: boolean,
     ): Promise<boolean> {
         return await isRemovedFromTheMeeting(page)
     }

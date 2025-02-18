@@ -305,7 +305,16 @@ async function tryOpenBrowser(
             '--ignore-certificate-errors',
             '--ignore-ssl-errors',
             '--allow-insecure-localhost',
+            '--disable-web-security',
+            '--disable-features=IsolateOrigins,site-per-process',
             '--unsafely-treat-insecure-origin-as-secure=http://localhost:3005',
+
+//TODO: put in playvrite
+            // '--disable-rtc-smoothness-algorithm',
+            // '--disable-webrtc-hw-decoding',
+            // '--disable-webrtc-hw-encoding',
+            // '--disable-blink-features=AutomationControlled',
+            // '--disable-setuid-sandbox'
         ],
         headless: false,
         devtools: false,

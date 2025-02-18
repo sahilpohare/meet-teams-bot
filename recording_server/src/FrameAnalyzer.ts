@@ -161,17 +161,24 @@ export class FrameAnalyzer {
         return [...this.framesOcrResults]
     }
 
-    public getFramesDirectory(): string {
+    public async getFramesDirectory(): Promise<string> {
         try {
-            if (!Logger.instance) {
-                return path.join(os.tmpdir(), 'frames')
-            }
-            return path.join(
-                path.dirname(Logger.instance.get_video_directory()),
-                'frames',
-            )
+            const framesDir = !Logger.instance
+                ? path.join(os.tmpdir(), 'frames')
+                : path.join(
+                      path.dirname(Logger.instance.get_video_directory()),
+                      'frames',
+                  )
+            
+            // Create the frames directory if it doesn't exist
+            await fs.mkdir(framesDir, { recursive: true })
+            
+            return framesDir
         } catch (err) {
-            return path.join(os.tmpdir(), 'frames')
+            const defaultFramesDir = path.join(os.tmpdir(), 'frames')
+            // Create the default frames directory if it doesn't exist
+            await fs.mkdir(defaultFramesDir, { recursive: true })
+            return defaultFramesDir
         }
     }
 

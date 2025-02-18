@@ -141,6 +141,7 @@ export class MeetProvider implements MeetingProviderInterface {
         cancellationToken: CancellationToken,
     ): Promise<boolean> {
         try {
+
             if (!page.isClosed()) {
                 try {
                     const elements = await page.$$('*')

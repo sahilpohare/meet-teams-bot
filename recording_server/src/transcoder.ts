@@ -102,7 +102,7 @@ class Transcoder {
                         '-update',
                         '1',
                         '-y',
-                        path.join(framesDir, 'temp_frame.jpg'),
+                        path.join(await framesDir, 'temp_frame.jpg'),
                     ],
                     {
                         stdio: 'ignore', // Ignorer toutes les sorties

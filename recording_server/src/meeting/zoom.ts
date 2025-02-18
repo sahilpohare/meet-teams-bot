@@ -1,6 +1,5 @@
 import * as puppeteer from 'puppeteer'
 
-import { JoinError, JoinErrorCode } from '../meeting'
 import {
     CancellationToken,
     MeetingParams,
@@ -10,8 +9,8 @@ import {
 
 import { Page } from 'puppeteer'
 import { URL } from 'url'
-import { sleep } from '../utils'
 import { parseMeetingUrlFromJoinInfos } from '../urlParser/zoomUrlParser'
+import { sleep } from '../utils'
 
 let IS_ZOOOM_RECORDING_APPROVED: RecordingApprovalState =
     RecordingApprovalState.WAITING
@@ -117,6 +116,7 @@ export class ZoomProvider implements MeetingProviderInterface {
         meetingParams: MeetingParams,
         page: Page,
         cancellationToken: CancellationToken,
+        isRecording?: boolean,
     ): Promise<boolean> {
         //TODO COMUNICATE WITH THE SERVER TO FIND THE END MEETING BUTTON
         return false
