@@ -514,8 +514,6 @@ export class MeetingHandle {
         await this.waitForEndMeeting()
 
         console.log('after waitForEndMeeting')
-        await Events.callEnded()
-
         await MeetingHandle.stopAudioStreaming()
 
         await this.stopRecordingInternal().catch((e) => {
