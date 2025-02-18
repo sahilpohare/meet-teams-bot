@@ -53,10 +53,21 @@ export class WordsPoster {
 
     // Initialize and start the transcriber.
     public static async init(params: MeetingParams): Promise<void> {
+        console.log('[WordsPoster] Initializing with params:', {
+            bot_uuid: params.bot_uuid,
+            provider: params.speech_to_text_provider,
+        })
+        if (WordsPoster.TRANSCRIBER) {
+            console.warn('[WordsPoster] Transcriber already initialized!')
+            return
+        }
         try {
             WordsPoster.TRANSCRIBER = new WordsPoster(params)
+            console.log(
+                '[WordsPoster] Successfully initialized new transcriber',
+            )
         } catch (e) {
-            console.error('error creating transcriber', e)
+            console.error('[WordsPoster] Error creating transcriber:', e)
             throw e
         }
     }
@@ -121,6 +132,9 @@ export class WordsPoster {
         timeStart: number,
         timeEnd: number,
     ): Promise<void> {
+        console.log(
+            `[WordsPoster] Starting transcribe for ${timeStart}-${timeEnd}`,
+        )
         let api = Api.instance
         console.log(
             `[WordsPoster] Begin transcription process ${timeStart}-${timeEnd}`,
@@ -167,9 +181,12 @@ export class WordsPoster {
             console.log(
                 `[WordsPoster] Got transcription with ${words.length} words for ${timeStart}-${timeEnd}`,
             )
+            console.log(
+                `[WordsPoster] About to post words to DB for ${timeStart}-${timeEnd}`,
+            )
             await api.postWords(words, bot.bot.id)
             console.log(
-                `[WordsPoster] Successfully saved words to DB ${timeStart}-${timeEnd}`,
+                `[WordsPoster] Successfully posted words to DB for ${timeStart}-${timeEnd}`,
             )
         } catch (error) {
             console.error(

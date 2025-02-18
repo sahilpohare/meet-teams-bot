@@ -288,7 +288,6 @@ class Transcoder {
                         timeEnd,
                     )
                     if (transcriptionPromise) {
-                        // Wrap la promesse pour la gestion d'erreur
                         const wrappedPromise = transcriptionPromise
                             .catch((error) => {
                                 console.error(
