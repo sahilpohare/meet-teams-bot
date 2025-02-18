@@ -1,5 +1,5 @@
-import { ApiTypes } from './api/types'
 import { Api } from './api/methods'
+import { ApiTypes } from './api/types'
 
 import { SpeakerData } from './types'
 
@@ -24,9 +24,19 @@ function newTranscriptQueue() {
 // IMPORTANT : For reasons of current compatibility, this function is only called
 // with a single speaker and not an array of multiple speakers. Handling multiple
 // speakers should be implemented at some point.
-export async function uploadTranscriptTask(speaker: SpeakerData, end: boolean) {
-    TRANSCRIPT_QUEUE.push(async () => {
-        await upload(speaker, end)
+export async function uploadTranscriptTask(
+    speaker: SpeakerData,
+    end: boolean,
+): Promise<void> {
+    return new Promise((resolve, reject) => {
+        TRANSCRIPT_QUEUE.push(async () => {
+            try {
+                await upload(speaker, end)
+                resolve()
+            } catch (error) {
+                reject(error)
+            }
+        })
     })
 }
 

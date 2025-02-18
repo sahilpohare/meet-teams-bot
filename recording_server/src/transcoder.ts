@@ -126,12 +126,13 @@ class Transcoder {
                 })
 
                 frameProcess.on('exit', (code) => {
-                    console.log(`Frame extraction process exited with code ${code}`)
+                    console.log(
+                        `Frame extraction process exited with code ${code}`,
+                    )
                 })
 
                 // S'assurer que le processus continue en arrière-plan
                 frameProcess.unref()
-
             } catch (frameErr) {
                 console.error('Frame extraction setup failed:', frameErr)
             }
@@ -281,21 +282,33 @@ class Transcoder {
                 this.transcribeDuration / this.chunkDuration
             console.log(`Chunks per transcribe: ${chunksPerTranscribe}`)
 
+            // Garder trace des segments déjà traités
+            const processedSegments = new Set<string>()
+
             if (!isFinal) {
-                // Recording is in process...
                 if (this.chunkReceavedCounter % chunksPerTranscribe === 0) {
                     const timeStart =
                         (this.chunkReceavedCounter - chunksPerTranscribe) *
                         this.chunkDuration
                     const timeEnd = timeStart + this.transcribeDuration
+                    const segmentKey = `${timeStart}-${timeEnd}`
+
+                    if (processedSegments.has(segmentKey)) {
+                        console.log(`Skipping duplicate segment ${segmentKey}`)
+                        return
+                    }
+
                     console.log(
                         `Requesting transcription for segment ${timeStart}ms to ${timeEnd}ms`,
                     )
+
+                    processedSegments.add(segmentKey)
 
                     const transcriptionPromise = WordsPoster.TRANSCRIBER?.push(
                         timeStart,
                         timeEnd,
                     )
+
                     if (transcriptionPromise) {
                         const wrappedPromise = transcriptionPromise
                             .catch((error) => {
@@ -303,7 +316,7 @@ class Transcoder {
                                     `Transcription failed for segment ${timeStart}-${timeEnd}:`,
                                     error,
                                 )
-                                // Retirer la promesse du tableau
+                                processedSegments.delete(segmentKey)
                                 this.currentTranscriptionPromises =
                                     this.currentTranscriptionPromises.filter(
                                         (p) => p !== wrappedPromise,
@@ -314,7 +327,6 @@ class Transcoder {
                                 console.log(
                                     `Transcription completed for segment ${timeStart}-${timeEnd}`,
                                 )
-                                // Retirer la promesse du tableau après succès
                                 this.currentTranscriptionPromises =
                                     this.currentTranscriptionPromises.filter(
                                         (p) => p !== wrappedPromise,
@@ -328,50 +340,32 @@ class Transcoder {
                     }
                 }
             } else {
-                // Recording has stopped - handle final segment
                 console.log(
-                    `Processing final chunk. Waiting for ${this.currentTranscriptionPromises.length} pending transcriptions...`,
+                    'Processing final chunk. Waiting for pending transcriptions...',
                 )
+                await Promise.all(this.currentTranscriptionPromises)
 
-                // Attendre toutes les transcriptions en cours
-                if (this.currentTranscriptionPromises.length > 0) {
-                    const results = await Promise.allSettled(
-                        this.currentTranscriptionPromises,
-                    )
-                    results.forEach((result, index) => {
-                        if (result.status === 'rejected') {
-                            console.error(
-                                `Transcription ${index} failed:`,
-                                result.reason,
-                            )
-                        } else {
-                            console.log(
-                                `Transcription ${index} completed successfully`,
-                            )
-                        }
-                    })
-                }
-
+                const lastProcessedSegment =
+                    Math.floor(
+                        this.chunkReceavedCounter / chunksPerTranscribe,
+                    ) * chunksPerTranscribe
                 const remainingChunks =
-                    this.chunkReceavedCounter % chunksPerTranscribe
-                console.log(
-                    `Final segment calculation: remainingChunks=${remainingChunks}, total chunks=${this.chunkReceavedCounter}`,
-                )
+                    this.chunkReceavedCounter - lastProcessedSegment
 
                 if (remainingChunks > 0) {
-                    const timeStart =
-                        (this.chunkReceavedCounter - remainingChunks) *
-                        this.chunkDuration
+                    const timeStart = lastProcessedSegment * this.chunkDuration
                     const timeEnd =
                         this.chunkReceavedCounter * this.chunkDuration
+
                     console.log(
                         `Requesting final transcription from ${timeStart}ms to ${timeEnd}ms`,
                     )
-
-                    const finalTranscriptionPromise =
-                        WordsPoster.TRANSCRIBER?.push(timeStart, timeEnd)
-                    if (finalTranscriptionPromise) {
-                        await finalTranscriptionPromise.catch((error) => {
+                    const transcriptionPromise = WordsPoster.TRANSCRIBER?.push(
+                        timeStart,
+                        timeEnd,
+                    )
+                    if (transcriptionPromise) {
+                        await transcriptionPromise.catch((error) => {
                             console.error('Final transcription failed:', error)
                             throw error
                         })
@@ -561,7 +555,12 @@ class Transcoder {
         timeStart: number,
         timeEnd: number,
     ): Promise<void> {
-        console.log('Running audio extraction...')
+        console.log('Running audio extraction...', {
+            timeStart,
+            timeEnd,
+            webmPath: this.webmPath,
+            outputPath: outputAudioPath,
+        })
 
         // Conversion des millisecondes en secondes avec précision
         const startSeconds = (timeStart / 1000).toFixed(3)
@@ -569,24 +568,31 @@ class Transcoder {
 
         return new Promise(async (resolve, reject) => {
             try {
-                const ffmpegArgs = [
-                    '-y', // Écraser les fichiers de sortie si existants
-                    '-ss', // Position de départ
-                    startSeconds, // En secondes
-                    '-i', // Fichier d'entrée
-                    this.webmPath,
-                    '-t', // Durée de l'extrait
-                    durationSeconds, // En secondes
+                // Vérifier d'abord que le fichier webm existe et n'est pas vide
+                const webmStats = await fs.stat(this.webmPath)
+                if (webmStats.size === 0) {
+                    console.error('Source WebM file is empty')
+                    reject(new Error('Source WebM file is empty'))
+                    return
+                }
+                console.log(`Source WebM file size: ${webmStats.size} bytes`)
 
-                    // Output 1: Audio
+                const ffmpegArgs = [
+                    '-y',
+                    '-ss',
+                    startSeconds,
+                    '-i',
+                    this.webmPath,
+                    '-t',
+                    durationSeconds,
                     '-map',
-                    '0:a', // Sélectionner la piste audio
-                    '-acodec', // Codec audio
-                    'pcm_s16le', // Format WAV standard
-                    '-ac', // Nombre de canaux
-                    '1', // Mono
-                    '-ar', // Taux d'échantillonnage
-                    '16000', // 16kHz
+                    '0:a',
+                    '-acodec',
+                    'pcm_s16le',
+                    '-ac',
+                    '1',
+                    '-ar',
+                    '16000',
                     outputAudioPath,
                 ]
                 console.log('FFmpeg extraction command:', ffmpegArgs.join(' '))
@@ -609,14 +615,16 @@ class Transcoder {
                 child.on('close', async (code) => {
                     if (code === 0) {
                         try {
-                            // Vérification de la taille du fichier
                             const stats = await fs.stat(outputAudioPath)
                             console.log(
-                                `Audio extraction completed successfully. File size: ${stats.size} bytes`,
+                                `Audio extraction completed. File size: ${stats.size} bytes`,
                             )
 
-                            if (stats.size === 0) {
-                                console.error('Generated audio file is empty')
+                            // Un fichier WAV vide fait environ 44 bytes (en-tête WAV)
+                            if (stats.size <= 44) {
+                                console.error(
+                                    'Generated audio file is empty (only header)',
+                                )
                                 reject(
                                     new Error('Generated audio file is empty'),
                                 )
@@ -630,26 +638,11 @@ class Transcoder {
                         }
                     } else {
                         console.error('FFmpeg extraction output:', output)
-                        if (output.includes('File ended prematurely at pos.')) {
-                            try {
-                                await fs.unlink(outputAudioPath)
-                                console.log(
-                                    'Output file deleted due to premature termination',
-                                )
-                            } catch (err) {
-                                console.error(
-                                    'Error deleting the output file:',
-                                    err,
-                                )
-                            }
-                            reject(new Error('The file terminated prematurely'))
-                        } else {
-                            reject(
-                                new Error(
-                                    `Audio extraction failed with code ${code}`,
-                                ),
-                            )
-                        }
+                        reject(
+                            new Error(
+                                `Audio extraction failed with code ${code}: ${output}`,
+                            ),
+                        )
                     }
                 })
             } catch (error) {

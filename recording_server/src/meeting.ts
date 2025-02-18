@@ -541,11 +541,17 @@ export class MeetingHandle {
         )
 
         while (MeetingHandle.status.state === 'Recording') {
-            console.log('Checking for meeting end...');
             let now = Date.now()
-            
-            try {
-                const endMeetingResult = await this.provider
+            // console.log(
+            //     'number of attendees',
+            //     NUMBER_OF_ATTENDEES.get(),
+            //     'no speaker ',
+            //     NO_SPEAKER_THRESHOLD < now,
+            //     'FIRST_USER_JOINED',
+            //     FIRST_USER_JOINED.get(),
+            // )
+            if (
+                await this.provider
                     .findEndMeeting(
                         this.param,
                         this.meeting.page!,
@@ -553,54 +559,34 @@ export class MeetingHandle {
                     )
                     .catch((e) => {
                         console.error(`findEndMeeting crashed with error: ${e}`)
-                        return null;
-                    });
-                
-                console.log('findEndMeeting result:', endMeetingResult);
-                
-                if (endMeetingResult === null) {
-                    console.error('findEndMeeting failed, stopping recording');
-                    await this.stopRecording('findEndMeeting failed');
-                    break;
-                }
-
-                if (endMeetingResult) {
-                    console.log('findEndMeeting triggered')
-                    await this.stopRecording('Bot removed')
-                    break;
-                }
-
-                if (
-                    (NUMBER_OF_ATTENDEES.get() === 0 &&
-                        START_RECORDING_TIMESTAMP.get() + NO_SPEAKER_THRESHOLD <
-                            now) ||
-                    (NUMBER_OF_ATTENDEES.get() === 0 && FIRST_USER_JOINED.get())
-                ) {
-                    await this.stopRecording('no attendees')
-                    break;
-                } else if (
-                    START_RECORDING_TIMESTAMP.get() !== null &&
-                    START_RECORDING_TIMESTAMP.get() + NO_SPEAKER_THRESHOLD < now &&
-                    NO_SPEAKER_DETECTED_TIMESTAMP.get() !== null &&
-                    NO_SPEAKER_DETECTED_TIMESTAMP.get() +
-                        NO_SPEAKER_DETECTED_TIMEOUT <
-                        now
-                ) {
-                    await this.stopRecording('no speaker detected timeout')
-                    break;
-                } else {
-                    console.log(
-                        '[waiting for end meeting] no speaker detected timestamp',
-                        START_RECORDING_TIMESTAMP.get(),
-                        NO_SPEAKER_DETECTED_TIMESTAMP.get(),
-                    )
-                    console.log('[waiting for end meeting] meeting not ended')
-                    await sleep(FIND_END_MEETING_SLEEP)
-                }
-            } catch (e) {
-                console.error('Critical error in waitForEndMeeting:', e);
-                await this.stopRecording('Error in waitForEndMeeting');
-                break;
+                    })
+            ) {
+                console.log('findEndMeeting triggered')
+                await this.stopRecording('Bot removed')
+            } else if (
+                (NUMBER_OF_ATTENDEES.get() === 0 &&
+                    START_RECORDING_TIMESTAMP.get() + NO_SPEAKER_THRESHOLD <
+                        now) ||
+                (NUMBER_OF_ATTENDEES.get() === 0 && FIRST_USER_JOINED.get())
+            ) {
+                await this.stopRecording('no attendees')
+            } else if (
+                START_RECORDING_TIMESTAMP.get() !== null &&
+                START_RECORDING_TIMESTAMP.get() + NO_SPEAKER_THRESHOLD < now &&
+                NO_SPEAKER_DETECTED_TIMESTAMP.get() !== null &&
+                NO_SPEAKER_DETECTED_TIMESTAMP.get() +
+                    NO_SPEAKER_DETECTED_TIMEOUT <
+                    now
+            ) {
+                await this.stopRecording('no speaker detected timeout')
+            } else {
+                console.log(
+                    '[waiting for end meeting] no speaker detected timestamp',
+                    START_RECORDING_TIMESTAMP.get(),
+                    NO_SPEAKER_DETECTED_TIMESTAMP.get(),
+                )
+                console.log('[waiting for end meeting] meeting not ended')
+                await sleep(FIND_END_MEETING_SLEEP)
             }
         }
     }
@@ -634,12 +620,14 @@ export class MeetingHandle {
         try {
             console.log('Starting recording shutdown sequence...')
 
-            // Étape 1: Arrêter d'abord le media recorder
+            // Étape 1: Arrêter le media recorder
             console.log('Step 1: Stopping media recorder...')
             try {
                 await this.meeting.backgroundPage?.evaluate(() =>
                     (window as any).stopMediaRecorder?.(),
                 )
+                // Attendre que le dernier chunk soit traité
+                await new Promise((resolve) => setTimeout(resolve, 1000))
             } catch (e) {
                 console.error('stopMediaRecorder error:', e)
             }
@@ -656,12 +644,16 @@ export class MeetingHandle {
                 console.error('Browser kill error:', e)
             }
 
-            // Étape 4: Arrêter que le transcoder termine son traitement
+            // Étape 4: Attendre que le transcoder termine son traitement
             console.log('Step 4: Stopping transcoder and uploading video...')
             await TRANSCODER.stop()
 
-            // Étape 5: Upload de la dernière transcription
-            console.log('Step 5: Uploading final transcript...')
+            // Étape 5: Attendre que WordsPoster finisse de traiter sa queue
+            console.log('Step 5: Waiting for WordsPoster to finish...')
+            await WordsPoster.TRANSCRIBER?.stop()
+
+            // Étape 6: Upload de la dernière transcription
+            console.log('Step 6: Uploading final transcript...')
             await uploadTranscriptTask(
                 {
                     name: 'END',
@@ -672,9 +664,6 @@ export class MeetingHandle {
                 true,
             )
 
-            // Étape finale: Arrêt du transcriber
-            console.log('Step 7: Final cleanup...')
-            await WordsPoster.TRANSCRIBER?.stop()
             this.meeting.meetingTimeoutInterval &&
                 clearTimeout(this.meeting.meetingTimeoutInterval)
             console.log('Meeting terminated successfully')

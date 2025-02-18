@@ -38,6 +38,7 @@ export class WordsPoster {
 
     private stopped = false
     private transcribeQueue: asyncLib.QueueObject<() => void>
+    private processedSegments: Set<string> = new Set()
 
     // Returns a new `WordsPoster`.
     private constructor(params: MeetingParams) {
@@ -74,26 +75,42 @@ export class WordsPoster {
 
     // Request e new Transcribe
     public async push(timeStart: number, timeEnd: number): Promise<void> {
-        console.log(
-            `[WordsPoster] Queuing transcription task ${timeStart}-${timeEnd}`,
-        )
+        const segmentKey = `${timeStart}-${timeEnd}`
+
+        if (this.processedSegments.has(segmentKey)) {
+            console.log(
+                `[WordsPoster] Skipping duplicate segment ${segmentKey}`,
+            )
+            return Promise.resolve()
+        }
+
+        console.log(`[WordsPoster] Queuing transcription task ${segmentKey}`)
+
         return new Promise((resolve, reject) => {
             this.transcribeQueue.push(async () => {
-                console.log(
-                    `[WordsPoster] Starting transcription ${timeStart}-${timeEnd}`,
-                )
+                if (this.processedSegments.has(segmentKey)) {
+                    console.log(
+                        `[WordsPoster] Skipping duplicate segment ${segmentKey} (double-check)`,
+                    )
+                    resolve()
+                    return
+                }
+
                 try {
+                    this.processedSegments.add(segmentKey)
+
                     await WordsPoster.TRANSCRIBER?.transcribe(
                         timeStart,
                         timeEnd,
                     )
                     console.log(
-                        `[WordsPoster] Transcription completed ${timeStart}-${timeEnd}`,
+                        `[WordsPoster] Transcription completed ${segmentKey}`,
                     )
                     resolve()
                 } catch (error) {
+                    this.processedSegments.delete(segmentKey)
                     console.error(
-                        `[WordsPoster] Transcription failed ${timeStart}-${timeEnd}:`,
+                        `[WordsPoster] Transcription failed ${segmentKey}:`,
                         error,
                     )
                     reject(error)
