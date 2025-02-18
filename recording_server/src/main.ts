@@ -20,6 +20,7 @@ import { TRANSCODER } from './transcoder'
 import { MeetingParams } from './types'
 
 import { spawn } from 'child_process'
+import { Events } from './events'
 
 const ZOOM_SDK_DEBUG_EXECUTABLE_PATHNAME = './target/debug/client'
 const ZOOM_SDK_RELEASE_EXECUTABLE_PATHNAME = './target/release/client'
@@ -313,14 +314,18 @@ async function handleErrorInStartRecording(error: Error, data: MeetingParams) {
     if (error instanceof JoinError) {
         console.error('a join error occurred while starting recording', error)
     } else {
-        console.error(
-            'an internal error occurred while starting recording',
-            error,
-        )
+        console.error('an internal error occurred while starting recording', error)
     }
 
-    // Non-blocking call pour notifier l'erreur
-    meetingBotStartRecordFailed(
+    // Ensure we send call ended event before the error notification
+    try {
+        Events.callEnded()
+    } catch (e) {
+        console.error('Failed to send call ended event:', e)
+    }
+
+    // Then send the error notification
+    await meetingBotStartRecordFailed(
         data.meeting_url,
         data.bot_uuid,
         error instanceof JoinError ? error.message : JoinErrorCode.Internal,
