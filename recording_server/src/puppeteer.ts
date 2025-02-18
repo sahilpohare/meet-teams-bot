@@ -309,7 +309,7 @@ async function tryOpenBrowser(
             '--disable-features=IsolateOrigins,site-per-process',
             '--unsafely-treat-insecure-origin-as-secure=http://localhost:3005',
 
-//TODO: put in playvrite
+            //TODO: put in playvrite
             // '--disable-rtc-smoothness-algorithm',
             // '--disable-webrtc-hw-decoding',
             // '--disable-webrtc-hw-encoding',

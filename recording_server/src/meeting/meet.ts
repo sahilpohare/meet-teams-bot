@@ -143,34 +143,43 @@ export class MeetProvider implements MeetingProviderInterface {
     ): Promise<boolean> {
         try {
             // Vérifier si la page est gelée
-            let isPageFrozen = false;
+            let isPageFrozen = false
             try {
                 await Promise.race([
                     page.evaluate(() => document.readyState),
-                    new Promise((_, reject) => 
-                        setTimeout(() => reject(new Error('Page freeze timeout')), 30000)
-                    )
+                    new Promise((_, reject) =>
+                        setTimeout(
+                            () => reject(new Error('Page freeze timeout')),
+                            30000,
+                        ),
+                    ),
                 ])
             } catch (e) {
                 console.log('Page appears to be frozen for 30 seconds')
-                isPageFrozen = true;
+                isPageFrozen = true
             }
 
             // Si la page est gelée, vérifier s'il y a des frames
             if (isPageFrozen) {
                 const frameAnalyzer = FrameAnalyzer.getInstance()
                 const framesDir = await frameAnalyzer.getFramesDirectory()
-                
+
                 try {
                     const files = await fs.readdir(framesDir)
-                    const hasFrames = files.some(file => file.endsWith('.jpg'))
-                    
+                    const hasFrames = files.some((file) =>
+                        file.endsWith('.jpg'),
+                    )
+
                     if (!hasFrames) {
-                        console.log('Page is frozen and no frames detected - meeting likely failed to start recording')
+                        console.log(
+                            'Page is frozen and no frames detected - meeting likely failed to start recording',
+                        )
                         return true
                     }
                 } catch (e) {
-                    console.log('Failed to read frames directory, assuming no frames exist')
+                    console.log(
+                        'Failed to read frames directory, assuming no frames exist',
+                    )
                     return true
                 }
             }
@@ -185,6 +194,9 @@ export class MeetProvider implements MeetingProviderInterface {
                         )
                         if (
                             text?.includes("You've been removed") ||
+                            text?.includes(
+                                'we encountered a problem joining',
+                            ) ||
                             text?.includes('The call ended') ||
                             text?.includes('Return to home') ||
                             text?.includes('The call ended')
@@ -207,6 +219,7 @@ export class MeetProvider implements MeetingProviderInterface {
             const lastText = frameAnalyzer.getLastFrameText()
             if (
                 lastText?.includes("You've been removed") ||
+                lastText?.includes('we encountered a problem joining') ||
                 lastText?.includes('The call ended') ||
                 lastText?.includes('Return to home')
             ) {
@@ -333,6 +346,10 @@ async function notAcceptedInMeeting(page: Page): Promise<boolean> {
                 if (elem.innerText && typeof elem.innerText === 'string') {
                     if (
                         elem.innerText.includes('denied') ||
+                        elem.innerText.includes("You've been removed") ||
+                        elem.innerText.includes(
+                            'we encountered a problem joining',
+                        ) ||
                         elem.innerText.includes("You can't join")
                     ) {
                         console.log('XXXXXXXXXXXXXXXXXX User has denied entry')

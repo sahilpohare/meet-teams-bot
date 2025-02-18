@@ -236,7 +236,9 @@ logger.info('version 0.0.1')
                 console.error('Cannot upload video to S3: ', e)
             })
             if (meeting_succesful) {
-                console.log(`${Date.now()} Finalize project && Sending WebHook complete`)
+                console.log(
+                    `${Date.now()} Finalize project && Sending WebHook complete`,
+                )
                 await Api.instance.endMeetingTrampoline().catch((e) => {
                     console.error('error in endMeetingTranpoline', e)
                 })
@@ -246,7 +248,7 @@ logger.info('version 0.0.1')
                     meetingUrl: consumeResult.params.meeting_url,
                     botUuid: consumeResult.params.bot_uuid,
                     success: false,
-                    errorMessage: 'Recording failed to complete'
+                    errorMessage: 'Recording failed to complete',
                 })
             }
         } else {
@@ -303,7 +305,7 @@ logger.info('version 0.0.1')
                     meetingUrl: consumeResult.params.meeting_url,
                     botUuid: consumeResult.params.bot_uuid,
                     success: false,
-                    errorMessage: 'Zoom client error'
+                    errorMessage: 'Zoom client error',
                 })
             }
         }
@@ -325,12 +327,12 @@ logger.info('version 0.0.1')
     }
 })()
 
-let webhookSent = false;
+let webhookSent = false
 
 async function sendWebhookOnce(params: {
-    meetingUrl: string,
-    botUuid: string,
-    success: boolean,
+    meetingUrl: string
+    botUuid: string
+    success: boolean
     errorMessage?: string
 }) {
     if (webhookSent) {
@@ -340,15 +342,15 @@ async function sendWebhookOnce(params: {
 
     try {
         Events.callEnded()
-        
+
         if (!params.success) {
             await meetingBotStartRecordFailed(
                 params.meetingUrl,
                 params.botUuid,
-                params.errorMessage || 'Unknown error'
+                params.errorMessage || 'Unknown error',
             )
         }
-        
+
         webhookSent = true
     } catch (e) {
         console.error('Failed to send webhook:', e)
@@ -361,14 +363,18 @@ async function handleErrorInStartRecording(error: Error, data: MeetingParams) {
     if (error instanceof JoinError) {
         console.error('a join error occurred while starting recording', error)
     } else {
-        console.error('an internal error occurred while starting recording', error)
+        console.error(
+            'an internal error occurred while starting recording',
+            error,
+        )
     }
 
     await sendWebhookOnce({
         meetingUrl: data.meeting_url,
         botUuid: data.bot_uuid,
         success: false,
-        errorMessage: error instanceof JoinError ? error.message : JoinErrorCode.Internal
+        errorMessage:
+            error instanceof JoinError ? error.message : JoinErrorCode.Internal,
     })
 }
 

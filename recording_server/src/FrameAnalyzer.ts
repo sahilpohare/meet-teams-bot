@@ -169,10 +169,10 @@ export class FrameAnalyzer {
                       path.dirname(Logger.instance.get_video_directory()),
                       'frames',
                   )
-            
+
             // Create the frames directory if it doesn't exist
             await fs.mkdir(framesDir, { recursive: true })
-            
+
             return framesDir
         } catch (err) {
             const defaultFramesDir = path.join(os.tmpdir(), 'frames')

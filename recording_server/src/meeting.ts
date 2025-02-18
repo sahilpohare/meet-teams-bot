@@ -356,12 +356,16 @@ export class MeetingHandle {
 
             // Étape 5: Setup de l'enregistrement
             listenPage(this.meeting.backgroundPage)
-            
+
             const timeoutPromise = new Promise((_, reject) => {
                 setTimeout(() => {
-                    reject(new Error('Timeout: Recording sequence took more than 30 seconds'));
-                }, 30000);
-            });
+                    reject(
+                        new Error(
+                            'Timeout: Recording sequence took more than 30 seconds',
+                        ),
+                    )
+                }, 30000)
+            })
 
             const recordingSequence = async () => {
                 await Events.inCallNotRecording()
@@ -376,10 +380,10 @@ export class MeetingHandle {
                     console.error(`Cannot start Transcoder: ${e}`)
                 })
 
-            // Démarrage du WordPoster
-            await WordsPoster.init(this.param).catch((e) => {
-                console.error(`Cannot start Transcriber: ${e}`)
-            })
+                // Démarrage du WordPoster
+                await WordsPoster.init(this.param).catch((e) => {
+                    console.error(`Cannot start Transcriber: ${e}`)
+                })
 
                 // Nettoyage du HTML
                 await this.meeting.backgroundPage.evaluate(
@@ -452,7 +456,7 @@ export class MeetingHandle {
                 )
 
                 console.log('startRecording called')
-                
+
                 await Events.inCallRecording()
                 return // Succès !
             }
@@ -463,13 +467,15 @@ export class MeetingHandle {
                 await new Promise((resolve) => setTimeout(resolve, 2000))
                 await this.cleanEverything()
                 MeetingHandle.status.error = error
-                throw error
+                throw new JoinError(JoinErrorCode.Internal)
             }
         } catch (error) {
             await new Promise((resolve) => setTimeout(resolve, 2000))
             await this.cleanEverything()
             MeetingHandle.status.error = error
-            throw error
+            throw error instanceof JoinError
+                ? error
+                : new JoinError(JoinErrorCode.Internal)
         }
     }
 
@@ -523,6 +529,9 @@ export class MeetingHandle {
         console.log('before cleanEverything')
         await this.cleanEverything()
         console.log('after cleanEverything')
+
+        // Retourner false si le meeting s'est terminé à cause d'une erreur
+        return !MeetingHandle.status.error
     }
 
     private async waitForEndMeeting() {
@@ -593,6 +602,12 @@ export class MeetingHandle {
             exit_reason: reason,
             newState: MeetingHandle.status.state,
         })
+
+        // Ajout d'une propriété pour tracker la raison de l'arrêt
+        MeetingHandle.status.error =
+            reason === 'Bot removed'
+                ? new Error('Meeting failed to start recording properly')
+                : null
 
         await this.stopRecordingInternal().catch((e) => {
             console.error(`Failed to stop recording: ${e}`)
