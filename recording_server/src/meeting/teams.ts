@@ -612,12 +612,19 @@ async function ensurePageLoaded(
         return true
     } catch (error) {
         try {
-            Logger.instance.screenshot(page, 'page_not_loaded_' + Date.now())
+            // Ajout d'un timeout sur la prise de screenshot
+            await Promise.race([
+                Logger.instance.screenshot(page, 'page_not_loaded_' + Date.now()),
+                new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Screenshot timeout')), 5000)
+                )
+            ]).catch(err => {
+                console.error('Screenshot failed or timed out:', err)
+            })
         } catch (error) {
             console.error('Failed to screenshot page:', error)
         }
         console.error('Failed to ensure page is loaded:', error)
-        // Propager l'erreur de timeout pour retry
         throw new Error('RetryableError: Page load timeout')
     }
 }
