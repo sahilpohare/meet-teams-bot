@@ -1,6 +1,10 @@
-import { RecordingMode, SpeakerData } from '../observeSpeakers'
+import { RecordingMode, SpeakerData } from '../observeSpeakers';
 
 export const SPEAKER_LATENCY = 0 // ms
+
+let lastValidSpeakers: SpeakerData[] = [];
+let lastValidSpeakerCheck = Date.now();
+const FREEZE_TIMEOUT = 30000; // 30 secondes
 
 export async function getSpeakerRootToObserve(
     recordingMode: RecordingMode,
@@ -10,7 +14,7 @@ export async function getSpeakerRootToObserve(
             document,
             {
                 attributes: true,
-                characterData: true,
+                characterData: false,
                 childList: true,
                 subtree: true,
                 attributeFilter: ['class'],
@@ -43,22 +47,34 @@ export async function getSpeakerRootToObserve(
             filteredDivs.forEach((div) => {
                 div.remove()
             })
+
+            // Observer le document entier au lieu du panneau participants
+            return [
+                document,
+                {
+                    attributes: true,
+                    characterData: false,
+                    childList: true,
+                    subtree: true,
+                    attributeFilter: ['class', 'aria-label'],
+                },
+            ]
         } catch (e) {
             console.error(
                 '[getSpeakerRootToObserve] on meet error removing useless divs',
                 e,
             )
+            return [
+                document,
+                {
+                    attributes: true,
+                    characterData: false,
+                    childList: true,
+                    subtree: true,
+                    attributeFilter: ['class', 'aria-label'],
+                },
+            ]
         }
-        return [
-            document.querySelector("[aria-label='Participants']")!,
-            {
-                attributes: true,
-                characterData: true,
-                childList: true,
-                subtree: true,
-                attributeFilter: ['class'],
-            },
-        ]
     }
 }
 
@@ -67,24 +83,22 @@ export function getSpeakerFromDocument(
     timestamp: number,
 ): SpeakerData[] {
     try {
-        // Vérifier si la page est accessible/valide
-        const documentState = document.readyState;
-        const isPageEmpty = document.body.innerHTML.trim() === '';
-        
-        if (documentState !== 'complete' || isPageEmpty) {
-            console.log('[getSpeakerFromDocument] Page is frozen or empty');
-            // Retourner un tableau vide pour indiquer qu'il n'y a plus de speakers
-            // Cela déclenchera la condition de fin dans waitForEndMeeting
+        // Vérifier si la page est gelée
+        const currentTime = Date.now();
+        if (currentTime - lastValidSpeakerCheck > FREEZE_TIMEOUT) {
+            console.log('[getSpeakerFromDocument] Page appears to be frozen for more than 30 seconds');
             return [];
         }
 
-        console.log(
-            '[getSpeakerFromDocument] - Starting participant detection...',
-        )
+        console.log('[getSpeakerFromDocument] - Starting participant detection...')
 
-        const participantsList = document.querySelector(
-            "[aria-label='Participants']",
-        )!
+        const participantsList = document.querySelector("[aria-label='Participants']")
+        if (!participantsList) {
+            console.log('[getSpeakerFromDocument] No participants list found')
+            lastValidSpeakers = []; 
+            return []; // Vrai cas de 0 participants
+        }
+
         const participantItems =
             participantsList.querySelectorAll('[role="listitem"]')
         console.log(
@@ -94,6 +108,7 @@ export function getSpeakerFromDocument(
 
         if (!participantItems || participantItems.length === 0) {
             console.log('[getSpeakerFromDocument] No participants found - possible end of meeting');
+            lastValidSpeakers = []; // Mettre à jour l'état
             return [];
         }
 
@@ -218,25 +233,21 @@ export function getSpeakerFromDocument(
             )
         })
 
-        // Convert map to array of SpeakerData
-        const result = Array.from(uniqueParticipants.values()).map(
-            (participant) => ({
-                name: participant.name,
-                id: 0,
-                timestamp,
-                isSpeaking: participant.isSpeaking,
-            }),
-        )
+        // Avant le return final, sauvegarder l'état
+        const speakers = Array.from(uniqueParticipants.values()).map(participant => ({
+            name: participant.name,
+            id: 0,
+            timestamp,
+            isSpeaking: participant.isSpeaking,
+        }));
+        
+        lastValidSpeakers = speakers;
+        lastValidSpeakerCheck = currentTime;
+        return speakers;
 
-        console.log('[getSpeakerFromDocument] - Final results:', result)
-        return result
     } catch (e) {
-        console.error(
-            '[getSpeakerFromDocument] - Error in getSpeakerFromDocument:',
-            e,
-        )
-        // En cas d'erreur, on considère qu'il n'y a plus de speakers
-        return []
+        console.error('[getSpeakerFromDocument] - Error:', e)
+        return lastValidSpeakers;
     }
 }
 

@@ -93,10 +93,19 @@ async function checkSpeakers() {
     }
 }
 
-// ___PERIODIC_SEQUENCE_FOR_EACH_MUTATIONS___
-var MUTATION_OBSERVER = new MutationObserver(function (mutations) {
-    mutations.forEach(() => checkSpeakers())
-})
+let checkSpeakersTimeout: number | null = null;
+const MUTATION_DEBOUNCE = 10; // 10ms est suffisant pour regrouper les mutations simultanées
+
+var MUTATION_OBSERVER = new MutationObserver(function () {
+    if (checkSpeakersTimeout !== null) {
+        window.clearTimeout(checkSpeakersTimeout);
+    }
+
+    checkSpeakersTimeout = window.setTimeout(() => {
+        checkSpeakers();
+        checkSpeakersTimeout = null;
+    }, MUTATION_DEBOUNCE);
+});
 
 // Observe Speakers mutation
 async function observeSpeakers() {
