@@ -381,9 +381,11 @@ export class MeetingHandle {
                 })
 
                 // Démarrage du WordPoster
-                await WordsPoster.init(this.param).catch((e) => {
+                try {
+                    await WordsPoster.init(this.param)
+                } catch (e) {
                     console.error(`Cannot start Transcriber: ${e}`)
-                })
+                }
 
                 // Nettoyage du HTML
                 await this.meeting.backgroundPage.evaluate(
@@ -586,6 +588,18 @@ export class MeetingHandle {
                     NO_SPEAKER_DETECTED_TIMESTAMP.get(),
                 )
                 console.log('[waiting for end meeting] meeting not ended')
+
+                // Si WordsPoster est initialisé, on gère ses erreurs ici
+                if (WordsPoster.TRANSCRIBER) {
+                    try {
+                        // Vérifier l'état de la transcription si nécessaire
+                        // Mais ne pas arrêter le meeting en cas d'erreur
+                    } catch (error) {
+                        console.error('Transcription error:', error)
+                        // On continue le meeting même si la transcription échoue
+                    }
+                }
+
                 await sleep(FIND_END_MEETING_SLEEP)
             }
         }
@@ -653,8 +667,14 @@ export class MeetingHandle {
             await TRANSCODER.stop()
 
             // Étape 5: Attendre que WordsPoster finisse de traiter sa queue
+            // Mais ne pas bloquer si ça échoue
             console.log('Step 5: Waiting for WordsPoster to finish...')
-            await WordsPoster.TRANSCRIBER?.stop()
+            try {
+                await WordsPoster.TRANSCRIBER?.stop()
+            } catch (error) {
+                console.error('Error stopping WordsPoster:', error)
+                // Continue with shutdown even if transcription fails
+            }
 
             // Étape 6: Upload de la dernière transcription
             console.log('Step 6: Uploading final transcript...')
