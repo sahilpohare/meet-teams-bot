@@ -310,6 +310,15 @@ export async function innerTextWithSelector(
 }
 
 async function tryFindInterface(page: puppeteer.Page): Promise<boolean> {
+    // Ajouter des logs de métriques
+    const metrics = await page.metrics();
+    console.log('Page metrics:', {
+        JSHeapUsedSize: Math.round(metrics.JSHeapUsedSize / 1024 / 1024) + 'MB',
+        JSHeapTotalSize: Math.round(metrics.JSHeapTotalSize / 1024 / 1024) + 'MB',
+        Nodes: metrics.Nodes,
+        ScriptDuration: Math.round(metrics.ScriptDuration * 1000) + 'ms'
+    });
+    
     const controller = new AbortController()
     const signal = controller.signal
     await ensurePageLoaded(page)
