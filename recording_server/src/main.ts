@@ -369,13 +369,25 @@ async function handleErrorInStartRecording(error: Error, data: MeetingParams) {
         )
     }
 
-    await sendWebhookOnce({
-        meetingUrl: data.meeting_url,
-        botUuid: data.bot_uuid,
-        success: false,
-        errorMessage:
-            error instanceof JoinError ? error.message : JoinErrorCode.Internal,
-    })
+    // Attendre que la notification soit bien envoyée avant de continuer
+    try {
+        await sendWebhookOnce({
+            meetingUrl: data.meeting_url,
+            botUuid: data.bot_uuid,
+            success: false,
+            errorMessage:
+                error instanceof JoinError ? error.message : JoinErrorCode.Internal,
+        })
+        
+        // Attendre un peu pour s'assurer que la requête est bien traitée
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        
+        // Seulement après on envoie l'événement call_ended
+        await Events.callEnded()
+    } catch (e) {
+        console.error('Failed to send error notification:', e)
+        throw e // Relancer l'erreur pour être sûr qu'elle est bien gérée
+    }
 }
 
 export function meetingBotStartRecordFailed(

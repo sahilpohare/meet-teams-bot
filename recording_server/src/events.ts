@@ -16,24 +16,24 @@ export class Events {
         )
     }
 
-    static joiningCall() {
-        Events.EVENTS?.send('joining_call')
+    static async joiningCall() {
+        return Events.EVENTS?.send('joining_call')
     }
 
-    static inWaitingRoom() {
-        Events.EVENTS?.send('in_waiting_room')
+    static async inWaitingRoom() {
+        return Events.EVENTS?.send('in_waiting_room')
     }
 
-    static inCallNotRecording() {
-        Events.EVENTS?.send('in_call_not_recording')
+    static async inCallNotRecording() {
+        return Events.EVENTS?.send('in_call_not_recording')
     }
 
-    static inCallRecording() {
-        Events.EVENTS?.send('in_call_recording')
+    static async inCallRecording() {
+        return Events.EVENTS?.send('in_call_recording')
     }
 
-    static callEnded() {
-        Events.EVENTS?.send('call_ended')
+    static async callEnded() {
+        return Events.EVENTS?.send('call_ended')
     }
 
     private constructor(
@@ -42,36 +42,35 @@ export class Events {
         private webhookUrl: string,
     ) {}
 
-    private send(code: string) {
-        // Non-blocking axios call
-        axios({
-            method: 'POST',
-            url: this.webhookUrl,
-            timeout: 5000, // 5 secondes de timeout
-            headers: {
-                'User-Agent': 'meetingbaas/1.0',
-                'x-meeting-baas-api-key': this.apiKey,
-            },
-            data: {
-                event: 'bot.status_change',
+    private async send(code: string): Promise<void> {
+        try {
+            await axios({
+                method: 'POST',
+                url: this.webhookUrl,
+                timeout: 5000, // 5 secondes de timeout
+                headers: {
+                    'User-Agent': 'meetingbaas/1.0',
+                    'x-meeting-baas-api-key': this.apiKey,
+                },
                 data: {
-                    bot_id: this.botId,
-                    status: {
-                        code,
-                        created_at: new Date().toISOString(),
+                    event: 'bot.status_change',
+                    data: {
+                        bot_id: this.botId,
+                        status: {
+                            code,
+                            created_at: new Date().toISOString(),
+                        },
                     },
                 },
-            },
-        })
-            .then(() => {
-                console.log(
-                    'Event sent successfully:',
-                    code,
-                    this.botId,
-                    this.webhookUrl,
-                )
             })
-            .catch((error) => {
+            console.log(
+                'Event sent successfully:',
+                code,
+                this.botId,
+                this.webhookUrl,
+            )
+        } catch (error) {
+            if (error instanceof Error) {
                 console.error(
                     'Unable to send event:',
                     code,
@@ -79,6 +78,8 @@ export class Events {
                     this.webhookUrl,
                     error.message,
                 )
-            })
+            }
+            throw error
+        }
     }
 }

@@ -620,21 +620,25 @@ export class MeetingHandle {
         try {
             console.log('Starting recording shutdown sequence...')
 
-            // Étape 1: Arrêter le media recorder
+            // Étape 1: Arrêter le media recorder et attendre son dernier chunk
             console.log('Step 1: Stopping media recorder...')
+            let lastChunkProcessed = false
             try {
                 await this.meeting.backgroundPage?.evaluate(() =>
                     (window as any).stopMediaRecorder?.(),
                 )
-                // Attendre que le dernier chunk soit traité
-                await new Promise((resolve) => setTimeout(resolve, 1000))
+                // Attendre que le dernier chunk soit traité naturellement
+                await new Promise((resolve) => setTimeout(resolve, 2000))
+                lastChunkProcessed = true
             } catch (e) {
                 console.error('stopMediaRecorder error:', e)
             }
 
-            // Étape 2: Envoyer le chunk final vide au transcoder
-            console.log('Step 2: Sending final empty chunk to transcoder...')
-            await TRANSCODER.uploadChunk(Buffer.alloc(0), true)
+            // Étape 2: S'assurer que tout est bien terminé avec un chunk vide si nécessaire
+            if (!TRANSCODER.isSuccessfullyStopped() && !lastChunkProcessed) {
+                console.log('Step 2: Sending final empty chunk to transcoder...')
+                await TRANSCODER.uploadChunk(Buffer.alloc(0), true)
+            }
 
             // Étape 3: Kill brutal du navigateur et des pages
             console.log('Step 3: Force closing browser...')

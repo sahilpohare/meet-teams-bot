@@ -661,6 +661,10 @@ class Transcoder {
             throw err
         }
     }
+
+    public isSuccessfullyStopped(): boolean {
+        return this.transcoder_successfully_stopped
+    }
 }
 
 // Creating a global instance
