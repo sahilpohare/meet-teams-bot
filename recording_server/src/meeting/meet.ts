@@ -1,12 +1,13 @@
-import { Browser, Page } from '@playwright/test'
+import { BrowserContext, Page } from '@playwright/test'
 import * as fs from 'fs/promises'
 
-import { JoinError, JoinErrorCode } from '../meeting'
+
 import {
-    CancellationToken,
+    JoinError,
+    JoinErrorCode,
     MeetingParams,
     MeetingProviderInterface,
-    RecordingMode,
+    RecordingMode
 } from '../types'
 
 import { FrameAnalyzer } from '../FrameAnalyzer'
@@ -22,7 +23,7 @@ export class MeetProvider implements MeetingProviderInterface {
         this.frameAnalyzer.initialize().catch(console.error)
     }
 
-    async parseMeetingUrl(browser: Browser, meeting_url: string) {
+    async parseMeetingUrl( meeting_url: string) {
         return parseMeetingUrlFromJoinInfos(meeting_url)
     }
 
@@ -36,13 +37,13 @@ export class MeetProvider implements MeetingProviderInterface {
     }
 
     async openMeetingPage(
-        browser: Browser,
+        browserContext: BrowserContext,
         link: string,
         streaming_input: string | undefined,
     ): Promise<Page> {
         try {
             console.log('Creating new page in existing context...')
-            const page = await browser.newPage()
+            const page = await browserContext.newPage()
             
             console.log(`Navigating to ${link}...`)
             await page.goto(link, {
@@ -122,7 +123,7 @@ export class MeetProvider implements MeetingProviderInterface {
     async findEndMeeting(
         meetingParams: MeetingParams,
         page: Page,
-        cancellationToken: CancellationToken,
+        // cancellationToken: CancellationToken,
     ): Promise<boolean> {
         try {
             // Vérifier si la page est gelée

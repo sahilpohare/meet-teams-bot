@@ -4,7 +4,7 @@ import {
     delSessionInRedis,
     terminateInstance,
 } from './instance'
-import { JoinError, JoinErrorCode, MeetingHandle } from './meeting'
+import { MeetingHandle } from './meeting'
 
 import { clientRedis } from './server'
 
@@ -17,7 +17,7 @@ import { exit } from 'process'
 import { Api } from './api/methods'
 import { Consumer } from './rabbitmq'
 import { TRANSCODER } from './transcoder'
-import { MeetingParams } from './types'
+import { JoinError, JoinErrorCode, MeetingParams } from './types'
 
 import { spawn } from 'child_process'
 import { getCachedExtensionId, openBrowser } from './browser'
@@ -218,39 +218,29 @@ logger.info('version 0.0.1')
             })
         } else if (consumeResult.params.meetingProvider !== 'Zoom') {
             // Assuming that recording is active at this point
-            let meeting_succesful = await MeetingHandle.instance
-                .recordMeetingToEnd()
-                .catch((e) => {
-                    console.error('record meeting to end failed: ', e)
-                    return false
-                })
-                .then((_) => {
-                    return true
-                })
-            // Stop transcoder even if the meeting ended with an error
-            // to have a video uploaded to s3 even in case there is a crash
-            await TRANSCODER.stop().catch((e) => {
-                console.error('error when stopping transcoder: ', e)
-            })
-            console.log(`${Date.now()} Uploading video to S3`)
-            await TRANSCODER.uploadVideoToS3().catch((e) => {
-                console.error('Cannot upload video to S3: ', e)
-            })
-            if (meeting_succesful) {
-                console.log(
-                    `${Date.now()} Finalize project && Sending WebHook complete`,
-                )
-                await Api.instance.endMeetingTrampoline().catch((e) => {
-                    console.error('error in endMeetingTranpoline', e)
-                })
-            } else {
-                // Add handling for failed non-Zoom meetings
+            try {
+                // Démarrer le meeting avec la machine à états
+                await MeetingHandle.instance.startRecordMeeting();
+                
+                // Si on arrive ici, c'est que tout s'est bien passé
+                console.log(`${Date.now()} Finalize project && Sending WebHook complete`);
+                await Api.instance.endMeetingTrampoline();
+            } catch (error) {
+                // La machine à états a déjà géré le nettoyage
+                console.error('Meeting failed:', error);
                 await sendWebhookOnce({
                     meetingUrl: consumeResult.params.meeting_url,
                     botUuid: consumeResult.params.bot_uuid,
                     success: false,
-                    errorMessage: 'Recording failed to complete',
-                })
+                    errorMessage: error instanceof JoinError ? error.message : 'Recording failed to complete'
+                });
+            } finally {
+                // S'assurer que le transcoder est arrêté et que la vidéo est uploadée
+                if (TRANSCODER) {
+                    await TRANSCODER.stop().catch(e => console.error('Error stopping transcoder:', e));
+                    console.log(`${Date.now()} Uploading video to S3`);
+                    await TRANSCODER.uploadVideoToS3().catch(e => console.error('Cannot upload video to S3:', e));
+                }
             }
         } else {
             // Configuring and launching LINUX ZOOM SDK
@@ -361,33 +351,25 @@ async function sendWebhookOnce(params: {
 }
 
 async function handleErrorInStartRecording(error: Error, data: MeetingParams) {
-    if (error instanceof JoinError) {
-        console.error('a join error occurred while starting recording', error)
-    } else {
-        console.error(
-            'an internal error occurred while starting recording',
-            error,
-        )
-    }
+    logger.error('Error during meeting start:', {
+        error: error instanceof JoinError ? error.message : 'Internal error',
+        details: error
+    });
 
-    // Attendre que la notification soit bien envoyée avant de continuer
     try {
+        // Envoyer le webhook d'erreur
         await sendWebhookOnce({
             meetingUrl: data.meeting_url,
             botUuid: data.bot_uuid,
             success: false,
-            errorMessage:
-                error instanceof JoinError ? error.message : JoinErrorCode.Internal,
-        })
+            errorMessage: error instanceof JoinError ? error.message : JoinErrorCode.Internal
+        });
         
-        // Attendre un peu pour s'assurer que la requête est bien traitée
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        
-        // Seulement après on envoie l'événement call_ended
-        await Events.callEnded()
+        // Les événements sont maintenant gérés par la machine à états
+        // Events.callEnded() n'est plus nécessaire ici
     } catch (e) {
-        console.error('Failed to send error notification:', e)
-        throw e // Relancer l'erreur pour être sûr qu'elle est bien gérée
+        logger.error('Failed to handle start recording error:', e);
+        throw e;
     }
 }
 

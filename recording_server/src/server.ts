@@ -272,18 +272,30 @@ export async function server() {
         res.sendStatus(200)
     })
 
-    function stop_record(res: any, reason: string) {
-        MeetingHandle.instance
-            .stopRecording(reason)
-            .then(() => {
-                res.status(200)
-            })
-            .catch((e) => {
-                console.error(`stop recording error ${e}`)
-                res.status(400).json({
-                    error: e,
-                })
-            })
+    async function stop_record(res: any, reason: string) {
+        try {
+            const meetingHandle = MeetingHandle.instance;
+            
+            if (!meetingHandle) {
+                return res.status(404).json({ 
+                    error: 'No active meeting found' 
+                });
+            }
+    
+            // Appeler la méthode d'arrêt
+            await meetingHandle.stopMeeting(reason);
+    
+            res.json({ 
+                success: true, 
+                message: 'Meeting stopped successfully' 
+            });
+        } catch (error) {
+            console.error('Failed to stop meeting:', error);
+            res.status(500).json({ 
+                error: 'Failed to stop meeting',
+                details: (error as Error).message 
+            });
+        }
     }
 
     // Get Recording Server Build Version Info

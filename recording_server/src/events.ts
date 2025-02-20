@@ -36,13 +36,37 @@ export class Events {
         return Events.EVENTS?.send('call_ended')
     }
 
+    // Nouveaux événements pour les erreurs
+    static async botRejected() {
+        return Events.EVENTS?.send('bot_rejected')
+    }
+
+    static async botRemoved() {
+        return Events.EVENTS?.send('bot_removed')
+    }
+
+    static async waitingRoomTimeout() {
+        return Events.EVENTS?.send('waiting_room_timeout')
+    }
+
+    static async invalidMeetingUrl() {
+        return Events.EVENTS?.send('invalid_meeting_url')
+    }
+
+    static async meetingError(error: Error) {
+        return Events.EVENTS?.send('meeting_error', {
+            error_message: error.message,
+            error_type: error.constructor.name
+        })
+    }
+
     private constructor(
         private botId: string,
         private apiKey: string,
         private webhookUrl: string,
     ) {}
 
-    private async send(code: string): Promise<void> {
+    private async send(code: string, additionalData: Record<string, any> = {}): Promise<void> {
         try {
             await axios({
                 method: 'POST',
@@ -59,6 +83,7 @@ export class Events {
                         status: {
                             code,
                             created_at: new Date().toISOString(),
+                            ...additionalData
                         },
                     },
                 },

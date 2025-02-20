@@ -1,4 +1,4 @@
-import { Browser, Page } from '@playwright/test'
+import { Browser, BrowserContext, Page } from '@playwright/test'
 
 export type MeetingStatus = 'Recording' | 'Cleanup' | 'Done'
 
@@ -13,7 +13,7 @@ export type RecordingMode = 'speaker_view' | 'gallery_view' | 'audio_only'
 
 export interface MeetingProviderInterface {
     openMeetingPage(
-        browser: Browser,
+        browserContext: BrowserContext,
         link: string,
         streaming_input: string | undefined,
     ): Promise<Page>
@@ -25,10 +25,9 @@ export interface MeetingProviderInterface {
     findEndMeeting(
         meetingParams: MeetingParams,
         page: Page,
-        cancellationToken: CancellationToken,
+        // cancellationToken: CancellationToken,
     ): Promise<boolean>
     parseMeetingUrl(
-        browser: Browser,
         meeting_url: string,
     ): Promise<{ meetingId: string; password: string }>
     getMeetingLink(
@@ -132,4 +131,25 @@ export enum RecordingApprovalState {
     WAITING = 'WAITING',
     ENABLE = 'ENABLE',
     DISABLE = 'DISABLE',
+}
+
+
+export class JoinError extends Error {
+    details?: any;
+
+    constructor(message: string, details?: any) {
+        super(message);
+        this.name = 'JoinError';
+        this.details = details;
+    }
+}
+
+
+export enum JoinErrorCode {
+    CannotJoinMeeting = 'CannotJoinMeeting',
+    BotNotAccepted = 'BotNotAccepted',
+    BotRemoved = 'BotRemoved',
+    TimeoutWaitingToStart = 'TimeoutWaitingToStart',
+    Internal = 'InternalError',
+    InvalidMeetingUrl = 'InvalidMeetingUrl',
 }

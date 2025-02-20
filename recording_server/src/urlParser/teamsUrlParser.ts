@@ -1,4 +1,5 @@
-import { JoinError, JoinErrorCode } from '../meeting'
+import { JoinError, JoinErrorCode } from "../types"
+
 
 export interface TeamsUrlComponents {
     meetingId: string

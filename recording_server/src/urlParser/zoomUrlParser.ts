@@ -1,5 +1,5 @@
 import { Browser } from '@playwright/test'
-import { JoinError, JoinErrorCode } from '../meeting'
+import { JoinError, JoinErrorCode } from '../types'
 
 interface ZoomUrlComponents {
     meetingId: string

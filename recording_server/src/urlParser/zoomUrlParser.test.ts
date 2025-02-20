@@ -1,5 +1,6 @@
 import { Browser } from '@playwright/test'
-import { JoinError } from '../meeting'
+
+import { JoinError } from '../types'
 import { parseMeetingUrlFromJoinInfos } from './zoomUrlParser'
 
 describe('Zoom URL Parser', () => {

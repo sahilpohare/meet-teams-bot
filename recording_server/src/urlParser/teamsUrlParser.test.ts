@@ -1,4 +1,5 @@
-import { JoinError } from '../meeting'
+
+import { JoinError } from '../types'
 import { parseMeetingUrlFromJoinInfos } from './teamsUrlParser'
 
 describe('Teams URL Parser', () => {

@@ -1,10 +1,8 @@
-import { Browser, Page } from '@playwright/test'
+import { BrowserContext, Page } from '@playwright/test'
 
-import { JoinError, JoinErrorCode } from '../meeting'
 import {
-    CancellationToken,
-    MeetingParams,
-    MeetingProviderInterface,
+    JoinError, JoinErrorCode, MeetingParams,
+    MeetingProviderInterface
 } from '../types'
 
 import { Logger } from '../logger'
@@ -13,7 +11,7 @@ import { sleep } from '../utils'
 
 export class TeamsProvider implements MeetingProviderInterface {
     constructor() {}
-    async parseMeetingUrl(browser: Browser, meeting_url: string) {
+    async parseMeetingUrl(meeting_url: string) {
         return parseMeetingUrlFromJoinInfos(meeting_url)
     }
     getMeetingLink(
@@ -26,18 +24,13 @@ export class TeamsProvider implements MeetingProviderInterface {
     }
 
     async openMeetingPage(
-        browser: Browser,
+        browserContext: BrowserContext,
         link: string,
         streaming_input: string | undefined,
     ): Promise<Page> {
         const url = new URL(link)
-        const context = await browser.newContext({
-            permissions: streaming_input 
-                ? ['microphone', 'camera'] 
-                : ['camera']
-        })
+        const page = await browserContext.newPage()
         
-        const page = await context.newPage()
         await page.goto(link, { waitUntil: 'networkidle' })
         return page
     }
@@ -115,7 +108,7 @@ export class TeamsProvider implements MeetingProviderInterface {
     async findEndMeeting(
         meetingParams: MeetingParams,
         page: Page,
-        cancellationToken: CancellationToken,
+        // cancellationToken: CancellationToken,
     ): Promise<boolean> {
         try {
             if (await isRemovedFromTheMeeting(page)) {
