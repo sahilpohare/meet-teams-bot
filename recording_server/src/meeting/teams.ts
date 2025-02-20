@@ -31,7 +31,22 @@ export class TeamsProvider implements MeetingProviderInterface {
         const url = new URL(link)
         const page = await browserContext.newPage()
         
-        await page.goto(link, { waitUntil: 'networkidle' })
+        // Configure les timeouts et autres paramètres
+        await page.setDefaultTimeout(30000)
+        await page.setDefaultNavigationTimeout(30000)
+        
+        // Active la journalisation des requêtes console pour le debugging
+        page.on('console', msg => console.log('Browser console:', msg.text()))
+        
+        // Attend que la page soit complètement chargée
+        await page.goto(link, { 
+            waitUntil: 'networkidle',
+            timeout: 30000 
+        })
+        
+        // Attend un peu plus pour s'assurer que tout est chargé
+        await page.waitForTimeout(2000)
+        
         return page
     }
 
@@ -46,7 +61,6 @@ export class TeamsProvider implements MeetingProviderInterface {
             await ensurePageLoaded(page)
         } catch (error) {
             console.error('Page load failed:', error)
-            // On throw une Error simple (pas JoinError) pour que meeting.ts fasse un retry
             throw new Error('Page failed to load - retrying')
         }
 
@@ -67,11 +81,10 @@ export class TeamsProvider implements MeetingProviderInterface {
             NewInterface
                 ? 'light 🥕🥕'
                 : (await page.url()).includes('live')
-                  ? 'live 💃🏼'
-                  : 'old 👴🏻',
+                ? 'live 💃🏼'
+                : 'old 👴🏻',
         )
 
-        //be sure the page is loaded
         try {
             await clickWithInnerText(page, 'button', 'Join now', 100, false)
         } catch (e) {
@@ -102,58 +115,130 @@ export class TeamsProvider implements MeetingProviderInterface {
             throw new Error('RetryableError')
         }
 
-        await findShowEveryOne(page, false, cancelCheck)
-    }
+        await Logger.instance.screenshot(page, 'afterjoinnow')
 
-    async findEndMeeting(
-        meetingParams: MeetingParams,
-        page: Page,
-        // cancellationToken: CancellationToken,
-    ): Promise<boolean> {
-        try {
-            if (await isRemovedFromTheMeeting(page)) {
-                return true
-            }
-
-            if (await isBotNotAccepted(page)) {
+        while (true) {
+            const botNotAccepted = await isBotNotAccepted(page)
+            if (botNotAccepted) {
                 throw new JoinError(JoinErrorCode.BotNotAccepted)
             }
 
-            return false
-        } catch (error) {
-            if (error instanceof JoinError) {
-                throw error
+            const clickSuccess = await clickWithInnerText(
+                page,
+                'button',
+                'React',
+                2,
+                false,
+            )
+
+            if (cancelCheck?.()) {
+                throw new JoinError(JoinErrorCode.TimeoutWaitingToStart)
             }
-            console.error('Error in findEndMeeting:', error)
-            return false
+
+            if (clickSuccess) {
+                break
+            }
+
+            await sleep(500)
         }
+
+        try {
+            if (await clickWithInnerText(page, 'button', 'View', 10, false)) {
+                if (meetingParams.recording_mode !== 'gallery_view') {
+                    await clickWithInnerText(page, 'button', 'View', 10)
+                    await clickWithInnerText(page, 'div', 'Speaker', 20)
+                }
+            }
+        } catch (e) {
+            console.error('Error handling "View" or "Speaker" mode:', e)
+        }
+    }
+
+    async findEndMeeting(
+        _meetingParams: MeetingParams,
+        page: Page,
+    ): Promise<boolean> {
+        return await isRemovedFromTheMeeting(page)
     }
 }
 
-async function clickWithInnerText(
+const INPUT_BOT = 'input[placeholder="Type your name"]'
+
+export async function clickWithInnerText(
     page: Page,
-    selector: string,
-    text: string,
-    maxAttempts: number,
-    shouldClick: boolean = true,
+    htmlType: string,
+    innerText: string,
+    iterations: number,
+    click: boolean = true,
+    cancelCheck?: () => boolean,
 ): Promise<boolean> {
-    for (let i = 0; i < maxAttempts; i++) {
+    let i = 0
+    let continueButton = false
+
+    if (!(await ensurePageLoaded(page))) {
+        console.error('Page is not fully loaded at the start.')
+        return false
+    }
+
+    while (!continueButton && (iterations == null || i < iterations) && !cancelCheck?.()) {
         try {
-            const element = page.locator(`${selector}:has-text("${text}")`)
-            if (await element.count() > 0) {
-                if (shouldClick) {
-                    await element.click()
+            if (i % 5 === 0) {
+                const isPageLoaded = await ensurePageLoaded(page)
+                if (!isPageLoaded) {
+                    console.error('Page seems frozen or not responding.')
+                    return false
                 }
-                return true
             }
+
+            continueButton = await page.evaluate(
+                ({ innerText, htmlType, i, click }) => {
+                    let elements: Element[] = []
+                    const iframes = document.querySelectorAll('iframe')
+                    
+                    if (i % 2 === 0 && iframes.length > 0) {
+                        const firstIframe = iframes[0]
+                        try {
+                            const docInIframe = firstIframe.contentDocument || 
+                                              firstIframe.contentWindow?.document
+                            if (docInIframe) {
+                                elements = Array.from(docInIframe.querySelectorAll(htmlType))
+                            }
+                        } catch (e) {
+                            console.warn('Iframe access error:', e)
+                        }
+                    }
+                    
+                    if (elements.length === 0) {
+                        elements = Array.from(document.querySelectorAll(htmlType))
+                    }
+
+                    for (const elem of elements) {
+                        if (elem.textContent?.trim() === innerText) {
+                            if (click) {
+                                (elem as HTMLElement).click()
+                            }
+                            return true
+                        }
+                    }
+                    return false
+                },
+                { innerText, htmlType, i, click }
+            )
         } catch (e) {
-            if (i === maxAttempts - 1) {
+            if (i === iterations - 1) {
                 console.error(`Error in clickWithInnerText (last attempt):`, e)
             }
+            continueButton = false
         }
-        await page.waitForTimeout(100 + i * 100)
+
+        if (!continueButton) {
+            await page.waitForTimeout(100 + i * 100)
+        }
+        
+        console.log(`${innerText} ${click ? 'clicked' : 'found'} : ${JSON.stringify(continueButton)}`)
+        i++
     }
-    return false
+    return continueButton
 }
 
 async function typeBotName(
@@ -163,82 +248,98 @@ async function typeBotName(
 ): Promise<void> {
     for (let i = 0; i < maxAttempts; i++) {
         try {
-            const input = page.locator('input[type="text"]')
+            await page.waitForSelector(INPUT_BOT, { timeout: 1000 })
+            const input = page.locator(INPUT_BOT)
+            
             if (await input.count() > 0) {
+                await input.focus()
                 await input.fill(botName)
-                return
+                
+                // Verify the input value
+                const currentValue = await input.inputValue()
+                if (currentValue === botName) {
+                    return
+                }
+                
+                // If fill didn't work, try typing
+                await input.clear()
+                await page.keyboard.type(botName, { delay: 100 })
+                
+                if (await input.inputValue() === botName) {
+                    return
+                }
             }
+            
+            await page.waitForTimeout(500)
         } catch (e) {
             console.error(`Error typing bot name (attempt ${i + 1}):`, e)
         }
-        await page.waitForTimeout(100)
     }
     throw new Error('Failed to type bot name')
 }
 
 async function tryFindInterface(page: Page): Promise<boolean> {
+    await ensurePageLoaded(page)
+    
     try {
-        const newInterfaceIndicator = page.locator('div[data-tid="calling-preview"]')
-        return await newInterfaceIndicator.count() > 0
-    } catch (e) {
-        console.error('Error in tryFindInterface:', e)
+        const joinNowPromise = clickWithInnerText(page, 'button', 'Join now', 10, false)
+        const continueWithoutAudioPromise = clickWithInnerText(
+            page,
+            'button',
+            'Continue without audio or video',
+            10,
+            false
+        )
+
+        const [joinNowExists, continueWithoutAudioExists] = await Promise.all([
+            joinNowPromise,
+            continueWithoutAudioPromise
+        ])
+
+        if (joinNowExists) {
+            console.log('Found Join now interface')
+            return true
+        } else if (continueWithoutAudioExists) {
+            await clickWithInnerText(
+                page,
+                'button',
+                'Continue without audio or video',
+                5,
+                true
+            )
+            console.log('Found Continue without audio/video interface')
+            return false
+        }
+
+        console.log('No known interface buttons found')
         return false
+    } catch (error) {
+        console.error('Error detecting interface:', error)
+        throw new Error('RetryableError: Interface detection failed')
     }
 }
 
-async function findShowEveryOne(
-    page: Page,
-    click: boolean,
-    cancelCheck: () => boolean,
-): Promise<void> {
-    let showEveryOneFound = false
-    let i = 0
-
-    while (!showEveryOneFound) {
-        const button = page.locator('button[title="Show participants"]')
-        showEveryOneFound = await button.count() > 0
-        if (showEveryOneFound && click) {
-            await button.click()
-        }
-
-        await Logger.instance.screenshot(page, `findShowEveryone_${i}`)
-        console.log({ showEveryOneFound })
-
-        if (cancelCheck()) {
-            throw new JoinError(JoinErrorCode.TimeoutWaitingToStart)
-        }
-
-        try {
-            if (await isBotNotAccepted(page)) {
-                console.log('Bot not accepted, exiting meeting')
-                throw new JoinError(JoinErrorCode.BotNotAccepted)
-            }
-        } catch (error) {
-            if (error instanceof JoinError) {
-                console.log('Caught JoinError, exiting meeting')
-                throw error
-            }
-            console.error('Unexpected error:', error)
-        }
-
-        if (!showEveryOneFound) {
-            await sleep(1000)
-        }
-        i++
+async function checkPageForText(page: Page, text: string): Promise<boolean> {
+    try {
+        const content = await page.content()
+        return content.includes(text)
+    } catch (error) {
+        console.error('Error checking page for text:', error)
+        return false
     }
 }
 
 async function isRemovedFromTheMeeting(page: Page): Promise<boolean> {
     try {
-        // Vérifie que la page est toujours chargée
         if (!(await ensurePageLoaded(page))) {
             return true
         }
-        
-        // Vérifie si le bouton "Raise" est présent
-        const raiseButton = page.locator('button[title="Raise your hand"]')
+
+        const raiseButton = page.locator('button#raisehands-button:has-text("Raise")')
         const buttonExists = await raiseButton.count() > 0
 
+        console.log('raiseButton', JSON.stringify(raiseButton))
+        console.log('buttonExists', JSON.stringify(buttonExists))
         if (!buttonExists) {
             console.log('no raise button found, Bot removed from the meeting')
             return true
@@ -254,12 +355,12 @@ async function isBotNotAccepted(page: Page): Promise<boolean> {
     const deniedTexts = [
         'Sorry, but you were denied access to the meeting.',
         'Someone in the meeting should let you in soon',
-        'Waiting to be admitted',
+        'Waiting to be admitted'
     ]
 
     for (const text of deniedTexts) {
-        const element = page.locator(`text=${text}`)
-        if (await element.count() > 0) {
+        const found = await checkPageForText(page, text)
+        if (found) {
             return true
         }
     }
@@ -302,23 +403,13 @@ async function activateCamera(page: Page): Promise<void> {
     }
 }
 
-async function ensurePageLoaded(page: Page, timeout = 45000): Promise<boolean> {
+async function ensurePageLoaded(page: Page, timeout = 20000): Promise<boolean> {
     try {
-        await page.waitForLoadState('domcontentloaded', { timeout })
+        await page.waitForFunction(() => document.readyState === 'complete', {
+            timeout: timeout
+        })
         return true
     } catch (error) {
-        try {
-            await Promise.race([
-                Logger.instance.screenshot(page, 'page_not_loaded_' + Date.now()),
-                new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Screenshot timeout')), 5000)
-                )
-            ]).catch(err => {
-                console.error('Screenshot failed or timed out:', err)
-            })
-        } catch (error) {
-            console.error('Failed to screenshot page:', error)
-        }
         console.error('Failed to ensure page is loaded:', error)
         throw new Error('RetryableError: Page load timeout')
     }

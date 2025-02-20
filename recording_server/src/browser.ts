@@ -2,7 +2,7 @@ import { BrowserContext, chromium, Page } from '@playwright/test'
 import * as fs from 'fs'
 import { join } from 'path'
 
-const EXTENSION_NAME = 'spoke'
+// const EXTENSION_NAME = 'spoke'
 const GOOGLE_CHROME_EXECUTABLE_PATH =
     process.env.GOOGLE_CHROME_EXECTUTABLE_PATH || '/usr/bin/google-chrome'
 const USER_DATA_DIR = '/tmp/test-user-data-dir'
@@ -69,7 +69,6 @@ export async function openBrowser(
             executablePath: GOOGLE_CHROME_EXECUTABLE_PATH,
             viewport: { width, height },
             args: [
-
                 '--no-sandbox',
                 '--disable-rtc-smoothness-algorithm',
                 '--disable-webrtc-hw-decoding',
@@ -84,33 +83,16 @@ export async function openBrowser(
                 `--whitelisted-extension-id=${extensionId}`,
                 '--ignore-certificate-errors',
                 '--allow-insecure-localhost',
-
-                // '--no-sandbox',
-                // '--disable-rtc-smoothness-algorithm',
-                // '--disable-webrtc-hw-decoding',
-                // '--disable-webrtc-hw-encoding',
-                // '--disable-blink-features=AutomationControlled',
-                // '--disable-setuid-sandbox',
-                // `--disable-extensions-except=${pathToExtension}`,
-                // `--load-extension=${pathToExtension}`,
-                // '--autoplay-policy=no-user-gesture-required',
-                // '--disable-default-apps',
-                // '--disable-client-side-phishing-detection',
-                // '--disable-background-timer-throttling',
-                // '--disable-dev-shm-usage',
-                // '--enable-features=SharedArrayBuffer',
-                // '--disable-extensions',
-                // `--disable-extension-${extensionId}`,
-                // `--whitelisted-extension-id=${extensionId}`,
-                // '--ignore-certificate-errors',
-                // '--ignore-ssl-errors',
-                // '--allow-insecure-localhost',
-                // '--unsafely-treat-insecure-origin-as-secure=http://localhost:3005',
+                '--disable-blink-features=TrustedDOMTypes',
+                '--disable-features=TrustedScriptTypes',
+                '--disable-features=TrustedHTML',
             ],
             slowMo: slowMo ? 100 : undefined,
             permissions: ['microphone', 'camera'],
             ignoreHTTPSErrors: true,
             acceptDownloads: true,
+            bypassCSP: true,
+            timeout: 120000,
         })
 
         console.log('Waiting for background page...')
@@ -130,39 +112,4 @@ export async function openBrowser(
         console.error('Failed to open browser:', error)
         throw error
     }
-}
-
-export function listenPage(page: Page) {
-    page.on('console', async (message) => {
-        try {
-            const type = message.type().substr(0, 3).toUpperCase()
-            let text = message.text()
-
-            const location = message.location()
-            const tags = `${location.url}:${location.lineNumber}}`
-
-            switch (type) {
-                case 'LOG':
-                    console.log(`${tags}\n${text}`)
-                    break
-                case 'WAR':
-                    console.log('\x1b[38;5;214m%s\x1b[0m', `${tags}\n${text}`)
-                    break
-                case 'ERR':
-                    console.log('\x1b[31m%s\x1b[0m', `${tags}\n${text}`)
-                    break
-                case 'INF':
-                    console.log('\x1b[32m%s\x1b[0m', `${tags}\n${text}`)
-                    break
-                default:
-                    console.log(`DEFAULT CASE ${type} ! ${tags}\n${text}`)
-            }
-        } catch (e) {
-            console.log(`Failed to log forward logs: ${e}`)
-        }
-    })
-}
-
-export function removeListenPage(page: Page) {
-    page.removeListener('console', () => {})
 }
