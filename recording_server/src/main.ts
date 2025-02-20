@@ -5,7 +5,7 @@ import {
     terminateInstance,
 } from './instance'
 import { JoinError, JoinErrorCode, MeetingHandle } from './meeting'
-import { getCachedExtensionId, getExtensionId, openBrowser } from './puppeteer'
+
 import { clientRedis } from './server'
 
 import axios from 'axios'
@@ -20,6 +20,7 @@ import { TRANSCODER } from './transcoder'
 import { MeetingParams } from './types'
 
 import { spawn } from 'child_process'
+import { getCachedExtensionId, openBrowser } from './browser'
 import { Events } from './events'
 
 const ZOOM_SDK_DEBUG_EXECUTABLE_PATHNAME = './target/debug/client'
@@ -153,7 +154,7 @@ console.debug = (msg: string, ...args: any[]) =>
 logger.info('version 0.0.1')
 ;(async () => {
     if (process.argv[2]?.includes('get_extension_id')) {
-        getExtensionId().then((x) => console.log(x))
+        getCachedExtensionId().then((x) => console.log(x))
     } else {
         // set default axios config
         axios.defaults.baseURL = API_SERVER_BASEURL

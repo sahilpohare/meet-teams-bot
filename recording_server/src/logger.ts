@@ -11,7 +11,7 @@ const NODE_NAME = process.env.NODE_NAME
 const util = require('util')
 const execPromise = util.promisify(exec)
 
-import { Page } from 'puppeteer'
+import { Page } from '@playwright/test'
 
 import { s3cp } from './s3'
 import { MeetingParams } from './types'
@@ -58,7 +58,12 @@ export class Logger {
                 '/',
                 '',
             )}_${date}.jpg`
-            await page.screenshot({ path: link })
+            await page.screenshot({ 
+                path: link,
+                timeout: 5000,
+                animations: "disabled",
+                scale: "css"
+            })
             await s3cp(
                 link,
                 `${this.bot_uuid}/screenshot_${name.replaceAll(

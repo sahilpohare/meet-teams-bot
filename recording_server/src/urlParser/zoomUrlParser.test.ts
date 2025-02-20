@@ -1,4 +1,4 @@
-import { Browser } from 'puppeteer'
+import { Browser } from '@playwright/test'
 import { JoinError } from '../meeting'
 import { parseMeetingUrlFromJoinInfos } from './zoomUrlParser'
 

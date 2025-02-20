@@ -1,4 +1,4 @@
-import { Browser } from 'puppeteer'
+import { Browser } from '@playwright/test'
 import { JoinError, JoinErrorCode } from '../meeting'
 
 interface ZoomUrlComponents {

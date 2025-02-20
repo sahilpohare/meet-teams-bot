@@ -1,4 +1,4 @@
-import { Browser, Page } from 'puppeteer'
+import { Browser, Page } from '@playwright/test'
 
 export type MeetingStatus = 'Recording' | 'Cleanup' | 'Done'
 
@@ -126,7 +126,7 @@ export type SpeakerData = {
 export interface MessageData {
     msg: SpeakerData[]
 }
-export type MeetingProvider = 'Zoom' | 'Meet' | 'Teams'
+export type MeetingProvider = 'Meet' | 'Teams' | 'Zoom'
 
 export enum RecordingApprovalState {
     WAITING = 'WAITING',

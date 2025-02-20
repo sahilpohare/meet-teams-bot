@@ -6,9 +6,8 @@ import { execSync } from 'child_process'
 import { SoundContext, VideoContext } from './media_context'
 import {
     MessageToBroadcast,
-    RecordingApprovalState,
     SpeakerData,
-    StopRecordParams,
+    StopRecordParams
 } from './types'
 
 import axios from 'axios'
@@ -22,7 +21,6 @@ import { unlinkSync } from 'fs'
 import { PORT } from './instance'
 import { Logger } from './logger'
 import { MeetingHandle } from './meeting'
-import { ZOOM_RECORDING_APPROVAL_STATUS } from './meeting/zoom'
 import { Streaming } from './streaming'
 import { TRANSCODER } from './transcoder'
 import { uploadTranscriptTask } from './uploadTranscripts'
@@ -233,29 +231,6 @@ export async function server() {
         const data: StopRecordParams = req.body
         console.log('end meeting from api server :', data)
         stop_record(res, 'api request')
-    })
-
-    // Stop meeting from zoom
-    app.post('/end_zoom_meeting', async (_req, res) => {
-        console.log('end meeting from zoom notification')
-        ZOOM_RECORDING_APPROVAL_STATUS.set(RecordingApprovalState.DISABLE)
-        stop_record(res, 'zoom request')
-    })
-
-    app.post('/start_zoom_recording', async (_req, res) => {
-        console.log('start recording from zoom notification')
-
-        try {
-            await ZOOM_RECORDING_APPROVAL_STATUS.set(
-                RecordingApprovalState.ENABLE,
-            )
-            res.status(200).json({ message: 'Recording started successfully' })
-        } catch (e) {
-            console.error(`start recording error: ${e}`)
-            res.status(400).json({
-                error: e || 'An error occurred while starting the recording',
-            })
-        }
     })
 
     //logger zoom

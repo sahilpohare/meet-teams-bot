@@ -1,5 +1,5 @@
+import { Browser, Page } from '@playwright/test'
 import * as fs from 'fs/promises'
-import * as puppeteer from 'puppeteer'
 
 import { JoinError, JoinErrorCode } from '../meeting'
 import {
@@ -9,7 +9,6 @@ import {
     RecordingMode,
 } from '../types'
 
-import { Page } from 'puppeteer'
 import { FrameAnalyzer } from '../FrameAnalyzer'
 import { Logger } from '../logger'
 import { parseMeetingUrlFromJoinInfos } from '../urlParser/meetUrlParser'
@@ -23,9 +22,10 @@ export class MeetProvider implements MeetingProviderInterface {
         this.frameAnalyzer.initialize().catch(console.error)
     }
 
-    async parseMeetingUrl(browser: puppeteer.Browser, meeting_url: string) {
+    async parseMeetingUrl(browser: Browser, meeting_url: string) {
         return parseMeetingUrlFromJoinInfos(meeting_url)
     }
+
     getMeetingLink(
         meeting_id: string,
         _password: string,
@@ -34,99 +34,82 @@ export class MeetProvider implements MeetingProviderInterface {
     ) {
         return meeting_id
     }
+
     async openMeetingPage(
-        browser: puppeteer.Browser,
+        browser: Browser,
         link: string,
         streaming_input: string | undefined,
-    ): Promise<puppeteer.Page> {
-        const url = new URL(link)
-
-        const context = browser.defaultBrowserContext()
-        await context.clearPermissionOverrides()
-        if (streaming_input) {
-            await context.overridePermissions(url.origin, [
-                'microphone',
-                'camera',
-            ])
-        } else {
-            await context.overridePermissions(url.origin, ['camera'])
+    ): Promise<Page> {
+        try {
+            console.log('Creating new page in existing context...')
+            const page = await browser.newPage()
+            
+            console.log(`Navigating to ${link}...`)
+            await page.goto(link, {
+                waitUntil: 'networkidle',
+                timeout: 30000
+            })
+            console.log('Navigation completed')
+            
+            return page
+        } catch (error) {
+            console.error('openMeetingPage error:', {
+                message: (error as Error).message,
+                stack: (error as Error).stack,
+                name: (error as Error).name
+            })
+            throw error
         }
-
-        const page = await browser.newPage()
-        await page.goto(link, { waitUntil: 'networkidle2' })
-        return page
     }
 
     async joinMeeting(
-        page: puppeteer.Page,
+        page: Page,
         cancelCheck: () => boolean,
         meetingParams: MeetingParams,
     ): Promise<void> {
         await clickDismiss(page)
         await sleep(300)
-        let maxAttempts = 5
 
         console.log(
             'useWithoutAccountClicked:',
-            await clickWithInnerText(
-                page,
-                'span',
-                ['Use without an account'],
-                5,
-            ),
+            await clickWithInnerText(page, 'span', ['Use without an account'], 5),
         )
+
         await Logger.instance.screenshot(page, `before_typing_bot_name`)
+        
         for (let attempt = 1; attempt <= 5; attempt++) {
             if (await typeBotName(page, meetingParams.bot_name)) {
                 console.log('Bot name typed at attempt', attempt)
                 break
             }
-            await Logger.instance.screenshot(
-                page,
-                `bot_name_typing_failed_attempt_${attempt}`,
-            )
+            await Logger.instance.screenshot(page, `bot_name_typing_failed_attempt_${attempt}`)
             await clickOutsideModal(page)
             await page.waitForTimeout(500)
         }
-        // await typeBotName(page, meetingParams.bot_name)
+
         await Logger.instance.screenshot(page, `after_typing_bot_name`)
-        // await MuteMicrophone(page)
-        const askToJoinClicked = await clickWithInnerText(
-            page,
-            'span',
-            ['Ask to join', 'Join now'],
-            10,
-        )
+
+        const askToJoinClicked = await clickWithInnerText(page, 'span', ['Ask to join', 'Join now'], 10)
         if (!askToJoinClicked) {
             throw new JoinError(JoinErrorCode.CannotJoinMeeting)
         }
 
         await findShowEveryOne(page, false, cancelCheck)
 
-        // Send entry message in chat if any
         if (meetingParams.enter_message) {
             console.log('Sending entry message...')
-            console.log(
-                'send message?',
-                await sendEntryMessage(page, meetingParams.enter_message),
-            )
+            console.log('send message?', await sendEntryMessage(page, meetingParams.enter_message))
             await sleep(100)
         }
 
+        const maxAttempts = 5
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
             if (await changeLayout(page, meetingParams.recording_mode)) {
-                console.log(
-                    `Changement de disposition réussi à la tentative ${attempt}.`,
-                )
+                console.log(`Layout change successful on attempt ${attempt}`)
                 break
             }
-
-            console.log(`Tentative ${attempt} échouée.`)
-            await Logger.instance.screenshot(
-                page,
-                `layout_change_failed_attempt_${attempt}`,
-            )
-
+            console.log(`Attempt ${attempt} failed`)
+            await Logger.instance.screenshot(page, `layout_change_failed_attempt_${attempt}`)
             await clickOutsideModal(page)
             await page.waitForTimeout(500)
         }
@@ -147,11 +130,8 @@ export class MeetProvider implements MeetingProviderInterface {
             try {
                 await Promise.race([
                     page.evaluate(() => document.readyState),
-                    new Promise((_, reject) =>
-                        setTimeout(
-                            () => reject(new Error('Page freeze timeout')),
-                            30000,
-                        ),
+                    new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Page freeze timeout')), 30000)
                     ),
                 ])
             } catch (e) {
@@ -159,73 +139,47 @@ export class MeetProvider implements MeetingProviderInterface {
                 isPageFrozen = true
             }
 
-            // Si la page est gelée, vérifier s'il y a des frames
             if (isPageFrozen) {
                 const frameAnalyzer = FrameAnalyzer.getInstance()
                 const framesDir = await frameAnalyzer.getFramesDirectory()
-
                 try {
                     const files = await fs.readdir(framesDir)
-                    const hasFrames = files.some((file) =>
-                        file.endsWith('.jpg'),
-                    )
-
-                    if (!hasFrames) {
-                        console.log(
-                            'Page is frozen and no frames detected - meeting likely failed to start recording',
-                        )
+                    if (!files.some(file => file.endsWith('.jpg'))) {
+                        console.log('Page is frozen and no frames detected')
                         return true
                     }
                 } catch (e) {
-                    console.log(
-                        'Failed to read frames directory, assuming no frames exist',
-                    )
+                    console.log('Failed to read frames directory')
                     return true
                 }
             }
 
-            // Le reste des vérifications normales
             if (!page.isClosed()) {
-                try {
-                    const elements = await page.$$('*')
-                    for (const element of elements) {
-                        const text = await element.evaluate(
-                            (el) => (el as HTMLElement).innerText,
-                        )
-                        if (
-                            text?.includes("You've been removed") ||
-                            text?.includes(
-                                'we encountered a problem joining',
-                            ) ||
-                            text?.includes('The call ended') ||
-                            text?.includes('Return to home') ||
-                            text?.includes('The call ended')
-                        ) {
-                            console.log(
-                                'End meeting detected through page content:',
-                                text,
-                            )
-                            return true
-                        }
-                    }
-                } catch (e) {
-                    console.log('Page access failed, falling back to OCR')
+                const content = await page.content()
+                const endMessages = [
+                    "You've been removed",
+                    'we encountered a problem joining',
+                    'The call ended',
+                    'Return to home'
+                ]
+                
+                if (endMessages.some(msg => content.includes(msg))) {
+                    console.log('End meeting detected through page content')
+                    return true
                 }
             }
 
-            // Vérification OCR
-            console.log('OCR, trying to find end meeting')
+            // OCR Check
             const frameAnalyzer = FrameAnalyzer.getInstance()
             const lastText = frameAnalyzer.getLastFrameText()
-            if (
-                lastText?.includes("You've been removed") ||
+            if (lastText?.includes("You've been removed") ||
                 lastText?.includes('we encountered a problem joining') ||
                 lastText?.includes('The call ended') ||
-                lastText?.includes('Return to home')
-            ) {
+                lastText?.includes('Return to home')) {
                 console.log('End meeting detected through OCR:', lastText)
                 return true
             }
+            
             return false
         } catch (error) {
             console.error('Error in findEndMeeting:', error)
@@ -235,39 +189,27 @@ export class MeetProvider implements MeetingProviderInterface {
 }
 
 async function findShowEveryOne(
-    page: puppeteer.Page,
+    page: Page,
     click: boolean,
     cancelCheck: () => boolean,
 ) {
     let showEveryOneFound = false
     let i = 0
 
-    while (showEveryOneFound === false) {
-        showEveryOneFound = await page.$$eval(
-            'button',
-            (elems, click) => {
-                for (const e of elems) {
-                    let elem = e as any
-                    // 2024-08-26 : 'People' seems to be the new ariaLabel value and it replaces 'Show everyone'
-                    if (
-                        elem.ariaLabel === 'Show everyone' ||
-                        elem.ariaLabel === 'People'
-                    ) {
-                        if (click) {
-                            elem.click()
-                        }
-                        return true
-                    }
-                }
-                return false
-            },
-            click,
-        )
+    while (!showEveryOneFound) {
+        const button = page.locator('button[aria-label="Show everyone"], button[aria-label="People"]')
+        showEveryOneFound = await button.count() > 0
+        if (showEveryOneFound && click) {
+            await button.click()
+        }
+
         await Logger.instance.screenshot(page, `findShowEveryone`)
         console.log({ showEveryOneFound })
+        
         if (cancelCheck()) {
             throw new JoinError(JoinErrorCode.TimeoutWaitingToStart)
         }
+        
         try {
             if (await notAcceptedInMeeting(page)) {
                 console.log('Bot not accepted, exiting meeting')
@@ -276,11 +218,12 @@ async function findShowEveryOne(
         } catch (error) {
             if (error instanceof JoinError) {
                 console.log('Caught JoinError, exiting meeting')
-                throw error // This will propagate the error up
+                throw error
             }
             console.error('Unexpected error:', error)
         }
-        if (showEveryOneFound === false) {
+        
+        if (!showEveryOneFound) {
             await sleep(1000)
         }
         i++
@@ -298,71 +241,42 @@ async function sendEntryMessage(
         await page.click('button[aria-label="Chat with everyone"]')
         await page.waitForSelector(
             'textarea[placeholder="Send a message"], textarea[aria-label="Send a message to everyone"]',
+            { state: 'visible' }
         )
 
-        let res = await page.evaluate(async (message) => {
-            const textarea = document.querySelector(
-                'textarea[placeholder="Send a message"], textarea[aria-label="Send a message to everyone"]',
-            )
-            if (textarea) {
-                ;(textarea as HTMLTextAreaElement).focus()
-                ;(textarea as HTMLTextAreaElement).value = message
-                textarea.dispatchEvent(new Event('input', { bubbles: true }))
+        const textarea = page.locator('textarea[placeholder="Send a message"], textarea[aria-label="Send a message to everyone"]')
+        await textarea.fill(enterMessage)
 
-                const icons = document.querySelectorAll('i')
-                const sendIcon = Array.from(icons).find((icon) =>
-                    icon.textContent.includes('send'),
-                )
-                const sendButton = sendIcon ? sendIcon.closest('button') : null
-
-                if (sendButton) {
-                    if (sendButton.disabled) {
-                        sendButton.disabled = false
-                    }
-                    sendButton.click()
-                    console.log('Clicked on send button')
-                    return true
-                } else {
-                    console.log('Send button not found')
-                    return false
-                }
-            } else {
-                console.log('Textarea not found')
-                return false
-            }
-        }, enterMessage)
-        page.click('button[aria-label="Chat with everyone"]')
-        return res
+        const sendButton = page.locator('button:has(i:text("send"))')
+        if (await sendButton.count() > 0) {
+            await sendButton.click()
+            console.log('Clicked on send button')
+            await page.click('button[aria-label="Chat with everyone"]')
+            return true
+        }
+        console.log('Send button not found')
+        return false
     } catch (error) {
         console.error('Failed to send entry message:', error)
         return false
     }
 }
+
 async function notAcceptedInMeeting(page: Page): Promise<boolean> {
     try {
-        const denied = await page.$$eval('*', (elems) => {
-            for (const e of elems) {
-                let elem = e as HTMLElement
-                if (elem.innerText && typeof elem.innerText === 'string') {
-                    if (
-                        elem.innerText.includes('denied') ||
-                        elem.innerText.includes("You've been removed") ||
-                        elem.innerText.includes(
-                            'we encountered a problem joining',
-                        ) ||
-                        elem.innerText.includes("You can't join")
-                    ) {
-                        console.log('XXXXXXXXXXXXXXXXXX User has denied entry')
-                        return true
-                    }
-                }
-            }
-            return false
-        })
+        const deniedTexts = [
+            'denied',
+            "You've been removed",
+            'we encountered a problem joining',
+            "You can't join"
+        ]
 
-        if (denied) {
-            console.log('Access denied, throwing JoinError')
-            throw new JoinError(JoinErrorCode.BotNotAccepted)
+        for (const text of deniedTexts) {
+            const element = page.locator(`text=${text}`)
+            if (await element.count() > 0) {
+                console.log('XXXXXXXXXXXXXXXXXX User has denied entry')
+                throw new JoinError(JoinErrorCode.BotNotAccepted)
+            }
         }
 
         return false
@@ -384,40 +298,24 @@ async function removedFromMeeting(page: Page): Promise<boolean> {
             'Return to home',
             "You've been removed from the meeting",
         ]
-        const RETRY_DELAY = 500
 
-        const checkForRemoval = async () => {
-            return await page.evaluate((messages) => {
-                const elements = document.querySelectorAll('*')
-
-                for (const element of elements) {
-                    const text = element.textContent || ''
-
-                    // Still in meeting if we see 'Leave call'
-                    if (text.includes('Leave call')) {
-                        console.log('Leave call found, still in meeting')
-                        return false
-                    }
-
-                    // Check for any removal messages
-                    if (messages.some((msg) => text.includes(msg))) {
-                        console.log('Removal message found, removed bot')
-                        return true
-                    }
-                }
-                return false
-            }, REMOVAL_MESSAGES)
+        // Vérifier si "Leave call" est toujours présent
+        const leaveCallButton = page.locator('text="Leave call"')
+        if (await leaveCallButton.count() > 0) {
+            console.log('Leave call found, still in meeting')
+            return false
         }
 
-        // First check
-        const firstCheck = await checkForRemoval()
-        if (firstCheck) {
-            return true
+        // Vérifier les messages de fin
+        for (const message of REMOVAL_MESSAGES) {
+            const element = page.locator(`text="${message}"`)
+            if (await element.count() > 0) {
+                console.log('Removal message found:', message)
+                return true
+            }
         }
 
-        // Wait and do second check
-        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY))
-        return await checkForRemoval()
+        return false
     } catch (error) {
         console.error('Error in removedFromMeeting:', error)
         if (error instanceof Error) {
@@ -433,64 +331,46 @@ async function removedFromMeeting(page: Page): Promise<boolean> {
 
 async function clickDismiss(page: Page): Promise<boolean> {
     try {
-        return await page.$$eval('div[role=button]', (elems) => {
-            for (const e of elems) {
-                let elem = e as any
-                if (elem.innerText === 'Dismiss') {
-                    elem.click()
-                    return true
-                }
-            }
-            return false
-        })
+        const dismissButton = await page.locator('div[role=button]')
+            .filter({ hasText: 'Dismiss' })
+            .first()
+        if (await dismissButton.count() > 0) {
+            await dismissButton.click()
+            return true
+        }
+        return false
     } catch (e) {
         console.error('[joinMeeting] meet find dismiss', e)
         return false
     }
 }
 
-export async function clickWithInnerText(
-    page: puppeteer.Page,
-    htmlType: string,
-    innerText: string[],
-    iterations: number,
-    clickParent: boolean = false,
+async function clickWithInnerText(
+    page: Page,
+    selector: string,
+    texts: string[],
+    maxAttempts: number,
+    shouldClick: boolean = true
 ): Promise<boolean> {
-    let i = 0
-    let buttonClicked = false
-
-    while (!buttonClicked && i < iterations) {
+    for (let i = 0; i < maxAttempts; i++) {
         try {
-            buttonClicked = await page.$$eval(
-                htmlType,
-                (elems, innerText, clickParent) => {
-                    let buttonClicked = false
-                    for (const e of elems) {
-                        let elem = e as any
-                        for (const text of innerText as string[]) {
-                            if (elem.innerText === text) {
-                                buttonClicked = true
-                                if (clickParent) {
-                                    elem.parentElement.click()
-                                } else {
-                                    elem.click()
-                                }
-                                break
-                            }
-                        }
+            for (const text of texts) {
+                const element = await page.locator(`${selector}:has-text("${text}")`)
+                if (await element.count() > 0) {
+                    if (shouldClick) {
+                        await element.click()
                     }
-                    return buttonClicked
-                },
-                innerText,
-                clickParent,
-            )
+                    return true
+                }
+            }
         } catch (e) {
-            console.error('exeption in use without an account')
+            if (i === maxAttempts - 1) {
+                console.error(`Error in clickWithInnerText (last attempt):`, e)
+            }
         }
-        await sleep(100)
-        i += 1
+        await page.waitForTimeout(100 + i * 100)
     }
-    return buttonClicked
+    return false
 }
 
 async function changeLayout(
@@ -498,51 +378,31 @@ async function changeLayout(
     recordingMode: RecordingMode,
 ): Promise<boolean> {
     try {
-        const moreVertClicked = await clickWithInnerText(
-            page,
-            'i',
-            ['more_vert'],
-            10,
-        )
-        console.log('more vert clicked: ', moreVertClicked)
-        if (!moreVertClicked) return false
+        const moreVertButton = page.locator('i:text("more_vert")')
+        if (!await moreVertButton.click().then(() => true).catch(() => false)) {
+            return false
+        }
+        console.log('more vert clicked')
 
-        const changeLayoutClicked = await clickWithInnerText(
-            page,
-            'span',
-            ['Change layout'],
-            10,
-        )
-        console.log('span change layout clicked: ', changeLayoutClicked)
-        if (!changeLayoutClicked) return false
+        const changeLayoutButton = page.locator('span:text("Change layout")')
+        if (!await changeLayoutButton.click().then(() => true).catch(() => false)) {
+            return false
+        }
+        console.log('change layout clicked')
 
-        let layoutChangeSuccessful = false
+        let layoutButton
         if (recordingMode === 'gallery_view') {
-            layoutChangeSuccessful = await clickWithInnerText(
-                page,
-                'span',
-                ['Tiled'],
-                10,
-                true,
-            )
-            console.log('gallery view clicked: ', layoutChangeSuccessful)
+            layoutButton = page.locator('span:text("Tiled")')
         } else {
-            layoutChangeSuccessful = await clickWithInnerText(
-                page,
-                'span',
-                ['Spotlight'],
-                10,
-                true,
-            )
-            console.log('spotlight clicked: ', layoutChangeSuccessful)
-            //TODO: ajouter une capture d'écran si false
+            layoutButton = page.locator('span:text("Spotlight")')
         }
 
-        if (!layoutChangeSuccessful) return false
+        if (!await layoutButton.click().then(() => true).catch(() => false)) {
+            return false
+        }
+        console.log(`${recordingMode} clicked`)
 
         await clickOutsideModal(page)
-        // click outside the modal to close it
-
         return true
     } catch (e) {
         console.error('Error in changeLayout:', e)
@@ -566,22 +426,15 @@ async function typeBotName(page: Page, botName: string): Promise<boolean> {
     try {
         await page.waitForSelector(INPUT, { timeout: 1000 })
 
-        await page.$$eval(INPUT, (elems) => {
-            for (const elem of elems) {
-                ;(elem as any).value = ''
-            }
-        })
-        await page.focus(INPUT)
-        await page.keyboard.type(BotNameTyped)
-        return await page.$$eval(
-            INPUT,
-            (elems, BotNameTyped) => {
-                for (const elem of elems) {
-                    return (elem as any).value.includes(BotNameTyped)
-                }
-            },
-            BotNameTyped,
-        )
+        // Effacer le champ de texte existant
+        await page.fill(INPUT, '')
+        
+        // Taper le nouveau nom
+        await page.fill(INPUT, BotNameTyped)
+        
+        // Vérifier que le texte a bien été saisi
+        const inputValue = await page.inputValue(INPUT)
+        return inputValue.includes(BotNameTyped)
     } catch (e) {
         console.error('error in typeBotName', e)
         return false

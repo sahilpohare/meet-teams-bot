@@ -1,24 +1,23 @@
 import { BrandingHandle, generateBranding, playBranding } from './branding'
+import { getCachedExtensionId, listenPage, openBrowser } from './browser'
 import { LOCAL_RECORDING_SERVER_LOCATION, delSessionInRedis } from './instance'
 import { SoundContext, VideoContext } from './media_context'
-import { getCachedExtensionId, listenPage, openBrowser } from './puppeteer'
 import {
     CancellationToken,
-    Meeting,
     MeetingParams,
     MeetingProvider,
     MeetingProviderInterface,
     MeetingStatus,
-    SpeakerData,
+    SpeakerData
 } from './types'
 
-import { Page } from 'puppeteer'
 
+// import { Browser as PuppeteerBrowser, Page as PuppeteerPage } from 'puppeteer'
+import { Page as PlaywrightPage } from 'playwright'
 import { Events } from './events'
 import { Logger } from './logger'
 import { MeetProvider } from './meeting/meet'
 import { TeamsProvider } from './meeting/teams'
-import { ZoomProvider } from './meeting/zoom'
 import { TRANSCODER } from './transcoder'
 import { uploadTranscriptTask } from './uploadTranscripts'
 import { sleep } from './utils'
@@ -67,9 +66,12 @@ const MAX_RETRIES = 3
 const FIND_END_MEETING_SLEEP = 250
 
 export class JoinError extends Error {
-    constructor(code: JoinErrorCode) {
-        super(code)
-        this.name = 'JoinError'
+    details?: any;
+
+    constructor(message: string, details?: any) {
+        super(message);
+        this.name = 'JoinError';
+        this.details = details;
     }
 }
 
@@ -91,10 +93,15 @@ export class Status {
     }
 }
 
+
+
 export class MeetingHandle {
     static instance: MeetingHandle = null
     static status: Status = new Status()
-    private meeting: Meeting
+    private playwrightPage: PlaywrightPage
+    private backgroundPage: PlaywrightPage
+    private browserContext: any
+    private meetingTimeoutInterval: NodeJS.Timeout | null
     private param: MeetingParams
     private brandingGenerateProcess: BrandingHandle | null
     private provider: MeetingProviderInterface
@@ -121,7 +128,7 @@ export class MeetingHandle {
         return MeetingHandle.instance.param.bot_uuid
     }
     static async stopAudioStreaming() {
-        await MeetingHandle.instance.meeting.backgroundPage!.evaluate(() => {
+        await MeetingHandle.instance.backgroundPage!.evaluate(() => {
             const w = window as any
             return w.stopAudioStreaming()
         })
@@ -132,10 +139,8 @@ export class MeetingHandle {
         ): MeetingProviderInterface {
             if (meetingProvider === 'Teams') {
                 return new TeamsProvider()
-            } else if (meetingProvider === 'Meet') {
-                return new MeetProvider()
             } else {
-                return new ZoomProvider()
+                return new MeetProvider()
             }
         }
         console.log(
@@ -144,12 +149,9 @@ export class MeetingHandle {
         )
         this.provider = newMeetingProvider(meetingParams.meetingProvider)
         this.param = meetingParams
-        this.meeting = {
-            page: null,
-            backgroundPage: null,
-            browser: null,
-            meetingTimeoutInterval: null,
-        }
+        this.browserContext = null
+        this.playwrightPage = null
+        this.backgroundPage = null
         this.param.local_recording_server_location =
             LOCAL_RECORDING_SERVER_LOCATION
         // TODO : Remove that when we will develop gallery_view
@@ -162,34 +164,111 @@ export class MeetingHandle {
     public async startRecordMeeting(maxRetries = MAX_RETRIES) {
         let joinSuccess = false
 
-        // Étape 1: Setup initial (branding)
-        if (this.param.bot_branding) {
-            this.brandingGenerateProcess = generateBranding(
-                this.param.bot_name,
-                this.param.custom_branding_bot_path,
-            )
-            await this.brandingGenerateProcess.wait
-            playBranding()
-        }
-
         try {
+            console.log('=== INITIALIZATION CHECK ===')
+            console.log('Checking provider initialization:', {
+                providerExists: !!this.provider,
+                providerType: this.provider?.constructor.name,
+                paramsExist: !!this.param,
+                meetingUrl: this.param?.meeting_url
+            })
+
+            if (!this.provider || !this.param) {
+                console.error('Critical initialization error:', {
+                    provider: !!this.provider,
+                    params: !!this.param
+                })
+                throw new JoinError('InitializationError')
+            }
+
+            console.log('=== PARAMETERS VALIDATION ===')
+            console.log('Meeting parameters:', {
+                meetingUrl: this.param.meeting_url,
+                botName: this.param.bot_name,
+                recordingMode: this.param.recording_mode,
+                hasBranding: !!this.param.bot_branding,
+                hasStreamingInput: !!this.param.streaming_input
+            })
+
+            // Validate required parameters
+            if (!this.param.meeting_url) {
+                console.error('Missing meeting URL')
+                throw new JoinError('MissingMeetingUrl')
+            }
+
+            if (!this.param.bot_name) {
+                console.error('Missing bot name')
+                throw new JoinError('MissingBotName')
+            }
+
+            try {
+                // Validate meeting URL format
+                new URL(this.param.meeting_url)
+            } catch (e) {
+                console.error('Invalid meeting URL format:', this.param.meeting_url)
+                throw new JoinError('InvalidMeetingUrl')
+            }
+
+            console.log('=== Starting startRecordMeeting ===', {
+                maxRetries,
+                meetingUrl: this.param.meeting_url,
+                provider: this.param.meetingProvider,
+                botName: this.param.bot_name
+            })
+
+            // Étape 1: Setup initial (branding)
+            console.log('=== Step 1: Initial Setup ===')
+            if (this.param.bot_branding) {
+                console.log('Starting branding generation...', {
+                    botName: this.param.bot_name,
+                    brandingPath: this.param.custom_branding_bot_path
+                })
+                this.brandingGenerateProcess = generateBranding(
+                    this.param.bot_name,
+                    this.param.custom_branding_bot_path,
+                )
+                await this.brandingGenerateProcess.wait
+                console.log('Branding generation completed')
+                playBranding()
+            }
+
             // Étape 2: Setup du browser
+            console.log('=== Step 2: Browser Setup ===')
+            console.log('Fetching extension ID...')
             const extensionId = await getCachedExtensionId()
+            console.log('Extension ID retrieved:', extensionId)
+            
+            console.log('Opening browser...')
             const { browser, backgroundPage } = await openBrowser(
                 extensionId,
                 false,
                 false,
-            )
-            this.meeting.browser = browser
-            this.meeting.backgroundPage = backgroundPage
-            console.log('Extension found', { extensionId })
+            ).catch(error => {
+                console.error('Failed to open browser:', {
+                    error,
+                    stack: error.stack
+                })
+                throw error
+            })
+            console.log('Browser opened successfully')
+            
+            this.browserContext = browser
+            this.backgroundPage = backgroundPage
 
             // Étape 3: Récupération des infos de la réunion
+            console.log('=== Step 3: Meeting Info Retrieval ===')
+            console.log('Parsing meeting URL:', this.param.meeting_url)
             const { meetingId, password } = await this.provider.parseMeetingUrl(
-                this.meeting.browser,
+                this.browserContext,
                 this.param.meeting_url,
-            )
-            console.log('meeting id found', { meetingId })
+            ).catch(error => {
+                console.error('Failed to parse meeting URL:', {
+                    error,
+                    stack: error.stack
+                })
+                throw error
+            })
+            console.log('Meeting info parsed:', { meetingId, hasPassword: !!password })
 
             const meetingLink = this.provider.getMeetingLink(
                 meetingId,
@@ -198,10 +277,10 @@ export class MeetingHandle {
                 this.param.bot_name,
                 this.param.enter_message,
             )
-            console.log('Meeting link found', { meetingLink })
+            console.log('Meeting link generated:', meetingLink)
 
             async function handleWaitingRoom(
-                page: Page,
+                page: PlaywrightPage,
                 provider: MeetingProviderInterface,
                 params: MeetingParams,
             ): Promise<void> {
@@ -261,101 +340,109 @@ export class MeetingHandle {
             }
 
             // boucle de retry de startRecordMeeting
-            for (
-                let attempt = 0;
-                attempt < maxRetries && !joinSuccess;
-                attempt++
-            ) {
+            console.log('=== Starting join attempts ===')
+            for (let attempt = 0; attempt < maxRetries && !joinSuccess; attempt++) {
                 try {
-                    this.meeting.page = await this.provider.openMeetingPage(
-                        this.meeting.browser,
-                        meetingLink,
+                    console.log(`Starting attempt ${attempt + 1}/${maxRetries}`)
+                    
+                    console.log('Opening meeting page...')
+                    this.playwrightPage = await this.provider.openMeetingPage(
+                        this.browserContext,
+                        this.param.meeting_url,
                         this.param.streaming_input,
-                    )
-                    console.log('meeting page opened')
+                    ).catch(error => {
+                        console.error('Failed to open meeting page:', {
+                            error,
+                            stack: error.stack
+                        })
+                        throw error
+                    })
+                    console.log('Meeting page opened successfully')
 
-                    // Configuration du timeout du meeting avant de commencer
-                    this.meeting.meetingTimeoutInterval = setTimeout(() => {
+                    // Configuration du timeout
+                    console.log(`Setting meeting timeout to ${RECORDING_TIMEOUT}ms`)
+                    this.meetingTimeoutInterval = setTimeout(() => {
+                        console.log('Meeting timeout triggered')
                         MeetingHandle.instance?.meetingTimeout()
                     }, RECORDING_TIMEOUT)
 
                     Events.inWaitingRoom()
+                    console.log('Entering waiting room...')
 
                     try {
                         await handleWaitingRoom(
-                            this.meeting.page,
+                            this.playwrightPage,
                             this.provider,
                             this.param,
                         )
+                        console.log('Successfully joined meeting!')
                         joinSuccess = true
                     } catch (error) {
-                        console.error(
-                            `Attempt ${attempt + 1} failed with error:`,
-                            error instanceof JoinError ? error.message : error,
-                        )
+                        console.error('Waiting room error:', {
+                            message: (error as Error).message,
+                            stack: (error as Error).stack,
+                            name: (error as Error).name,
+                            isJoinError: error instanceof JoinError,
+                            details: error
+                        })
 
                         if (error instanceof JoinError) {
                             if (
-                                error.message ===
-                                    JoinErrorCode.BotNotAccepted ||
-                                error.message ===
-                                    JoinErrorCode.TimeoutWaitingToStart
+                                error.message === JoinErrorCode.BotNotAccepted ||
+                                error.message === JoinErrorCode.TimeoutWaitingToStart
                             ) {
-                                console.log(
-                                    `${error.message}, initiating shutdown sequence...`,
-                                )
+                                console.log(`Critical join error: ${error.message}`)
                                 MeetingHandle.status.state = 'Cleanup'
-
                                 await this.cleanEverything()
                                 throw error
                             }
                         }
 
-                        // En cas d'erreur, nettoyer le timeout du meeting
-                        clearTimeout(this.meeting.meetingTimeoutInterval)
+                        console.log('Cleaning up failed attempt...')
+                        clearTimeout(this.meetingTimeoutInterval)
 
-                        if (this.meeting.page) {
-                            await this.meeting.page
-                                .close()
-                                .catch((e) =>
-                                    console.error('Error closing page:', e),
-                                )
-                        }
+                        // if (this.playwrightPage) {
+                        //     console.log('Closing playwright page...')
+                        //     await this.playwrightPage.close()
+                        //         .catch(e => console.error('Error closing page:', e))
+                        // }
 
                         if (attempt === maxRetries - 1) {
+                            console.error('Max retries reached, initiating final cleanup')
                             await this.cleanEverything()
                             throw error
                         }
 
-                        console.log(
-                            `Retrying... (${attempt + 1}/${maxRetries})`,
-                        )
+                        console.log(`Waiting before retry ${attempt + 1}/${maxRetries}`)
                         await sleep(2000)
                     }
                 } catch (error) {
-                    clearTimeout(this.meeting.meetingTimeoutInterval)
+                    console.error(`Attempt ${attempt + 1} failed with error:`, {
+                        message: (error as Error).message,
+                        stack: (error as Error).stack,  
+                        name: (error as Error).name,
+                        details: error
+                    })
+
+                    clearTimeout(this.meetingTimeoutInterval)
 
                     if (error instanceof JoinError) {
                         throw error
                     }
 
-                    console.error(
-                        `Error in retry loop (attempt ${attempt + 1}):`,
-                        error,
-                    )
                     if (attempt === maxRetries - 1) {
                         await this.cleanEverything()
-                        throw error
+                        throw new JoinError(JoinErrorCode.Internal)
                     }
                 }
             }
 
             if (!joinSuccess) {
-                throw new Error('Failed to join meeting after all retries')
+                throw new JoinError(JoinErrorCode.Internal)
             }
 
             // Étape 5: Setup de l'enregistrement
-            listenPage(this.meeting.backgroundPage)
+            listenPage(this.backgroundPage)
 
             const timeoutPromise = new Promise((_, reject) => {
                 setTimeout(() => {
@@ -388,7 +475,7 @@ export class MeetingHandle {
                 }
 
                 // Nettoyage du HTML
-                await this.meeting.backgroundPage.evaluate(
+                await this.backgroundPage.evaluate(
                     async (params) => {
                         const w = window as any
                         await w.remove_shitty_html(
@@ -405,32 +492,29 @@ export class MeetingHandle {
                 await sleep(3000)
 
                 // Démarrage de l'enregistrement
-                let result: string | number =
-                    await this.meeting.backgroundPage.evaluate(
-                        async (meuh) => {
-                            try {
-                                const w = window as any
-                                let res = await w.startRecording(
-                                    meuh.local_recording_server_location,
-                                    meuh.chunk_duration,
-                                    meuh.streaming_output,
-                                    meuh.streaming_audio_frequency,
-                                )
-                                return res as number
-                            } catch (error) {
-                                console.error(error)
-                                return error as string
-                            }
-                        },
-                        {
-                            local_recording_server_location:
-                                this.param.local_recording_server_location,
-                            chunk_duration: CHUNK_DURATION,
-                            streaming_output: this.param.streaming_output,
-                            streaming_audio_frequency:
-                                this.param.streaming_audio_frequency,
-                        },
-                    )
+                let result: string | number = await this.backgroundPage.evaluate(
+                    async (params) => {
+                        try {
+                            const w = window as any
+                            let res = await w.startRecording(
+                                params.local_recording_server_location,
+                                params.chunk_duration,
+                                params.streaming_output,
+                                params.streaming_audio_frequency,
+                            )
+                            return res as number
+                        } catch (error) {
+                            console.error(error)
+                            return error as string
+                        }
+                    },
+                    {
+                        local_recording_server_location: this.param.local_recording_server_location,
+                        chunk_duration: CHUNK_DURATION,
+                        streaming_output: this.param.streaming_output,
+                        streaming_audio_frequency: this.param.streaming_audio_frequency,
+                    }
+                )
 
                 if (typeof result === 'number') {
                     console.info(`START_RECORDING_TIMESTAMP = ${result}`)
@@ -441,7 +525,7 @@ export class MeetingHandle {
                 }
 
                 // Démarrage de l'observation des speakers
-                await this.meeting.backgroundPage.evaluate(
+                await this.backgroundPage.evaluate(
                     async (params) => {
                         const w = window as any
                         await w.start_speakers_observer(
@@ -472,12 +556,33 @@ export class MeetingHandle {
                 throw new JoinError(JoinErrorCode.Internal)
             }
         } catch (error) {
-            await new Promise((resolve) => setTimeout(resolve, 2000))
-            await this.cleanEverything()
-            MeetingHandle.status.error = error
-            throw error instanceof JoinError
-                ? error
-                : new JoinError(JoinErrorCode.Internal)
+            console.error('Fatal error in startRecordMeeting:', {
+                error,
+                errorType: error.constructor.name,
+                message: (error as Error).message,
+                stack: (error as Error).stack,
+                params: {
+                    meetingUrl: this.param?.meeting_url,
+                    botName: this.param?.bot_name,
+                    providerExists: !!this.provider
+                }
+            })
+
+            // Ensure proper cleanup
+            try {
+                await this.cleanEverything()
+            } catch (cleanupError) {
+                console.error('Error during cleanup:', cleanupError)
+            }
+
+            // Convert unknown errors to JoinError
+            if (!(error instanceof JoinError)) {
+                throw new JoinError(
+                    (error as Error).message || 'InternalError',
+                    { originalError: error }
+                )
+            }
+            throw error
         }
     }
 
@@ -504,16 +609,16 @@ export class MeetingHandle {
 
     private async cleanMeeting() {
         try {
-            await this.meeting.page?.close()
+            await this.playwrightPage?.close()
         } catch (e) {}
         try {
-            await this.meeting.backgroundPage?.close()
+            await this.backgroundPage?.close()
         } catch (e) {}
         try {
-            await this.meeting.browser?.close()
+            await this.browserContext?.close()
         } catch (e) {}
         try {
-            clearTimeout(this.meeting.meetingTimeoutInterval!)
+            clearTimeout(this.meetingTimeoutInterval!)
         } catch (e) {}
     }
 
@@ -556,7 +661,7 @@ export class MeetingHandle {
                 await this.provider
                     .findEndMeeting(
                         this.param,
-                        this.meeting.page!,
+                        this.playwrightPage!,
                         cancelationToken,
                     )
                     .catch((e) => {
@@ -638,58 +743,67 @@ export class MeetingHandle {
             console.log('Step 1: Stopping media recorder...')
             let lastChunkProcessed = false
             try {
-                await this.meeting.backgroundPage?.evaluate(() =>
-                    (window as any).stopMediaRecorder?.(),
-                )
-                // Attendre que le dernier chunk soit traité naturellement
-                await new Promise((resolve) => setTimeout(resolve, 2000))
-                lastChunkProcessed = true
+                if (this.backgroundPage) {
+                    await this.backgroundPage.evaluate(() =>
+                        (window as any).stopMediaRecorder?.(),
+                    )
+                    // Attendre que le dernier chunk soit traité naturellement
+                    await new Promise((resolve) => setTimeout(resolve, 2000))
+                    lastChunkProcessed = true
+                }
             } catch (e) {
                 console.error('stopMediaRecorder error:', e)
             }
 
             // Étape 2: S'assurer que tout est bien terminé avec un chunk vide si nécessaire
-            if (!TRANSCODER.isSuccessfullyStopped() && !lastChunkProcessed) {
+            if (TRANSCODER && !lastChunkProcessed) {
                 console.log('Step 2: Sending final empty chunk to transcoder...')
                 await TRANSCODER.uploadChunk(Buffer.alloc(0), true)
             }
 
-            // Étape 3: Kill brutal du navigateur et des pages
+            // Étape 3: Kill brutal du navigateur
             console.log('Step 3: Force closing browser...')
             try {
-                this.meeting.browser?.process()?.kill('SIGKILL')
+                if (this.browserContext) {
+                    await this.browserContext.close()
+                }
             } catch (e) {
                 console.error('Browser kill error:', e)
             }
 
             // Étape 4: Attendre que le transcoder termine son traitement
             console.log('Step 4: Stopping transcoder and uploading video...')
-            await TRANSCODER.stop()
+            if (TRANSCODER) {
+                await TRANSCODER.stop()
+            }
 
             // Étape 5: Attendre que WordsPoster finisse de traiter sa queue
-            // Mais ne pas bloquer si ça échoue
             console.log('Step 5: Waiting for WordsPoster to finish...')
             try {
-                await WordsPoster.TRANSCRIBER?.stop()
+                if (WordsPoster.TRANSCRIBER) {
+                    await WordsPoster.TRANSCRIBER.stop()
+                }
             } catch (error) {
                 console.error('Error stopping WordsPoster:', error)
-                // Continue with shutdown even if transcription fails
             }
 
             // Étape 6: Upload de la dernière transcription
             console.log('Step 6: Uploading final transcript...')
-            await uploadTranscriptTask(
-                {
-                    name: 'END',
-                    id: 0,
-                    timestamp: Date.now(),
-                    isSpeaking: false,
-                } as SpeakerData,
-                true,
-            )
+            if (WordsPoster.TRANSCRIBER) {
+                await uploadTranscriptTask(
+                    {
+                        name: 'END',
+                        id: 0,
+                        timestamp: Date.now(),
+                        isSpeaking: false,
+                    } as SpeakerData,
+                    true,
+                )
+            }
 
-            this.meeting.meetingTimeoutInterval &&
-                clearTimeout(this.meeting.meetingTimeoutInterval)
+            if (this.meetingTimeoutInterval) {
+                clearTimeout(this.meetingTimeoutInterval)
+            }
             console.log('Meeting terminated successfully')
         } catch (error) {
             console.error('Fatal error during stopRecordingInternal:', error)
@@ -701,5 +815,23 @@ export class MeetingHandle {
         console.log('Meeting timeout reached, initiating shutdown...')
         MeetingHandle.status.state = 'Cleanup'
         await this.recordMeetingToEnd()
+    }
+
+    // Ajout d'une méthode helper pour la validation
+    private validateParameters() {
+        const requiredParams = {
+            meeting_url: this.param.meeting_url,
+            bot_name: this.param.bot_name,
+            recording_mode: this.param.recording_mode
+        }
+
+        const missingParams = Object.entries(requiredParams)
+            .filter(([_, value]) => !value)
+            .map(([key]) => key)
+
+        if (missingParams.length > 0) {
+            console.error('Missing required parameters:', missingParams)
+            throw new JoinError(`MissingParameters: ${missingParams.join(', ')}`)
+        }
     }
 }
