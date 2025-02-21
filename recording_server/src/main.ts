@@ -16,7 +16,6 @@ import { exit } from 'process'
 // import { generateBranding } from './branding'
 import { Api } from './api/methods'
 import { Consumer } from './rabbitmq'
-import { TRANSCODER } from './transcoder'
 import { JoinError, JoinErrorCode, MeetingParams } from './types'
 
 import { spawn } from 'child_process'
@@ -239,17 +238,6 @@ logger.info('version 0.0.1')
                             ? error.message
                             : 'Recording failed to complete',
                 })
-            } finally {
-                // S'assurer que le transcoder est arrêté et que la vidéo est uploadée
-                if (TRANSCODER) {
-                    await TRANSCODER.stop().catch((e) =>
-                        console.error('Error stopping transcoder:', e),
-                    )
-                    console.log(`${Date.now()} Uploading video to S3`)
-                    await TRANSCODER.uploadVideoToS3().catch((e) =>
-                        console.error('Cannot upload video to S3:', e),
-                    )
-                }
             }
         } else {
             // Configuring and launching LINUX ZOOM SDK

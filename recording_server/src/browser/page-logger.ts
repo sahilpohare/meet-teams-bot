@@ -1,7 +1,11 @@
 import { Page } from '@playwright/test'
 
 // Liste des URL à ignorer pour les erreurs
-const IGNORED_URLS = ['api.flightproxy.teams.microsoft.com', 'broker.skype.com']
+const IGNORED_URLS = [
+    'api.flightproxy.teams.microsoft.com',
+    'broker.skype.com',
+    'meet.google.com/$rpc/google.rtc.meetings.v1.MeetingDeviceService/UpdateMeetingDevice'
+]
 
 // Liste des erreurs à ignorer
 const IGNORED_ERRORS = [
@@ -39,6 +43,13 @@ export function listenPage(page: Page) {
     page.on('console', async (message) => {
         try {
             const text = message.text()
+            const location = message.location()
+
+            // Ignorer les messages si l'URL est dans la liste IGNORED_URLS
+            if (shouldIgnoreError(location.url)) {
+                return
+            }
+
             // Ignorer certains messages d'erreur connus
             if (IGNORED_ERRORS.some((err) => text.includes(err))) {
                 return
@@ -56,7 +67,6 @@ export function listenPage(page: Page) {
             )
 
             const type = message.type().substr(0, 3).toUpperCase()
-            const location = message.location()
             const tags = `${location.url}:${location.lineNumber}`
             const formattedText = args.length === 1 ? args[0] : args.join(' ')
 

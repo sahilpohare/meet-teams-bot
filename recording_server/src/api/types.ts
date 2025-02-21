@@ -17,6 +17,7 @@ export namespace ApiTypes {
         end_time: number | null
         lang: string | null
     }
+    
     export type QueryableTranscript = {
         id: number
         bot_id: number

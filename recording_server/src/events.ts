@@ -16,6 +16,7 @@ export class Events {
         )
     }
 
+
     static async joiningCall() {
         return Events.EVENTS?.send('joining_call')
     }
@@ -30,6 +31,14 @@ export class Events {
 
     static async inCallRecording() {
         return Events.EVENTS?.send('in_call_recording')
+    }
+
+    static async recordingPaused() {
+        return Events.EVENTS?.send('recording_paused')
+    }
+
+    static async recordingResumed() {
+        return Events.EVENTS?.send('recording_resumed')
     }
 
     static async callEnded() {

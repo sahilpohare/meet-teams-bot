@@ -1,84 +1,150 @@
-import { Events } from '../../events'
-import { MEETING_CONSTANTS } from '../constants'
+import { Events } from '../../events';
+import { MEETING_CONSTANTS } from '../constants';
 
-import { MeetingStateType, StateExecuteResult } from '../types'
-import { BaseState } from './base-state'
+import { MeetingStateType, StateExecuteResult } from '../types';
+import { BaseState } from './base-state';
+
+import { PathManager } from '../../utils/PathManager';
+
 
 export class RecordingState extends BaseState {
-    private readonly CHECK_INTERVAL = 250 // 250ms
+    private isProcessing: boolean = true;
+    private pathManager: PathManager;
+    private readonly CHECK_INTERVAL = 250;
 
     async execute(): StateExecuteResult {
         try {
-            console.info('Starting recording monitoring')
+            console.info('Starting recording state');
+            
+            // Initialiser PathManager
+            this.pathManager = PathManager.getInstance(this.context.params.bot_uuid);
+            await this.pathManager.initializePaths();
+            
+            // Initialiser l'enregistrement
+            await this.initializeRecording();
 
-            while (true) {
-                // Vérifier si la réunion doit se terminer
-                const { shouldEnd, reason } = await this.checkEndConditions()
-
+            // Boucle principale
+            while (this.isProcessing) {
+                // Vérifier si on doit s'arrêter
+                const { shouldEnd, reason } = await this.checkEndConditions();
                 if (shouldEnd) {
-                    console.info(`Meeting end condition met: ${reason}`)
-                    await this.handleMeetingEnd(reason)
-                    return this.transition(MeetingStateType.Cleanup)
+                    console.info(`Meeting end condition met: ${reason}`);
+                    await this.handleMeetingEnd(reason);
+                    break;
                 }
 
-                // Attendre avant la prochaine vérification
-                await this.sleep(this.CHECK_INTERVAL)
+                // Si pause demandée, transitionner vers l'état Paused
+                if (this.context.isPaused) {
+                    return this.transition(MeetingStateType.Paused);
+                }
+
+                await this.sleep(this.CHECK_INTERVAL);
             }
+
+            return this.transition(MeetingStateType.Cleanup);
         } catch (error) {
-            console.error('Error in recording state:', error)
-            return this.handleError(error as Error)
+            console.error('Error in recording state:', error);
+            return this.handleError(error as Error);
         }
     }
 
-    private async checkEndConditions(): Promise<{
-        shouldEnd: boolean
-        reason?: string
-    }> {
-        const now = Date.now()
+    private async initializeRecording(): Promise<void> {
+        // Vérifier que les services sont bien initialisés
+        if (!this.context.transcriptionService) {
+            throw new Error('TranscriptionService not initialized');
+        }
+    
+        // Configurer les listeners
+        await this.setupEventListeners();
+        console.info('Recording initialized successfully');
+    }
 
+    private async setupEventListeners(): Promise<void> {
+        this.context.transcoder?.on('chunkProcessed', async (chunkInfo) => {
+            const { startTime, endTime } = this.calculateSegmentTimes(chunkInfo);
+            await this.context.transcriptionService?.transcribeSegment(
+                startTime, 
+                endTime, 
+                chunkInfo.audioUrl
+            );
+        });
+
+        this.context.transcoder?.on('error', async (error) => {
+            console.error('Recording error:', error);
+            this.context.error = error;
+            this.isProcessing = false;
+        });
+
+        this.context.transcriptionService?.on('transcriptionComplete', (result) => {
+            if (result.results.length > 0) {
+                this.context.lastSpeakerTime = Date.now();
+            }
+        });
+    }
+
+    private async checkEndConditions(): Promise<{ shouldEnd: boolean; reason?: string }> {
+        const now = Date.now();
+    
         try {
+            // On vérifie si un arrêt a été demandé via la machine d'état
+            if (this.context.endReason) {
+                return { shouldEnd: true, reason: this.context.endReason };
+            }
+    
             // Vérifier si le bot a été retiré
             if (await this.checkBotRemoved()) {
-                return { shouldEnd: true, reason: 'bot_removed' }
+                return { shouldEnd: true, reason: 'bot_removed' };
             }
-
-            // Vérifier s'il n'y a plus de participants
+    
+            // Vérifier les participants
             if (await this.checkNoAttendees(now)) {
-                return { shouldEnd: true, reason: 'no_attendees' }
+                return { shouldEnd: true, reason: 'no_attendees' };
             }
-
-            // Vérifier s'il n'y a pas eu de son depuis longtemps
+    
+            // Vérifier l'activité audio
             if (await this.checkNoSpeaker(now)) {
-                return { shouldEnd: true, reason: 'no_speaker' }
+                return { shouldEnd: true, reason: 'no_speaker' };
             }
-
-            // Vérifier le timeout global de l'enregistrement
+    
+            // Vérifier le timeout global
             if (this.checkRecordingTimeout(now)) {
-                return { shouldEnd: true, reason: 'recording_timeout' }
+                return { shouldEnd: true, reason: 'recording_timeout' };
             }
-
-            return { shouldEnd: false }
+    
+            return { shouldEnd: false };
         } catch (error) {
-            console.error('Error checking end conditions:', error)
-            return { shouldEnd: true, reason: 'error_during_check' }
+            console.error('Error checking end conditions:', error);
+            return { shouldEnd: true, reason: 'error_during_check' };
         }
     }
 
     private async handleMeetingEnd(reason: string): Promise<void> {
+        console.info(`Handling meeting end. Reason: ${reason}`);
+        
         try {
-            console.info(`Handling meeting end. Reason: ${reason}`)
-
-            // Mettre à jour le contexte
-            this.context.endReason = reason
-
-            // Notifier de la fin de l'appel
-            await Events.callEnded()
-
-            // Arrêter l'audio streaming
-            await this.stopAudioStreaming()
+            this.context.endReason = reason;
+            await Events.callEnded();
+            
+            // Arrêter les processus
+            await this.stopProcesses();
+            
+            this.isProcessing = false;
         } catch (error) {
-            console.error('Error during meeting end handling:', error)
-            throw error
+            console.error('Error during meeting end:', error);
+            throw error;
+        }
+    }
+
+    private async stopProcesses(): Promise<void> {
+        try {
+            await this.stopAudioStreaming();
+            await Promise.all([
+                this.context.transcoder?.stop(),
+                this.context.transcriptionService?.stop()
+            ]);
+        } catch (error) {
+            console.error('Error stopping processes:', error);
+            throw error;
         }
     }
 
@@ -206,5 +272,12 @@ export class RecordingState extends BaseState {
 
     private sleep(ms: number): Promise<void> {
         return new Promise((resolve) => setTimeout(resolve, ms))
+    }
+
+    private calculateSegmentTimes(chunkInfo: any): { startTime: number; endTime: number } {
+        return {
+            startTime: chunkInfo.timestamp,
+            endTime: chunkInfo.timestamp + MEETING_CONSTANTS.CHUNK_DURATION
+        };
     }
 }

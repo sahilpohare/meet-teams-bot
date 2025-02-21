@@ -1,5 +1,6 @@
 import { MeetingStateType, ParticipantState, StateTransition } from './types'
 
+import { Transcoder } from '../recording/Transcoder'
 import { getStateInstance } from './states'
 import { MeetingContext } from './types'
 
@@ -13,7 +14,6 @@ export class MeetingStateMachine {
         this.currentState = MeetingStateType.Initialization
         this.context = {
             ...initialContext,
-            startTime: Date.now(),
             error: null,
         } as MeetingContext
     }
@@ -60,6 +60,14 @@ export class MeetingStateMachine {
         return this.error
     }
 
+    public getStartTime(): number {
+        return this.context.startTime!
+    }
+
+    public getTranscoder(): Transcoder {
+        return this.context.transcoder
+    }
+
     private async handleError(error: Error): Promise<void> {
         try {
             console.error('Error in state machine:', error)
@@ -78,6 +86,33 @@ export class MeetingStateMachine {
             // Dans tous les cas, on termine par le nettoyage
             await this.transitionToCleanup()
         }
+    }
+    
+    public async pauseRecording(): Promise<void> {
+        if (this.currentState !== MeetingStateType.Recording) {
+            throw new Error('Cannot pause: meeting is not in recording state');
+        }
+
+        console.info('Pause requested');
+        this.context.isPaused = true;
+        this.currentState = MeetingStateType.Paused;
+    }
+
+    public async resumeRecording(): Promise<void> {
+        if (this.currentState !== MeetingStateType.Paused) {
+            throw new Error('Cannot resume: meeting is not paused');
+        }
+
+        console.info('Resume requested');
+        this.context.isPaused = false;
+    }
+
+    public isPaused(): boolean {
+        return this.currentState === MeetingStateType.Paused;
+    }
+
+    public getPauseDuration(): number {
+        return this.context.totalPauseDuration || 0;
     }
 
     public updateParticipantState(state: ParticipantState): void {

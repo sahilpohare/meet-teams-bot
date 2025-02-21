@@ -3,9 +3,9 @@ import * as rax from 'retry-axios'
 
 import { ApiTypes } from './types'
 
+import { RecognizerWord } from '../transcription/WordPoster'
 import { MeetingParams } from '../types'
 
-import { RecognizerWord } from '../words_poster/words_poster'
 
 export class Api {
     public static instance: Api | null = null // Singleton class

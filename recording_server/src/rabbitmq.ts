@@ -29,17 +29,38 @@ export class Consumer {
         : 'worker_bot_queue'
     static readonly PREFETCH_COUNT = 1
 
-    private constructor(private channel: Channel) {}
+    private constructor(private channel: Channel) {
+        this.channel.on('error', (err) => {
+            console.error('Channel error:', err)
+            this.reconnect()
+        })
+
+        this.channel.on('close', () => {
+            console.log('Channel closed, attempting to reconnect...')
+            this.reconnect()
+        })
+    }
+
+    private async reconnect() {
+        try {
+            const connection = await connect(process.env.AMQP_ADDRESS)
+            this.channel = await connection.createChannel()
+            this.channel.prefetch(Consumer.PREFETCH_COUNT)
+            console.log('Successfully reconnected to RabbitMQ')
+        } catch (error) {
+            console.error('Failed to reconnect:', error)
+            setTimeout(() => this.reconnect(), 5000)
+        }
+    }
 
     static async init(): Promise<Consumer> {
         const connection = await connect(process.env.AMQP_ADDRESS)
-
         console.log('connected to rabbitmq: ', process.env.AMQP_ADDRESS)
+        
         const channel = await connection.createChannel()
-
         console.log('declaring queue: ', Consumer.QUEUE_NAME)
+        
         channel.prefetch(Consumer.PREFETCH_COUNT)
-
         return new Consumer(channel)
     }
 
@@ -61,42 +82,56 @@ export class Consumer {
                 .consume(Consumer.QUEUE_NAME, async (message) => {
                     console.log(`consume message : ${message}`)
                     if (message !== null) {
-                        // configure rabbit increase timeout or timeout max < rabbitmq message timeout
-                        console.log('canceling channel')
-                        await this.channel.cancel(message.fields.consumerTag)
-
-                        const meetingParams = JSON.parse(
-                            message.content.toString(),
-                        ) as MeetingParams
-
-                        console.log('initializing logger')
-                        let logger = new Logger(meetingParams)
-                        await logger.init()
-
-                        new Api(meetingParams)
-
-                        let error = null
                         try {
-                            console.log('awaiting handler...')
-                            await handler(meetingParams)
+                            this.channel.ack(message)
+
+                            console.log('canceling channel')
+                            await this.channel.cancel(message.fields.consumerTag)
+
+                            const meetingParams = JSON.parse(
+                                message.content.toString(),
+                            ) as MeetingParams
+
+                            console.log('initializing logger')
+                            let logger = new Logger(meetingParams)
+                            await logger.init()
+
+                            new Api(meetingParams)
+
+                            let error = null
+                            try {
+                                console.log('awaiting handler...')
+                                await handler(meetingParams)
+                            } catch (e) {
+                                console.error('error while awaiting handler:', e)
+                                error = e
+                            }
+
+                            resolve({ params: meetingParams, error: error })
                         } catch (e) {
-                            console.error('error while awaiting handler')
-                            error = e
+                            console.error('Error processing message:', e)
+                            resolve({ 
+                                params: null, 
+                                error: new Error(`Failed to process message: ${(e as Error).message}`) 
+                            })
                         }
-                        // TODO: retry in rabbitmq
-                        console.log('ACK rabbutMQ')
-                        this.channel.ack(message)
-                        resolve({ params: meetingParams, error: error })
                     } else {
                         console.log('Consumer cancelled by server')
-                        reject() // TODO errors
+                        resolve({ 
+                            params: null, 
+                            error: new Error('Consumer cancelled by server') 
+                        })
                     }
                 })
                 .then((consumer) => {
                     console.log('consumer started: ', consumer.consumerTag)
                 })
                 .catch((e) => {
-                    reject() // TODO errors
+                    console.error('Failed to start consumer:', e)
+                    resolve({ 
+                        params: null, 
+                        error: new Error(`Failed to start consumer: ${e.message}`) 
+                    })
                 })
         })
     }

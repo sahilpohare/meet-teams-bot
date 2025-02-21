@@ -1,0 +1,120 @@
+import * as fs from 'fs/promises';
+import * as path from 'path';
+
+const EFS_MOUNT_POINT = process.env.EFS_MOUNT_POINT || '/mnt/efs';
+
+export class PathManager {
+    private static instance: PathManager;
+    private environment: string;
+    private botUuid: string | null;
+
+    private constructor() {
+        this.environment = process.env.ENVIRON || 'dev';
+        this.botUuid = null;
+    }
+
+    public static getInstance(botUuid?: string): PathManager {
+        if (!PathManager.instance) {
+            PathManager.instance = new PathManager();
+        }
+        if (botUuid) {
+            PathManager.instance.setBotUuid(botUuid);
+        }
+        return PathManager.instance;
+    }
+
+    public setBotUuid(botUuid: string): void {
+        this.botUuid = botUuid;
+    }
+
+    private ensureBotUuid(): void {
+        if (!this.botUuid) {
+            throw new Error('botUuid must be set before using PathManager methods');
+        }
+    }
+
+    public async initializePaths(): Promise<void> {
+        const basePath = this.getBasePath();
+        await fs.mkdir(basePath, { recursive: true });
+    }
+
+    public getBasePath(): string {
+        this.ensureBotUuid();
+        switch (this.environment) {
+            case 'prod':
+                return path.join(EFS_MOUNT_POINT, 'prod', this.botUuid);
+            case 'preprod':
+                return path.join(EFS_MOUNT_POINT, 'preprod', this.botUuid);
+            default:
+                return path.join('./data', this.botUuid);
+        }
+    }
+
+    public getWebmPath(): string {
+        return path.join(this.getBasePath(), 'temp', 'output.webm');
+    }
+
+    public getVideoPath(): string {
+        return path.join(this.getBasePath(), 'video');
+    }
+
+     public async moveFile(sourcePath: string, destPath: string): Promise<void> {
+        try {
+            // Vérifier que le fichier source existe
+            await fs.access(sourcePath);
+
+            // Créer le dossier de destination si nécessaire
+            await fs.mkdir(path.dirname(destPath), { recursive: true });
+
+            // Si le fichier de destination existe déjà, le supprimer
+            try {
+                await fs.unlink(destPath);
+            } catch (e) {
+                // Ignore si le fichier n'existe pas
+            }
+
+            // Déplacer le fichier
+            await fs.rename(sourcePath, destPath);
+            
+            console.log(`File moved successfully from ${sourcePath} to ${destPath}`);
+        } catch (error) {
+            console.error('Error moving file:', error);
+            throw new Error(`Failed to move file: ${(error as Error).message}`);
+        }
+    }
+
+    public async ensureDirectories(): Promise<void> {
+        const paths = [
+            this.getBasePath(),
+            this.getVideoPath(),
+            path.dirname(this.getWebmPath())
+        ];
+
+        await Promise.all(paths.map(p => fs.mkdir(p, { recursive: true })));
+    }
+
+    public getS3Paths(): { bucketName: string; s3Path: string } {
+        const timestamp = Date.now();
+        return {
+            bucketName: process.env.AWS_S3_VIDEO_BUCKET || '',
+            s3Path: `${this.environment}/${this.botUuid}/${timestamp}`
+        };
+    }
+
+    public getOutputPath(): string {
+        return path.join(this.getVideoPath(), `output_${Date.now()}.mp4`);
+    }
+
+    public getTranscriberConfig(): {
+        outputPath: string;
+        bucketName: string;
+        s3Path: string;
+    } {
+        const { bucketName, s3Path } = this.getS3Paths();
+        return {
+            outputPath: this.getOutputPath(),
+            bucketName,
+            s3Path
+        };
+    }
+}

@@ -1,9 +1,9 @@
 import { delSessionInRedis } from '../../instance'
 import { Logger } from '../../logger'
 import { SoundContext, VideoContext } from '../../media_context'
-import { TRANSCODER } from '../../transcoder'
+
+
 import { uploadTranscriptTask } from '../../uploadTranscripts'
-import { WordsPoster } from '../../words_poster/words_poster'
 import { MeetingStateType, StateExecuteResult } from '../types'
 import { BaseState } from './base-state'
 
@@ -30,6 +30,7 @@ export class CleanupState extends BaseState {
             this.stopTranscoder(),
             this.finalizeTranscriptions(),
             this.cleanupRedisSession(),
+            this.uploadVideoToS3(),
         ]
 
         const results = await Promise.allSettled(cleanupTasks)
@@ -89,8 +90,8 @@ export class CleanupState extends BaseState {
 
     private async stopTranscoder(): Promise<void> {
         try {
-            if (TRANSCODER) {
-                await TRANSCODER.stop()
+            if (this.context.transcoder) {
+                await this.context.transcoder.stop()
             }
         } catch (error) {
             console.error('Failed to stop transcoder:', error)
@@ -100,8 +101,8 @@ export class CleanupState extends BaseState {
     private async finalizeTranscriptions(): Promise<void> {
         try {
             // Arrêt du WordsPoster
-            if (WordsPoster.TRANSCRIBER) {
-                await WordsPoster.TRANSCRIBER.stop()
+            if (this.context.transcriptionService) {
+                await this.context.transcriptionService.stop()
             }
 
             // Upload de la dernière transcription
@@ -116,6 +117,22 @@ export class CleanupState extends BaseState {
             )
         } catch (error) {
             console.error('Failed to finalize transcriptions:', error)
+        }
+    }
+
+    private async uploadVideoToS3(): Promise<void> {
+        try {
+            if (this.context.transcoder) {
+                await this.context.transcoder.stop().catch((e) =>
+                    console.error('Error stopping transcoder:', e),
+                )
+                console.log(`${Date.now()} Uploading video to S3`)
+                await this.context.transcoder.uploadVideoToS3().catch((e) =>
+                    console.error('Cannot upload video to S3:', e),
+                )
+            }  
+        } catch (error) {
+            console.error('Failed to upload video to S3:', error)
         }
     }
 

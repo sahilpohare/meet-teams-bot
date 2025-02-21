@@ -1,9 +1,8 @@
 import { Api } from './api/methods'
 import { ApiTypes } from './api/types'
+import { MeetingHandle } from './meeting'
 
 import { SpeakerData } from './types'
-
-import { START_RECORDING_TIMESTAMP } from './meeting'
 
 import * as asyncLib from 'async'
 
@@ -51,7 +50,7 @@ async function upload(speaker: SpeakerData, end: boolean) {
             .patchTranscript({
                 id: LAST_TRANSRIPT.id,
                 end_time:
-                    (speaker.timestamp - START_RECORDING_TIMESTAMP.get()) /
+                    (speaker.timestamp - MeetingHandle.instance.getStartTime()) /
                     1000,
             } as ApiTypes.ChangeableTranscript)
             .catch((e) => {
@@ -73,7 +72,7 @@ async function upload(speaker: SpeakerData, end: boolean) {
                 bot_id: bot.bot.id,
                 speaker: speaker.name,
                 start_time:
-                    (speaker.timestamp - START_RECORDING_TIMESTAMP.get()) /
+                    (speaker.timestamp - MeetingHandle.instance.getStartTime()) /
                     1000,
                 end_time: null,
                 lang: null,

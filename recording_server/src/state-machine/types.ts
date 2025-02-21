@@ -3,6 +3,8 @@ import { MeetingParams } from '../types'
 import { BrowserContext, Page } from '@playwright/test'
 import { BrandingHandle } from '../branding'
 import { MeetingHandle } from '../meeting'
+import { Transcoder } from '../recording/Transcoder'
+import { TranscriptionService } from '../transcription/TranscriptionService'
 import { MeetingProviderInterface } from '../types'
 
 export enum MeetingStateType {
@@ -10,6 +12,8 @@ export enum MeetingStateType {
     WaitingRoom = 'waitingRoom',
     InCall = 'inCall',
     Recording = 'recording',
+    Paused = 'paused',
+    Resuming = 'resuming',
     Cleanup = 'cleanup',
     Error = 'error',
 }
@@ -48,6 +52,24 @@ export interface MeetingContext {
     extensionId?: string
     meetingId?: string
     meetingPassword?: string
+
+
+    // Service de transcription
+    transcriptionService?: TranscriptionService;
+
+    // Service de transcodeage video
+    transcoder?: Transcoder;
+
+    // Recording state (Play/Pause)
+    isPaused?: boolean;
+    pauseStartTime?: number;
+    totalPauseDuration?: number;
+    lastRecordingState?: {
+        timestamp?: number;
+        attendeesCount?: number;
+        lastSpeakerTime?: number;
+        noSpeakerDetectedTime?: number;
+    }
 }
 
 export interface StateTransition {

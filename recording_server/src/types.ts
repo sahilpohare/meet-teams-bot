@@ -1,6 +1,5 @@
 import { Browser, BrowserContext, Page } from '@playwright/test'
-
-export type MeetingStatus = 'Recording' | 'Cleanup' | 'Done'
+import { SpeechToTextProvider } from './transcription/TranscriptionService'
 
 export type Meeting = {
     page: Page
@@ -39,7 +38,7 @@ export interface MeetingProviderInterface {
     ): string
 }
 
-export type SpeechToTextProvider = 'Gladia' | 'Runpod' | 'Default'
+
 
 export type MeetingParams = {
     use_my_vocabulary: boolean

@@ -7,20 +7,12 @@ import { SoundContext, VideoContext } from './media_context'
 import { MessageToBroadcast, SpeakerData, StopRecordParams } from './types'
 
 import axios from 'axios'
-import {
-    FIRST_USER_JOINED,
-    NO_SPEAKER_DETECTED_TIMESTAMP,
-    NUMBER_OF_ATTENDEES,
-} from './meeting'
-
 import { unlinkSync } from 'fs'
-import { PORT } from './instance'
-import { Logger } from './logger'
 import { MeetingHandle } from './meeting'
-import { Streaming } from './streaming'
-import { TRANSCODER } from './transcoder'
-import { uploadTranscriptTask } from './uploadTranscripts'
 import { SpeakerManager } from './speaker-manager'
+
+const HOST = '0.0.0.0'
+export const PORT = 8080
 
 console.log('redis url: ', process.env.REDIS_URL)
 export const clientRedis = redis.createClient({
@@ -29,7 +21,6 @@ export const clientRedis = redis.createClient({
 clientRedis.on('error', (err) => {
     console.error('Redis error:', err)
 })
-const HOST = '0.0.0.0'
 
 const MEET_ORIGINS = [
     'https://meet.google.com',
@@ -45,9 +36,6 @@ async function getAllowedOrigins(): Promise<string[]> {
         ...MEET_ORIGINS,
     ]
 }
-
-const PAUSE_BETWEEN_SENTENCES: number = 600 // ms
-var CUR_SPEAKER: SpeakerData | null = null
 
 export async function server() {
     const app = express()
@@ -340,7 +328,7 @@ export async function server() {
 
     // Stop Transcoder
     app.post('/transcoder/stop', async (req, res) => {
-        await TRANSCODER.stop()
+        await MeetingHandle.instance.getTranscoder().stop()
             .catch((e) => {
                 res.status(500).json({
                     message: `Error occured when stoping transcoder: ${e}`,
@@ -352,112 +340,6 @@ export async function server() {
                 })
             })
     })
-
-    // Ajoutez cette nouvelle route pour récupérer le chemin du fichier de sortie
-    // app.get('/transcoder/output', (req, res) => {
-    //     const outputPath = TRANSCODER.getOutputPath()
-    //     res.status(200).json({ outputPath })
-    // })
-
-    // app.post('/transcoder/extract_audio', async (req, res) => {
-    //     const { timeStart, timeEnd, bucketName, s3Path } = req.body
-
-    //     if (typeof timeStart !== 'number' || typeof timeEnd !== 'number') {
-    //         return res.status(400).json({
-    //             error: 'timeStart et timeEnd doivent être des nombres',
-    //         })
-    //     }
-
-    //     if (typeof bucketName !== 'string' || typeof s3Path !== 'string') {
-    //         return res.status(400).json({
-    //             error: 'bucketName et s3Path doivent être des chaînes de caractères',
-    //         })
-    //     }
-
-    //     try {
-    //         const s3Url = await TRANSCODER.extractAudio(
-    //             timeStart,
-    //             timeEnd,
-    //             bucketName,
-    //             s3Path,
-    //         )
-    //         return res.status(200).json({
-    //             message: 'Extraction audio et upload réussis',
-    //             s3Url,
-    //         })
-    //     } catch (err) {
-    //         console.error(
-    //             "Erreur lors de l'extraction audio ou de l'upload:",
-    //             err,
-    //         )
-    //         return res.status(500).json({
-    //             error: "Erreur lors de l'extraction audio ou de l'upload",
-    //         })
-    //     }
-    // })
-
-    // // Route modifiée pour supprimer un fichier S3
-    // app.delete('/transcoder/s3file', async (req, res) => {
-    //     const { s3Path, bucketName } = req.body
-
-    //     function deleteFromS3(
-    //         _bucketName: string,
-    //         s3Path: string,
-    //     ): Promise<void> {
-    //         return new Promise((resolve, reject) => {
-    //             // TODO : Given _bucketName is completly bullshit here !!! FUCK IT !
-    //             let bucketName: string =
-    //                 process.env.AWS_S3_TEMPORARY_AUDIO_BUCKET
-
-    //             const s3FullPath = `s3://${bucketName}/${s3Path}`
-
-    //             const awsCommand = spawn('aws', ['s3', 'rm', s3FullPath])
-
-    //             let errorOutput = ''
-
-    //             awsCommand.stderr.on('data', (data) => {
-    //                 errorOutput += data.toString()
-    //             })
-
-    //             awsCommand.on('close', (code) => {
-    //                 if (code === 0) {
-    //                     console.log(
-    //                         `Fichier supprimé avec succès: ${s3FullPath}`,
-    //                     )
-    //                     resolve()
-    //                 } else {
-    //                     console.error(
-    //                         'Erreur lors de la suppression du fichier S3:',
-    //                         errorOutput,
-    //                     )
-    //                     reject(
-    //                         new Error(
-    //                             `Échec de la suppression S3 avec le code ${code}`,
-    //                         ),
-    //                     )
-    //                 }
-    //             })
-    //         })
-    //     }
-
-    //     if (!s3Path || typeof s3Path !== 'string') {
-    //         return res.status(400).json({
-    //             error: 'Le paramètre s3Path est requis dans le corps de la requête et doit être une chaîne de caractères',
-    //         })
-    //     }
-
-    //     try {
-    //         await deleteFromS3(bucketName, s3Path)
-    //         return res
-    //             .status(200)
-    //             .json({ message: 'Fichier S3 supprimé avec succès' })
-    //     } catch (error) {
-    //         console.error('Erreur lors de la suppression du fichier S3:', error)
-    //         return res.status(500).json({
-    //             error: 'Erreur lors de la suppression du fichier S3',
-    //         })
-    //     }
-    // })
 
     try {
         app.listen(PORT, HOST)
@@ -475,7 +357,7 @@ async function uploadChunk(req: any, res: any, isFinal: boolean) {
     }
 
     try {
-        await TRANSCODER.uploadChunk(req.body, isFinal)
+        await MeetingHandle.instance.getTranscoder().uploadChunk(req.body, isFinal)
         return res.status(200).json({ message: 'Chunk uploadé avec succès' })
     } catch (err) {
         console.error("Erreur lors de l'upload du chunk:", err)
