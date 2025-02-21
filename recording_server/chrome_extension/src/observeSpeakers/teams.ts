@@ -19,7 +19,7 @@ export async function getSpeakerRootToObserve(
             },
         ]
     } catch (e) {
-        console.error('[Teams] Failed to observe Teams meeting', e)
+        // console.error('[Teams] Failed to observe Teams meeting', e)
     }
 }
 
@@ -28,14 +28,14 @@ function getDocumentRoot(): Document {
         try {
             const doc = iframe.contentDocument || iframe.contentWindow?.document
             if (doc) {
-                console.log('[Teams] Document root found in iframe')
+                // console.log('[Teams] Document root found in iframe')
                 return doc
             }
         } catch (e) {
-            console.warn('[Teams] Error accessing iframe content', e)
+            // console.warn('[Teams] Error accessing iframe content', e)
         }
     }
-    console.log('[Teams] Using main document as root')
+    // console.log('[Teams] Using main document as root')
     return document
 }
 
@@ -144,7 +144,7 @@ export function getSpeakerFromDocument(
             }
         })
         .filter((value) => value !== undefined) as SpeakerData[]
-    console.table(speakers)
+    // console.table(speakers)
     return speakers
 }
 

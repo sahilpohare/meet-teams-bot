@@ -41,7 +41,7 @@ export async function getSpeakerRootToObserve(
                 )
             })
             // Log the filtered divs
-            console.log(filteredDivs)
+            // console.log(filteredDivs)
 
             // Example action: outline the filtered divs
             filteredDivs.forEach((div) => {
@@ -60,10 +60,10 @@ export async function getSpeakerRootToObserve(
                 },
             ]
         } catch (e) {
-            console.error(
-                '[getSpeakerRootToObserve] on meet error removing useless divs',
-                e,
-            )
+            // console.error(
+            //     '[getSpeakerRootToObserve] on meet error removing useless divs',
+            //     e,
+            // )
             return [
                 document,
                 {
@@ -86,28 +86,28 @@ export function getSpeakerFromDocument(
         // Vérifier si la page est gelée
         const currentTime = Date.now();
         if (currentTime - lastValidSpeakerCheck > FREEZE_TIMEOUT) {
-            console.log('[getSpeakerFromDocument] Page appears to be frozen for more than 30 seconds');
+            // console.log('[getSpeakerFromDocument] Page appears to be frozen for more than 30 seconds');
             return [];
         }
 
-        console.log('[getSpeakerFromDocument] - Starting participant detection...')
+        // console.log('[getSpeakerFromDocument] - Starting participant detection...')
 
         const participantsList = document.querySelector("[aria-label='Participants']")
         if (!participantsList) {
-            console.log('[getSpeakerFromDocument] No participants list found')
+            // console.log('[getSpeakerFromDocument] No participants list found')
             lastValidSpeakers = []; 
             return []; // Vrai cas de 0 participants
         }
 
         const participantItems =
             participantsList.querySelectorAll('[role="listitem"]')
-        console.log(
-            '[getSpeakerFromDocument] - Found participants items:',
-            participantItems.length,
-        )
+        // console.log(
+        //     '[getSpeakerFromDocument] - Found participants items:',
+        //     participantItems.length,
+        // )
 
         if (!participantItems || participantItems.length === 0) {
-            console.log('[getSpeakerFromDocument] No participants found - possible end of meeting');
+            // console.log('[getSpeakerFromDocument] No participants found - possible end of meeting');
             lastValidSpeakers = []; // Mettre à jour l'état
             return [];
         }
@@ -125,52 +125,52 @@ export function getSpeakerFromDocument(
         participantItems.forEach((item, index) => {
             const ariaLabel = item.getAttribute('aria-label')?.trim()
             if (!ariaLabel) {
-                console.warn(
-                    '[getSpeakerFromDocument] - Participant item without aria-label found:',
-                    item,
-                )
+                // console.warn(
+                //     '[getSpeakerFromDocument] - Participant item without aria-label found:',
+                //     item,
+                // )
                 return
             }
 
-            console.log(
-                `[getSpeakerFromDocument] - Processing participant ${
-                    index + 1
-                }/${participantItems.length}:`,
-                ariaLabel,
-            )
+            // console.log(
+            //     `[getSpeakerFromDocument] - Processing participant ${
+            //         index + 1
+            //     }/${participantItems.length}:`,
+            //     ariaLabel,
+            // )
 
             // Check if this participant is already in our map
             if (!uniqueParticipants.has(ariaLabel)) {
-                console.log(
-                    '[getSpeakerFromDocument] - New participant detected:',
-                    ariaLabel,
-                )
+                // console.log(
+                //     '[getSpeakerFromDocument] - New participant detected:',
+                //     ariaLabel,
+                // )
                 uniqueParticipants.set(ariaLabel, {
                     name: ariaLabel,
                     isSpeaking: false,
                     isPresenting: false,
                 })
             } else {
-                console.log(
-                    '[getSpeakerFromDocument] - Updating existing participant:',
-                    ariaLabel,
-                )
+                // console.log(
+                //     '[getSpeakerFromDocument] - Updating existing participant:',
+                //     ariaLabel,
+                // )
             }
 
             const participant = uniqueParticipants.get(ariaLabel)!
 
             // Check if participant is presenting
             const allDivs = Array.from(item.querySelectorAll('div'))
-            console.log(
-                '[getSpeakerFromDocument] - Checking presentation status...',
-            )
+            // console.log(
+            //     '[getSpeakerFromDocument] - Checking presentation status...',
+            // )
             const isPresenting = allDivs.some((div) => {
                 const text = div.textContent?.trim()
                 if (text === 'Presentation') {
-                    console.log(
-                        '[getSpeakerFromDocument] - Presentation detected for:',
-                        ariaLabel,
-                    )
+                    // console.log(
+                    //     '[getSpeakerFromDocument] - Presentation detected for:',
+                    //     ariaLabel,
+                    // )
                     return true
                 }
                 return false
@@ -181,7 +181,7 @@ export function getSpeakerFromDocument(
             }
 
             // Check for speaking indicators
-            console.log('🎤 Checking speaking indicators...')
+            // console.log('🎤 Checking speaking indicators...')
             const speakingIndicators = Array.from(
                 item.querySelectorAll('*'),
             ).filter((elem) => {
@@ -190,15 +190,15 @@ export function getSpeakerFromDocument(
                     color === 'rgba(26, 115, 232, 0.9)' ||
                     color === 'rgb(26, 115, 232)'
                 if (isIndicator) {
-                    console.log(
-                        '[getSpeakerFromDocument] - Found speaking indicator:',
-                        color,
-                    )
+                    // console.log(
+                    //     '[getSpeakerFromDocument] - Found speaking indicator:',
+                    //     color,
+                    // )
                 }
                 return isIndicator
             })
 
-            console.log('Found speaking indicators:', speakingIndicators.length)
+            // console.debug('Found speaking indicators:', speakingIndicators.length)
 
             // Check background position for speaking status
             speakingIndicators.forEach((indicator) => {
@@ -206,15 +206,15 @@ export function getSpeakerFromDocument(
                 if (backgroundElement) {
                     const backgroundPosition =
                         getComputedStyle(backgroundElement).backgroundPositionX
-                    console.log(
-                        '[getSpeakerFromDocument] - Background position:',
-                        backgroundPosition,
-                    )
+                    // console.debug(
+                    //     '[getSpeakerFromDocument] - Background position:',
+                    //     backgroundPosition,
+                    // )
                     if (backgroundPosition !== '0px') {
-                        console.log(
-                            '[getSpeakerFromDocument] - Speaking detected for:',
-                            ariaLabel,
-                        )
+                        // console.log(
+                        //     '[getSpeakerFromDocument] - Speaking detected for:',
+                        //     ariaLabel,
+                        // )
                         participant.isSpeaking = true
                     }
                 }
@@ -222,15 +222,15 @@ export function getSpeakerFromDocument(
 
             // Update the map with potentially modified participant data
             uniqueParticipants.set(ariaLabel, participant)
-            console.log(
-                '[getSpeakerFromDocument] - Current status for',
-                ariaLabel,
-                ':',
-                {
-                    isSpeaking: participant.isSpeaking,
-                    isPresenting: participant.isPresenting,
-                },
-            )
+            // console.debug(
+            //     '[getSpeakerFromDocument] - Current status for',
+            //     ariaLabel,
+            //     ':',
+            //     {
+            //         isSpeaking: participant.isSpeaking,
+            //         isPresenting: participant.isPresenting,
+            //     },
+            // )
         })
 
         // Avant le return final, sauvegarder l'état
@@ -246,7 +246,7 @@ export function getSpeakerFromDocument(
         return speakers;
 
     } catch (e) {
-        console.error('[getSpeakerFromDocument] - Error:', e)
+        // console.error('[getSpeakerFromDocument] - Error:', e)
         return lastValidSpeakers;
     }
 }

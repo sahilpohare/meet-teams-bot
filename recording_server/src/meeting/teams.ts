@@ -1,8 +1,10 @@
 import { BrowserContext, Page } from '@playwright/test'
 
 import {
-    JoinError, JoinErrorCode, MeetingParams,
-    MeetingProviderInterface
+    JoinError,
+    JoinErrorCode,
+    MeetingParams,
+    MeetingProviderInterface,
 } from '../types'
 
 import { Logger } from '../logger'
@@ -30,23 +32,23 @@ export class TeamsProvider implements MeetingProviderInterface {
     ): Promise<Page> {
         const url = new URL(link)
         const page = await browserContext.newPage()
-        
+
         // Configure les timeouts et autres paramètres
         await page.setDefaultTimeout(30000)
         await page.setDefaultNavigationTimeout(30000)
-        
+
         // Active la journalisation des requêtes console pour le debugging
-        page.on('console', msg => console.log('Browser console:', msg.text()))
-        
+        page.on('console', (msg) => console.log('Browser console:', msg.text()))
+
         // Attend que la page soit complètement chargée
-        await page.goto(link, { 
+        await page.goto(link, {
             waitUntil: 'networkidle',
-            timeout: 30000 
+            timeout: 30000,
         })
-        
+
         // Attend un peu plus pour s'assurer que tout est chargé
         await page.waitForTimeout(2000)
-        
+
         return page
     }
 
@@ -81,8 +83,8 @@ export class TeamsProvider implements MeetingProviderInterface {
             NewInterface
                 ? 'light 🥕🥕'
                 : (await page.url()).includes('live')
-                ? 'live 💃🏼'
-                : 'old 👴🏻',
+                  ? 'live 💃🏼'
+                  : 'old 👴🏻',
         )
 
         try {
@@ -180,7 +182,11 @@ export async function clickWithInnerText(
         return false
     }
 
-    while (!continueButton && (iterations == null || i < iterations) && !cancelCheck?.()) {
+    while (
+        !continueButton &&
+        (iterations == null || i < iterations) &&
+        !cancelCheck?.()
+    ) {
         try {
             if (i % 5 === 0) {
                 const isPageLoaded = await ensurePageLoaded(page)
@@ -194,35 +200,40 @@ export async function clickWithInnerText(
                 ({ innerText, htmlType, i, click }) => {
                     let elements: Element[] = []
                     const iframes = document.querySelectorAll('iframe')
-                    
+
                     if (i % 2 === 0 && iframes.length > 0) {
                         const firstIframe = iframes[0]
                         try {
-                            const docInIframe = firstIframe.contentDocument || 
-                                              firstIframe.contentWindow?.document
+                            const docInIframe =
+                                firstIframe.contentDocument ||
+                                firstIframe.contentWindow?.document
                             if (docInIframe) {
-                                elements = Array.from(docInIframe.querySelectorAll(htmlType))
+                                elements = Array.from(
+                                    docInIframe.querySelectorAll(htmlType),
+                                )
                             }
                         } catch (e) {
                             console.warn('Iframe access error:', e)
                         }
                     }
-                    
+
                     if (elements.length === 0) {
-                        elements = Array.from(document.querySelectorAll(htmlType))
+                        elements = Array.from(
+                            document.querySelectorAll(htmlType),
+                        )
                     }
 
                     for (const elem of elements) {
                         if (elem.textContent?.trim() === innerText) {
                             if (click) {
-                                (elem as HTMLElement).click()
+                                ;(elem as HTMLElement).click()
                             }
                             return true
                         }
                     }
                     return false
                 },
-                { innerText, htmlType, i, click }
+                { innerText, htmlType, i, click },
             )
         } catch (e) {
             if (i === iterations - 1) {
@@ -234,8 +245,10 @@ export async function clickWithInnerText(
         if (!continueButton) {
             await page.waitForTimeout(100 + i * 100)
         }
-        
-        console.log(`${innerText} ${click ? 'clicked' : 'found'} : ${JSON.stringify(continueButton)}`)
+
+        console.log(
+            `${innerText} ${click ? 'clicked' : 'found'} : ${JSON.stringify(continueButton)}`,
+        )
         i++
     }
     return continueButton
@@ -250,26 +263,26 @@ async function typeBotName(
         try {
             await page.waitForSelector(INPUT_BOT, { timeout: 1000 })
             const input = page.locator(INPUT_BOT)
-            
-            if (await input.count() > 0) {
+
+            if ((await input.count()) > 0) {
                 await input.focus()
                 await input.fill(botName)
-                
+
                 // Verify the input value
                 const currentValue = await input.inputValue()
                 if (currentValue === botName) {
                     return
                 }
-                
+
                 // If fill didn't work, try typing
                 await input.clear()
                 await page.keyboard.type(botName, { delay: 100 })
-                
-                if (await input.inputValue() === botName) {
+
+                if ((await input.inputValue()) === botName) {
                     return
                 }
             }
-            
+
             await page.waitForTimeout(500)
         } catch (e) {
             console.error(`Error typing bot name (attempt ${i + 1}):`, e)
@@ -280,20 +293,26 @@ async function typeBotName(
 
 async function tryFindInterface(page: Page): Promise<boolean> {
     await ensurePageLoaded(page)
-    
+
     try {
-        const joinNowPromise = clickWithInnerText(page, 'button', 'Join now', 10, false)
+        const joinNowPromise = clickWithInnerText(
+            page,
+            'button',
+            'Join now',
+            10,
+            false,
+        )
         const continueWithoutAudioPromise = clickWithInnerText(
             page,
             'button',
             'Continue without audio or video',
             10,
-            false
+            false,
         )
 
         const [joinNowExists, continueWithoutAudioExists] = await Promise.all([
             joinNowPromise,
-            continueWithoutAudioPromise
+            continueWithoutAudioPromise,
         ])
 
         if (joinNowExists) {
@@ -305,7 +324,7 @@ async function tryFindInterface(page: Page): Promise<boolean> {
                 'button',
                 'Continue without audio or video',
                 5,
-                true
+                true,
             )
             console.log('Found Continue without audio/video interface')
             return false
@@ -335,8 +354,10 @@ async function isRemovedFromTheMeeting(page: Page): Promise<boolean> {
             return true
         }
 
-        const raiseButton = page.locator('button#raisehands-button:has-text("Raise")')
-        const buttonExists = await raiseButton.count() > 0
+        const raiseButton = page.locator(
+            'button#raisehands-button:has-text("Raise")',
+        )
+        const buttonExists = (await raiseButton.count()) > 0
 
         console.log('raiseButton', JSON.stringify(raiseButton))
         console.log('buttonExists', JSON.stringify(buttonExists))
@@ -355,7 +376,7 @@ async function isBotNotAccepted(page: Page): Promise<boolean> {
     const deniedTexts = [
         'Sorry, but you were denied access to the meeting.',
         'Someone in the meeting should let you in soon',
-        'Waiting to be admitted'
+        'Waiting to be admitted',
     ]
 
     for (const text of deniedTexts) {
@@ -371,7 +392,7 @@ async function handlePermissionDialog(page: Page): Promise<void> {
     console.log('handling permission dialog')
     try {
         const okButton = page.locator('button:has-text("OK")')
-        if (await okButton.count() > 0) {
+        if ((await okButton.count()) > 0) {
             await okButton.click()
             console.log('Permission dialog handled successfully')
         } else {
@@ -386,9 +407,9 @@ async function activateCamera(page: Page): Promise<void> {
     console.log('activating camera')
     try {
         const cameraOffText = page.locator('text="Your camera is turned off"')
-        if (await cameraOffText.count() > 0) {
+        if ((await cameraOffText.count()) > 0) {
             const cameraButton = page.locator('button[title="Turn camera on"]')
-            if (await cameraButton.count() > 0) {
+            if ((await cameraButton.count()) > 0) {
                 await cameraButton.click()
                 console.log('Camera button clicked successfully')
                 await sleep(500)
@@ -406,7 +427,7 @@ async function activateCamera(page: Page): Promise<void> {
 async function ensurePageLoaded(page: Page, timeout = 20000): Promise<boolean> {
     try {
         await page.waitForFunction(() => document.readyState === 'complete', {
-            timeout: timeout
+            timeout: timeout,
         })
         return true
     } catch (error) {

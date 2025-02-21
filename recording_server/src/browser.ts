@@ -22,7 +22,6 @@ const P720: Resolution = {
     height: 720,
 }
 
-const HEIGHT_INTERFACE_CHROME = 120
 var RESOLUTION: Resolution = P720
 
 export async function getCachedExtensionId() {
@@ -60,7 +59,7 @@ export async function openBrowser(
     console.log('Path to Extension : ', pathToExtension)
 
     const width = RESOLUTION.width
-    const height = RESOLUTION.height + HEIGHT_INTERFACE_CHROME
+    const height = RESOLUTION.height
 
     try {
         console.log('Launching persistent context...')

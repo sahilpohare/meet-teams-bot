@@ -377,25 +377,35 @@ async function changeLayout(
             )
 
             // More options button - en utilisant Call controls comme parent
-            const moreOptionsButton = page.locator('div[role="region"][aria-label="Call controls"] button[aria-label="More options"]')
+            const moreOptionsButton = page.locator(
+                'div[role="region"][aria-label="Call controls"] button[aria-label="More options"]',
+            )
             await moreOptionsButton.waitFor({ state: 'visible', timeout: 5000 })
             await moreOptionsButton.click()
             console.log('More options clicked successfully')
 
             // Change layout option - using the menu item role with dashboard icon
-            const changeLayoutMenuItem = page.locator('li[role="menuitem"]').filter({
-                has: page.locator('i.google-material-icons:has-text("dashboard")')
+            const changeLayoutMenuItem = page
+                .locator('li[role="menuitem"]')
+                .filter({
+                    has: page.locator(
+                        'i.google-material-icons:has-text("dashboard")',
+                    ),
+                })
+            await changeLayoutMenuItem.waitFor({
+                state: 'visible',
+                timeout: 5000,
             })
-            await changeLayoutMenuItem.waitFor({ state: 'visible', timeout: 5000 })
             await changeLayoutMenuItem.click()
             console.log('Change layout clicked successfully')
 
             // Select layout option based on mode
-            const layoutOption = recordingMode === 'gallery_view' ? 'Tiled' : 'Spotlight'
-            
+            const layoutOption =
+                recordingMode === 'gallery_view' ? 'Tiled' : 'Spotlight'
+
             // Click on the label with the desired text
             const layoutLabel = page.locator('label.DxvcU').filter({
-                has: page.locator(`span.xo15nd:has-text("${layoutOption}")`)
+                has: page.locator(`span.xo15nd:has-text("${layoutOption}")`),
             })
             await layoutLabel.waitFor({ state: 'visible', timeout: 5000 })
             await layoutLabel.click()

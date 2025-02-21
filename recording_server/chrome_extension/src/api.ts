@@ -22,7 +22,7 @@ export class ApiService {
         return new Promise((resolve) => {
             chrome.storage.local.set({ RecordingServerLocation: url }, () => {
                 ApiService.RecordingServerLocation = url
-                console.log('ApiService initialized with URL:', url)
+                // console.log('ApiService initialized with URL:', url)
                 resolve()
             })
         })
@@ -51,12 +51,12 @@ export class ApiService {
             throw new Error('ApiService not initialized. Call init() first.')
         }
 
-        console.log(
-            'Sending message to recording server with PATH:',
-            messageType,
-            payload,
-            url,
-        )
+        // console.log(
+        //     'Sending message to recording server with PATH:',
+        //     messageType,
+        //     payload,
+        //     url,
+        // )
 
         async function upload_chunk(isFinal: boolean) {
             let route = !isFinal ? 'upload_chunk' : 'upload_chunk_final'

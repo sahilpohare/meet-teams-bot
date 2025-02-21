@@ -220,26 +220,35 @@ logger.info('version 0.0.1')
             // Assuming that recording is active at this point
             try {
                 // Démarrer le meeting avec la machine à états
-                await MeetingHandle.instance.startRecordMeeting();
-                
+                await MeetingHandle.instance.startRecordMeeting()
+
                 // Si on arrive ici, c'est que tout s'est bien passé
-                console.log(`${Date.now()} Finalize project && Sending WebHook complete`);
-                await Api.instance.endMeetingTrampoline();
+                console.log(
+                    `${Date.now()} Finalize project && Sending WebHook complete`,
+                )
+                await Api.instance.endMeetingTrampoline()
             } catch (error) {
                 // La machine à états a déjà géré le nettoyage
-                console.error('Meeting failed:', error);
+                console.error('Meeting failed:', error)
                 await sendWebhookOnce({
                     meetingUrl: consumeResult.params.meeting_url,
                     botUuid: consumeResult.params.bot_uuid,
                     success: false,
-                    errorMessage: error instanceof JoinError ? error.message : 'Recording failed to complete'
-                });
+                    errorMessage:
+                        error instanceof JoinError
+                            ? error.message
+                            : 'Recording failed to complete',
+                })
             } finally {
                 // S'assurer que le transcoder est arrêté et que la vidéo est uploadée
                 if (TRANSCODER) {
-                    await TRANSCODER.stop().catch(e => console.error('Error stopping transcoder:', e));
-                    console.log(`${Date.now()} Uploading video to S3`);
-                    await TRANSCODER.uploadVideoToS3().catch(e => console.error('Cannot upload video to S3:', e));
+                    await TRANSCODER.stop().catch((e) =>
+                        console.error('Error stopping transcoder:', e),
+                    )
+                    console.log(`${Date.now()} Uploading video to S3`)
+                    await TRANSCODER.uploadVideoToS3().catch((e) =>
+                        console.error('Cannot upload video to S3:', e),
+                    )
                 }
             }
         } else {
@@ -353,8 +362,8 @@ async function sendWebhookOnce(params: {
 async function handleErrorInStartRecording(error: Error, data: MeetingParams) {
     logger.error('Error during meeting start:', {
         error: error instanceof JoinError ? error.message : 'Internal error',
-        details: error
-    });
+        details: error,
+    })
 
     try {
         // Envoyer le webhook d'erreur
@@ -362,14 +371,17 @@ async function handleErrorInStartRecording(error: Error, data: MeetingParams) {
             meetingUrl: data.meeting_url,
             botUuid: data.bot_uuid,
             success: false,
-            errorMessage: error instanceof JoinError ? error.message : JoinErrorCode.Internal
-        });
-        
+            errorMessage:
+                error instanceof JoinError
+                    ? error.message
+                    : JoinErrorCode.Internal,
+        })
+
         // Les événements sont maintenant gérés par la machine à états
         // Events.callEnded() n'est plus nécessaire ici
     } catch (e) {
-        logger.error('Failed to handle start recording error:', e);
-        throw e;
+        logger.error('Failed to handle start recording error:', e)
+        throw e
     }
 }
 

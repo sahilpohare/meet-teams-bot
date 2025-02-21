@@ -105,7 +105,7 @@ function setUserAgent(window: Window, userAgent: string) {
         try {
             Object.defineProperty(window.navigator, 'userAgent', userAgentProp)
         } catch (e) {
-            console.warn('Failed to set userAgent', e)
+            // console.warn('Failed to set userAgent', e)
         }
     }
 }

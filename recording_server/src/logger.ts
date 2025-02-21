@@ -58,11 +58,11 @@ export class Logger {
                 '/',
                 '',
             )}_${date}.jpg`
-            await page.screenshot({ 
+            await page.screenshot({
                 path: link,
                 timeout: 5000,
-                animations: "disabled",
-                scale: "css"
+                animations: 'disabled',
+                scale: 'css',
             })
             await s3cp(
                 link,

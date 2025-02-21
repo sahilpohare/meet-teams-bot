@@ -1,4 +1,3 @@
-
 import { JoinError } from '../types'
 import { parseMeetingUrlFromJoinInfos } from './meetUrlParser'
 

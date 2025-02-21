@@ -1,16 +1,11 @@
 import { LOCAL_RECORDING_SERVER_LOCATION } from './instance'
-import {
-    MeetingParams,
-    MeetingProviderInterface,
-    MeetingStatus
-} from './types'
-
+import { MeetingParams, MeetingProviderInterface, MeetingStatus } from './types'
 
 // import { Browser as PuppeteerBrowser, Page as PuppeteerPage } from 'puppeteer'
 import { MeetProvider } from './meeting/meet'
 import { TeamsProvider } from './meeting/teams'
 import { MeetingStateMachine } from './state-machine/machine'
-import { MeetingStateType } from './state-machine/types'
+import { MeetingStateType, ParticipantState } from './state-machine/types'
 
 let _NO_SPEAKER_DETECTED_TIMESTAMP: number | null = null
 export const NO_SPEAKER_DETECTED_TIMESTAMP = {
@@ -54,9 +49,6 @@ const MAX_RETRIES = 3
 
 const FIND_END_MEETING_SLEEP = 250
 
-
-
-
 export class Status {
     state: MeetingStatus
     error: any | null
@@ -66,69 +58,80 @@ export class Status {
     }
 }
 
-
 export class MeetingHandle {
-    static instance: MeetingHandle = null;
-    private stateMachine: MeetingStateMachine;
-    private param: MeetingParams;
-    private provider: MeetingProviderInterface;
+    static instance: MeetingHandle = null
+    private stateMachine: MeetingStateMachine
+    private param: MeetingParams
+    private provider: MeetingProviderInterface
 
     static init(meetingParams: MeetingParams) {
         if (MeetingHandle.instance == null) {
-            this.instance = new MeetingHandle(meetingParams);
-            console.log('*** INIT MeetingHandle.instance', meetingParams.meeting_url);
+            this.instance = new MeetingHandle(meetingParams)
+            console.log(
+                '*** INIT MeetingHandle.instance',
+                meetingParams.meeting_url,
+            )
         }
     }
 
     constructor(meetingParams: MeetingParams) {
-        this.param = meetingParams;
-        this.provider = meetingParams.meetingProvider === 'Teams' 
-            ? new TeamsProvider() 
-            : new MeetProvider();
+        this.param = meetingParams
+        this.provider =
+            meetingParams.meetingProvider === 'Teams'
+                ? new TeamsProvider()
+                : new MeetProvider()
 
         // Configuration initiale
-        this.param.local_recording_server_location = LOCAL_RECORDING_SERVER_LOCATION;
-        this.param.recording_mode = this.param.recording_mode === 'gallery_view' 
-            ? 'speaker_view' 
-            : this.param.recording_mode;
+        this.param.local_recording_server_location =
+            LOCAL_RECORDING_SERVER_LOCATION
+        this.param.recording_mode =
+            this.param.recording_mode === 'gallery_view'
+                ? 'speaker_view'
+                : this.param.recording_mode
 
         // Initialisation de la machine à états
         this.stateMachine = new MeetingStateMachine({
             params: this.param,
             provider: this.provider,
-            meetingHandle: this
-        });
+            meetingHandle: this,
+        })
     }
 
     static getUserId(): number | null {
-        return MeetingHandle.instance.param.user_id;
+        return MeetingHandle.instance.param.user_id
     }
 
     static getBotId(): string {
-        return MeetingHandle.instance.param.bot_uuid;
+        return MeetingHandle.instance.param.bot_uuid
     }
 
     public getState(): MeetingStateType {
-        return this.stateMachine.getCurrentState();
+        return this.stateMachine.getCurrentState()
+    }
+
+    public updateParticipantState(state: ParticipantState): void {
+        if (this.stateMachine) {
+            this.stateMachine.updateParticipantState(state)
+        }
     }
 
     public getError(): Error | null {
-        return this.stateMachine.getError();
+        return this.stateMachine.getError()
     }
 
     public async startRecordMeeting(): Promise<void> {
-        await this.stateMachine.start();
+        await this.stateMachine.start()
     }
 
     public async stopMeeting(reason: string = 'manual_stop'): Promise<void> {
-        await this.stateMachine.requestStop(reason);
+        await this.stateMachine.requestStop(reason)
     }
 
     public getProvider(): MeetingProviderInterface {
-        return this.provider;
+        return this.provider
     }
 
     public getParams(): MeetingParams {
-        return this.param;
+        return this.param
     }
 }

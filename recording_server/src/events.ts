@@ -56,7 +56,7 @@ export class Events {
     static async meetingError(error: Error) {
         return Events.EVENTS?.send('meeting_error', {
             error_message: error.message,
-            error_type: error.constructor.name
+            error_type: error.constructor.name,
         })
     }
 
@@ -66,7 +66,10 @@ export class Events {
         private webhookUrl: string,
     ) {}
 
-    private async send(code: string, additionalData: Record<string, any> = {}): Promise<void> {
+    private async send(
+        code: string,
+        additionalData: Record<string, any> = {},
+    ): Promise<void> {
         try {
             await axios({
                 method: 'POST',
@@ -83,7 +86,7 @@ export class Events {
                         status: {
                             code,
                             created_at: new Date().toISOString(),
-                            ...additionalData
+                            ...additionalData,
                         },
                     },
                 },

@@ -4,11 +4,7 @@ import * as redis from 'redis'
 
 import { execSync } from 'child_process'
 import { SoundContext, VideoContext } from './media_context'
-import {
-    MessageToBroadcast,
-    SpeakerData,
-    StopRecordParams
-} from './types'
+import { MessageToBroadcast, SpeakerData, StopRecordParams } from './types'
 
 import axios from 'axios'
 import {
@@ -24,6 +20,7 @@ import { MeetingHandle } from './meeting'
 import { Streaming } from './streaming'
 import { TRANSCODER } from './transcoder'
 import { uploadTranscriptTask } from './uploadTranscripts'
+import { SpeakerManager } from './speaker-manager'
 
 console.log('redis url: ', process.env.REDIS_URL)
 export const clientRedis = redis.createClient({
@@ -110,122 +107,15 @@ export async function server() {
 
     // Speakers event from All providers : Write logs and send data to extension
     app.post('/add_speaker', async (req, res) => {
-        const speakers: SpeakerData[] = req.body
-        Streaming.instance?.send_speaker_state(speakers)
-        console.table(speakers)
-        let input = JSON.stringify(speakers)
-        await fs
-            .appendFile(
-                Logger.instance.get_speaker_log_directory(),
-                `${input}\n`,
-            )
-            .catch((e) => {
-                console.error(`Cannot append speaker log file ! : ${e}`)
-            })
-
-        // Set the number of attendees in the meeting
-        NUMBER_OF_ATTENDEES.set(speakers.length)
-        NUMBER_OF_ATTENDEES.get() > 0 && FIRST_USER_JOINED.set(true)
-        console.log('NUMBER_OF_ATTENDEES', NUMBER_OF_ATTENDEES.get())
-        // Count the number of active speakers;
-        // an active speaker is a speaker who is currently speaking.
-
-        const speakers_count: number = speakers.reduce(
-            (acc, s) => acc + (s.isSpeaking === true ? 1 : 0),
-            0,
-        )
-
-        switch (speakers_count) {
-            case 0:
-                // There are no speaker
-                NO_SPEAKER_DETECTED_TIMESTAMP.set(Date.now())
-                if (CUR_SPEAKER) {
-                    CUR_SPEAKER.isSpeaking = false
-                    if (speakers.length > 0) {
-                        CUR_SPEAKER.timestamp = speakers[0].timestamp
-                    }
-                }
-                break
-            case 1:
-                NO_SPEAKER_DETECTED_TIMESTAMP.set(null)
-
-                // Only one speaker is detected
-                const active_speaker = speakers.find(
-                    (v) => v.isSpeaking === true,
-                )
-                if (active_speaker.name !== CUR_SPEAKER?.name) {
-                    // Change of speaker case
-                    await uploadTranscriptTask(active_speaker, false)
-                } else {
-                    if (CUR_SPEAKER!.isSpeaking === false) {
-                        // The speaker was no longer speaking
-                        if (
-                            active_speaker.timestamp >=
-                            CUR_SPEAKER!.timestamp + PAUSE_BETWEEN_SENTENCES
-                        ) {
-                            // Update the information that the speaker has started speaking again.
-                            // Make a break between sentences.
-                            await uploadTranscriptTask(active_speaker, false)
-                        }
-                    } else {
-                        // Speaker is already on speaking : Dont do anything
-                    }
-                }
-                CUR_SPEAKER = active_speaker
-                break
-            default:
-                NO_SPEAKER_DETECTED_TIMESTAMP.set(null)
-                FIRST_USER_JOINED.set(true)
-                // Multiple speakers are currently speaking.
-
-                // Interuption Behavior - Not the best choice
-                // Make an arbitrary choice for the new speaker; they take over from the previous one.
-                // ------------------------------------------
-                // const new_active_speaker = speakers.find(
-                //     (v) =>
-                //         v.isSpeaking === true &&
-                //         new_active_speaker.name !== CUR_SPEAKER?.name,
-                // )
-                // MeetingHandle.addSpeaker(new_active_speaker)
-                // CUR_SPEAKER = new_active_speaker
-
-                // Same Speaker Prime - Best for me (mordak)
-                // -----------------------------------------
-                const has_speaking_cur_speaker = speakers.some(
-                    (speaker) =>
-                        speaker.name === CUR_SPEAKER?.name &&
-                        speaker.isSpeaking === true,
-                )
-                if (has_speaking_cur_speaker) {
-                    const active_speaker = speakers.find(
-                        (speaker) => speaker.name === CUR_SPEAKER!.name,
-                    )
-                    if (CUR_SPEAKER!.isSpeaking === false) {
-                        // The speaker was no longer speaking
-                        if (
-                            active_speaker.timestamp >=
-                            CUR_SPEAKER!.timestamp + PAUSE_BETWEEN_SENTENCES
-                        ) {
-                            // Update the information that the speaker has started speaking again.
-                            // Make a break between sentences.
-                            uploadTranscriptTask(active_speaker, false)
-                        }
-                    } else {
-                        // Speaker is already on speaking : Dont do anything
-                    }
-                    CUR_SPEAKER = active_speaker
-                } else {
-                    // Make an arbitrary choice for the new speaker;
-                    const active_speaker = speakers.find(
-                        (v) => v.isSpeaking === true,
-                    )
-                    uploadTranscriptTask(active_speaker, false)
-                    CUR_SPEAKER = active_speaker
-                }
+        try {
+            const speakers: SpeakerData[] = req.body
+            await SpeakerManager.getInstance().handleSpeakerUpdate(speakers)
+            res.status(200).send('ok')
+        } catch (error) {
+            console.error('Error in add_speaker route:', error)
+            res.status(500).send('Internal server error')
         }
-        res.status(200).send('ok')
     })
-
     // Leave bot request from api server
     app.post('/stop_record', async (req, res) => {
         const data: StopRecordParams = req.body
@@ -274,27 +164,27 @@ export async function server() {
 
     async function stop_record(res: any, reason: string) {
         try {
-            const meetingHandle = MeetingHandle.instance;
-            
+            const meetingHandle = MeetingHandle.instance
+
             if (!meetingHandle) {
-                return res.status(404).json({ 
-                    error: 'No active meeting found' 
-                });
+                return res.status(404).json({
+                    error: 'No active meeting found',
+                })
             }
-    
+
             // Appeler la méthode d'arrêt
-            await meetingHandle.stopMeeting(reason);
-    
-            res.json({ 
-                success: true, 
-                message: 'Meeting stopped successfully' 
-            });
+            await meetingHandle.stopMeeting(reason)
+
+            res.json({
+                success: true,
+                message: 'Meeting stopped successfully',
+            })
         } catch (error) {
-            console.error('Failed to stop meeting:', error);
-            res.status(500).json({ 
+            console.error('Failed to stop meeting:', error)
+            res.status(500).json({
                 error: 'Failed to stop meeting',
-                details: (error as Error).message 
-            });
+                details: (error as Error).message,
+            })
         }
     }
 

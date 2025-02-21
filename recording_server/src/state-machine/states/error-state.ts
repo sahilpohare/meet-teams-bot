@@ -1,36 +1,36 @@
-import { Events } from '../../events';
-import { Logger } from '../../logger';
-import { JoinError, JoinErrorCode } from '../../types';
-import { MeetingStateType, StateExecuteResult } from '../types';
-import { BaseState } from './base-state';
+import { Events } from '../../events'
+import { Logger } from '../../logger'
+import { JoinError, JoinErrorCode } from '../../types'
+import { MeetingStateType, StateExecuteResult } from '../types'
+import { BaseState } from './base-state'
 
 export class ErrorState extends BaseState {
     async execute(): StateExecuteResult {
         try {
             // Log l'erreur
-            await this.logError();
+            await this.logError()
 
             // Notification des événements d'erreur
-            await this.notifyError();
+            await this.notifyError()
 
             // Mise à jour des métriques
-            this.updateMetrics();
+            this.updateMetrics()
 
             // Passage au nettoyage
-            return this.transition(MeetingStateType.Cleanup);
+            return this.transition(MeetingStateType.Cleanup)
         } catch (error) {
-            console.error('Error in ErrorState:', error);
+            console.error('Error in ErrorState:', error)
             // Même en cas d'erreur dans la gestion d'erreur, on passe au nettoyage
-            return this.transition(MeetingStateType.Cleanup);
+            return this.transition(MeetingStateType.Cleanup)
         }
     }
 
     private async logError(): Promise<void> {
-        const error = this.context.error;
-        
+        const error = this.context.error
+
         if (!error) {
-            console.error('Unknown error occurred');
-            return;
+            console.error('Unknown error occurred')
+            return
         }
 
         // Création d'un objet d'erreur détaillé
@@ -45,64 +45,65 @@ export class ErrorState extends BaseState {
             meetingUrl: this.context.params?.meeting_url,
             botName: this.context.params?.bot_name,
             sessionId: this.context.params?.session_id,
-            timestamp: Date.now()
-        };
+            timestamp: Date.now(),
+        }
 
         // Log de l'erreur avec tous les détails
-        console.error('Meeting error occurred:', errorDetails);
+        console.error('Meeting error occurred:', errorDetails)
 
         // Upload immédiat des logs en cas d'erreur
         try {
-            await Logger.instance.upload_log();
+            await Logger.instance.upload_log()
         } catch (uploadError) {
-            console.error('Failed to upload error logs:', uploadError);
+            console.error('Failed to upload error logs:', uploadError)
         }
     }
 
     private async notifyError(): Promise<void> {
-        const error = this.context.error;
+        const error = this.context.error
 
         if (error instanceof JoinError) {
             switch (error.message) {
                 case JoinErrorCode.BotNotAccepted:
-                    await Events.botRejected();
-                    break;
+                    await Events.botRejected()
+                    break
                 case JoinErrorCode.BotRemoved:
-                    await Events.botRemoved();
-                    break;
+                    await Events.botRemoved()
+                    break
                 case JoinErrorCode.TimeoutWaitingToStart:
-                    await Events.waitingRoomTimeout();
-                    break;
+                    await Events.waitingRoomTimeout()
+                    break
                 case JoinErrorCode.InvalidMeetingUrl:
-                    await Events.invalidMeetingUrl();
-                    break;
+                    await Events.invalidMeetingUrl()
+                    break
                 default:
-                    await Events.meetingError(error);
+                    await Events.meetingError(error)
             }
         } else {
-            await Events.meetingError(error);
+            await Events.meetingError(error)
         }
     }
 
     private updateMetrics(): void {
-        const error = this.context.error;
-        
+        const error = this.context.error
+
         const metrics = {
-            errorType: error instanceof JoinError ? 'JoinError' : 'UnknownError',
+            errorType:
+                error instanceof JoinError ? 'JoinError' : 'UnknownError',
             errorCode: error instanceof JoinError ? error.message : 'Internal',
             timestamp: Date.now(),
-            meetingDuration: this.context.startTime 
-                ? Date.now() - this.context.startTime 
+            meetingDuration: this.context.startTime
+                ? Date.now() - this.context.startTime
                 : 0,
             state: this.stateType,
             // Autres métriques pertinentes du contexte
             attendeesCount: this.context.attendeesCount,
             firstUserJoined: this.context.firstUserJoined,
-            sessionId: this.context.params?.session_id
-        };
+            sessionId: this.context.params?.session_id,
+        }
 
         // Log des métriques
-        console.info('Error metrics:', metrics);
+        console.info('Error metrics:', metrics)
 
         // Ici, vous pouvez envoyer les métriques à votre système de monitoring
         // Par exemple :

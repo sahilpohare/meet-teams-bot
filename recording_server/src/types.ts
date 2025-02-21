@@ -133,17 +133,15 @@ export enum RecordingApprovalState {
     DISABLE = 'DISABLE',
 }
 
-
 export class JoinError extends Error {
-    details?: any;
+    details?: any
 
     constructor(message: string, details?: any) {
-        super(message);
-        this.name = 'JoinError';
-        this.details = details;
+        super(message)
+        this.name = 'JoinError'
+        this.details = details
     }
 }
-
 
 export enum JoinErrorCode {
     CannotJoinMeeting = 'CannotJoinMeeting',

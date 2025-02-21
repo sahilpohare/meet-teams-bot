@@ -34,7 +34,7 @@ export async function removeInitialShityHtml(mode: RecordingMode) {
             bannerDiv.style.opacity = '0'
         }
     } catch (e) {
-        console.error('Error with banner div:', e)
+        // console.error('Error with banner div:', e)
     }
     try {
         for (div of document.getElementsByTagName('div')) {
@@ -54,7 +54,7 @@ export async function removeInitialShityHtml(mode: RecordingMode) {
     try {
         removeBlackBox()
     } catch (e) {
-        console.error('Error with removeBlackBox:', e)
+        // console.error('Error with removeBlackBox:', e)
     }
     try {
         const politeDivs = document.querySelectorAll('div[aria-live="polite"]')
@@ -62,7 +62,7 @@ export async function removeInitialShityHtml(mode: RecordingMode) {
             ;(div as HTMLElement).style.opacity = '0'
         })
     } catch (e) {
-        console.error('Error setting opacity for aria-live="polite" divs:', e)
+        // console.error('Error setting opacity for aria-live="polite" divs:', e)
     }
 
     // People panel shitty HTML remove
@@ -81,10 +81,10 @@ export async function removeInitialShityHtml(mode: RecordingMode) {
                 rootLeft.parentElement.parentElement.parentElement.parentElement.style.width =
                     '97vw'
             } catch (e) {
-                console.error(
-                    '[getSpeakerRootToObserve] on meet error finding You',
-                    e,
-                )
+                // console.error(
+                //     '[getSpeakerRootToObserve] on meet error finding You',
+                //     e,
+                // )
             }
         }
     }
@@ -142,18 +142,18 @@ export function removeShityHtml(mode: RecordingMode) {
                 }
             }
         } catch (e) {
-            console.error('Error with video setup:', e)
+            // console.error('Error with video setup:', e)
         }
 
         try {
             document.getElementsByTagName('video')[1].style.position = 'fixed'
         } catch (e) {
-            console.error('Error with second video:', e)
+            // console.error('Error with second video:', e)
         }
         try {
             removeBlackBox()
         } catch (e) {
-            console.error('Error with removeBlackBox:', e)
+            // console.error('Error with removeBlackBox:', e)
         }
     }
 
@@ -165,7 +165,7 @@ export function removeShityHtml(mode: RecordingMode) {
             bannerDiv.style.opacity = '0'
         }
     } catch (e) {
-        console.error('Error with banner div:', e)
+        // console.error('Error with banner div:', e)
     }
     try {
         for (const div of document.getElementsByTagName('div')) {
@@ -187,7 +187,7 @@ export function removeShityHtml(mode: RecordingMode) {
             ;(div as HTMLElement).style.opacity = '0'
         })
     } catch (e) {
-        console.error('Error setting opacity for aria-live="polite" divs:', e)
+        // console.error('Error setting opacity for aria-live="polite" divs:', e)
     }
     try {
         var icons = Array.from(
@@ -200,7 +200,7 @@ export function removeShityHtml(mode: RecordingMode) {
             }
         })
     } catch (e) {
-        console.error('Error applying opacity:', e)
+        // console.error('Error applying opacity:', e)
     }
 
     // People panel shitty HTML remove
@@ -219,10 +219,10 @@ export function removeShityHtml(mode: RecordingMode) {
                 rootLeft.parentElement.parentElement.parentElement.parentElement.style.width =
                     '97vw'
             } catch (e) {
-                console.error(
-                    '[getSpeakerRootToObserve] on meet error finding You',
-                    e,
-                )
+                // console.error(
+                //     '[getSpeakerRootToObserve] on meet error finding You',
+                //     e,
+                // )
             }
         }
     }
@@ -245,10 +245,10 @@ export function removeShityHtml(mode: RecordingMode) {
                 currentElement = currentElement.parentElement
             }
         } else {
-            console.log("No 'mood' icon found.")
+            // console.log("No 'mood' icon found.")
         }
     } catch (e) {
-        console.error("Error finding 'mood' icon:", e)
+        // console.error("Error finding 'mood' icon:", e)
     }
 }
 
@@ -259,7 +259,7 @@ function removeBlackBox(): void {
     )
 
     if (elements.length === 0) {
-        console.log("Aucun élément trouvé avec data-layout='roi-crop'")
+        // console.log("Aucun élément trouvé avec data-layout='roi-crop'")
         return
     }
 
@@ -288,8 +288,6 @@ function removeBlackBox(): void {
             applyStylesRecursively(el, 4)
         }
     })
-
-    console.log('Styles appliqués avec succès')
 }
 
 function applyStylesRecursively(

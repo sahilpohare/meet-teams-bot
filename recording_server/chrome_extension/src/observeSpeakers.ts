@@ -84,12 +84,12 @@ async function checkSpeakers() {
                 'SPEAKERS',
                 currentSpeakersList,
             ).catch((e) => {
-                console.error('Catch on send currentSpeakersList :', e)
+                // console.error('Catch on send currentSpeakersList :', e)
             })
             CUR_SPEAKERS = new_speakers
         }
     } catch (e) {
-        console.error('Catch on MutationObserver :', e)
+        // console.error('Catch on MutationObserver :', e)
     }
 }
 
@@ -110,12 +110,12 @@ var MUTATION_OBSERVER = new MutationObserver(function () {
 // Observe Speakers mutation
 async function observeSpeakers() {
     if (MEETING_PROVIDER === 'Zoom') {
-        console.info(
-            'ZOOM observation speackers is not handled by the Extension!',
-        )
+        // console.info(
+        //     'ZOOM observation speackers is not handled by the Extension!',
+        // )
         return
     } else {
-        console.log('start observe speakers', RECORDING_MODE)
+        // console.log('start observe speakers', RECORDING_MODE)
     }
     // ___INITIAL_SEQUENCE___
     try {
@@ -133,13 +133,11 @@ async function observeSpeakers() {
                 'SPEAKERS',
                 currentSpeakersList,
             ).catch((e) => {
-                console.error('Catch on send initial speakers list :', e)
+                // console.error('Catch on send initial speakers list :', e)
             })
-        } else {
-            // RIP -> El Famoso speaker '-'
         }
     } catch (e) {
-        console.error('Catch on initial observe speaker sequence :', e)
+        // console.error('Catch on initial observe speaker sequence :', e)
     }
 
     try {
@@ -148,28 +146,6 @@ async function observeSpeakers() {
         ))!
         MUTATION_OBSERVER.observe(observe_parameters[0], observe_parameters[1])
     } catch (e) {
-        console.error('Catch on observe speaker init terminaison :', e)
+        // console.error('Catch on observe speaker init terminaison :', e)
     }
 }
-
-// // Refresh the number of participants
-// async function refreshAttendeesLoop() {
-//     while (true) {
-//         try {
-//             const allAttendees = R.filter(
-//                 (attendee: string) =>
-//                     attendee != BOT_NAME &&
-//                     !attendee.toLowerCase().includes('notetaker'), // notetaker is for competiter bot's
-//                 PROVIDER!.findAllAttendees(),
-//             )
-//             console.log('refresh participants loop :', allAttendees)
-//             chrome.runtime.sendMessage({
-//                 type: 'REFRESH_ATTENDEES',
-//                 payload: allAttendees,
-//             })
-//         } catch (e) {
-//             console.error('Catch on refresh attendees :', e)
-//         }
-//         await sleep(10000)
-//     }
-// }
