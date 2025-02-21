@@ -1,6 +1,5 @@
 import { MeetingStateType, ParticipantState, StateTransition } from './types'
 
-import { Transcoder } from '../recording/Transcoder'
 import { getStateInstance } from './states'
 import { MeetingContext } from './types'
 
@@ -62,10 +61,6 @@ export class MeetingStateMachine {
 
     public getStartTime(): number {
         return this.context.startTime!
-    }
-
-    public getTranscoder(): Transcoder {
-        return this.context.transcoder
     }
 
     private async handleError(error: Error): Promise<void> {

@@ -24,44 +24,88 @@ interface FFmpegProcessOptions {
 }
 
 export class Transcoder extends EventEmitter {
-    private static readonly FFMPEG_CLOSE_TIMEOUT: number = 60_000; // 60 seconds
-    private static readonly FASTSTART_TIMEOUT: number = 30_000; // 30 seconds
+    private static readonly FFMPEG_CLOSE_TIMEOUT: number = 60_000;
+    private static readonly FASTSTART_TIMEOUT: number = 30_000;
 
     private ffmpegProcess: ChildProcess | null = null;
     private videoProcessor: VideoChunkProcessor;
     private audioExtractor: AudioExtractor;
-    private pathManager: PathManager;
     private s3Uploader: S3Uploader;
+    private pathManager: PathManager | null = null; // Initialisé à null
     
     private isRecording: boolean = false;
     private isPaused: boolean = false;
     private isStopped: boolean = false;
     private chunkReceivedCounter: number = 0;
+    private isConfigured: boolean = false; // Nouveau flag pour vérifier la configuration
 
-    constructor(private config: TranscoderConfig) {
+    private config: TranscoderConfig;
+
+    constructor(initialConfig: Partial<TranscoderConfig>) {
         super();
-        this.pathManager = PathManager.getInstance();
-        this.videoProcessor = new VideoChunkProcessor(config);
+        this.config = {
+            chunkDuration: initialConfig.chunkDuration || MEETING_CONSTANTS.CHUNK_DURATION,
+            transcribeDuration: initialConfig.transcribeDuration || MEETING_CONSTANTS.TRANSCRIBE_DURATION,
+            outputPath: '',
+            bucketName: initialConfig.bucketName || process.env.AWS_S3_VIDEO_BUCKET || '',
+            s3Path: ''
+        };
+
+        this.videoProcessor = new VideoChunkProcessor(this.config);
         this.audioExtractor = new AudioExtractor();
         this.s3Uploader = new S3Uploader();
         this.setupEventListeners();
     }
 
+    public configure(pathManager: PathManager): void {
+        if (!pathManager) {
+            throw new Error('PathManager is required for configuration');
+        }
+        this.pathManager = pathManager;
+        this.config.outputPath = pathManager.getVideoPath();
+        const { bucketName, s3Path } = pathManager.getS3Paths();
+        this.config.bucketName = bucketName;
+        this.config.s3Path = s3Path;
+        this.videoProcessor.updateConfig(this.config);
+        this.isConfigured = true;
+
+        console.log('Transcoder configured with paths:', {
+            outputPath: this.config.outputPath,
+            webmPath: this.pathManager.getWebmPath(),
+            s3Path: this.config.s3Path
+        });
+    }
+
     public async start(): Promise<void> {
+        if (!this.isConfigured || !this.pathManager) {
+            throw new Error('Transcoder must be configured with PathManager before starting');
+        }
+
         if (this.isRecording) {
             throw new Error('Transcoder is already running');
         }
 
         try {
-            // Initialiser les chemins et dossiers nécessaires
+            // S'assurer que les répertoires existent
             await this.pathManager.ensureDirectories();
+            
+            // Log les chemins importants
+            console.log('Starting transcoder with paths:', {
+                outputPath: this.config.outputPath,
+                webmPath: this.pathManager.getWebmPath()
+            });
 
             // Démarrer FFmpeg
             await this.startFFmpeg();
-
+            
             this.isRecording = true;
-            this.emit('started');
+            this.emit('started', {
+                timestamp: Date.now(),
+                outputPath: this.config.outputPath
+            });
+
         } catch (error) {
+            console.error('Failed to start transcoder:', error);
             this.emit('error', { type: 'startError', error });
             throw error;
         }
@@ -118,20 +162,30 @@ export class Transcoder extends EventEmitter {
     }
 
     public async uploadChunk(chunk: Buffer, isFinal: boolean = false): Promise<void> {
+        console.log('Transcoder receiving chunk:', {
+            size: chunk.length,
+            isFinal,
+            isRecording: this.isRecording,
+            isPaused: this.isPaused
+        });
+    
         if (this.isStopped) {
             console.log('Transcoder is in stopped state');
             return;
         }
-
+    
         if (!this.ffmpegProcess) {
             throw new Error('Transcoder not initialized');
         }
-
+    
         try {
             this.chunkReceivedCounter++;
+            console.log(`Processing chunk #${this.chunkReceivedCounter}`);
+    
             await this.videoProcessor.processChunk(chunk, isFinal);
-
+    
             if (isFinal) {
+                console.log('Processing final chunk');
                 await this.videoProcessor.finalize();
             }
         } catch (error) {
@@ -159,26 +213,40 @@ export class Transcoder extends EventEmitter {
     }
 
     private async startFFmpeg(): Promise<void> {
-        const options: FFmpegProcessOptions = {
-            outputPath: this.config.outputPath,
-            logLevel: 'verbose',
-            audioOptions: {
-                codec: 'aac',
-                bitrate: '128k'
-            }
-        };
-
-        const ffmpegArgs = this.buildFFmpegArgs(options);
-
+        const outputPath = this.config.outputPath;
+        
+        console.log('Starting FFmpeg with output path:', outputPath);
+    
+        // Vérifier que le chemin de sortie a une extension
+        if (!outputPath.endsWith('.mp4')) {
+            throw new Error('Output path must have .mp4 extension');
+        }
+    
+        const ffmpegArgs = [
+            '-i', 'pipe:0',                // Input from pipe
+            '-c:v', 'copy',                // Copy video codec
+            '-c:a', 'aac',                 // Convert audio to AAC
+            '-b:a', '128k',                // Audio bitrate
+            '-strict', 'experimental',      // Allow experimental codecs
+            '-f', 'mp4',                   // Force MP4 format
+            '-movflags', '+frag_keyframe+empty_moov+faststart', // Optimizations
+            '-y',                          // Overwrite output
+            outputPath
+        ];
+    
+        console.log('FFmpeg command:', ffmpegArgs.join(' '));
+    
         this.ffmpegProcess = spawn('ffmpeg', ffmpegArgs, {
             stdio: ['pipe', 'inherit', 'inherit']
         });
-
+    
         this.ffmpegProcess.on('error', (error) => {
+            console.error('FFmpeg process error:', error);
             this.emit('error', { type: 'ffmpegError', error });
         });
-
+    
         this.ffmpegProcess.on('close', (code) => {
+            console.log('FFmpeg process closed with code:', code);
             if (code !== 0) {
                 this.emit('error', { 
                     type: 'ffmpegClose',
@@ -186,19 +254,6 @@ export class Transcoder extends EventEmitter {
                 });
             }
         });
-    }
-
-    private buildFFmpegArgs(options: FFmpegProcessOptions): string[] {
-        return [
-            '-i', 'pipe:0',                              // Input from pipe
-            '-c:v', 'copy',                              // Copy video codec
-            '-c:a', options.audioOptions?.codec || 'aac', // Audio codec
-            '-b:a', options.audioOptions?.bitrate || '128k', // Audio bitrate
-            '-movflags', '+frag_keyframe+empty_moov',    // Streaming optimizations
-            '-y',                                        // Overwrite output
-            options.outputPath,                          // Output path
-            '-loglevel', options.logLevel || 'verbose'   // Log level
-        ];
     }
 
     private async stopFFmpeg(): Promise<void> {
@@ -320,16 +375,9 @@ export class Transcoder extends EventEmitter {
     }
 }
 
-// Supprimer l'instance globale et la remplacer par une factory
-export function createTranscoder(botUuid: string): Transcoder {
-    const pathManager = PathManager.getInstance();
-    pathManager.setBotUuid(botUuid);
-    
-    return new Transcoder({
-        chunkDuration: MEETING_CONSTANTS.CHUNK_DURATION,
-        transcribeDuration: MEETING_CONSTANTS.TRANSCRIBE_DURATION,
-        outputPath: pathManager.getVideoPath(),
-        bucketName: process.env.AWS_S3_VIDEO_BUCKET || '',
-        s3Path: pathManager.getVideoPath()
-    });
-}
+// Création d'une instance globale unique
+export const TRANSCODER = new Transcoder({
+    chunkDuration: MEETING_CONSTANTS.CHUNK_DURATION,      // 10 secondes par chunk
+    transcribeDuration: MEETING_CONSTANTS.TRANSCRIBE_DURATION, // 3 minutes de transcription
+    bucketName: process.env.AWS_S3_VIDEO_BUCKET || '',
+});

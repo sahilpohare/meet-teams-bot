@@ -22,6 +22,11 @@ export class VideoChunkProcessor extends EventEmitter {
         this.setupQueue();
     }
 
+
+    public updateConfig(config: TranscoderConfig) {
+        this.config = config;
+    }
+
     private setupQueue() {
         this.chunkQueue = queue<ChunkTask>(async (task, callback) => {
             try {
@@ -64,16 +69,23 @@ export class VideoChunkProcessor extends EventEmitter {
 
     private async processChunkInternal(chunk: Buffer, metadata: ChunkMetadata): Promise<void> {
         try {
-            // Traitement du chunk vidéo
-            await this.writeChunk(chunk);
-
+            console.log(`Processing chunk #${metadata.index}, size: ${chunk.length} bytes`);
+    
+            // Émettre l'événement avec le chunk
+            this.emit('chunkReady', {
+                chunk,
+                metadata,
+                timestamp: Date.now()
+            });
+    
             // Émettre l'événement de chunk traité
             this.emit('chunkProcessed', {
                 metadata,
                 timestamp: Date.now()
             });
-
+    
         } catch (error) {
+            console.error('Error processing chunk:', error);
             this.emit('error', error);
             throw error;
         }
@@ -104,7 +116,13 @@ export class VideoChunkProcessor extends EventEmitter {
     }
 
     private async writeChunk(chunk: Buffer): Promise<void> {
-        // Ici, implémentez la logique d'écriture du chunk
-        // Par exemple, l'envoi à FFmpeg ou l'écriture dans un fichier
+        try {
+            // Émettre l'événement avec le chunk
+            this.emit('chunkReady', { chunk, timestamp: Date.now() });
+        } catch (error) {
+            console.error('Error writing chunk:', error);
+            this.emit('error', error);
+            throw error;
+        }
     }
 }

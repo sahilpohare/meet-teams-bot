@@ -8,11 +8,13 @@ export class PathManager {
     private environment: string;
     private botUuid: string | null;
 
+
     private constructor() {
         this.environment = process.env.ENVIRON || 'dev';
         this.botUuid = null;
     }
 
+    
     public static getInstance(botUuid?: string): PathManager {
         if (!PathManager.instance) {
             PathManager.instance = new PathManager();
@@ -55,8 +57,33 @@ export class PathManager {
     }
 
     public getVideoPath(): string {
-        return path.join(this.getBasePath(), 'video');
+        // Ajout de l'extension .mp4
+        return path.join(this.getBasePath(), 'video.mp4');
     }
+
+    public getOutputPath(): string {
+        // Ajout de l'extension .mp4
+        const timestamp = Date.now();
+        return path.join(this.getBasePath(), `output_${timestamp}.mp4`);
+    }
+
+    public getTempPath(): string {
+        return path.join(this.getBasePath(), 'temp');
+    }
+
+    public async ensureDirectories(): Promise<void> {
+        const paths = [
+            this.getBasePath(),
+            path.dirname(this.getVideoPath()),
+            this.getTempPath()
+        ];
+
+        for (const p of paths) {
+            await fs.mkdir(p, { recursive: true });
+            console.log(`Created directory: ${p}`);
+        }
+    }
+
 
      public async moveFile(sourcePath: string, destPath: string): Promise<void> {
         try {
@@ -83,26 +110,12 @@ export class PathManager {
         }
     }
 
-    public async ensureDirectories(): Promise<void> {
-        const paths = [
-            this.getBasePath(),
-            this.getVideoPath(),
-            path.dirname(this.getWebmPath())
-        ];
-
-        await Promise.all(paths.map(p => fs.mkdir(p, { recursive: true })));
-    }
-
     public getS3Paths(): { bucketName: string; s3Path: string } {
         const timestamp = Date.now();
         return {
             bucketName: process.env.AWS_S3_VIDEO_BUCKET || '',
             s3Path: `${this.environment}/${this.botUuid}/${timestamp}`
         };
-    }
-
-    public getOutputPath(): string {
-        return path.join(this.getVideoPath(), `output_${Date.now()}.mp4`);
     }
 
     public getTranscriberConfig(): {

@@ -4,7 +4,6 @@ import { MeetingParams, MeetingProviderInterface } from './types'
 // import { Browser as PuppeteerBrowser, Page as PuppeteerPage } from 'puppeteer'
 import { MeetProvider } from './meeting/meet'
 import { TeamsProvider } from './meeting/teams'
-import { Transcoder } from './recording/Transcoder'
 import { MeetingStateMachine } from './state-machine/machine'
 import { MeetingStateType, ParticipantState } from './state-machine/types'
 
@@ -45,10 +44,6 @@ export class MeetingHandle {
             provider: this.provider,
             meetingHandle: this,
         })
-    }
-
-    public getTranscoder(): Transcoder {
-        return this.stateMachine.getTranscoder()
     }
 
     public getStartTime(): number {

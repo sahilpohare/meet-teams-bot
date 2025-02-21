@@ -1,5 +1,5 @@
 import { Events } from '../../events';
-
+import { TRANSCODER } from '../../recording/Transcoder';            
 import { TranscriptionService } from '../../transcription/TranscriptionService';
 import { MeetingStateType, StateExecuteResult } from '../types';
 import { BaseState } from './base-state';
@@ -63,7 +63,7 @@ export class PausedState extends BaseState {
             });
 
             // Pause du Transcoder
-            await this.context.transcoder?.pause();
+            await TRANSCODER.pause();
 
             // Pause du service de transcription
             if (this.transcriptionService) {

@@ -1,4 +1,5 @@
 import { Events } from '../../events';
+import { TRANSCODER } from '../../recording/Transcoder';
 
 import { TranscriptionService } from '../../transcription/TranscriptionService';
 import { MeetingStateType, StateExecuteResult } from '../types';
@@ -49,7 +50,7 @@ export class ResumingState extends BaseState {
             });
 
             // Reprendre le Transcoder
-            await this.context.transcoder?.resume();
+            await TRANSCODER.resume();
 
             // Reprendre le service de transcription
             if (this.transcriptionService) {

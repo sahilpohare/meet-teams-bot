@@ -4,8 +4,8 @@ import { MEETING_CONSTANTS } from '../constants';
 import { MeetingStateType, StateExecuteResult } from '../types';
 import { BaseState } from './base-state';
 
+import { TRANSCODER } from '../../recording/Transcoder';
 import { PathManager } from '../../utils/PathManager';
-
 
 export class RecordingState extends BaseState {
     private isProcessing: boolean = true;
@@ -60,7 +60,7 @@ export class RecordingState extends BaseState {
     }
 
     private async setupEventListeners(): Promise<void> {
-        this.context.transcoder?.on('chunkProcessed', async (chunkInfo) => {
+        TRANSCODER.on('chunkProcessed', async (chunkInfo) => {
             const { startTime, endTime } = this.calculateSegmentTimes(chunkInfo);
             await this.context.transcriptionService?.transcribeSegment(
                 startTime, 
@@ -69,7 +69,7 @@ export class RecordingState extends BaseState {
             );
         });
 
-        this.context.transcoder?.on('error', async (error) => {
+        TRANSCODER.on('error', async (error) => {
             console.error('Recording error:', error);
             this.context.error = error;
             this.isProcessing = false;
@@ -125,7 +125,14 @@ export class RecordingState extends BaseState {
             this.context.endReason = reason;
             await Events.callEnded();
             
-            // Arrêter les processus
+            // Arrêter dans l'ordre correct :
+            // 1. D'abord stopper l'enregistrement dans l'extension
+            await this.stopRecordingInExtension();
+            
+            // 2. Attendre un peu pour s'assurer que les derniers chunks sont envoyés
+            await this.sleep(2000);
+            
+            // 3. Arrêter le Transcoder et la transcription
             await this.stopProcesses();
             
             this.isProcessing = false;
@@ -135,11 +142,43 @@ export class RecordingState extends BaseState {
         }
     }
 
+    private async stopRecordingInExtension(): Promise<void> {
+        if (!this.context.backgroundPage) {
+            throw new Error('Background page not available');
+        }
+
+        try {
+            // 1. Arrêter l'enregistrement média
+            await this.context.backgroundPage.evaluate(() => {
+                const w = window as any;
+                return w.stopMediaRecorder();
+            });
+            console.info('Media recorder stopped');
+
+            // 2. Arrêter le streaming audio
+            await this.context.backgroundPage.evaluate(() => {
+                const w = window as any;
+                return w.stopAudioStreaming();
+            });
+            console.info('Audio streaming stopped');
+
+            // 3. Nettoyer l'observateur des speakers (optionnel)
+            // await this.context.backgroundPage.evaluate(() => {
+            //     const w = window as any;
+            //     if (w.remove_shitty_html) {
+            //         w.remove_shitty_html();
+            //     }
+            // });
+        } catch (error) {
+            console.error('Failed to stop recording in extension:', error);
+            throw error;
+        }
+    }
+
     private async stopProcesses(): Promise<void> {
         try {
-            await this.stopAudioStreaming();
             await Promise.all([
-                this.context.transcoder?.stop(),
+                TRANSCODER.stop(),
                 this.context.transcriptionService?.stop()
             ]);
         } catch (error) {
@@ -181,11 +220,11 @@ export class RecordingState extends BaseState {
         // Vrai si au moins un utilisateur a rejoint puis est parti
         const noAttendeesAfterJoin = firstUserJoined
 
-        console.log('--------------------------------')
-        console.log('attendeesCount', attendeesCount)
-        console.log('noAttendeesTimeout', noAttendeesTimeout)
-        console.log('noAttendeesAfterJoin', noAttendeesAfterJoin)
-        console.log('--------------------------------')
+        // console.log('--------------------------------')
+        // console.log('attendeesCount', attendeesCount)
+        // console.log('noAttendeesTimeout', noAttendeesTimeout)
+        // console.log('noAttendeesAfterJoin', noAttendeesAfterJoin)
+        // console.log('--------------------------------')
 
         // On termine si :
         // - Il n'y a personne actuellement ET
@@ -211,11 +250,11 @@ export class RecordingState extends BaseState {
         const noSpeakerDetectedTime = this.context.noSpeakerDetectedTime || 0
         const firstUserJoined = this.context.firstUserJoined || false
 
-        console.log('--------------------------------')
-        console.log('hasAttendees', hasAttendees)
-        console.log('lastSpeakerTime', lastSpeakerTime)
-        console.log('startTime', startTime)
-        console.log('--------------------------------')
+        // console.log('--------------------------------')
+        // console.log('hasAttendees', hasAttendees)
+        // console.log('lastSpeakerTime', lastSpeakerTime)
+        // console.log('startTime', startTime)
+        // console.log('--------------------------------')
 
         // Cas 1 : Il y a des participants et on a un timestamp de dernière parole
         if (hasAttendees && lastSpeakerTime !== null) {

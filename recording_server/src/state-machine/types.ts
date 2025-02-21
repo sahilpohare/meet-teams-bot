@@ -3,9 +3,9 @@ import { MeetingParams } from '../types'
 import { BrowserContext, Page } from '@playwright/test'
 import { BrandingHandle } from '../branding'
 import { MeetingHandle } from '../meeting'
-import { Transcoder } from '../recording/Transcoder'
 import { TranscriptionService } from '../transcription/TranscriptionService'
 import { MeetingProviderInterface } from '../types'
+import { PathManager } from '../utils/PathManager'
 
 export enum MeetingStateType {
     Initialization = 'initialization',
@@ -53,12 +53,11 @@ export interface MeetingContext {
     meetingId?: string
     meetingPassword?: string
 
+    // PathManager
+    pathManager?: PathManager
 
     // Service de transcription
     transcriptionService?: TranscriptionService;
-
-    // Service de transcodeage video
-    transcoder?: Transcoder;
 
     // Recording state (Play/Pause)
     isPaused?: boolean;

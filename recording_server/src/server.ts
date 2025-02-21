@@ -9,6 +9,7 @@ import { MessageToBroadcast, SpeakerData, StopRecordParams } from './types'
 import axios from 'axios'
 import { unlinkSync } from 'fs'
 import { MeetingHandle } from './meeting'
+import { TRANSCODER } from './recording/Transcoder'
 import { SpeakerManager } from './speaker-manager'
 
 const HOST = '0.0.0.0'
@@ -318,9 +319,34 @@ export async function server() {
         process.exit(0)
     })
 
+    // Dans server.ts, on reçoit les chunks mais il n'y a pas de logging
     app.post('/transcoder/upload_chunk', async (req, res) => {
         return await uploadChunk(req, res, false)
     })
+
+    // Ajoutons des logs pour tracer le flux des données
+    async function uploadChunk(req: any, res: any, isFinal: boolean) {
+        if (!req.body || !Buffer.isBuffer(req.body)) {
+            console.log('Invalid chunk received:', typeof req.body)
+            return res.status(400).json({ error: 'Invalid chunk format' })
+        }
+
+        console.log('Chunk received:', {
+            size: req.body.length,
+            isFinal,
+            timestamp: Date.now(),
+        })
+
+        try {
+            await TRANSCODER.uploadChunk(req.body, isFinal)
+            return res
+                .status(200)
+                .json({ message: 'Chunk uploaded successfully' })
+        } catch (err) {
+            console.error('Error uploading chunk:', err)
+            return res.status(500).json({ error: 'Chunk upload failed' })
+        }
+    }
 
     app.post('/transcoder/upload_chunk_final', async (req, res) => {
         return await uploadChunk(req, res, true)
@@ -328,7 +354,7 @@ export async function server() {
 
     // Stop Transcoder
     app.post('/transcoder/stop', async (req, res) => {
-        await MeetingHandle.instance.getTranscoder().stop()
+        await TRANSCODER.stop()
             .catch((e) => {
                 res.status(500).json({
                     message: `Error occured when stoping transcoder: ${e}`,
@@ -357,7 +383,7 @@ async function uploadChunk(req: any, res: any, isFinal: boolean) {
     }
 
     try {
-        await MeetingHandle.instance.getTranscoder().uploadChunk(req.body, isFinal)
+        await TRANSCODER.uploadChunk(req.body, isFinal)
         return res.status(200).json({ message: 'Chunk uploadé avec succès' })
     } catch (err) {
         console.error("Erreur lors de l'upload du chunk:", err)
