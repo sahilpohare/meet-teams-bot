@@ -63,9 +63,9 @@ export class PathManager {
         return filePath;
     }
 
-    public getVideoPath(): string {
+    public getOutputPath(): string {
         // Ajout de l'extension .mp4
-        return path.join(this.getBasePath(), 'video.mp4');
+        return path.join(this.getBasePath(), 'output');
     }
     public getAudioTmpPath(): string {
         return path.join(this.getBasePath(), 'audio_tmp');
@@ -96,7 +96,7 @@ export class PathManager {
     public async ensureDirectories(): Promise<void> {
         const paths = [
             this.getBasePath(),
-            path.dirname(this.getVideoPath()),
+            path.dirname(this.getOutputPath()),
             this.getTempPath(),
             this.getFramesPath(),
             this.getAudioTmpPath(),

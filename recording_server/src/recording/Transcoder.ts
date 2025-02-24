@@ -100,10 +100,10 @@ export class Transcoder extends EventEmitter {
         // Ajuster l'extension du fichier de sortie selon le mode
         if (this.isAudioOnly) {
             // Assurer que le fichier audio se termine par .mp3
-            this.config.outputPath = pathManager.getVideoPath().replace(/\.mp4$/, '.mp3');
+            this.config.outputPath = pathManager.getOutputPath() + '.mp3';
         } else {
             // Mode vidéo normal
-            this.config.outputPath = pathManager.getVideoPath();
+            this.config.outputPath = pathManager.getOutputPath() + '.mp4';
         }
     
         const { bucketName, s3Path } = pathManager.getS3Paths();
@@ -324,7 +324,7 @@ export class Transcoder extends EventEmitter {
                 '-i', 'pipe:0',          // Entrée depuis stdin
                 '-vn',                    // Pas de vidéo
                 '-c:a', 'libmp3lame',    // Codec MP3
-                '-q:a', '4',              // Qualité MP3 (0-9, 0=meilleure)
+                '-q:a', '3',              // Qualité MP3 (0-9, 0=meilleure)
                 '-f', 'mp3',              // Format MP3
                 '-y',                     // Écraser le fichier existant
                 this.config.outputPath

@@ -27,6 +27,12 @@ export async function uploadTranscriptTask(
     speaker: SpeakerData,
     end: boolean,
 ): Promise<void> {
+
+    if (speaker.timestamp === null || speaker.timestamp === undefined) {
+        console.log("Skipping transcript upload - timestamps not yet available");
+        return;
+    }
+    
     return new Promise((resolve, reject) => {
         TRANSCRIPT_QUEUE.push(async () => {
             try {
