@@ -36,7 +36,7 @@ export class InCallState extends BaseState {
             console.info('Starting recording setup sequence')
 
             // Notifier qu'on est en appel mais pas encore en enregistrement
-            await Events.inCallNotRecording()
+            Events.inCallNotRecording()
 
             // Initialiser les services
             await this.initializeServices()

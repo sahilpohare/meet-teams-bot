@@ -65,22 +65,22 @@ export class ErrorState extends BaseState {
         if (error instanceof JoinError) {
             switch (error.message) {
                 case JoinErrorCode.BotNotAccepted:
-                    await Events.botRejected()
+                    Events.botRejected()
                     break
                 case JoinErrorCode.BotRemoved:
-                    await Events.botRemoved()
+                    Events.botRemoved()
                     break
                 case JoinErrorCode.TimeoutWaitingToStart:
-                    await Events.waitingRoomTimeout()
+                    Events.waitingRoomTimeout()
                     break
                 case JoinErrorCode.InvalidMeetingUrl:
-                    await Events.invalidMeetingUrl()
+                    Events.invalidMeetingUrl()
                     break
                 default:
-                    await Events.meetingError(error)
+                    Events.meetingError(error)
             }
         } else {
-            await Events.meetingError(error)
+            Events.meetingError(error)
         }
     }
 

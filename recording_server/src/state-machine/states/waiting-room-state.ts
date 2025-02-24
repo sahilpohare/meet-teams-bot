@@ -7,7 +7,7 @@ export class WaitingRoomState extends BaseState {
     async execute(): StateExecuteResult {
         try {
             console.info('Entering waiting room state')
-            await Events.inWaitingRoom()
+            Events.inWaitingRoom()
 
             // Obtenir les informations de la réunion
             const { meetingId, password } = await this.getMeetingInfo()
@@ -40,10 +40,10 @@ export class WaitingRoomState extends BaseState {
             if (error instanceof JoinError) {
                 switch (error.message) {
                     case JoinErrorCode.BotNotAccepted:
-                        await Events.botRejected()
+                        Events.botRejected()
                         return this.handleError(error)
                     case JoinErrorCode.TimeoutWaitingToStart:
-                        await Events.waitingRoomTimeout()
+                        Events.waitingRoomTimeout()
                         return this.handleError(error)
                 }
             }

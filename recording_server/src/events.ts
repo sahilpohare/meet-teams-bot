@@ -83,7 +83,7 @@ export class Events {
             await axios({
                 method: 'POST',
                 url: this.webhookUrl,
-                timeout: 5000, // 5 secondes de timeout
+                timeout: 5000,
                 headers: {
                     'User-Agent': 'meetingbaas/1.0',
                     'x-meeting-baas-api-key': this.apiKey,
@@ -108,15 +108,14 @@ export class Events {
             )
         } catch (error) {
             if (error instanceof Error) {
-                console.error(
-                    'Unable to send event:',
+                console.warn(
+                    'Unable to send event (continuing execution):',
                     code,
                     this.botId,
                     this.webhookUrl,
                     error.message,
                 )
             }
-            throw error
         }
     }
 }

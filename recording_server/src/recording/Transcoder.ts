@@ -414,12 +414,27 @@ export class Transcoder extends EventEmitter {
         }
 
         return new Promise<void>((resolve, reject) => {
-            const canContinue = this.webmWriteStream!.write(chunk);
+            const onDrain = () => {
+                cleanup();
+                resolve();
+            };
+
+            const onError = (error: Error) => {
+                cleanup();
+                reject(error);
+            };
+
+            const cleanup = () => {
+                this.webmWriteStream!.removeListener('drain', onDrain);
+                this.webmWriteStream!.removeListener('error', onError);
+            };
+
+            const canContinue = this.webmWriteStream.write(chunk);
             if (canContinue) {
                 resolve();
             } else {
-                this.webmWriteStream!.once('drain', resolve);
-                this.webmWriteStream!.once('error', reject);
+                this.webmWriteStream.once('drain', onDrain);
+                this.webmWriteStream.once('error', onError);
             }
         });
     }

@@ -183,7 +183,7 @@ export class Consumer {
             MeetingHandle.init(data)
 
             Events.init(data)
-            await Events.joiningCall()
+            Events.joiningCall()
 
             await MeetingHandle.instance.startRecordMeeting()
         }

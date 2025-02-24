@@ -148,7 +148,7 @@ export class RecordingState extends BaseState {
 private async handleMeetingEnd(reason: string): Promise<void> {
     try {
         this.context.endReason = reason;
-        await Events.callEnded();
+        Events.callEnded();
         
         // Arrêter dans l'ordre correct
         await this.stopVideoRecording();

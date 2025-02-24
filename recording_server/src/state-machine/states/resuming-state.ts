@@ -17,7 +17,7 @@ export class ResumingState extends BaseState {
             await this.resumeRecording();
 
             // Notifier de la reprise
-            await Events.recordingResumed();
+            Events.recordingResumed();
 
             // Réinitialiser les variables de pause
             this.context.pauseStartTime = null;

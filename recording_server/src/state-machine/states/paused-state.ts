@@ -29,7 +29,7 @@ export class PausedState extends BaseState {
             await this.pauseRecording();
 
             // Notifier de la pause
-            await Events.recordingPaused();
+            Events.recordingPaused();
 
             // Attendre la demande de reprise
             while (this.context.isPaused) {
