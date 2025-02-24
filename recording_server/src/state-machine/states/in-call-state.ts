@@ -44,9 +44,6 @@ export class InCallState extends BaseState {
             // Nettoyer le HTML et démarrer l'observation
             await this.setupBrowserComponents()
 
-            // Notifier que l'enregistrement est démarré
-            await Events.inCallRecording()
-
             console.info('Recording setup completed successfully')
         } catch (error) {
             console.error('Failed during recording setup:', error)
@@ -64,7 +61,8 @@ export class InCallState extends BaseState {
     
         // Créer le WordsPoster
         const wordsPoster = new WordsPoster();
-    
+        console.log("CONTEXT PARAMS", this.context.params);
+        
         // Initialiser le service de transcription avec le WordsPoster
         this.context.transcriptionService = new TranscriptionService(
             this.context.params.speech_to_text_provider || 'Default',
@@ -73,10 +71,11 @@ export class InCallState extends BaseState {
             wordsPoster // passer le WordsPoster ici
         );
     
-        // Configurer le transcoder
+        // Configurer le transcoder avec le mode d'enregistrement
         TRANSCODER.configure(
             this.context.pathManager,
-            this.context.transcriptionService
+            this.context.transcriptionService,
+            this.context.params.recording_mode
         );
     
         await TRANSCODER.start();
@@ -147,5 +146,8 @@ export class InCallState extends BaseState {
         // Enregistrer le timestamp de début
         this.context.startTime = startTime
         console.info(`Recording started at timestamp: ${startTime}`)
+
+        // Notifier que l'enregistrement est démarré avec le startTime
+        Events.inCallRecording({ start_time: startTime })
     }
 }

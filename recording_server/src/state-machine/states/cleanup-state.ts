@@ -108,7 +108,7 @@ export class CleanupState extends BaseState {
 
         try {
             console.log('Uploading video to S3');
-            await TRANSCODER.uploadVideoToS3();
+            await TRANSCODER.uploadToS3();
         } catch (error) {
             console.error('Failed to upload video to S3:', error);
         }

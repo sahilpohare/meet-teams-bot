@@ -29,8 +29,8 @@ export class Events {
         return Events.EVENTS?.send('in_call_not_recording')
     }
 
-    static async inCallRecording() {
-        return Events.EVENTS?.send('in_call_recording')
+    static async inCallRecording(data: { start_time: number }) {
+        return Events.EVENTS?.send('in_call_recording', data)
     }
 
     static async recordingPaused() {

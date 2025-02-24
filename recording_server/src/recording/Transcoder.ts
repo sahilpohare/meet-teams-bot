@@ -3,6 +3,7 @@ import { EventEmitter } from 'events';
 import * as fs from 'fs';
 import { MEETING_CONSTANTS } from '../state-machine/constants';
 import { TranscriptionSegment, TranscriptionService } from '../transcription/TranscriptionService';
+import { RecordingMode } from '../types';
 import { PathManager } from '../utils/PathManager';
 import { S3Uploader } from '../utils/S3Uploader';
 import { AudioExtractor } from './AudioExtractor';
@@ -16,6 +17,7 @@ export interface TranscoderConfig {
     bucketName: string;
     s3Path: string;
     audioBucketName: string;
+    recordingMode: RecordingMode;
 }
 
 export class Transcoder extends EventEmitter {
@@ -44,6 +46,7 @@ export class Transcoder extends EventEmitter {
     private isPaused: boolean = false;
     private isStopped: boolean = false;
     private isConfigured: boolean = false;
+    private isAudioOnly: boolean = false;
 
     constructor(initialConfig: Partial<TranscoderConfig>) {
         super();
@@ -55,8 +58,12 @@ export class Transcoder extends EventEmitter {
             outputPath: '',
             bucketName: initialConfig.bucketName || process.env.AWS_S3_VIDEO_BUCKET || '',
             audioBucketName: process.env.AWS_S3_TEMPORARY_AUDIO_BUCKET || '',
-            s3Path: ''
+            s3Path: '',
+            recordingMode: initialConfig.recordingMode || 'speaker_view'
         };
+
+        // Vérifier si on est en mode audio-only
+        this.isAudioOnly = this.config.recordingMode === 'audio_only';
 
         this.initializeComponents();
         this.setupEventListeners();
@@ -69,29 +76,49 @@ export class Transcoder extends EventEmitter {
         this.transcriptionState = new TranscriptionStateManager();
     }
 
-    public configure(pathManager: PathManager, transcriptionService: TranscriptionService): void {
+    public configure(
+        pathManager: PathManager, 
+        transcriptionService: TranscriptionService, 
+        recordingMode?: RecordingMode
+    ): void {
         if (!pathManager) {
             throw new Error('PathManager is required for configuration');
         }
         if (!transcriptionService) {
             throw new Error('TranscriptionService is required for configuration');
         }
-
+    
         this.pathManager = pathManager;
         this.transcriptionService = transcriptionService;
-
-        this.config.outputPath = pathManager.getVideoPath();
+        
+        // Mettre à jour le mode d'enregistrement si fourni
+        if (recordingMode) {
+            this.config.recordingMode = recordingMode;
+            this.isAudioOnly = recordingMode === 'audio_only';
+        }
+    
+        // Ajuster l'extension du fichier de sortie selon le mode
+        if (this.isAudioOnly) {
+            // Assurer que le fichier audio se termine par .mp3
+            this.config.outputPath = pathManager.getVideoPath().replace(/\.mp4$/, '.mp3');
+        } else {
+            // Mode vidéo normal
+            this.config.outputPath = pathManager.getVideoPath();
+        }
+    
         const { bucketName, s3Path } = pathManager.getS3Paths();
         this.config.bucketName = bucketName;
         this.config.s3Path = s3Path;
         
         this.videoProcessor.updateConfig(this.config);
         this.isConfigured = true;
-
+    
         console.log('Transcoder configured:', {
             outputPath: this.config.outputPath,
             webmPath: this.pathManager.getWebmPath(),
             s3Path: this.config.s3Path,
+            recordingMode: this.config.recordingMode,
+            isAudioOnly: this.isAudioOnly,
             hasTranscriptionService: !!this.transcriptionService
         });
     }
@@ -105,8 +132,15 @@ export class Transcoder extends EventEmitter {
             throw new Error('Transcoder is already running');
         }
 
-        if (!this.config.outputPath.endsWith('.mp4')) {
-            throw new Error('Output path must have .mp4 extension');
+        // Valider l'extension du fichier en fonction du mode
+        if (this.isAudioOnly) {
+            if (!this.config.outputPath.endsWith('.mp3')) {
+                throw new Error('Output path must have .mp3 extension in audio-only mode');
+            }
+        } else {
+            if (!this.config.outputPath.endsWith('.mp4')) {
+                throw new Error('Output path must have .mp4 extension in video mode');
+            }
         }
     }
 
@@ -121,7 +155,8 @@ export class Transcoder extends EventEmitter {
             
             this.isRecording = true;
             this.emit('started', {
-                outputPath: this.config.outputPath
+                outputPath: this.config.outputPath,
+                isAudioOnly: this.isAudioOnly
             });
         } catch (error) {
             this.emit('error', { type: 'startError', error });
@@ -129,7 +164,7 @@ export class Transcoder extends EventEmitter {
         }
     }
     
-    // Gestion des chunks
+    // Gestion des chunks - identique pour audio et vidéo
     public async uploadChunk(chunk: Buffer, isFinal: boolean = false): Promise<void> {
         if (!this.isReadyForChunks()) return;
     
@@ -148,7 +183,7 @@ export class Transcoder extends EventEmitter {
         }
     }
     
-    // Gestion de la transcription
+    // Gestion de la transcription - identique pour audio et vidéo
     private async processTranscriptionSegment(segment: TranscriptionSegment): Promise<void> {
         if (!this.transcriptionService) {
             throw new Error('TranscriptionService not configured');
@@ -188,8 +223,13 @@ export class Transcoder extends EventEmitter {
 
             // Fermer les flux
             await this.stopAllStreams();
-            await this.optimizeVideo();
-            await this.uploadVideoToS3();
+            
+            if (!this.isAudioOnly) {
+                // L'optimisation n'est nécessaire que pour les vidéos MP4
+                await this.optimizeVideo();
+            }
+            
+            await this.uploadToS3();
 
             this.isRecording = false;
             this.isStopped = true;
@@ -200,7 +240,7 @@ export class Transcoder extends EventEmitter {
         }
     }
     
-    // Gestion des événements
+    // Gestion des événements - identique pour audio et vidéo
     private setupEventListeners(): void {
         this.videoProcessor.on('chunkProcessed', async ({ metadata }) => {
             const segment = this.transcriptionState.addChunk(metadata.timestamp);
@@ -219,7 +259,7 @@ export class Transcoder extends EventEmitter {
         });
     }
     
-    // Helpers d'état
+    // Helpers d'état - identique pour audio et vidéo
     private isReadyForChunks(): boolean {
         if (this.isStopped || !this.isRecording) {
             console.log('Cannot process chunk: transcoder not ready');
@@ -276,23 +316,44 @@ export class Transcoder extends EventEmitter {
     }
 
     private async startFFmpeg(): Promise<void> {
-        const ffmpegArgs = [
-            '-i', 'pipe:0',
-            '-c:v', 'copy',
-            '-c:a', 'aac',
-            '-b:a', '128k',
-            '-strict', 'experimental',
-            '-f', 'mp4',
-            '-movflags', '+frag_keyframe+empty_moov+faststart',
-            '-y',
-            this.config.outputPath
-        ];
+        let ffmpegArgs: string[] = [];
+        
+        if (this.isAudioOnly) {
+            // Configuration pour l'extraction audio MP3
+            ffmpegArgs = [
+                '-i', 'pipe:0',          // Entrée depuis stdin
+                '-vn',                    // Pas de vidéo
+                '-c:a', 'libmp3lame',    // Codec MP3
+                '-q:a', '4',              // Qualité MP3 (0-9, 0=meilleure)
+                '-f', 'mp3',              // Format MP3
+                '-y',                     // Écraser le fichier existant
+                this.config.outputPath
+            ];
+        } else {
+            // Configuration MP4 standard (inchangée)
+            ffmpegArgs = [
+                '-i', 'pipe:0',
+                '-c:v', 'copy',
+                '-c:a', 'aac',
+                '-b:a', '128k',
+                '-strict', 'experimental',
+                '-f', 'mp4',
+                '-movflags', '+frag_keyframe+empty_moov+faststart',
+                '-y',
+                this.config.outputPath
+            ];
+        }
 
         this.ffmpegProcess = spawn('ffmpeg', ffmpegArgs, {
             stdio: ['pipe', 'inherit', 'inherit']
         });
 
         this.setupFFmpegListeners();
+        
+        console.log('Started FFmpeg process:', { 
+            isAudioOnly: this.isAudioOnly,
+            outputPath: this.config.outputPath 
+        });
     }
 
     private setupFFmpegListeners(): void {
@@ -387,7 +448,8 @@ export class Transcoder extends EventEmitter {
     }
 
     private async optimizeVideo(): Promise<void> {
-        if (!this.pathManager) return;
+        // On n'optimise que les MP4, pas les MP3
+        if (!this.pathManager || this.isAudioOnly) return;
 
         const tempPath = `${this.config.outputPath}_temp.mp4`;
         
@@ -420,10 +482,25 @@ export class Transcoder extends EventEmitter {
         });
     }
 
-    public async uploadVideoToS3(): Promise<string> {
+    public async uploadToS3(): Promise<string> {
         if (!this.pathManager) return Promise.reject(new Error('PathManager not configured'));
-        console.log('Uploading video to S3:', this.pathManager.getVideoPath(), this.config.bucketName, this.config.s3Path);
-        return this.s3Uploader.uploadFile(this.pathManager.getVideoPath(), this.config.bucketName, this.config.s3Path + '.mp4');
+        
+        const localPath = this.config.outputPath;
+        let s3Key: string;
+        
+        if (this.isAudioOnly) {
+            s3Key = `${this.config.s3Path}.mp3`;
+        } else {
+            s3Key = `${this.config.s3Path}.mp4`;
+        }
+        
+        console.log(`Uploading ${this.isAudioOnly ? 'audio' : 'video'} to S3:`, {
+            localPath,
+            bucketName: this.config.bucketName,
+            s3Key
+        });
+        
+        return this.s3Uploader.uploadFile(localPath, this.config.bucketName, s3Key);
     }
 
     public getStatus(): {
@@ -432,13 +509,15 @@ export class Transcoder extends EventEmitter {
         isStopped: boolean;
         chunksProcessed: number;
         isConfigured: boolean;
+        isAudioOnly: boolean;
     } {
         return {
             isRecording: this.isRecording,
             isPaused: this.isPaused,
             isStopped: this.isStopped,
             chunksProcessed: this.processedChunks,
-            isConfigured: this.isConfigured
+            isConfigured: this.isConfigured,
+            isAudioOnly: this.isAudioOnly
         };
     }
 }
@@ -450,15 +529,3 @@ export const TRANSCODER = new Transcoder({
     bucketName: process.env.AWS_S3_VIDEO_BUCKET || '',
     audioBucketName: process.env.AWS_S3_TEMPORARY_AUDIO_BUCKET || ''
 });
-
-
-
-
-
-
-
-
-
-
-
-    
