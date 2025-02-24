@@ -16,9 +16,8 @@ import { Consumer } from './rabbitmq'
 import { JoinError, JoinErrorCode, MeetingParams } from './types'
 
 import { spawn } from 'child_process'
-import { getCachedExtensionId, openBrowser } from './browser'
 import { Events } from './events'
-import { logger, redirectLogsToBot, setupConsoleLogger, setupExitHandler } from './utils/pinoLogger'
+import { logger, setupConsoleLogger, setupExitHandler } from './utils/pinoLogger'
 
 const ZOOM_SDK_DEBUG_EXECUTABLE_PATHNAME = './target/debug/client'
 const ZOOM_SDK_RELEASE_EXECUTABLE_PATHNAME = './target/release/client'
@@ -40,23 +39,14 @@ setupExitHandler();
 // CONST => Const
 // camelCase => Fn
 // PascalCase => Classes
-logger.info('version 0.0.1')
+
 ;(async () => {
-    if (process.argv[2]?.includes('get_extension_id')) {
-        getCachedExtensionId().then((x) => console.log(x))
-    } else {
+
         // set default axios config
         axios.defaults.baseURL = API_SERVER_BASEURL
         axios.defaults.withCredentials = true
 
-        // trigger system cache in order to decrease latency when first bot come
         let environ: string = process.env.ENVIRON
-        if (environ !== 'local' && !LOCK_INSTANCE_AT_STARTUP) {
-            await triggerCache().catch((e) => {
-                console.error(`Failed to trigger cache: ${e}`)
-                throw e
-            })
-        }
 
         console.log('Before REDIS.connect()')
         await clientRedis.connect().catch((e) => {
@@ -203,7 +193,7 @@ logger.info('version 0.0.1')
         }
         console.log('exiting instance')
         exit(0)
-    }
+    
 })()
 
 let webhookSent = false
@@ -286,18 +276,4 @@ export function meetingBotStartRecordFailed(
         .catch((error) => {
             console.error('Failed to notify recording failure:', error.message)
         })
-}
-
-/// open the browser a first time to speed up the next openings
-async function triggerCache() {
-    const extensionId = await getCachedExtensionId()
-    const [chrome, _chromium] = await Promise.all([
-        openBrowser(extensionId, false, false),
-        null,
-        null,
-        // openBrowser(extensionId, true, false),
-        // generateBranding('cache').wait,
-    ])
-    await chrome.browser.close()
-    // await chromium.browser.close()
 }

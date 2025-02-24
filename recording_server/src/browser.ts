@@ -1,10 +1,10 @@
 import { BrowserContext, chromium, Page } from '@playwright/test'
-import * as fs from 'fs'
 import { join } from 'path'
 
 // const EXTENSION_NAME = 'spoke'
 const GOOGLE_CHROME_EXECUTABLE_PATH =
     process.env.GOOGLE_CHROME_EXECTUTABLE_PATH || '/usr/bin/google-chrome'
+const EXTENSION_ID = 'eahilodcoaonodbfiijhpmfnddkfhmbl'
 const USER_DATA_DIR = '/tmp/test-user-data-dir'
 
 type Resolution = {
@@ -24,24 +24,8 @@ const P720: Resolution = {
 
 var RESOLUTION: Resolution = P720
 
-export async function getCachedExtensionId() {
-    try {
-        const data: string = await fs.promises.readFile(
-            './extension_id.txt',
-            'utf8',
-        )
-        const trimmedId = data.trim()
-        console.log(`getCachedExtensionId() = ${trimmedId}`)
-        return trimmedId
-    } catch (error) {
-        console.error('Error reading extension ID:', error)
-        throw new Error('Failed to read extension ID')
-    }
-}
-
 export async function openBrowser(
-    extensionId: string,
-    useChromium: boolean,
+    // useChromium: boolean,
     lowResolution: boolean,
     slowMo: boolean = false,
 ): Promise<{ browser: BrowserContext; backgroundPage: Page }> {
@@ -79,7 +63,7 @@ export async function openBrowser(
                 '--autoplay-policy=no-user-gesture-required',
                 '--disable-background-timer-throttling',
                 '--enable-features=SharedArrayBuffer',
-                `--whitelisted-extension-id=${extensionId}`,
+                `--whitelisted-extension-id=${EXTENSION_ID}`,
                 '--ignore-certificate-errors',
                 '--allow-insecure-localhost',
                 '--disable-blink-features=TrustedDOMTypes',
@@ -112,3 +96,4 @@ export async function openBrowser(
         throw error
     }
 }
+

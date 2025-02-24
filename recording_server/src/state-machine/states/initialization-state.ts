@@ -1,5 +1,5 @@
 import { generateBranding, playBranding } from '../../branding'
-import { getCachedExtensionId, openBrowser } from '../../browser'
+import { openBrowser } from '../../browser'
 import { MeetingHandle } from '../../meeting'
 import { JoinError, JoinErrorCode } from '../../types'
 import { PathManager } from '../../utils/PathManager'
@@ -54,9 +54,9 @@ export class InitializationState extends BaseState {
     }
 
     private async setupBrowser(): Promise<void> {
-        const extensionId = await getCachedExtensionId()
+       
         const { browser, backgroundPage } = await openBrowser(
-            extensionId,
+       
             false,
             false,
         )

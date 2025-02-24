@@ -87,7 +87,8 @@ export class AudioExtractor extends EventEmitter {
         } finally {
             // Nettoyage
             try {
-                await fs.unlink(outputPath);
+                //TODO: Uncomment this when we want to delete the audio file for prod
+                // await fs.unlink(outputPath);
             } catch (e) {
                 console.error('Error cleaning up temp file:', e);
             }
