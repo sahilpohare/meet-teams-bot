@@ -324,7 +324,6 @@ export async function server() {
         return await uploadChunk(req, res, false)
     })
 
-    // Ajoutons des logs pour tracer le flux des données
     async function uploadChunk(req: any, res: any, isFinal: boolean) {
         if (!req.body || !Buffer.isBuffer(req.body)) {
             console.log('Invalid chunk received:', typeof req.body)

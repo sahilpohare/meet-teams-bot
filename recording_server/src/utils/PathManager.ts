@@ -13,7 +13,6 @@ export class PathManager {
         this.environment = process.env.ENVIRON || 'dev';
         this.botUuid = null;
     }
-
     
     public static getInstance(botUuid?: string): PathManager {
         if (!PathManager.instance) {
@@ -53,19 +52,42 @@ export class PathManager {
     }
 
     public getWebmPath(): string {
-        return path.join(this.getBasePath(), 'temp', 'output.webm');
+        const basePath = path.join(this.getBasePath(), 'temp');
+        const filePath = path.join(basePath, 'output.webm');  // Inclure l'extension directement
+        
+        console.log('Generated WebM path:', {
+            basePath,
+            filePath
+        });
+        
+        return filePath;
     }
 
     public getVideoPath(): string {
         // Ajout de l'extension .mp4
         return path.join(this.getBasePath(), 'video.mp4');
     }
-
-    public getOutputPath(): string {
-        // Ajout de l'extension .mp4
-        const timestamp = Date.now();
-        return path.join(this.getBasePath(), `output_${timestamp}.mp4`);
+    public getAudioTmpPath(): string {
+        return path.join(this.getBasePath(), 'audio_tmp');
     }
+
+    public getSpeakerLogPath(): string {
+        return path.join(this.getBasePath(), 'SeparationSpeakerLog.txt');
+    }
+
+    public getLogPath(): string {
+        return path.join(this.getBasePath(), 'logs.log');
+    }
+
+    public getFramesPath(): string {
+        return path.join(this.getBasePath(), 'frames');
+    }
+
+    // public getOutputPath(): string {
+    //     // Ajout de l'extension .mp4
+    //     const timestamp = Date.now();
+    //     return path.join(this.getBasePath(), `output_${timestamp}.mp4`);
+    // }
 
     public getTempPath(): string {
         return path.join(this.getBasePath(), 'temp');
@@ -75,7 +97,9 @@ export class PathManager {
         const paths = [
             this.getBasePath(),
             path.dirname(this.getVideoPath()),
-            this.getTempPath()
+            this.getTempPath(),
+            this.getFramesPath(),
+            this.getAudioTmpPath(),
         ];
 
         for (const p of paths) {
@@ -111,23 +135,22 @@ export class PathManager {
     }
 
     public getS3Paths(): { bucketName: string; s3Path: string } {
-        const timestamp = Date.now();
         return {
             bucketName: process.env.AWS_S3_VIDEO_BUCKET || '',
-            s3Path: `${this.environment}/${this.botUuid}/${timestamp}`
+            s3Path: `${this.botUuid}`
         };
     }
 
-    public getTranscriberConfig(): {
-        outputPath: string;
-        bucketName: string;
-        s3Path: string;
-    } {
-        const { bucketName, s3Path } = this.getS3Paths();
-        return {
-            outputPath: this.getOutputPath(),
-            bucketName,
-            s3Path
-        };
-    }
+    // public getTranscriberConfig(): {
+    //     outputPath: string;
+    //     bucketName: string;
+    //     s3Path: string;
+    // } {
+    //     const { bucketName, s3Path } = this.getS3Paths();
+    //     return {
+    //         outputPath: this.getOutputPath(),
+    //         bucketName,
+    //         s3Path
+    //     };
+    // }
 }

@@ -11,9 +11,16 @@ export type RecognizerWord = {
 export class WordsPoster {
     private processedSegments: Set<string> = new Set();
     private api: Api;
+    private bot_id: Promise<number>;
 
-    constructor(private meetingId: string) {
+    constructor() {
         this.api = Api.instance;
+        this.bot_id = this.getBotId();
+    }
+
+    private async getBotId(): Promise<number> {
+        const bot = await this.api.getBot();
+        return bot.bot.id;
     }
 
     public async saveToDatabase(results: TranscriptionResult[], segment: TranscriptionSegment): Promise<void> {
@@ -27,7 +34,7 @@ export class WordsPoster {
         try {
             this.processedSegments.add(segmentKey);
 
-            const bot = await this.api.getBot();
+            
             
             // Transformer les résultats en format RecognizerWord
             const words: RecognizerWord[] = results.map(result => ({
@@ -37,7 +44,7 @@ export class WordsPoster {
             }));
 
             // Utiliser postWords au lieu de postTranscript
-            await this.api.postWords(words, bot.bot.id);
+            await this.api.postWords(words, await this.bot_id);
 
             console.log(`[WordsPoster] Successfully posted words to DB for ${segmentKey}`);
         } catch (error) {

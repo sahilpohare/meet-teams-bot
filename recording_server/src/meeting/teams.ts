@@ -7,9 +7,9 @@ import {
     MeetingProviderInterface,
 } from '../types'
 
-import { Logger } from '../logger'
 import { parseMeetingUrlFromJoinInfos } from '../urlParser/teamsUrlParser'
 import { sleep } from '../utils'
+import { takeScreenshot } from '../utils/takeScreenshot'
 
 export class TeamsProvider implements MeetingProviderInterface {
     constructor() {}
@@ -117,7 +117,7 @@ export class TeamsProvider implements MeetingProviderInterface {
             throw new Error('RetryableError')
         }
 
-        await Logger.instance.screenshot(page, 'afterjoinnow')
+        await takeScreenshot(page, 'afterjoinnow')
 
         while (true) {
             const botNotAccepted = await isBotNotAccepted(page)

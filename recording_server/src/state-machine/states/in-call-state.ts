@@ -1,6 +1,7 @@
 import { Events } from '../../events'
 import { TRANSCODER } from '../../recording/Transcoder'
 import { TranscriptionService } from '../../transcription/TranscriptionService'
+import { WordsPoster } from '../../transcription/WordPoster'
 import { MEETING_CONSTANTS } from '../constants'
 import { MeetingStateType, StateExecuteResult } from '../types'
 import { BaseState } from './base-state'
@@ -52,32 +53,36 @@ export class InCallState extends BaseState {
         }
     }
 
+
     private async initializeServices(): Promise<void> {
         console.info('Initializing services');
     
-        // Vérifier que le PathManager est bien configuré
         if (!this.context.pathManager) {
             throw new Error('PathManager not initialized');
         }
     
-        // Configurer le transcoder avant de le démarrer
-        TRANSCODER.configure(this.context.pathManager);
-    
-        // Initialiser le service de transcription
+        // Créer le WordsPoster
+        const wordsPoster = new WordsPoster();
+        
+        // Initialiser le service de transcription avec le WordsPoster
         this.context.transcriptionService = new TranscriptionService(
             this.context.params.speech_to_text_provider || 'Default',
             this.context.params.speech_to_text_api_key,
+            {}, // options
+            wordsPoster // passer le WordsPoster ici
         );
     
-        // Démarrer le transcoder maintenant qu'il est configuré
-        await TRANSCODER.start().catch(error => {
-            console.error('Failed to start transcoder:', error);
-            throw error;
-        });
+        // Configurer le transcoder
+        TRANSCODER.configure(
+            this.context.pathManager,
+            this.context.transcriptionService
+        );
+    
+        await TRANSCODER.start();
         
         console.info('Services initialized successfully');
     }
-
+    
     private async setupBrowserComponents(): Promise<void> {
         if (!this.context.backgroundPage) {
             throw new Error('Background page not initialized')

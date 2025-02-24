@@ -2,6 +2,7 @@ import { delSessionInRedis } from '../../instance'
 import { Logger } from '../../logger'
 import { SoundContext, VideoContext } from '../../media_context'
 import { TRANSCODER } from '../../recording/Transcoder'
+import { MEETING_CONSTANTS } from '../constants'
 
 
 import { MeetingStateType, StateExecuteResult } from '../types'
@@ -11,7 +12,18 @@ export class CleanupState extends BaseState {
     async execute(): StateExecuteResult {
         try {
             console.info('Starting cleanup sequence');
-            await this.performCleanup();
+            
+            // Utiliser Promise.race pour implémenter le timeout
+            const cleanupPromise = this.performCleanup();
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Cleanup timeout')), MEETING_CONSTANTS.CLEANUP_TIMEOUT);
+            });
+
+            try {
+                await Promise.race([cleanupPromise, timeoutPromise]);
+            } catch (error) {
+                console.error('Cleanup failed or timed out:', error);
+            }
             return this.transition(MeetingStateType.Cleanup); // État final
         } catch (error) {
             console.error('Error during cleanup:', error);
@@ -22,7 +34,10 @@ export class CleanupState extends BaseState {
 
     private async performCleanup(): Promise<void> {
         try {
-            // 1. Upload des logs avant toute opération destructive
+            // 1. Arrêter le Transcoder et la transcription
+            await this.stopTranscoderAndTranscription();
+
+            // 2. Upload des logs avant toute opération destructive
             await this.uploadLogs();
 
             // 2. Nettoyage des ressources de l'extension et du navigateur
@@ -37,6 +52,19 @@ export class CleanupState extends BaseState {
         } catch (error) {
             console.error('Cleanup error:', error);
             // On continue même en cas d'erreur
+        }
+    }
+
+
+    private async stopTranscoderAndTranscription(): Promise<void> {
+        try {
+            await Promise.all([
+                TRANSCODER.stop(),
+                this.context.transcriptionService?.stop()
+            ]);
+        } catch (error) {
+            console.error('Error stopping processes:', error);
+            throw error;
         }
     }
 

@@ -1,7 +1,6 @@
 import { spawn } from 'child_process';
 import { EventEmitter } from 'events';
 import * as fs from 'fs/promises';
-import * as os from 'os';
 import * as path from 'path';
 import { PathManager } from '../utils/PathManager';
 import { S3Uploader } from '../utils/S3Uploader';
@@ -12,6 +11,7 @@ export interface AudioExtractionOptions {
     format?: string;         // Par défaut 'wav'
     maxRetries?: number;     // Par défaut 3
     retryDelay?: number;     // Par défaut 2000ms
+    segmentDuration?: number; // Par défaut 3 minutes
 }
 
 export class AudioExtractor extends EventEmitter {
@@ -41,20 +41,31 @@ export class AudioExtractor extends EventEmitter {
         s3Path: string
     ): Promise<string> {
         console.log('Starting audio extraction:', { startTime, endTime, s3Path });
-
+    
         const audioFileName = `audio_${startTime}_${endTime}.${this.options.format}`;
-        const outputPath = path.join(os.tmpdir(), audioFileName);
-        const webmPath = this.pathManager.getWebmPath();
-
+        const outputPath = path.join(this.pathManager.getAudioTmpPath(), audioFileName);
+        const webmPath = this.pathManager.getWebmPath();  // Le chemin inclut déjà .webm
+    
         try {
+            console.log('Paths for extraction:', {
+                webmPath,
+                outputPath,
+                exists: await this.checkWebmFile(webmPath)
+            });
+
             // Extraire l'audio
             await this.extractAudioSegment(webmPath, startTime, endTime, outputPath);
             
             // Vérifier le fichier
             await this.validateAudioFile(outputPath);
 
-            // Upload vers S3
-            const s3Url = await this.s3Uploader.uploadFile(outputPath, bucketName, s3Path);
+            // Upload vers S3 avec le bon chemin
+            const s3Url = await this.s3Uploader.uploadFile(
+                outputPath, 
+                bucketName, 
+                `${s3Path}/${path.basename(outputPath)}`,
+                true
+            );
 
             this.emit('extractionComplete', {
                 startTime,
@@ -66,6 +77,11 @@ export class AudioExtractor extends EventEmitter {
             return s3Url;
 
         } catch (error) {
+            console.error('Audio extraction failed:', {
+                error,
+                webmPath,
+                outputPath
+            });
             this.emit('error', error);
             throw error;
         } finally {
@@ -78,14 +94,36 @@ export class AudioExtractor extends EventEmitter {
         }
     }
 
+    private async checkWebmFile(webmPath: string): Promise<boolean> {
+        try {
+            const stats = await fs.stat(webmPath);
+            if (stats.size === 0) {
+                throw new Error(`WebM file is empty: ${webmPath}`);
+            }
+            return true;
+        } catch (error) {
+            if (error instanceof Error && error.message === 'ENOENT') {
+                // Essayer sans l'extension .webm
+                const pathWithoutExt = webmPath.replace('.webm', '');
+                const statsWithoutExt = await fs.stat(pathWithoutExt);
+                if (statsWithoutExt.size === 0) {
+                    throw new Error(`WebM file is empty: ${pathWithoutExt}`);
+                }
+                return true;
+            }
+            throw new Error(`WebM file not accessible: ${(error as Error).message}`);
+        }
+    }
+
     private async extractAudioSegment(
         webmPath: string,
         startTime: number,
         endTime: number,
         outputPath: string
     ): Promise<void> {
-        const duration = (endTime - startTime) / 1000;
-        const startSeconds = startTime / 1000;
+        // Convertir en secondes et arrondir
+        const duration = Math.floor((endTime - startTime) / 1000);
+        const startSeconds = Math.floor(startTime / 1000);
 
         const ffmpegArgs = [
             '-y',
@@ -96,18 +134,24 @@ export class AudioExtractor extends EventEmitter {
             '-acodec', 'pcm_s16le',
             '-ac', this.options.channels!.toString(),
             '-ar', this.options.sampleRate!.toString(),
+            '-f', 'wav', // Forcer le format WAV
             outputPath
         ];
 
-        console.log('FFmpeg extraction command:', ffmpegArgs.join(' '));
+        console.log('FFmpeg extraction command:', {
+            command: ffmpegArgs.join(' '),
+            startTime: startSeconds,
+            duration
+        });
 
         return new Promise((resolve, reject) => {
             const process = spawn('ffmpeg', ffmpegArgs);
             let errorOutput = '';
 
             process.stderr.on('data', (data) => {
-                errorOutput += data.toString();
-                this.emit('progress', data.toString());
+                const message = data.toString();
+                errorOutput += message;
+                this.emit('progress', message);
             });
 
             process.on('close', (code) => {
@@ -118,14 +162,21 @@ export class AudioExtractor extends EventEmitter {
                 }
             });
 
-            process.on('error', reject);
+            process.on('error', (error) => {
+                reject(new Error(`FFmpeg process error: ${error.message}`));
+            });
         });
     }
 
     private async validateAudioFile(filePath: string): Promise<void> {
-        const stats = await fs.stat(filePath);
-        if (stats.size <= 44) { // Taille minimale d'un fichier WAV valide
-            throw new Error('Generated audio file is invalid (too small)');
+        try {
+            const stats = await fs.stat(filePath);
+            if (stats.size <= 44) {
+                throw new Error('Generated audio file is invalid (too small)');
+            }
+            console.log('Audio file validated:', { path: filePath, size: stats.size });
+        } catch (error) {
+            throw new Error(`Audio file validation failed: ${(error as Error).message}`);
         }
     }
 

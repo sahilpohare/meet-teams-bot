@@ -2,8 +2,8 @@ import * as fs from 'fs/promises'
 import * as os from 'os'
 import * as path from 'path'
 import { createWorker } from 'tesseract.js'
-import { Logger } from './logger'
 import { sleep } from './utils'
+import { PathManager } from './utils/PathManager'
 
 interface FrameResult {
     timestamp: number
@@ -164,7 +164,7 @@ export class FrameAnalyzer {
     public async getFramesDirectory(): Promise<string> {
         try {
             // Récupérer le chemin de base de la vidéo
-            const videoDir = Logger.instance?.get_video_directory()
+            const videoDir = PathManager.getInstance().getBasePath()
             console.log('Video directory:', videoDir)
 
             // Construire le chemin pour les frames

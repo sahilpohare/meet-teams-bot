@@ -1,9 +1,9 @@
 import { generateBranding, playBranding } from '../../branding'
 import { getCachedExtensionId, openBrowser } from '../../browser'
 import { MeetingHandle } from '../../meeting'
-import { TRANSCODER } from '../../recording/Transcoder'
 import { JoinError, JoinErrorCode } from '../../types'
 import { PathManager } from '../../utils/PathManager'
+import { redirectLogsToBot } from '../../utils/pinoLogger'
 import { MeetingStateType, StateExecuteResult } from '../types'
 import { BaseState } from './base-state'
 
@@ -28,9 +28,10 @@ export class InitializationState extends BaseState {
             }
 
             // Setup path manager
-            if (!this.context.pathManager) {
-                await this.setupPathManager()
-            }
+
+            this.setupPathManager().then(() => {
+                this.setupPinoLogger()
+            })
 
             // Setup browser
             await this.setupBrowser()
@@ -65,10 +66,15 @@ export class InitializationState extends BaseState {
     }
 
     private async setupPathManager(): Promise<void> {
-        this.context.pathManager = PathManager.getInstance(this.context.params.bot_uuid);
-        await this.context.pathManager.ensureDirectories();
-        
-        // Configure Transcoder with PathManager
-        TRANSCODER.configure(this.context.pathManager);
+        if (!this.context.pathManager) {
+            this.context.pathManager = PathManager.getInstance(
+                this.context.params.bot_uuid,
+            )
+            await this.context.pathManager.ensureDirectories()
+        }
+    }
+
+    private setupPinoLogger(): void {
+        redirectLogsToBot(this.context.params.bot_uuid)
     }
 }

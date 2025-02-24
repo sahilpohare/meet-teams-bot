@@ -27,6 +27,7 @@ export class RecordingState extends BaseState {
             while (this.isProcessing) {
                 // Vérifier si on doit s'arrêter
                 const { shouldEnd, reason } = await this.checkEndConditions();
+
                 if (shouldEnd) {
                     console.info(`Meeting end condition met: ${reason}`);
                     await this.handleMeetingEnd(reason);
@@ -49,37 +50,63 @@ export class RecordingState extends BaseState {
     }
 
     private async initializeRecording(): Promise<void> {
+        console.info('Initializing recording...');
+        
         // Vérifier que les services sont bien initialisés
         if (!this.context.transcriptionService) {
+            console.error('TranscriptionService missing from context');
             throw new Error('TranscriptionService not initialized');
         }
+    
+        // Log l'état du contexte
+        console.info('Context state:', {
+            hasTranscriptionService: !!this.context.transcriptionService,
+            hasPathManager: !!this.context.pathManager,
+            isTranscoderConfigured: TRANSCODER.getStatus().isConfigured
+        });
     
         // Configurer les listeners
         await this.setupEventListeners();
         console.info('Recording initialized successfully');
     }
-
+    
     private async setupEventListeners(): Promise<void> {
+        console.info('Setting up event listeners...');
+    
         TRANSCODER.on('chunkProcessed', async (chunkInfo) => {
-            const { startTime, endTime } = this.calculateSegmentTimes(chunkInfo);
-            await this.context.transcriptionService?.transcribeSegment(
-                startTime, 
-                endTime, 
-                chunkInfo.audioUrl
-            );
+            try {
+                console.info('Received chunk for transcription:', {
+                    startTime: chunkInfo.startTime,
+                    endTime: chunkInfo.endTime,
+                    hasAudioUrl: !!chunkInfo.audioUrl
+                });
+    
+                await this.context.transcriptionService?.transcribeSegment(
+                    chunkInfo.startTime,
+                    chunkInfo.endTime,
+                    chunkInfo.audioUrl
+                );
+            } catch (error) {
+                console.error('Error during transcription:', error);
+            }
         });
-
+    
         TRANSCODER.on('error', async (error) => {
             console.error('Recording error:', error);
             this.context.error = error;
             this.isProcessing = false;
         });
-
+    
         this.context.transcriptionService?.on('transcriptionComplete', (result) => {
+            console.info('Transcription complete:', {
+                hasResults: result.results.length > 0
+            });
             if (result.results.length > 0) {
                 this.context.lastSpeakerTime = Date.now();
             }
         });
+    
+        console.info('Event listeners setup complete');
     }
 
     private async checkEndConditions(): Promise<{ shouldEnd: boolean; reason?: string }> {
@@ -118,33 +145,30 @@ export class RecordingState extends BaseState {
         }
     }
 
-    private async handleMeetingEnd(reason: string): Promise<void> {
-        console.info(`Handling meeting end. Reason: ${reason}`);
+private async handleMeetingEnd(reason: string): Promise<void> {
+    try {
+        this.context.endReason = reason;
+        await Events.callEnded();
         
-        try {
-            this.context.endReason = reason;
-            await Events.callEnded();
-            
-            // Arrêter dans l'ordre correct :
-            // 1. D'abord stopper l'enregistrement dans l'extension
-            await this.stopRecordingInExtension();
-            
-            // 2. Attendre un peu pour s'assurer que les derniers chunks sont envoyés
-            await this.sleep(2000);
-            
-            // 3. Arrêter le Transcoder et la transcription
-            await this.stopProcesses();
-            
-            this.isProcessing = false;
-        } catch (error) {
-            console.error('Error during meeting end:', error);
-            throw error;
-        }
+        // Arrêter dans l'ordre correct
+        await this.stopVideoRecording();
+        await this.stopAudioStreaming();
+        
+        // Ajouter l'arrêt du Transcoder ici
+        await TRANSCODER.stop();
+        
+        await this.sleep(2000);
+        this.isProcessing = false;
+    } catch (error) {
+        console.error('Error during meeting end:', error);
+        throw error;
     }
+}
 
-    private async stopRecordingInExtension(): Promise<void> {
+    private async stopVideoRecording(): Promise<void> {
         if (!this.context.backgroundPage) {
-            throw new Error('Background page not available');
+           console.error('Background page not available for stopping video recording')
+           return
         }
 
         try {
@@ -153,39 +177,30 @@ export class RecordingState extends BaseState {
                 const w = window as any;
                 return w.stopMediaRecorder();
             });
-            console.info('Media recorder stopped');
-
-            // 2. Arrêter le streaming audio
-            await this.context.backgroundPage.evaluate(() => {
-                const w = window as any;
-                return w.stopAudioStreaming();
-            });
-            console.info('Audio streaming stopped');
-
-            // 3. Nettoyer l'observateur des speakers (optionnel)
-            // await this.context.backgroundPage.evaluate(() => {
-            //     const w = window as any;
-            //     if (w.remove_shitty_html) {
-            //         w.remove_shitty_html();
-            //     }
-            // });
         } catch (error) {
-            console.error('Failed to stop recording in extension:', error);
-            throw error;
+            console.error('Failed to stop video recording:', error)
+            throw error
         }
     }
 
-    private async stopProcesses(): Promise<void> {
+    private async stopAudioStreaming(): Promise<void> {
+        if (!this.context.backgroundPage) {
+            console.error('Background page not available for stopping audio')
+            return
+        }
+
         try {
-            await Promise.all([
-                TRANSCODER.stop(),
-                this.context.transcriptionService?.stop()
-            ]);
+            await this.context.backgroundPage.evaluate(() => {
+                const w = window as any
+                return w.stopAudioStreaming()
+            })
+            console.info('Audio streaming stopped successfully')
         } catch (error) {
-            console.error('Error stopping processes:', error);
-            throw error;
+            console.error('Failed to stop audio streaming:', error)
+            throw error
         }
     }
+
 
     private async checkBotRemoved(): Promise<boolean> {
         if (!this.context.playwrightPage) {
@@ -291,23 +306,7 @@ export class RecordingState extends BaseState {
         return startTime + MEETING_CONSTANTS.RECORDING_TIMEOUT < now
     }
 
-    private async stopAudioStreaming(): Promise<void> {
-        if (!this.context.backgroundPage) {
-            console.error('Background page not available for stopping audio')
-            return
-        }
 
-        try {
-            await this.context.backgroundPage.evaluate(() => {
-                const w = window as any
-                return w.stopAudioStreaming()
-            })
-            console.info('Audio streaming stopped successfully')
-        } catch (error) {
-            console.error('Failed to stop audio streaming:', error)
-            throw error
-        }
-    }
 
     private sleep(ms: number): Promise<void> {
         return new Promise((resolve) => setTimeout(resolve, ms))

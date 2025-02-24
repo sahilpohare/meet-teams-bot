@@ -3,10 +3,10 @@ import * as fs from 'fs'
 import { MeetingHandle } from './meeting'
 import { Streaming } from './streaming'
 
-import { Logger } from './logger'
 import { ParticipantState } from './state-machine/types'
 import { SpeakerData } from './types'
 import { uploadTranscriptTask } from './uploadTranscripts'
+import { PathManager } from './utils/PathManager'
 
 export class SpeakerManager {
     private static instance: SpeakerManager | null = null
@@ -49,7 +49,7 @@ export class SpeakerManager {
         const input = JSON.stringify(speakers)
         await fs.promises
             .appendFile(
-                Logger.instance.get_speaker_log_directory(),
+                PathManager.getInstance().getSpeakerLogPath(),
                 `${input}\n`,
             )
             .catch((e) => {

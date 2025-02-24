@@ -1,10 +1,13 @@
 import { ChildProcess, spawn } from 'child_process';
 import { EventEmitter } from 'events';
+import * as fs from 'fs';
 import { MEETING_CONSTANTS } from '../state-machine/constants';
+import { TranscriptionSegment, TranscriptionService } from '../transcription/TranscriptionService';
 import { PathManager } from '../utils/PathManager';
 import { S3Uploader } from '../utils/S3Uploader';
 import { AudioExtractor } from './AudioExtractor';
 import { VideoChunkProcessor } from './VideoChunkProcessor';
+import { TranscriptionStateManager } from './transcription-state-manager';
 
 export interface TranscoderConfig {
     chunkDuration: number;
@@ -12,246 +15,350 @@ export interface TranscoderConfig {
     outputPath: string;
     bucketName: string;
     s3Path: string;
-}
-
-interface FFmpegProcessOptions {
-    outputPath: string;
-    logLevel?: string;
-    audioOptions?: {
-        codec: string;
-        bitrate: string;
-    };
+    audioBucketName: string;
 }
 
 export class Transcoder extends EventEmitter {
     private static readonly FFMPEG_CLOSE_TIMEOUT: number = 60_000;
     private static readonly FASTSTART_TIMEOUT: number = 30_000;
 
-    private ffmpegProcess: ChildProcess | null = null;
+    // Configuration
+    private config: TranscoderConfig;
+
+    // Composants essentiels
+    private pathManager: PathManager | null = null;
     private videoProcessor: VideoChunkProcessor;
     private audioExtractor: AudioExtractor;
     private s3Uploader: S3Uploader;
-    private pathManager: PathManager | null = null; // Initialisé à null
+    private transcriptionState: TranscriptionStateManager;
+    private processedChunks: number = 0;
+
+    private transcriptionService: TranscriptionService;
     
+    // Streams de sortie
+    private ffmpegProcess: ChildProcess | null = null;
+    private webmWriteStream: fs.WriteStream | null = null;
+
+    // États
     private isRecording: boolean = false;
     private isPaused: boolean = false;
     private isStopped: boolean = false;
-    private chunkReceivedCounter: number = 0;
-    private isConfigured: boolean = false; // Nouveau flag pour vérifier la configuration
-
-    private config: TranscoderConfig;
+    private isConfigured: boolean = false;
 
     constructor(initialConfig: Partial<TranscoderConfig>) {
         super();
+        this.setMaxListeners(20);
+        
         this.config = {
-            chunkDuration: initialConfig.chunkDuration || MEETING_CONSTANTS.CHUNK_DURATION,
-            transcribeDuration: initialConfig.transcribeDuration || MEETING_CONSTANTS.TRANSCRIBE_DURATION,
+            chunkDuration: MEETING_CONSTANTS.CHUNK_DURATION,
+            transcribeDuration: MEETING_CONSTANTS.CHUNKS_PER_TRANSCRIPTION * MEETING_CONSTANTS.CHUNK_DURATION,
             outputPath: '',
             bucketName: initialConfig.bucketName || process.env.AWS_S3_VIDEO_BUCKET || '',
+            audioBucketName: process.env.AWS_S3_TEMPORARY_AUDIO_BUCKET || '',
             s3Path: ''
         };
 
-        this.videoProcessor = new VideoChunkProcessor(this.config);
-        this.audioExtractor = new AudioExtractor();
-        this.s3Uploader = new S3Uploader();
+        this.initializeComponents();
         this.setupEventListeners();
     }
 
-    public configure(pathManager: PathManager): void {
+    private initializeComponents(): void {
+        this.videoProcessor = new VideoChunkProcessor(this.config);
+        this.audioExtractor = new AudioExtractor();
+        this.s3Uploader = new S3Uploader();
+        this.transcriptionState = new TranscriptionStateManager();
+    }
+
+    public configure(pathManager: PathManager, transcriptionService: TranscriptionService): void {
         if (!pathManager) {
             throw new Error('PathManager is required for configuration');
         }
+        if (!transcriptionService) {
+            throw new Error('TranscriptionService is required for configuration');
+        }
+
         this.pathManager = pathManager;
+        this.transcriptionService = transcriptionService;
+
         this.config.outputPath = pathManager.getVideoPath();
         const { bucketName, s3Path } = pathManager.getS3Paths();
         this.config.bucketName = bucketName;
         this.config.s3Path = s3Path;
+        
         this.videoProcessor.updateConfig(this.config);
         this.isConfigured = true;
 
-        console.log('Transcoder configured with paths:', {
+        console.log('Transcoder configured:', {
             outputPath: this.config.outputPath,
             webmPath: this.pathManager.getWebmPath(),
-            s3Path: this.config.s3Path
+            s3Path: this.config.s3Path,
+            hasTranscriptionService: !!this.transcriptionService
         });
     }
 
-    public async start(): Promise<void> {
-        if (!this.isConfigured || !this.pathManager) {
-            throw new Error('Transcoder must be configured with PathManager before starting');
+    private validateStartConditions(): void {
+        if (!this.isConfigured || !this.pathManager || !this.transcriptionService) {
+            throw new Error('Transcoder must be configured with PathManager and TranscriptionService before starting');
         }
 
         if (this.isRecording) {
             throw new Error('Transcoder is already running');
         }
 
-        try {
-            // S'assurer que les répertoires existent
-            await this.pathManager.ensureDirectories();
-            
-            // Log les chemins importants
-            console.log('Starting transcoder with paths:', {
-                outputPath: this.config.outputPath,
-                webmPath: this.pathManager.getWebmPath()
-            });
+        if (!this.config.outputPath.endsWith('.mp4')) {
+            throw new Error('Output path must have .mp4 extension');
+        }
+    }
 
-            // Démarrer FFmpeg
-            await this.startFFmpeg();
+    public async start(): Promise<void> {
+        this.validateStartConditions();
+        try {
+            await this.pathManager!.ensureDirectories();
+            await Promise.all([
+                this.startFFmpeg(),
+                this.startWebmStream()
+            ]);
             
             this.isRecording = true;
             this.emit('started', {
-                timestamp: Date.now(),
                 outputPath: this.config.outputPath
             });
-
         } catch (error) {
-            console.error('Failed to start transcoder:', error);
             this.emit('error', { type: 'startError', error });
             throw error;
         }
     }
+    
+    // Gestion des chunks
+    public async uploadChunk(chunk: Buffer, isFinal: boolean = false): Promise<void> {
+        if (!this.isReadyForChunks()) return;
+    
+        try {
+            await Promise.all([
+                this.writeToFFmpeg(chunk),
+                this.writeToWebm(chunk)
+            ]);
+    
+            await this.videoProcessor.processChunk(chunk, isFinal);
+            if (isFinal) await this.stop();
+            this.processedChunks++;
+        } catch (error) {
+            this.emit('error', { type: 'chunkError', error });
+            throw error;
+        }
+    }
+    
+    // Gestion de la transcription
+    private async processTranscriptionSegment(segment: TranscriptionSegment): Promise<void> {
+        if (!this.transcriptionService) {
+            throw new Error('TranscriptionService not configured');
+        }
+    
+        try {
+            const audioUrl = await this.audioExtractor.extract(
+                segment.startTime,
+                segment.endTime,
+                this.config.audioBucketName,  // Utiliser le bucket audio temporaire
+                `${this.config.s3Path}`
+            );
+    
+            await this.transcriptionService.transcribeSegment(
+                segment.startTime,
+                segment.endTime,
+                audioUrl
+            );
+        } catch (error) {
+            console.error('Error processing transcription:', error);
+            this.emit('error', { type: 'transcriptionError', error });
+        }
+    }
 
     public async stop(): Promise<void> {
-        if (this.isStopped || !this.isRecording) {
-            return;
-        }
+        if (this.isStopped) return;
 
         try {
-            // Arrêter le processeur vidéo
+            // Finaliser le traitement des chunks
             await this.videoProcessor.finalize();
 
-            // Arrêter FFmpeg proprement
-            await this.stopFFmpeg();
+            // Vérifier s'il reste un segment à transcrire
+            const finalSegment = this.transcriptionState.finalize();
+            if (finalSegment) {
+                await this.processTranscriptionSegment(finalSegment);
+            }
 
-            // Optimiser la vidéo pour le streaming
+            // Fermer les flux
+            await this.stopAllStreams();
             await this.optimizeVideo();
+            await this.uploadVideoToS3();
 
             this.isRecording = false;
             this.isStopped = true;
             this.emit('stopped');
         } catch (error) {
-            this.emit('error', { type: 'stopError', error });
+            console.error('Error stopping transcoder:', error);
             throw error;
         }
+    }
+    
+    // Gestion des événements
+    private setupEventListeners(): void {
+        this.videoProcessor.on('chunkProcessed', async ({ metadata }) => {
+            const segment = this.transcriptionState.addChunk(metadata.timestamp);
+            if (segment) {
+                try {
+                    await this.processTranscriptionSegment(segment);
+                } catch (error) {
+                    console.error('Error handling transcription segment:', error);
+                    this.emit('error', { type: 'transcriptionError', error });
+                }
+            }
+        });
+       
+        this.videoProcessor.on('error', (error) => {
+            this.emit('error', { type: 'processorError', error });
+        });
+    }
+    
+    // Helpers d'état
+    private isReadyForChunks(): boolean {
+        if (this.isStopped || !this.isRecording) {
+            console.log('Cannot process chunk: transcoder not ready');
+            return false;
+        }
+        return true;
+    }
+
+    private async stopAllStreams(): Promise<void> {
+        const closePromises = [];
+        
+        if (this.webmWriteStream) {
+            closePromises.push(new Promise<void>(resolve => {
+                this.webmWriteStream!.end(() => resolve());
+            }));
+        }
+        
+        if (this.ffmpegProcess) {
+            closePromises.push(this.stopFFmpeg());
+        }
+    
+        await Promise.all(closePromises);
     }
 
     public async pause(): Promise<void> {
-        if (!this.isRecording || this.isPaused) return;
-
-        try {
-            await this.videoProcessor.pause();
-            this.isPaused = true;
-            this.emit('paused');
-        } catch (error) {
-            this.emit('error', { type: 'pauseError', error });
-            throw error;
-        }
+        if (!this.canPause()) return;
+        
+        await this.videoProcessor.pause();
+        this.isPaused = true;
+        this.emit('paused');
     }
-
+    
     public async resume(): Promise<void> {
-        if (!this.isRecording || !this.isPaused) return;
-
-        try {
-            await this.videoProcessor.resume();
-            this.isPaused = false;
-            this.emit('resumed');
-        } catch (error) {
-            this.emit('error', { type: 'resumeError', error });
-            throw error;
-        }
+        if (!this.canResume()) return;
+        
+        await this.videoProcessor.resume();
+        this.isPaused = false;
+        this.emit('resumed');
+    }
+    
+    private canPause(): boolean {
+        return this.isRecording && !this.isPaused;
+    }
+    
+    private canResume(): boolean {
+        return this.isRecording && this.isPaused;
     }
 
-    public async uploadChunk(chunk: Buffer, isFinal: boolean = false): Promise<void> {
-        console.log('Transcoder receiving chunk:', {
-            size: chunk.length,
-            isFinal,
-            isRecording: this.isRecording,
-            isPaused: this.isPaused
-        });
-    
-        if (this.isStopped) {
-            console.log('Transcoder is in stopped state');
-            return;
-        }
-    
-        if (!this.ffmpegProcess) {
-            throw new Error('Transcoder not initialized');
-        }
-    
-        try {
-            this.chunkReceivedCounter++;
-            console.log(`Processing chunk #${this.chunkReceivedCounter}`);
-    
-            await this.videoProcessor.processChunk(chunk, isFinal);
-    
-            if (isFinal) {
-                console.log('Processing final chunk');
-                await this.videoProcessor.finalize();
-            }
-        } catch (error) {
-            console.error('Error processing chunk:', error);
-            throw error;
-        }
-    }
-
-    public async extractAudio(
-        startTime: number,
-        endTime: number,
-    ): Promise<string> {
-        try {
-            const audioUrl = await this.audioExtractor.extract(
-                startTime,
-                endTime,
-                this.config.bucketName,
-                `${this.config.s3Path}/audio`
-            );
-            return audioUrl;
-        } catch (error) {
-            this.emit('error', { type: 'audioExtractionError', error });
-            throw error;
-        }
+    private async startWebmStream(): Promise<void> {
+        const webmPath = this.pathManager!.getWebmPath();
+        this.webmWriteStream = fs.createWriteStream(webmPath);
+        
+        console.log('Started WebM stream:', { path: webmPath });
     }
 
     private async startFFmpeg(): Promise<void> {
-        const outputPath = this.config.outputPath;
-        
-        console.log('Starting FFmpeg with output path:', outputPath);
-    
-        // Vérifier que le chemin de sortie a une extension
-        if (!outputPath.endsWith('.mp4')) {
-            throw new Error('Output path must have .mp4 extension');
-        }
-    
         const ffmpegArgs = [
-            '-i', 'pipe:0',                // Input from pipe
-            '-c:v', 'copy',                // Copy video codec
-            '-c:a', 'aac',                 // Convert audio to AAC
-            '-b:a', '128k',                // Audio bitrate
-            '-strict', 'experimental',      // Allow experimental codecs
-            '-f', 'mp4',                   // Force MP4 format
-            '-movflags', '+frag_keyframe+empty_moov+faststart', // Optimizations
-            '-y',                          // Overwrite output
-            outputPath
+            '-i', 'pipe:0',
+            '-c:v', 'copy',
+            '-c:a', 'aac',
+            '-b:a', '128k',
+            '-strict', 'experimental',
+            '-f', 'mp4',
+            '-movflags', '+frag_keyframe+empty_moov+faststart',
+            '-y',
+            this.config.outputPath
         ];
-    
-        console.log('FFmpeg command:', ffmpegArgs.join(' '));
-    
+
         this.ffmpegProcess = spawn('ffmpeg', ffmpegArgs, {
             stdio: ['pipe', 'inherit', 'inherit']
         });
-    
+
+        this.setupFFmpegListeners();
+    }
+
+    private setupFFmpegListeners(): void {
+        if (!this.ffmpegProcess) return;
+
         this.ffmpegProcess.on('error', (error) => {
             console.error('FFmpeg process error:', error);
             this.emit('error', { type: 'ffmpegError', error });
         });
-    
+
         this.ffmpegProcess.on('close', (code) => {
-            console.log('FFmpeg process closed with code:', code);
             if (code !== 0) {
                 this.emit('error', { 
                     type: 'ffmpegClose',
                     error: new Error(`FFmpeg exited with code ${code}`)
                 });
+            }
+        });
+    }
+
+    private async writeToFFmpeg(chunk: Buffer): Promise<void> {
+        if (!this.ffmpegProcess?.stdin) {
+            throw new Error('FFmpeg stdin not available');
+        }
+
+        return new Promise<void>((resolve, reject) => {
+            const stdin = this.ffmpegProcess!.stdin!;
+            
+            const onDrain = () => {
+                cleanup();
+                resolve();
+            };
+            
+            const onError = (error: Error) => {
+                cleanup();
+                reject(error);
+            };
+
+            const cleanup = () => {
+                stdin.removeListener('drain', onDrain);
+                stdin.removeListener('error', onError);
+            };
+
+            stdin.once('drain', onDrain);
+            stdin.once('error', onError);
+
+            const canContinue = stdin.write(chunk);
+            if (canContinue) {
+                cleanup();
+                resolve();
+            }
+        });
+    }
+
+    private async writeToWebm(chunk: Buffer): Promise<void> {
+        if (!this.webmWriteStream) {
+            throw new Error('WebM write stream not available');
+        }
+
+        return new Promise<void>((resolve, reject) => {
+            const canContinue = this.webmWriteStream!.write(chunk);
+            if (canContinue) {
+                resolve();
+            } else {
+                this.webmWriteStream!.once('drain', resolve);
+                this.webmWriteStream!.once('error', reject);
             }
         });
     }
@@ -273,7 +380,6 @@ export class Transcoder extends EventEmitter {
                 resolve();
             });
 
-            // Fermer proprement stdin
             if (this.ffmpegProcess.stdin) {
                 this.ffmpegProcess.stdin.end();
             }
@@ -281,8 +387,10 @@ export class Transcoder extends EventEmitter {
     }
 
     private async optimizeVideo(): Promise<void> {
-        const tempPath = `${this.config.outputPath}_temp.mp4`;
+        if (!this.pathManager) return;
 
+        const tempPath = `${this.config.outputPath}_temp.mp4`;
+        
         return new Promise<void>((resolve, reject) => {
             const fastStartProcess = spawn('ffmpeg', [
                 '-i', this.config.outputPath,
@@ -300,7 +408,7 @@ export class Transcoder extends EventEmitter {
                 clearTimeout(timeout);
                 if (code === 0) {
                     try {
-                        await this.pathManager.moveFile(tempPath, this.config.outputPath);
+                        await this.pathManager!.moveFile(tempPath, this.config.outputPath);
                         resolve();
                     } catch (error) {
                         reject(error);
@@ -312,52 +420,10 @@ export class Transcoder extends EventEmitter {
         });
     }
 
-    private setupEventListeners(): void {
-        this.videoProcessor.on('chunkReady', async ({ chunk }) => {
-            try {
-                await this.writeToFFmpeg(chunk);
-            } catch (error) {
-                this.emit('error', { type: 'writeError', error });
-            }
-        });
-
-        this.videoProcessor.on('error', (error) => {
-            this.emit('error', { type: 'processorError', error });
-        });
-
-        this.audioExtractor.on('error', (error) => {
-            this.emit('error', { type: 'audioError', error });
-        });
-    }
-
-    private async writeToFFmpeg(chunk: Buffer): Promise<void> {
-        if (!this.ffmpegProcess?.stdin) {
-            throw new Error('FFmpeg stdin not available');
-        }
-
-        return new Promise<void>((resolve, reject) => {
-            const canContinue = this.ffmpegProcess!.stdin!.write(chunk);
-            
-            if (canContinue) {
-                resolve();
-            } else {
-                this.ffmpegProcess!.stdin!.once('drain', resolve);
-                this.ffmpegProcess!.stdin!.once('error', reject);
-            }
-        });
-    }
-
-    public async uploadVideoToS3(): Promise<void> {
-        try {
-            await this.s3Uploader.uploadFile(
-                this.config.outputPath,
-                this.config.bucketName,
-                this.config.s3Path
-            );
-        } catch (error) {
-            this.emit('error', { type: 's3UploadError', error });
-            throw error;
-        }
+    public async uploadVideoToS3(): Promise<string> {
+        if (!this.pathManager) return Promise.reject(new Error('PathManager not configured'));
+        console.log('Uploading video to S3:', this.pathManager.getVideoPath(), this.config.bucketName, this.config.s3Path);
+        return this.s3Uploader.uploadFile(this.pathManager.getVideoPath(), this.config.bucketName, this.config.s3Path + '.mp4');
     }
 
     public getStatus(): {
@@ -365,19 +431,34 @@ export class Transcoder extends EventEmitter {
         isPaused: boolean;
         isStopped: boolean;
         chunksProcessed: number;
+        isConfigured: boolean;
     } {
         return {
             isRecording: this.isRecording,
             isPaused: this.isPaused,
             isStopped: this.isStopped,
-            chunksProcessed: this.chunkReceivedCounter
+            chunksProcessed: this.processedChunks,
+            isConfigured: this.isConfigured
         };
     }
 }
 
-// Création d'une instance globale unique
+// Instance globale unique
 export const TRANSCODER = new Transcoder({
-    chunkDuration: MEETING_CONSTANTS.CHUNK_DURATION,      // 10 secondes par chunk
-    transcribeDuration: MEETING_CONSTANTS.TRANSCRIBE_DURATION, // 3 minutes de transcription
+    chunkDuration: MEETING_CONSTANTS.CHUNK_DURATION,
+    transcribeDuration: MEETING_CONSTANTS.CHUNKS_PER_TRANSCRIPTION * MEETING_CONSTANTS.CHUNK_DURATION,
     bucketName: process.env.AWS_S3_VIDEO_BUCKET || '',
+    audioBucketName: process.env.AWS_S3_TEMPORARY_AUDIO_BUCKET || ''
 });
+
+
+
+
+
+
+
+
+
+
+
+    

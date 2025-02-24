@@ -9,8 +9,11 @@ export abstract class BaseState {
     constructor(context: MeetingContext, stateType: MeetingStateType) {
         this.context = context
         this.stateType = stateType
+
         this.setupPageLoggers()
     }
+
+
 
     private setupPageLoggers(): void {
         if (this.context.playwrightPage) {

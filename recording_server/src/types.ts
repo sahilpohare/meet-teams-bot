@@ -41,6 +41,7 @@ export interface MeetingProviderInterface {
 
 
 export type MeetingParams = {
+    id: string
     use_my_vocabulary: boolean
     meeting_url: string
     user_token: string

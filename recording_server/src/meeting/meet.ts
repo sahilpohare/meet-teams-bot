@@ -10,9 +10,10 @@ import {
 } from '../types'
 
 import { FrameAnalyzer } from '../FrameAnalyzer'
-import { Logger } from '../logger'
 import { parseMeetingUrlFromJoinInfos } from '../urlParser/meetUrlParser'
 import { sleep } from '../utils'
+import { PathManager } from '../utils/PathManager'
+import { takeScreenshot } from '../utils/takeScreenshot'
 
 export class MeetProvider implements MeetingProviderInterface {
     private frameAnalyzer: FrameAnalyzer
@@ -80,14 +81,14 @@ export class MeetProvider implements MeetingProviderInterface {
             ),
         )
 
-        await Logger.instance.screenshot(page, `before_typing_bot_name`)
+        await takeScreenshot(page, `before_typing_bot_name`)
 
         for (let attempt = 1; attempt <= 5; attempt++) {
             if (await typeBotName(page, meetingParams.bot_name)) {
                 console.log('Bot name typed at attempt', attempt)
                 break
             }
-            await Logger.instance.screenshot(
+            await takeScreenshot(
                 page,
                 `bot_name_typing_failed_attempt_${attempt}`,
             )
@@ -95,7 +96,7 @@ export class MeetProvider implements MeetingProviderInterface {
             await page.waitForTimeout(500)
         }
 
-        await Logger.instance.screenshot(page, `after_typing_bot_name`)
+        await takeScreenshot(page, `after_typing_bot_name`)
 
         const askToJoinClicked = await clickWithInnerText(
             page,
@@ -126,7 +127,7 @@ export class MeetProvider implements MeetingProviderInterface {
                 break
             }
             console.log(`Attempt ${attempt} failed`)
-            await Logger.instance.screenshot(
+            await takeScreenshot(
                 page,
                 `layout_change_failed_attempt_${attempt}`,
             )
@@ -163,8 +164,7 @@ export class MeetProvider implements MeetingProviderInterface {
             }
 
             if (isPageFrozen) {
-                const frameAnalyzer = FrameAnalyzer.getInstance()
-                const framesDir = await frameAnalyzer.getFramesDirectory()
+                const framesDir = PathManager.getInstance().getFramesPath()
                 try {
                     const files = await fs.readdir(framesDir)
                     if (!files.some((file) => file.endsWith('.jpg'))) {
@@ -230,7 +230,7 @@ async function findShowEveryOne(
             await button.click()
         }
 
-        await Logger.instance.screenshot(page, `findShowEveryone`)
+        await takeScreenshot(page, `findShowEveryone`)
         console.log({ showEveryOneFound })
 
         if (cancelCheck()) {
@@ -418,7 +418,7 @@ async function changeLayout(
             return true
         } catch (e) {
             console.error(`Error in changeLayout (attempt ${attempt}):`, e)
-            await Logger.instance.screenshot(
+            await takeScreenshot(
                 page,
                 `change_layout_error_${attempt}`,
             )

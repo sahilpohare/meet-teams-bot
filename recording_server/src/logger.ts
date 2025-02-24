@@ -11,9 +11,6 @@ const NODE_NAME = process.env.NODE_NAME
 const util = require('util')
 const execPromise = util.promisify(exec)
 
-import { Page } from '@playwright/test'
-
-import { s3cp } from './s3'
 import { MeetingParams } from './types'
 
 const EFS_MOUNT_POINT: string = '/mnt/efs'
@@ -45,46 +42,7 @@ export class Logger {
         })
     }
 
-    public async screenshot(page: Page, name: string) {
-        try {
-            const date = new Date()
-                .toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: 'numeric',
-                    day: 'numeric',
-                })
-                .replace(/\//g, '-')
-            const link = `${this.destination_dir}/screenshot_${name.replaceAll(
-                '/',
-                '',
-            )}_${date}.jpg`
-            await page.screenshot({
-                path: link,
-                timeout: 5000,
-                animations: 'disabled',
-                scale: 'css',
-            })
-            await s3cp(
-                link,
-                `${this.bot_uuid}/screenshot_${name.replaceAll(
-                    '/',
-                    '',
-                )}_${date}.jpg`,
-            ).catch((e) => {
-                console.error(`Failed to upload screenshot to s3 ${e}`)
-            })
-        } catch (e) {
-            console.error(`Failed to take screenshot ${e}`)
-        }
-    }
 
-    public get_video_directory(): string {
-        return `${this.destination_dir}/output.mp4`
-    }
-
-    public get_speaker_log_directory(): string {
-        return `${this.destination_dir}/SeparationSpeakerLog.txt`
-    }
 
     public async updateGrafanaAgentAddBotUuid() {
         let environ: string = process.env.ENVIRON
@@ -122,12 +80,6 @@ export class Logger {
         } catch (error) {
             console.error(`An error has occurred : ${error}`)
         }
-    }
-
-    public async remove_video() {
-        await fs.unlink(this.get_video_directory()).catch((e) => {
-            console.error('Cannot remove video : ', e)
-        })
     }
 
     public async upload_log() {

@@ -9,9 +9,6 @@ import { MeetingHandle } from './meeting'
 import { clientRedis } from './server'
 
 import axios from 'axios'
-import { join } from 'path'
-import pino from 'pino'
-import caller from 'pino-caller'
 import { exit } from 'process'
 // import { generateBranding } from './branding'
 import { Api } from './api/methods'
@@ -21,128 +18,21 @@ import { JoinError, JoinErrorCode, MeetingParams } from './types'
 import { spawn } from 'child_process'
 import { getCachedExtensionId, openBrowser } from './browser'
 import { Events } from './events'
+import { logger, redirectLogsToBot, setupConsoleLogger, setupExitHandler } from './utils/pinoLogger'
 
 const ZOOM_SDK_DEBUG_EXECUTABLE_PATHNAME = './target/debug/client'
 const ZOOM_SDK_RELEASE_EXECUTABLE_PATHNAME = './target/release/client'
 const ZOOM_SDK_LIBRARY_PATH = './zoom-sdk-linux-rs/zoom-meeting-sdk-linux'
 const ZOOM_SDK_RELATIVE_DIRECTORY = '../zoom'
 
-// const originalError = console.error
-// console.error = (...args: any[]) => {
-//     originalError('\x1b[31m%s\x1b[0m', ...args)
-// }
-// Create the logger instance
-const baseLogger = pino({
-    level: 'debug',
-    timestamp: true,
-    formatters: {
-        level: (label) => {
-            return { level: label }
-        },
-    },
-    transport: {
-        target: 'pino-pretty',
-        options: {
-            colorize: true,
-            translateTime: 'SYS:standard',
-            ignore: 'pid,hostname',
-            colorizeObjects: true, //--colorizeObjects
-            crlf: false, // --crlf
-            levelKey: 'level', // --levelKey
-            timestampKey: 'time', // --timestampKey
-            // The file or file descriptor (1 is stdout) to write to
-            destination: 1,
-            // You can also configure some SonicBoom options directly
-            append: true, // the file is opened with the 'a' flag
-            mkdir: true, // create the target destination
-            customPrettifiers: {},
-        },
-    },
-})
 
-function formatTable(data: any): string {
-    if (!Array.isArray(data) && typeof data !== 'object') {
-        return String(data)
-    }
 
-    const array = Array.isArray(data) ? data : [data]
-    if (array.length === 0) return ''
+// Setup initial console logging
+setupConsoleLogger();
 
-    const headers = new Set<string>()
-    array.forEach((item) =>
-        Object.keys(item).forEach((key) => headers.add(key)),
-    )
-    const cols = Array.from(headers)
+// Setup exit handler for proper log file cleanup
+setupExitHandler();
 
-    const lines = [
-        cols,
-        cols.map(() => '-'.repeat(15)),
-        ...array.map((item) =>
-            cols.map((col) => String(item[col] ?? '').substring(0, 15)),
-        ),
-    ]
-
-    const colWidths = cols.map((_, i) =>
-        Math.max(...lines.map((line) => line[i].length)),
-    )
-
-    return (
-        '\n' +
-        lines
-            .map(
-                (line) =>
-                    '│ ' +
-                    line.map((val, i) => val.padEnd(colWidths[i])).join(' │ ') +
-                    ' │',
-            )
-            .join('\n')
-    )
-}
-
-// Add caller information to logs
-export const logger = caller(baseLogger, {
-    relativeTo: join(__dirname, '..', '..', 'src'),
-    stackAdjustment: 1,
-})
-
-console.table = (data: any) => {
-    logger.info(formatTable(data))
-}
-
-const formatArgs = (msg: string, args: any[]) =>
-    msg +
-    ' ' +
-    args
-        .map((arg) => {
-            if (arg === null) return 'null'
-            if (arg === undefined) return 'undefined'
-            if (typeof arg === 'object') {
-                try {
-                    return JSON.stringify(arg, null, 2)
-                } catch (e) {
-                    return String(arg)
-                }
-            }
-            return String(arg)
-        })
-        .join(' ')
-
-export let rawConsoleLog = console.log
-export let rawConsoleInfo = console.info
-export let rawConsoleWarn = console.warn
-export let rawConsoleError = console.error
-export let rawConsoleDebug = console.debug
-
-console.log = (msg: string, ...args: any[]) =>
-    logger.info(formatArgs(msg, args))
-console.info = (msg: string, ...args: any[]) =>
-    logger.info(formatArgs(msg, args))
-console.warn = (msg: string, ...args: any[]) =>
-    logger.warn(formatArgs(msg, args))
-console.error = (msg: string, ...args: any[]) =>
-    logger.error(formatArgs(msg, args))
-console.debug = (msg: string, ...args: any[]) =>
-    logger.debug(formatArgs(msg, args))
 
 // ENTRY POINT
 // syntax convention
@@ -218,6 +108,7 @@ logger.info('version 0.0.1')
         } else if (consumeResult.params.meetingProvider !== 'Zoom') {
             // Assuming that recording is active at this point
             try {
+
                 // Démarrer le meeting avec la machine à états
                 await MeetingHandle.instance.startRecordMeeting()
 
