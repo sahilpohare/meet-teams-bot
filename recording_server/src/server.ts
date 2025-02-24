@@ -373,21 +373,3 @@ export async function server() {
         console.error(`Failed to register instance: ${e}`)
     }
 }
-
-async function uploadChunk(req: any, res: any, isFinal: boolean) {
-    if (!req.body || !Buffer.isBuffer(req.body)) {
-        return res
-            .status(400)
-            .json({ error: 'Le corps de la requête doit être un buffer' })
-    }
-
-    try {
-        await TRANSCODER.uploadChunk(req.body, isFinal)
-        return res.status(200).json({ message: 'Chunk uploadé avec succès' })
-    } catch (err) {
-        console.error("Erreur lors de l'upload du chunk:", err)
-        return res
-            .status(500)
-            .json({ error: "Erreur lors de l'upload du chunk" })
-    }
-}

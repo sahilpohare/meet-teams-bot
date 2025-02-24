@@ -22,6 +22,10 @@ export class SpeakerManager {
         return SpeakerManager.instance
     }
 
+    public static start(): void {
+        SpeakerManager.getInstance()
+    }
+
     public async handleSpeakerUpdate(speakers: SpeakerData[]): Promise<void> {
         try {
             // Envoyer l'état des speakers au streaming

@@ -13,6 +13,7 @@ export class WordsPoster {
     private api: Api;
     private bot_id: Promise<number>;
 
+
     constructor() {
         this.api = Api.instance;
         this.bot_id = this.getBotId();
@@ -33,20 +34,24 @@ export class WordsPoster {
 
         try {
             this.processedSegments.add(segmentKey);
-
             
+            // Utiliser directement le startTime du segment comme offset
+            // au lieu d'une valeur fixe d'offset
+            const segmentStartTime = segment.startTime / 1000; // Convertir en secondes
+            
+            console.log(`[WordsPoster] Processing segment from ${segmentStartTime}s to ${segment.endTime / 1000}s`);
             
             // Transformer les résultats en format RecognizerWord
+            // en ajoutant l'offset du segment
             const words: RecognizerWord[] = results.map(result => ({
                 text: result.text,
-                start_time: result.start_time,
-                end_time: result.end_time
+                start_time: result.start_time + segmentStartTime,
+                end_time: result.end_time + segmentStartTime
             }));
 
-            // Utiliser postWords au lieu de postTranscript
             await this.api.postWords(words, await this.bot_id);
 
-            console.log(`[WordsPoster] Successfully posted words to DB for ${segmentKey}`);
+            console.log(`[WordsPoster] Successfully posted ${words.length} words to DB for segment ${segmentKey}`);
         } catch (error) {
             this.processedSegments.delete(segmentKey);
             console.error(`[WordsPoster] Failed to save to database:`, error);

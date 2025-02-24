@@ -1,5 +1,6 @@
 import { Events } from '../../events'
 import { TRANSCODER } from '../../recording/Transcoder'
+import { SpeakerManager } from '../../speaker-manager'
 import { TranscriptionService } from '../../transcription/TranscriptionService'
 import { WordsPoster } from '../../transcription/WordPoster'
 import { MEETING_CONSTANTS } from '../constants'
@@ -63,7 +64,7 @@ export class InCallState extends BaseState {
     
         // Créer le WordsPoster
         const wordsPoster = new WordsPoster();
-        
+    
         // Initialiser le service de transcription avec le WordsPoster
         this.context.transcriptionService = new TranscriptionService(
             this.context.params.speech_to_text_provider || 'Default',
@@ -102,6 +103,8 @@ export class InCallState extends BaseState {
                 meetingProvider: this.context.params.meetingProvider,
             },
         )
+
+       SpeakerManager.start()
 
         // Démarrer l'observation des speakers
         await this.context.backgroundPage.evaluate(
