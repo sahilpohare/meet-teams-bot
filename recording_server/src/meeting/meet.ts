@@ -1,5 +1,4 @@
 import { BrowserContext, Page } from '@playwright/test'
-import * as fs from 'fs/promises'
 
 import {
     JoinError,
@@ -9,19 +8,11 @@ import {
     RecordingMode,
 } from '../types'
 
-import { FrameAnalyzer } from '../FrameAnalyzer'
 import { parseMeetingUrlFromJoinInfos } from '../urlParser/meetUrlParser'
 import { sleep } from '../utils'
-import { PathManager } from '../utils/PathManager'
 import { takeScreenshot } from '../utils/takeScreenshot'
 
 export class MeetProvider implements MeetingProviderInterface {
-    private frameAnalyzer: FrameAnalyzer
-
-    constructor() {
-        this.frameAnalyzer = FrameAnalyzer.getInstance()
-        this.frameAnalyzer.initialize().catch(console.error)
-    }
 
     async parseMeetingUrl(meeting_url: string) {
         return parseMeetingUrlFromJoinInfos(meeting_url)
@@ -146,35 +137,19 @@ export class MeetProvider implements MeetingProviderInterface {
         // cancellationToken: CancellationToken,
     ): Promise<boolean> {
         try {
-            // Vérifier si la page est gelée
-            let isPageFrozen = false
             try {
                 await Promise.race([
                     page.evaluate(() => document.readyState),
                     new Promise((_, reject) =>
                         setTimeout(
                             () => reject(new Error('Page freeze timeout')),
-                            30000,
+                            20000,
                         ),
                     ),
                 ])
             } catch (e) {
                 console.log('Page appears to be frozen for 30 seconds')
-                isPageFrozen = true
-            }
-
-            if (isPageFrozen) {
-                const framesDir = PathManager.getInstance().getFramesPath()
-                try {
-                    const files = await fs.readdir(framesDir)
-                    if (!files.some((file) => file.endsWith('.jpg'))) {
-                        console.log('Page is frozen and no frames detected')
-                        return true
-                    }
-                } catch (e) {
-                    console.log('Failed to read frames directory')
-                    return true
-                }
+                return true
             }
 
             if (!page.isClosed()) {
@@ -184,6 +159,7 @@ export class MeetProvider implements MeetingProviderInterface {
                     'we encountered a problem joining',
                     'The call ended',
                     'Return to home',
+                    'No one else',
                 ]
 
                 if (endMessages.some((msg) => content.includes(msg))) {
@@ -191,20 +167,6 @@ export class MeetProvider implements MeetingProviderInterface {
                     return true
                 }
             }
-
-            // OCR Check
-            const frameAnalyzer = FrameAnalyzer.getInstance()
-            const lastText = frameAnalyzer.getLastFrameText()
-            if (
-                lastText?.includes("You've been removed") ||
-                lastText?.includes('we encountered a problem joining') ||
-                lastText?.includes('The call ended') ||
-                lastText?.includes('Return to home')
-            ) {
-                console.log('End meeting detected through OCR:', lastText)
-                return true
-            }
-
             return false
         } catch (error) {
             console.error('Error in findEndMeeting:', error)
