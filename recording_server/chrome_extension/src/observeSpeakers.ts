@@ -109,15 +109,6 @@ var MUTATION_OBSERVER = new MutationObserver(function () {
 
 // Observe Speakers mutation
 async function observeSpeakers() {
-    if (MEETING_PROVIDER === 'Zoom') {
-        // console.info(
-        //     'ZOOM observation speackers is not handled by the Extension!',
-        // )
-        return
-    } else {
-        // console.log('start observe speakers', RECORDING_MODE)
-    }
-    // ___INITIAL_SEQUENCE___
     try {
         const currentSpeakersList: SpeakerData[] = R.filter(
             (u: SpeakerData) => u.name !== BOT_NAME && u.isSpeaking == true,
@@ -128,24 +119,28 @@ async function observeSpeakers() {
         )
 
         if (currentSpeakersList.length > 0) {
-            // Send initial active speakers if present
             await ApiService.sendMessageToRecordingServer(
                 'SPEAKERS',
                 currentSpeakersList,
-            ).catch((e) => {
-                // console.error('Catch on send initial speakers list :', e)
-            })
+            ).catch((e) => {})
         }
-    } catch (e) {
-        // console.error('Catch on initial observe speaker sequence :', e)
-    }
+    } catch (e) {}
 
     try {
-        let observe_parameters = (await PROVIDER?.getSpeakerRootToObserve(
-            RECORDING_MODE,
-        ))!
-        MUTATION_OBSERVER.observe(observe_parameters[0], observe_parameters[1])
+        if (!PROVIDER) {
+            console.warn('Provider is not initialized');
+            return;
+        }
+
+        const observe_parameters = await PROVIDER.getSpeakerRootToObserve(RECORDING_MODE);
+        
+        if (!observe_parameters || !observe_parameters[0]) {
+            console.warn('No valid root element to observe');
+            return;
+        }
+
+        MUTATION_OBSERVER.observe(observe_parameters[0], observe_parameters[1]);
     } catch (e) {
-        // console.error('Catch on observe speaker init terminaison :', e)
+        console.warn('Failed to initialize observer:', e);
     }
 }
