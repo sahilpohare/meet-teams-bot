@@ -2,8 +2,8 @@ jest.setTimeout(30000)
 
 global.console.error = jest.fn()
 
-// Mock les fonctions de Puppeteer pour les tests
-jest.mock('./src/puppeteer', () => ({
+// Mock les fonctions de Playwright pour les tests
+jest.mock('./src/browser', () => ({
     initializeBrowser: jest.fn(),
     cleanupBrowser: jest.fn(),
     findBackgroundPage: jest.fn(),
