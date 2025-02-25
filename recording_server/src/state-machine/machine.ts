@@ -25,19 +25,18 @@ export class MeetingStateMachine {
             ) {
                 console.info(`Current state: ${this.currentState}`)
 
-                const state = getStateInstance(this.currentState, this.context)
-                const transition: StateTransition = await state.execute()
-
-                // Mise à jour du contexte et de l'état
-                this.currentState = transition.nextState
-                this.context = transition.context
-
-                // Vérifier si on a une demande d'arrêt
                 if (this.forceStop) {
                     this.context.endReason =
                         this.context.endReason || 'forced_stop'
                     await this.transitionToCleanup()
+                    break
                 }
+
+                const state = getStateInstance(this.currentState, this.context)
+                const transition: StateTransition = await state.execute()
+
+                this.currentState = transition.nextState
+                this.context = transition.context
             }
         } catch (error) {
             this.error = error as Error
