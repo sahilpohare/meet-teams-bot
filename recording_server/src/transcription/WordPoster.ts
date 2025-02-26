@@ -35,14 +35,22 @@ export class WordsPoster {
         try {
             this.processedSegments.add(segmentKey);
             
+            // Si results est undefined ou vide, créer un résultat vide mais valide
+            if (!results || results.length === 0) {
+                console.warn(`[WordsPoster] No transcription results for segment ${segmentKey}, creating empty result`);
+                
+                // Poster un résultat vide mais valide
+                await this.api.postWords([], await this.bot_id);
+                console.log(`[WordsPoster] Posted empty result for segment ${segmentKey}`);
+                return;
+            }
+            
             // Utiliser directement le startTime du segment comme offset
-            // au lieu d'une valeur fixe d'offset
             const segmentStartTime = segment.startTime / 1000; // Convertir en secondes
             
             console.log(`[WordsPoster] Processing segment from ${segmentStartTime}s to ${segment.endTime / 1000}s`);
             
             // Transformer les résultats en format RecognizerWord
-            // en ajoutant l'offset du segment
             const words: RecognizerWord[] = results.map(result => ({
                 text: result.text,
                 start_time: result.start_time + segmentStartTime,
@@ -55,7 +63,7 @@ export class WordsPoster {
         } catch (error) {
             this.processedSegments.delete(segmentKey);
             console.error(`[WordsPoster] Failed to save to database:`, error);
-            throw error;
+            // Ne pas propager l'erreur pour éviter de faire planter l'application
         }
     }
 }

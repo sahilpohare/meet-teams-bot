@@ -52,6 +52,29 @@ export abstract class BaseTranscriptionProvider implements TranscriptionProvider
 
         throw new TranscriptionError(errorMessage, this.name, details);
     }
+
+    protected async withTimeout<T>(promise: Promise<T>, timeoutMs: number = 30000, fallback?: T): Promise<T> {
+        return new Promise<T>((resolve, reject) => {
+            const timeoutId = setTimeout(() => {
+                console.warn(`Operation timed out after ${timeoutMs}ms`);
+                if (fallback !== undefined) {
+                    resolve(fallback);
+                } else {
+                    reject(new Error(`Operation timed out after ${timeoutMs}ms`));
+                }
+            }, timeoutMs);
+
+            promise
+                .then(result => {
+                    clearTimeout(timeoutId);
+                    resolve(result);
+                })
+                .catch(error => {
+                    clearTimeout(timeoutId);
+                    reject(error);
+                });
+        });
+    }
 }
 
 // Classe d'erreur personnalisée pour la transcription

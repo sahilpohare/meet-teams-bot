@@ -44,14 +44,20 @@ export class AudioExtractor extends EventEmitter {
     
         const audioFileName = `audio_${startTime}_${endTime}.${this.options.format}`;
         const outputPath = path.join(this.pathManager.getAudioTmpPath(), audioFileName);
-        const webmPath = this.pathManager.getWebmPath();  // Le chemin inclut déjà .webm
+        const webmPath = this.pathManager.getWebmPath();
     
         try {
+            // Vérifier si le fichier webm existe
+            const webmExists = await this.checkWebmFile(webmPath);
             console.log('Paths for extraction:', {
                 webmPath,
                 outputPath,
-                exists: await this.checkWebmFile(webmPath)
+                exists: webmExists
             });
+
+            if (!webmExists) {
+                throw new Error(`WebM file does not exist or is empty: ${webmPath}`);
+            }
 
             // Extraire l'audio
             await this.extractAudioSegment(webmPath, startTime, endTime, outputPath);
@@ -98,21 +104,9 @@ export class AudioExtractor extends EventEmitter {
     private async checkWebmFile(webmPath: string): Promise<boolean> {
         try {
             const stats = await fs.stat(webmPath);
-            if (stats.size === 0) {
-                throw new Error(`WebM file is empty: ${webmPath}`);
-            }
-            return true;
+            return stats.isFile() && stats.size > 0;
         } catch (error) {
-            if (error instanceof Error && error.message === 'ENOENT') {
-                // Essayer sans l'extension .webm
-                const pathWithoutExt = webmPath.replace('.webm', '');
-                const statsWithoutExt = await fs.stat(pathWithoutExt);
-                if (statsWithoutExt.size === 0) {
-                    throw new Error(`WebM file is empty: ${pathWithoutExt}`);
-                }
-                return true;
-            }
-            throw new Error(`WebM file not accessible: ${(error as Error).message}`);
+            return false;
         }
     }
 

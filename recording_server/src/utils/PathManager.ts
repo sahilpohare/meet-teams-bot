@@ -30,7 +30,7 @@ export class PathManager {
 
     private ensureBotUuid(): void {
         if (!this.botUuid) {
-            throw new Error('botUuid must be set before using PathManager methods');
+            console.error('botUuid must be set before using PathManager methods');
         }
     }
 

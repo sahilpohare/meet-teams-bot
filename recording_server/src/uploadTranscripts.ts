@@ -50,42 +50,46 @@ async function upload(speaker: SpeakerData, end: boolean) {
         console.info('Transcriber is stoped')
         return
     }
-    const api = Api.instance
-    if (LAST_TRANSRIPT) {
-        await api
-            .patchTranscript({
-                id: LAST_TRANSRIPT.id,
-                end_time:
-                    (speaker.timestamp - MeetingHandle.instance.getStartTime()) /
-                    1000,
-            } as ApiTypes.ChangeableTranscript)
-            .catch((e) => {
-                console.error('Failed to patch transcript :', e)
-                throw e
-            })
-    }
-    if (end === true) {
-        // Just patch the last transcript if in end
-        TRANSCIBER_STOPED = true
-        return
-    } else {
-        const bot = await api.getBot().catch((e) => {
-            console.error('Failed to get bot :', e)
-            throw e
-        })
-        LAST_TRANSRIPT = await api
-            .postTranscript({
-                bot_id: bot.bot.id,
-                speaker: speaker.name,
-                start_time:
-                    (speaker.timestamp - MeetingHandle.instance.getStartTime()) /
-                    1000,
-                end_time: null,
-                lang: null,
-            } as ApiTypes.PostableTranscript)
-            .catch((e) => {
-                console.error('Failed to post transcript :', e)
-                throw e
-            })
+    
+    try {
+        const api = Api.instance
+        if (LAST_TRANSRIPT) {
+            try {
+                await api.patchTranscript({
+                    id: LAST_TRANSRIPT.id,
+                    end_time:
+                        (speaker.timestamp - MeetingHandle.instance.getStartTime()) /
+                        1000,
+                } as ApiTypes.ChangeableTranscript)
+            } catch (e) {
+                console.error('Failed to patch transcript, continuing execution:', e)
+                // Continue execution despite error
+            }
+        }
+        
+        if (end === true) {
+            // Just patch the last transcript if in end
+            TRANSCIBER_STOPED = true
+            return
+        } else {
+            try {
+                const bot = await api.getBot()
+                LAST_TRANSRIPT = await api.postTranscript({
+                    bot_id: bot.bot.id,
+                    speaker: speaker.name,
+                    start_time:
+                        (speaker.timestamp - MeetingHandle.instance.getStartTime()) /
+                        1000,
+                    end_time: null,
+                    lang: null,
+                } as ApiTypes.PostableTranscript)
+            } catch (e) {
+                console.error('Failed to post transcript, continuing execution:', e)
+                // Continue execution despite error
+            }
+        }
+    } catch (e) {
+        console.error('Unexpected error in transcript upload, continuing execution:', e)
+        // Continue execution despite any errors
     }
 }

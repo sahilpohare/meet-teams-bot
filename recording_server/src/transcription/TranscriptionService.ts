@@ -17,7 +17,7 @@ export interface TranscriptionSegment {
     startTime: number
     endTime: number
     audioUrl?: string
-    status: 'pending' | 'processing' | 'completed' | 'failed'
+    status: 'pending' | 'processing' | 'completed' | 'failed' | 'skipped'
     results?: TranscriptionResult[]
     error?: Error
     retryCount: number
@@ -90,7 +90,7 @@ export class TranscriptionService extends EventEmitter {
                 return new GladiaProvider(this.apiKey)
 
             default:
-                throw new Error(`Unknown provider type: ${type}`)
+                throw new Error(`Unknown provider type or unsuported provider: ${type}`)
         }
     }
 
@@ -140,13 +140,14 @@ export class TranscriptionService extends EventEmitter {
             retryCount: 0,
         })
 
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
             this.transcriptionQueue.push(async () => {
                 try {
                     await this.processSegment(segmentId)
-                    resolve()
                 } catch (error) {
-                    reject(error)
+                    console.error(`Error processing segment ${segmentId}:`, error)
+                } finally {
+                    resolve()
                 }
             })
         })
@@ -160,11 +161,22 @@ export class TranscriptionService extends EventEmitter {
             segment.status = 'processing'
             this.emit('processingSegment', { segmentId, segment })
 
-            // Tentative de transcription
-            const results = await this.provider.recognize(
-                segment.audioUrl!,
-                this.options.vocabulary || [],
-            )
+            // Ajouter un timeout pour éviter les blocages
+            const timeoutPromise = new Promise<never>((_, reject) => {
+                setTimeout(() => reject(new Error('Transcription timeout')), 60000); // 60 secondes
+            });
+
+            // Tentative de transcription avec timeout
+            const results = await Promise.race([
+                this.provider.recognize(
+                    segment.audioUrl!,
+                    this.options.vocabulary || [],
+                ),
+                timeoutPromise
+            ]).catch(error => {
+                console.warn(`Transcription failed or timed out: ${error.message}`);
+                return []; // Retourner un tableau vide en cas d'erreur
+            });
 
             // Mise à jour du segment avec les résultats
             segment.status = 'completed'
@@ -190,11 +202,18 @@ export class TranscriptionService extends EventEmitter {
                 // Réessayer plus tard
                 await this.retrySegment(segment)
             } else {
-                this.emit('transcriptionFailed', {
+                // Au lieu de simplement émettre un événement d'échec,
+                // on peut marquer le segment comme "skipped" et continuer
+                segment.status = 'skipped'
+                this.emit('transcriptionSkipped', {
                     segmentId,
                     error,
                     segment,
                 })
+                
+                // Fournir un résultat vide mais valide pour éviter les erreurs en aval
+                segment.results = []
+                this.segments.set(segmentId, segment)
             }
         }
     }
@@ -238,8 +257,8 @@ export class TranscriptionService extends EventEmitter {
     }
 
     public async stop(): Promise<void> {
+        this.isPaused = true
         try {
-            this.isPaused = true
             await new Promise<void>((resolve) =>
                 this.transcriptionQueue.drain(resolve),
             )
@@ -247,7 +266,7 @@ export class TranscriptionService extends EventEmitter {
         } catch (error) {
             console.error('Error stopping transcription service:', error)
             this.emit('error', error)
-            throw error
+            // Don't rethrow the error
         }
     }
 

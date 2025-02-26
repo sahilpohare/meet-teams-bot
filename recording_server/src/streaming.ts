@@ -37,7 +37,7 @@ export class Streaming {
                         port: EXTENSION_WEBSOCKET_PORT,
                     });
                 } catch (error) {
-                    throw new Error(`Failed to create WebSocket server on port ${EXTENSION_WEBSOCKET_PORT}: ${error as Error}.message`);
+                    throw new Error(`Failed to create WebSocket server on port ${EXTENSION_WEBSOCKET_PORT}: ${(error as Error).message}`);
                 }
 
                 // Event 'connection' on client extension WebSocket
@@ -47,7 +47,7 @@ export class Streaming {
                     try {
                         this.output_ws = new WebSocket(output)
                     } catch (error) {
-                        throw new Error(`Failed to connect to output WebSocket at ${output}: ${error as Error}.message`);
+                        throw new Error(`Failed to connect to output WebSocket at ${output}: ${(error as Error).message}`);
                     }
                     
                     // Send initial message to output webSocket
@@ -113,7 +113,7 @@ export class Streaming {
                 try {
                     this.input_ws = new WebSocket(input)
                 } catch (error) {
-                    throw new Error(`Failed to connect to input WebSocket at ${input}: ${error as Error}.message`);
+                    throw new Error(`Failed to connect to input WebSocket at ${input}: ${(error as Error).message}`);
                 }
                 // Event 'open' on input WebSocket
                 this.input_ws.on('open', () => {
@@ -128,10 +128,10 @@ export class Streaming {
             
             Streaming.instance = this
         } catch (error) {
-            console.error(`Streaming setup failed: ${error as Error}.message`);
+            console.error(`Streaming setup failed: ${(error as Error).message}`);
             throw {
                 code: JoinErrorCode.StreamingSetupFailed,
-                message: `Failed to setup streaming: ${error as Error}.message`
+                message: `Failed to setup streaming: ${(error as Error).message}`
             };
         }
     }
