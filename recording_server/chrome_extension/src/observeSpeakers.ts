@@ -96,10 +96,16 @@ async function checkSpeakers() {
 let checkSpeakersTimeout: number | null = null;
 const MUTATION_DEBOUNCE = 10; // 10ms est suffisant pour regrouper les mutations simultanées
 
+// Add a variable to track when we last detected a mutation
+let lastMutationTime = Date.now();
+
 var MUTATION_OBSERVER = new MutationObserver(function () {
     if (checkSpeakersTimeout !== null) {
         window.clearTimeout(checkSpeakersTimeout);
     }
+
+    // Update the last mutation time whenever a mutation is detected
+    lastMutationTime = Date.now();
 
     checkSpeakersTimeout = window.setTimeout(() => {
         checkSpeakers();
@@ -132,15 +138,45 @@ async function observeSpeakers() {
             return;
         }
 
-        const observe_parameters = await PROVIDER.getSpeakerRootToObserve(RECORDING_MODE);
+        await setupMutationObserver();
         
-        if (!observe_parameters || !observe_parameters[0]) {
-            console.warn('No valid root element to observe');
-            return;
-        }
-
-        MUTATION_OBSERVER.observe(observe_parameters[0], observe_parameters[1]);
+        // Set up periodic check to verify and potentially reset the mutation observer
+        setInterval(async () => {
+            if (document.visibilityState !== 'hidden') {
+                // Check if we haven't received mutations for a while (e.g., 10 seconds)
+                // This could indicate that the observer is no longer working properly
+                if (Date.now() - lastMutationTime > 2000) {
+                    console.warn('No mutations detected for 2 seconds, resetting observer');
+                    await setupMutationObserver();
+                }
+                
+                // Still call checkSpeakers as a fallback
+                checkSpeakers();
+            }
+        }, 5000);
     } catch (e) {
         console.warn('Failed to initialize observer:', e);
+        // Retry after a delay
+        setTimeout(observeSpeakers, 5000);
     }
+}
+
+// Extract the mutation observer setup into its own function
+async function setupMutationObserver() {
+    const observe_parameters = await PROVIDER!.getSpeakerRootToObserve(RECORDING_MODE);
+    
+    if (!observe_parameters || !observe_parameters[0]) {
+        console.warn('No valid root element to observe');
+        return false;
+    }
+
+    // Disconnect any existing observer before creating a new one
+    MUTATION_OBSERVER.disconnect();
+    MUTATION_OBSERVER.observe(observe_parameters[0], observe_parameters[1]);
+    console.log('Mutation observer successfully set up');
+    
+    // Reset the last mutation time when we set up a new observer
+    lastMutationTime = Date.now();
+    
+    return true;
 }

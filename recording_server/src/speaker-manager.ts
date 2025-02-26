@@ -12,6 +12,7 @@ export class SpeakerManager {
     private static instance: SpeakerManager | null = null
     private currentSpeaker: SpeakerData | null = null
     private readonly PAUSE_BETWEEN_SENTENCES = 1000 // 1 seconde
+    private lastSpeakerTime: number | null = null
 
     private constructor() {}
 
@@ -76,10 +77,14 @@ export class SpeakerManager {
             return
         }
 
+        if (speakersCount > 0) {
+            this.lastSpeakerTime = Date.now();
+        }
+
         const participantState: ParticipantState = {
             attendeesCount: speakers.length,
             firstUserJoined: speakers.length > 0,
-            lastSpeakerTime: speakersCount > 0 ? Date.now() : null,
+            lastSpeakerTime: this.lastSpeakerTime,
             noSpeakerDetectedTime: speakersCount === 0 ? Date.now() : null,
         }
 
