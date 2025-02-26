@@ -37,6 +37,13 @@ export class TeamsProvider implements MeetingProviderInterface {
         page.setDefaultTimeout(30000)
         page.setDefaultNavigationTimeout(30000)
 
+        // Set permissions based on streaming_input
+        if (streaming_input) {
+            await browserContext.grantPermissions(['microphone', 'camera'], { origin: url.origin })
+        } else {
+            await browserContext.grantPermissions(['camera'], { origin: url.origin })
+        }
+
         try {
             console.log('loading page')
             await page.goto(link, {
@@ -46,8 +53,8 @@ export class TeamsProvider implements MeetingProviderInterface {
             console.log('page loaded')
             
             await Promise.race([
-                page.getByRole('button', { name: 'Join now' }).waitFor({ timeout: 15000 }),
-                page.getByRole('button', { name: 'Continue without audio or video' }).waitFor({ timeout: 15000 })
+                page.getByRole('button', { name: 'Join now' }).waitFor({ timeout: 30000 }),
+                page.getByRole('button', { name: 'Continue without audio or video' }).waitFor({ timeout: 30000 })
             ]).catch(() => {
                 console.log('Initial button wait timed out, continuing anyway')
             })
@@ -106,9 +113,17 @@ export class TeamsProvider implements MeetingProviderInterface {
             try {
                 await handlePermissionDialog(page)
                 await activateCamera(page)
+                
+                // Control microphone based on streaming_input
+                const streaming_input = meetingParams.streaming_input
+                if (streaming_input) {
+                    await activateMicrophone(page)
+                } else {
+                    await deactivateMicrophone(page)
+                }
             } catch (e) {
                 console.warn(
-                    'Failed to handle camera and permissions, continuing anyway:',
+                    'Failed to handle camera/microphone and permissions, continuing anyway:',
                     e,
                 )
                 await sleep(2000)
@@ -430,6 +445,48 @@ async function activateCamera(page: Page): Promise<void> {
         }
     } catch (error) {
         console.error('Failed to activate camera:', error)
+    }
+}
+
+async function activateMicrophone(page: Page): Promise<void> {
+    console.log('activating microphone')
+    try {
+        const micOffText = page.locator('text="Your microphone is muted"')
+        if ((await micOffText.count()) > 0) {
+            const micButton = page.locator('button[title="Unmute"]')
+            if ((await micButton.count()) > 0) {
+                await micButton.click()
+                console.log('Microphone unmuted successfully')
+                await sleep(500)
+            } else {
+                console.log('Failed to find unmute button')
+            }
+        } else {
+            console.log('Microphone is already on or text not found')
+        }
+    } catch (error) {
+        console.error('Failed to activate microphone:', error)
+    }
+}
+
+async function deactivateMicrophone(page: Page): Promise<void> {
+    console.log('deactivating microphone')
+    try {
+        const micOnText = page.locator('text="Your microphone is on"')
+        if ((await micOnText.count()) > 0) {
+            const micButton = page.locator('button[title="Mute"]')
+            if ((await micButton.count()) > 0) {
+                await micButton.click()
+                console.log('Microphone muted successfully')
+                await sleep(500)
+            } else {
+                console.log('Failed to find mute button')
+            }
+        } else {
+            console.log('Microphone is already muted or text not found')
+        }
+    } catch (error) {
+        console.error('Failed to deactivate microphone:', error)
     }
 }
 

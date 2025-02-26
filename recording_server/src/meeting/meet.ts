@@ -35,6 +35,13 @@ export class MeetProvider implements MeetingProviderInterface {
         try {
             console.log('Creating new page in existing context...')
             const page = await browserContext.newPage()
+            
+            // Set permissions based on streaming_input
+            if (streaming_input) {
+                await browserContext.grantPermissions(['microphone', 'camera'])
+            } else {
+                await browserContext.grantPermissions(['camera'])
+            }
 
             console.log(`Navigating to ${link}...`)
             await page.goto(link, {
@@ -88,6 +95,13 @@ export class MeetProvider implements MeetingProviderInterface {
         }
 
         await takeScreenshot(page, `after_typing_bot_name`)
+        
+        // Control microphone based on streaming_input
+        if (meetingParams.streaming_input) {
+            await activateMicrophone(page)
+        } else {
+            await deactivateMicrophone(page)
+        }
 
         const askToJoinClicked = await clickWithInnerText(
             page,
@@ -432,6 +446,44 @@ async function typeBotName(page: Page, botName: string): Promise<boolean> {
         return inputValue.includes(BotNameTyped)
     } catch (e) {
         console.error('error in typeBotName', e)
+        return false
+    }
+}
+
+async function activateMicrophone(page: Page): Promise<boolean> {
+    console.log('Activating microphone...')
+    try {
+        // Look for the microphone button that's turned off
+        const microphoneButton = page.locator('div[aria-label="Turn on microphone"]')
+        if (await microphoneButton.count() > 0) {
+            await microphoneButton.click()
+            console.log('Microphone activated successfully')
+            return true
+        } else {
+            console.log('Microphone is already active or button not found')
+            return false
+        }
+    } catch (error) {
+        console.error('Error activating microphone:', error)
+        return false
+    }
+}
+
+async function deactivateMicrophone(page: Page): Promise<boolean> {
+    console.log('Deactivating microphone...')
+    try {
+        // Look for the microphone button that's turned on
+        const microphoneButton = page.locator('div[aria-label="Turn off microphone"]')
+        if (await microphoneButton.count() > 0) {
+            await microphoneButton.click()
+            console.log('Microphone deactivated successfully')
+            return true
+        } else {
+            console.log('Microphone is already deactivated or button not found')
+            return false
+        }
+    } catch (error) {
+        console.error('Error deactivating microphone:', error)
         return false
     }
 }
