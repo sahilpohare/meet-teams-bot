@@ -83,22 +83,80 @@ export class TeamsProvider implements MeetingProviderInterface {
         }
 
         try {
-            await clickWithInnerText(
-                page,
-                'button',
-                'Continue on this browser',
-                5,
-            )
+            // Try to find and click "Continue on this browser" for up to 30 seconds
+            const maxAttempts = 30;
+            const attemptInterval = 1000; // 1 second between attempts
+            
+            for (let i = 0; i < maxAttempts; i++) {
+                if (cancelCheck?.()) {
+                    break;
+                }
+                
+                const continueOnBrowserExists = await clickWithInnerText(
+                    page,
+                    'button',
+                    'Continue on this browser',
+                    1,
+                    true
+                )
+                
+                if (continueOnBrowserExists) {
+                    console.log('Clicked "Continue on this browser" button')
+                    break;
+                }
+                
+                // Check if we've already moved past this screen by looking for other buttons
+                const joinNowExists = await clickWithInnerText(
+                    page,
+                    'button',
+                    'Join now',
+                    1,
+                    false
+                )
+                
+                const continueWithoutAudioExists = await clickWithInnerText(
+                    page,
+                    'button',
+                    'Continue without audio or video',
+                    1,
+                    false
+                )
+                
+                if (joinNowExists) {
+                    console.log('Already at Join now screen, skipping "Continue on this browser"')
+                    break;
+                }
+                
+                if (continueWithoutAudioExists) {
+                    console.log('Found "Continue without audio or video" button')
+                    await clickWithInnerText(
+                        page,
+                        'button',
+                        'Continue without audio or video',
+                        5,
+                        true
+                    )
+                    console.log('Clicked "Continue without audio or video" button')
+                    break;
+                }
+                
+                if (i < maxAttempts - 1) {
+                    await sleep(attemptInterval);
+                }
+            }
         } catch (e) {
             console.warn('Failed to click "Continue on this browser":', e)
         }
 
-        const NewInterface = await tryFindInterface(page)
+        const currentUrl = await page.url()
+        const isLightInterface = currentUrl.includes('light')
+        const isLiveInterface = currentUrl.includes('live')
+        
         console.log(
             'interface : ',
-            NewInterface
+            isLightInterface
                 ? 'light 🥕🥕'
-                : (await page.url()).includes('live')
+                : isLiveInterface
                   ? 'live 💃🏼'
                   : 'old 👴🏻',
         )
@@ -109,7 +167,7 @@ export class TeamsProvider implements MeetingProviderInterface {
             console.warn('Failed to find "Join now" button (first attempt):', e)
         }
 
-        if (NewInterface) {
+        if (isLightInterface) {
             try {
                 await handlePermissionDialog(page)
                 await activateCamera(page)
@@ -313,53 +371,6 @@ async function typeBotName(
         }
     }
     throw new Error('Failed to type bot name')
-}
-
-async function tryFindInterface(page: Page): Promise<boolean> {
-    await ensurePageLoaded(page)
-
-    try {
-        const joinNowPromise = clickWithInnerText(
-            page,
-            'button',
-            'Join now',
-            10,
-            false,
-        )
-        const continueWithoutAudioPromise = clickWithInnerText(
-            page,
-            'button',
-            'Continue without audio or video',
-            10,
-            false,
-        )
-
-        const [joinNowExists, continueWithoutAudioExists] = await Promise.all([
-            joinNowPromise,
-            continueWithoutAudioPromise,
-        ])
-
-        if (joinNowExists) {
-            console.log('Found Join now interface')
-            return true
-        } else if (continueWithoutAudioExists) {
-            await clickWithInnerText(
-                page,
-                'button',
-                'Continue without audio or video',
-                5,
-                true,
-            )
-            console.log('Found Continue without audio/video interface')
-            return false
-        }
-
-        console.log('No known interface buttons found')
-        return false
-    } catch (error) {
-        console.error('Error detecting interface:', error)
-        throw new Error('RetryableError: Interface detection failed')
-    }
 }
 
 async function checkPageForText(page: Page, text: string): Promise<boolean> {
