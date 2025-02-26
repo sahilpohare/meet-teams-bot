@@ -112,15 +112,16 @@ export class MeetingStateMachine {
     public updateParticipantState(state: ParticipantState): void {
         if (this.currentState === MeetingStateType.Recording) {
             this.context.attendeesCount = state.attendeesCount
-            this.context.firstUserJoined = state.firstUserJoined
-            // On met toujours à jour ces valeurs
+            if (state.firstUserJoined) {
+                this.context.firstUserJoined = true
+            }
             this.context.lastSpeakerTime = state.lastSpeakerTime
             this.context.noSpeakerDetectedTime = state.noSpeakerDetectedTime
 
             console.info('Updated participant state:', {
                 attendeesCount: state.attendeesCount,
-                firstUserJoined: state.firstUserJoined,
-                lastSpeakerTime: state.lastSpeakerTime, // On log aussi ces valeurs
+                firstUserJoined: this.context.firstUserJoined,
+                lastSpeakerTime: state.lastSpeakerTime,
                 noSpeakerDetectedTime: state.noSpeakerDetectedTime,
                 state: this.currentState,
             })
