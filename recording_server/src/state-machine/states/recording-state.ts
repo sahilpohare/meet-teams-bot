@@ -222,83 +222,45 @@ private async handleMeetingEnd(reason: string): Promise<void> {
     /**
      * Vérifie si le meeting doit se terminer à cause d'un manque de participants
      * @param now Timestamp actuel
-     * @returns true si le meeting doit se terminer
+     * @returns true si le meeting doit se terminer par manque de participants
      */
     private checkNoAttendees(now: number): boolean {
         const attendeesCount = this.context.attendeesCount || 0
         const startTime = this.context.startTime || 0
         const firstUserJoined = this.context.firstUserJoined || false
 
-        // Vrai si on a dépassé les 7 minutes initiales
+        // Si des participants sont présents, pas besoin de terminer
+        if (attendeesCount > 0) {
+            return false;
+        }
+
+        // Vrai si on a dépassé les 7 minutes initiales sans aucun participant
         const noAttendeesTimeout =
             startTime + MEETING_CONSTANTS.INITIAL_WAIT_TIME < now
+        
         // Vrai si au moins un utilisateur a rejoint puis est parti
         const noAttendeesAfterJoin = firstUserJoined
 
-        // console.log('--------------------------------')
-        // console.log('attendeesCount', attendeesCount)
-        // console.log('noAttendeesTimeout', noAttendeesTimeout)
-        // console.log('noAttendeesAfterJoin', noAttendeesAfterJoin)
-        // console.log('--------------------------------')
-
-        // On termine si :
-        // - Il n'y a personne actuellement ET
-        // - Soit on a dépassé le timeout initial, soit quelqu'un était là mais est parti
-        return (
-            attendeesCount === 0 && (noAttendeesTimeout || noAttendeesAfterJoin)
-        )
+        // On termine si personne n'est présent ET
+        // soit on a dépassé le timeout initial, soit quelqu'un était là mais est parti
+        return noAttendeesTimeout || noAttendeesAfterJoin;
     }
 
     /**
      * Vérifie si le meeting doit se terminer à cause d'une absence de son
-     * Plusieurs cas sont gérés :
-     * 1. Avec participants : on vérifie juste le temps sans son (15 minutes)
-     * 2. Sans participants : on vérifie le temps initial (7 minutes) ET le temps sans son (15 minutes)
-     * 3. Si on a un timestamp de début de silence : on vérifie les 15 minutes de silence
      * @param now Timestamp actuel
-     * @returns true si le meeting doit se terminer
+     * @returns true si le meeting doit se terminer par absence de son
      */
     private checkNoSpeaker(now: number): boolean {
-        const startTime = this.context.startTime || 0
-        const lastSpeakerTime = this.context.lastSpeakerTime
-        const hasAttendees = this.context.attendeesCount > 0
         const noSpeakerDetectedTime = this.context.noSpeakerDetectedTime || 0
-        const firstUserJoined = this.context.firstUserJoined || false
 
-        // console.log('--------------------------------')
-        // console.log('hasAttendees', hasAttendees)
-        // console.log('lastSpeakerTime', lastSpeakerTime)
-        // console.log('startTime', startTime)
-        // console.log('--------------------------------')
-
-        // Cas 1 : Il y a des participants et on a un timestamp de dernière parole
-        if (hasAttendees && lastSpeakerTime !== null) {
-            // On vérifie uniquement si personne n'a parlé depuis 15 minutes
-            return lastSpeakerTime + MEETING_CONSTANTS.SILENCE_TIMEOUT < now
+        // Si aucune période de silence n'a été détectée, pas besoin de terminer
+        if (noSpeakerDetectedTime <= 0) {
+            return false;
         }
 
-        // Cas 2 : On a un timestamp de dernière parole mais pas de participants qui ont rejoint l'appel
-        if (lastSpeakerTime !== null && firstUserJoined === false) {
-            return (
-                // On vérifie les deux conditions :
-                // - 7 minutes depuis le début du meeting
-                startTime + MEETING_CONSTANTS.INITIAL_WAIT_TIME < now &&
-                // - 15 minutes sans son
-                lastSpeakerTime + MEETING_CONSTANTS.SILENCE_TIMEOUT < now
-            )
-        }
-
-        // Cas 3 : On a un timestamp de début de silence
-        if (noSpeakerDetectedTime !== null) {
-            // On vérifie si ça fait 15 minutes qu'on n'a pas de son
-            return (
-                noSpeakerDetectedTime + MEETING_CONSTANTS.SILENCE_TIMEOUT < now
-            )
-        }
-
-        // Cas par défaut : on ne termine pas le meeting
-        // (c'est le cas si on n'a aucun timestamp valide)
-        return false
+        // Vérifier si la période de silence a dépassé le timeout
+        return noSpeakerDetectedTime + MEETING_CONSTANTS.SILENCE_TIMEOUT < now;
     }
 
     private checkRecordingTimeout(now: number): boolean {
@@ -306,16 +268,7 @@ private async handleMeetingEnd(reason: string): Promise<void> {
         return startTime + MEETING_CONSTANTS.RECORDING_TIMEOUT < now
     }
 
-
-
     private sleep(ms: number): Promise<void> {
         return new Promise((resolve) => setTimeout(resolve, ms))
-    }
-
-    private calculateSegmentTimes(chunkInfo: any): { startTime: number; endTime: number } {
-        return {
-            startTime: chunkInfo.timestamp,
-            endTime: chunkInfo.timestamp + MEETING_CONSTANTS.CHUNK_DURATION
-        };
     }
 }
