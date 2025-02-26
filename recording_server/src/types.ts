@@ -150,4 +150,5 @@ export enum JoinErrorCode {
     TimeoutWaitingToStart = 'TimeoutWaitingToStart',
     Internal = 'InternalError',
     InvalidMeetingUrl = 'InvalidMeetingUrl',
+    StreamingSetupFailed = 'StreamingSetupFailed',
 }

@@ -3,7 +3,8 @@ import { Readable } from 'stream'
 import { RawData, Server, WebSocket } from 'ws'
 
 import { SoundContext } from './media_context'
-import { SpeakerData } from './types'
+import { JoinErrorCode, SpeakerData } from './types'
+
 
 const EXTENSION_WEBSOCKET_PORT: number = 8081
 const DEFAULT_SAMPLE_RATE: number = 24_000
@@ -27,88 +28,112 @@ export class Streaming {
         if (sample_rate) {
             this.sample_rate = sample_rate
         }
-        if (output) {
-            console.log(`output = ${output}`)
-            this.extension_ws = new WebSocket.Server({
-                port: EXTENSION_WEBSOCKET_PORT,
-            })
-
-            // Event 'connection' on client extension WebSocket
-            this.extension_ws.on('connection', (client: WebSocket) => {
-                console.log(`Client connected`)
-
-                this.output_ws = new WebSocket(output)
-                // Send initial message to output webSocket
-                this.output_ws.on('open', () => {
-                    this.output_ws.send(
-                        JSON.stringify({
-                            protocol_version: 1,
-                            bot_id,
-                            offset: 0.0,
-                        }),
-                    )
-                })
-                // Dual channel
-                if (input === output) {
-                    console.log(`input = ${input}`)
-                    this.play_incoming_audio_chunks(this.output_ws)
+        
+        try {
+            if (output) {
+                console.log(`output = ${output}`)
+                try {
+                    this.extension_ws = new WebSocket.Server({
+                        port: EXTENSION_WEBSOCKET_PORT,
+                    });
+                } catch (error) {
+                    throw new Error(`Failed to create WebSocket server on port ${EXTENSION_WEBSOCKET_PORT}: ${error as Error}.message`);
                 }
-                // Event 'message' on client extension WebSocket
-                client.on('message', (message) => {
-                    if (message instanceof Buffer) {
-                        const uint8Array = new Uint8Array(message)
-                        const f32Array = new Float32Array(uint8Array.buffer)
 
-                        // Convert f32Array to s16Array
-                        const s16Array = new Int16Array(f32Array.length)
-                        for (let i = 0; i < f32Array.length; i++) {
-                            s16Array[i] = Math.round(
-                                Math.max(
-                                    -32768,
-                                    Math.min(32767, f32Array[i] * 32768),
-                                ),
-                            )
-                        }
-                        // Send audio chunk to output webSocket
-                        if (this.output_ws.readyState === WebSocket.OPEN) {
-                            this.output_ws.send(s16Array.buffer)
-                        }
+                // Event 'connection' on client extension WebSocket
+                this.extension_ws.on('connection', (client: WebSocket) => {
+                    console.log(`Client connected`)
+
+                    try {
+                        this.output_ws = new WebSocket(output)
+                    } catch (error) {
+                        throw new Error(`Failed to connect to output WebSocket at ${output}: ${error as Error}.message`);
                     }
-                })
-                // Event 'close' on client extension WebSocket
-                client.on('close', () => {
-                    console.log(`Client has left`)
+                    
+                    // Send initial message to output webSocket
+                    this.output_ws.on('open', () => {
+                        this.output_ws.send(
+                            JSON.stringify({
+                                protocol_version: 1,
+                                bot_id,
+                                offset: 0.0,
+                            }),
+                        )
+                    })
+                    // Dual channel
+                    if (input === output) {
+                        console.log(`input = ${input}`)
+                        this.play_incoming_audio_chunks(this.output_ws)
+                    }
+                    // Event 'message' on client extension WebSocket
+                    client.on('message', (message) => {
+                        if (message instanceof Buffer) {
+                            const uint8Array = new Uint8Array(message)
+                            const f32Array = new Float32Array(uint8Array.buffer)
 
-                    this.output_ws.close()
+                            // Convert f32Array to s16Array
+                            const s16Array = new Int16Array(f32Array.length)
+                            for (let i = 0; i < f32Array.length; i++) {
+                                s16Array[i] = Math.round(
+                                    Math.max(
+                                        -32768,
+                                        Math.min(32767, f32Array[i] * 32768),
+                                    ),
+                                )
+                            }
+                            // Send audio chunk to output webSocket
+                            if (this.output_ws.readyState === WebSocket.OPEN) {
+                                this.output_ws.send(s16Array.buffer)
+                            }
+                        }
+                    })
+                    // Event 'close' on client extension WebSocket
+                    client.on('close', () => {
+                        console.log(`Client has left`)
+
+                        this.output_ws.close()
+                    })
+                    // Event 'error' on client extension WebSocket
+                    client.on('error', (err: Error) => {
+                        console.error(`WebSocket error : ${err}`)
+                    })
+                    // Event 'close' on output WebSocket
+                    this.output_ws.on('close', () => {
+                        console.log(`Output WebSocket closed`)
+                    })
+                    // Event 'error' on output WebSocket
+                    this.output_ws.on('error', (err: Error) => {
+                        console.error(`Output WebSocket error : ${err}`)
+                    })
                 })
-                // Event 'error' on client extension WebSocket
-                client.on('error', (err: Error) => {
-                    console.error(`WebSocket error : ${err}`)
+            }
+            
+            if (input && output !== input) {
+                console.log(`input = ${input}`)
+                try {
+                    this.input_ws = new WebSocket(input)
+                } catch (error) {
+                    throw new Error(`Failed to connect to input WebSocket at ${input}: ${error as Error}.message`);
+                }
+                // Event 'open' on input WebSocket
+                this.input_ws.on('open', () => {
+                    console.log(`Input WebSocket opened`)
                 })
-                // Event 'close' on output WebSocket
-                this.output_ws.on('close', () => {
-                    console.log(`Output WebSocket closed`)
+                // Event 'error' on input WebSocket
+                this.input_ws.on('error', (err: Error) => {
+                    console.error(`Input WebSocket error : ${err}`)
                 })
-                // Event 'error' on output WebSocket
-                this.output_ws.on('error', (err: Error) => {
-                    console.error(`Output WebSocket error : ${err}`)
-                })
-            })
+                this.play_incoming_audio_chunks(this.input_ws)
+            }
+            
+            Streaming.instance = this
+        } catch (error) {
+            console.error(`Streaming setup failed: ${error as Error}.message`);
+            throw {
+                code: JoinErrorCode.StreamingSetupFailed,
+                message: `Failed to setup streaming: ${error as Error}.message`
+            };
         }
-        if (input && output !== input) {
-            console.log(`input = ${input}`)
-            this.input_ws = new WebSocket(input)
-            // Event 'open' on input WebSocket
-            this.input_ws.on('open', () => {
-                console.log(`Input WebSocket opened`)
-            })
-            // Event 'error' on input WebSocket
-            this.input_ws.on('error', (err: Error) => {
-                console.error(`Input WebSocket error : ${err}`)
-            })
-            this.play_incoming_audio_chunks(this.input_ws)
-        }
-        Streaming.instance = this
     }
 
     // Send Speaker Data to Output WebSocket
