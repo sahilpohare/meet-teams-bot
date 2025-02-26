@@ -11,6 +11,7 @@ import { parseMeetingUrlFromJoinInfos } from '../urlParser/teamsUrlParser'
 import { sleep } from '../utils'
 import { takeScreenshot } from '../utils/takeScreenshot'
 
+
 export class TeamsProvider implements MeetingProviderInterface {
     constructor() {}
     async parseMeetingUrl(meeting_url: string) {
@@ -33,23 +34,31 @@ export class TeamsProvider implements MeetingProviderInterface {
         const url = new URL(link)
         const page = await browserContext.newPage()
 
-        // Configure les timeouts et autres paramètres
-        await page.setDefaultTimeout(30000)
-        await page.setDefaultNavigationTimeout(30000)
+        page.setDefaultTimeout(30000)
+        page.setDefaultNavigationTimeout(30000)
 
-        // Active la journalisation des requêtes console pour le debugging
-        page.on('console', (msg) => console.log('Browser console:', msg.text()))
+        try {
+            console.log('loading page')
+            await page.goto(link, {
+                waitUntil: 'domcontentloaded',
+                timeout: 30000,
+            })
+            console.log('page loaded')
+            
+            await Promise.race([
+                page.getByRole('button', { name: 'Join now' }).waitFor({ timeout: 15000 }),
+                page.getByRole('button', { name: 'Continue without audio or video' }).waitFor({ timeout: 15000 })
+            ]).catch(() => {
+                console.log('Initial button wait timed out, continuing anyway')
+            })
 
-        // Attend que la page soit complètement chargée
-        await page.goto(link, {
-            waitUntil: 'networkidle',
-            timeout: 30000,
-        })
+            console.log('page loaded 2')
 
-        // Attend un peu plus pour s'assurer que tout est chargé
-        await page.waitForTimeout(2000)
-
-        return page
+            return page
+        } catch (error) {
+            console.error('Error in openMeetingPage:', error)
+            throw error
+        }
     }
 
     async joinMeeting(

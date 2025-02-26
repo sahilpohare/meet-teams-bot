@@ -25,7 +25,7 @@ export class Api {
 
         axios.defaults.raxConfig = {
             instance: axios,
-            retry: 5, // Number of retry attempts
+            retry: 2, // Number of retry attempts
             backoffType: 'exponential',
             noResponseRetries: 2, // Number of retries for no responses
             retryDelay: 1000, // Delay between each retry in milliseconds
