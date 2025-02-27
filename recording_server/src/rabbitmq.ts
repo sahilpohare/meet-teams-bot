@@ -142,12 +142,36 @@ export class Consumer {
         await Logger.instance.updateGrafanaAgentAddBotUuid()
 
         console.log('####### DATA #######', data)
-        // Prevent instance for beeing scaled down
-        try {
-            await setProtection(true)
-        } catch (e) {
-            console.error('fail to set protection', e)
+        // Prevent instance for being scaled down
+        let protectionSet = false;
+        let retryCount = 0;
+        const maxRetries = 5;
+        
+        while (!protectionSet && retryCount < maxRetries) {
+            try {
+                await setProtection(true);
+                protectionSet = true;
+                console.log('Instance protection successfully set');
+            } catch (e) {
+                console.error(`Attempt ${retryCount + 1}/${maxRetries}: Failed to set protection`, e);
+                
+                if (e instanceof Error && e.message.includes('not in InService')) {
+                    console.warn('Instance not fully ready (not InService). Waiting before retry...');
+                    // Wait for 5 seconds before retrying
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                    retryCount++;
+                } else {
+                    // For other errors, just log and continue
+                    console.error('Unable to set protection due to unexpected error:', e);
+                    break;
+                }
+            }
         }
+        
+        if (!protectionSet) {
+            console.warn('Could not set instance protection after multiple attempts. Proceeding anyway, but instance might be terminated unexpectedly.');
+        }
+        
         let meetingSession = {
             bot_ip: POD_IP,
             user_id: data.user_id,
