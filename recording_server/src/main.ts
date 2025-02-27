@@ -110,6 +110,7 @@ setupExitHandler();
             } catch (error) {
                 // La machine à états a déjà géré le nettoyage
                 console.error('Meeting failed:', error)
+                // Attendre que le webhook soit envoyé avant de continuer
                 await sendWebhookOnce({
                     meetingUrl: consumeResult.params.meeting_url,
                     botUuid: consumeResult.params.bot_uuid,
@@ -210,9 +211,11 @@ async function sendWebhookOnce(params: {
     }
 
     try {
-        Events.callEnded()
+        // Attendre que l'événement soit envoyé
+        await Events.callEnded()
 
         if (!params.success) {
+            // Attendre que la notification d'échec soit envoyée
             await meetingBotStartRecordFailed(
                 params.meetingUrl,
                 params.botUuid,
@@ -220,11 +223,13 @@ async function sendWebhookOnce(params: {
             )
         }
 
+        console.log('All webhooks sent successfully');
         webhookSent = true
     } catch (e) {
         console.error('Failed to send webhook:', e)
         // Ne pas mettre webhookSent à true en cas d'erreur
         // pour permettre une nouvelle tentative
+        throw e; // Propager l'erreur pour que le code appelant puisse la gérer
     }
 }
 
@@ -272,8 +277,12 @@ export function meetingBotStartRecordFailed(
         data: { meeting_url: meetingLink, message },
         params: { bot_uuid },
     })
-        .then(() => {}) // Convertit explicitement en Promise<void>
-        .catch((error) => {
-            console.error('Failed to notify recording failure:', error.message)
+        .then(() => {
+            console.log('Successfully notified backend of recording failure');
         })
+        .catch((error) => {
+            console.error('Failed to notify recording failure:', error.message);
+            // Rethrow the error to ensure the promise is rejected
+            throw error;
+        });
 }
