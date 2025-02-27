@@ -86,28 +86,19 @@ export function getSpeakerFromDocument(
         // Vérifier si la page est gelée
         const currentTime = Date.now();
         if (currentTime - lastValidSpeakerCheck > FREEZE_TIMEOUT) {
-            // console.log('[getSpeakerFromDocument] Page appears to be frozen for more than 30 seconds');
             return [];
         }
 
-        // console.log('[getSpeakerFromDocument] - Starting participant detection...')
-
         const participantsList = document.querySelector("[aria-label='Participants']")
         if (!participantsList) {
-            // console.log('[getSpeakerFromDocument] No participants list found')
             lastValidSpeakers = []; 
             return []; // Vrai cas de 0 participants
         }
 
         const participantItems =
             participantsList.querySelectorAll('[role="listitem"]')
-        // console.log(
-        //     '[getSpeakerFromDocument] - Found participants items:',
-        //     participantItems.length,
-        // )
 
         if (!participantItems || participantItems.length === 0) {
-            // console.log('[getSpeakerFromDocument] No participants found - possible end of meeting');
             lastValidSpeakers = []; // Mettre à jour l'état
             return [];
         }
@@ -119,134 +110,152 @@ export function getSpeakerFromDocument(
                 name: string
                 isSpeaking: boolean
                 isPresenting: boolean
+                isInMergedAudio: boolean
+                cohortId: string | null
             }
         >()
 
-        participantItems.forEach((item, index) => {
-            const ariaLabel = item.getAttribute('aria-label')?.trim()
-            if (!ariaLabel) {
-                // console.warn(
-                //     '[getSpeakerFromDocument] - Participant item without aria-label found:',
-                //     item,
-                // )
-                return
+        // Structure pour les groupes fusionnés
+        const mergedGroups = new Map<
+            string,
+            {
+                isSpeaking: boolean
+                members: string[]
             }
+        >()
 
-            // console.log(
-            //     `[getSpeakerFromDocument] - Processing participant ${
-            //         index + 1
-            //     }/${participantItems.length}:`,
-            //     ariaLabel,
-            // )
-
-            // Check if this participant is already in our map
-            if (!uniqueParticipants.has(ariaLabel)) {
-                // console.log(
-                //     '[getSpeakerFromDocument] - New participant detected:',
-                //     ariaLabel,
-                // )
-                uniqueParticipants.set(ariaLabel, {
-                    name: ariaLabel,
-                    isSpeaking: false,
-                    isPresenting: false,
-                })
-            } else {
-                // console.log(
-                //     '[getSpeakerFromDocument] - Updating existing participant:',
-                //     ariaLabel,
-                // )
-            }
-
-            const participant = uniqueParticipants.get(ariaLabel)!
-
-            // Check if participant is presenting
-            const allDivs = Array.from(item.querySelectorAll('div'))
-            // console.log(
-            //     '[getSpeakerFromDocument] - Checking presentation status...',
-            // )
-            const isPresenting = allDivs.some((div) => {
-                const text = div.textContent?.trim()
-                if (text === 'Presentation') {
-                    // console.log(
-                    //     '[getSpeakerFromDocument] - Presentation detected for:',
-                    //     ariaLabel,
-                    // )
-                    return true
+        // Première passe: identifier tous les participants
+        for (let i = 0; i < participantItems.length; i++) {
+            const item = participantItems[i];
+            const ariaLabel = item.getAttribute('aria-label')?.trim();
+            
+            if (!ariaLabel) continue;
+            
+            // Vérifier si cet élément est "Merged audio"
+            const isMergedAudio = ariaLabel === 'Merged audio';
+            
+            // Obtenir le cohort-id pour les groupes fusionnés
+            let cohortId: string | null = null;
+            if (isMergedAudio) {
+                // Chercher le cohort-id dans l'élément parent
+                const cohortElement = item.closest('[data-cohort-id]');
+                if (cohortElement) {
+                    cohortId = cohortElement.getAttribute('data-cohort-id');
                 }
-                return false
-            })
-
-            if (isPresenting) {
-                participant.isPresenting = true
-            }
-
-            // Check for speaking indicators
-            // console.log('🎤 Checking speaking indicators...')
-            const speakingIndicators = Array.from(
-                item.querySelectorAll('*'),
-            ).filter((elem) => {
-                const color = getComputedStyle(elem).backgroundColor
-                const isIndicator =
-                    color === 'rgba(26, 115, 232, 0.9)' ||
-                    color === 'rgb(26, 115, 232)'
-                if (isIndicator) {
-                    // console.log(
-                    //     '[getSpeakerFromDocument] - Found speaking indicator:',
-                    //     color,
-                    // )
+                
+                // Vérifier si l'audio fusionné parle
+                const speakingIndicators = Array.from(
+                    item.querySelectorAll('*')
+                ).filter(elem => {
+                    const color = getComputedStyle(elem).backgroundColor;
+                    return color === 'rgba(26, 115, 232, 0.9)' || color === 'rgb(26, 115, 232)';
+                });
+                
+                // Vérifier aussi l'icône de micro non muet
+                const unmutedMicImg = item.querySelector('img[src*="mic_unmuted"]');
+                
+                const isSpeaking = speakingIndicators.length > 0 || !!unmutedMicImg;
+                
+                // Initialiser le groupe fusionné
+                if (cohortId) {
+                    mergedGroups.set(cohortId, {
+                        isSpeaking: isSpeaking,
+                        members: []
+                    });
                 }
-                return isIndicator
-            })
-
-            // console.debug('Found speaking indicators:', speakingIndicators.length)
-
-            // Check background position for speaking status
-            speakingIndicators.forEach((indicator) => {
-                const backgroundElement = indicator.children[1]
-                if (backgroundElement) {
-                    const backgroundPosition =
-                        getComputedStyle(backgroundElement).backgroundPositionX
-                    // console.debug(
-                    //     '[getSpeakerFromDocument] - Background position:',
-                    //     backgroundPosition,
-                    // )
-                    if (backgroundPosition !== '0px') {
-                        // console.log(
-                        //     '[getSpeakerFromDocument] - Speaking detected for:',
-                        //     ariaLabel,
-                        // )
-                        participant.isSpeaking = true
+            }
+            
+            // Vérifier si ce participant fait partie d'un groupe audio fusionné
+            const isInMergedAudio = !!item.querySelector('[aria-label="Adaptive audio group"]');
+            let participantCohortId: string | null = null;
+            
+            if (isInMergedAudio) {
+                // Chercher le cohort-id dans l'élément parent
+                const cohortElement = item.closest('[data-cohort-id]');
+                if (cohortElement) {
+                    participantCohortId = cohortElement.getAttribute('data-cohort-id');
+                }
+                
+                // Ajouter ce participant au groupe fusionné correspondant
+                if (participantCohortId && mergedGroups.has(participantCohortId)) {
+                    mergedGroups.get(participantCohortId)!.members.push(ariaLabel);
+                }
+            }
+            
+            // Ajouter le participant à notre map seulement s'il n'est pas dans un groupe fusionné
+            // ou s'il est l'entrée "Merged audio" elle-même
+            if (isMergedAudio || !isInMergedAudio) {
+                const uniqueKey = isMergedAudio && cohortId ? `Merged audio_${cohortId}` : ariaLabel;
+                
+                if (!uniqueParticipants.has(uniqueKey)) {
+                    uniqueParticipants.set(uniqueKey, {
+                        name: ariaLabel,
+                        isSpeaking: false,
+                        isPresenting: false,
+                        isInMergedAudio: isMergedAudio,
+                        cohortId: isMergedAudio ? cohortId : null
+                    });
+                }
+                
+                const participant = uniqueParticipants.get(uniqueKey)!;
+                
+                // Vérifier si le participant présente
+                const allDivs = Array.from(item.querySelectorAll('div'));
+                const isPresenting = allDivs.some(div => {
+                    const text = div.textContent?.trim();
+                    return text === 'Presentation';
+                });
+                
+                if (isPresenting) {
+                    participant.isPresenting = true;
+                }
+                
+                // Vérifier les indicateurs de parole
+                const speakingIndicators = Array.from(
+                    item.querySelectorAll('*')
+                ).filter(elem => {
+                    const color = getComputedStyle(elem).backgroundColor;
+                    return color === 'rgba(26, 115, 232, 0.9)' || color === 'rgb(26, 115, 232)';
+                });
+                
+                speakingIndicators.forEach(indicator => {
+                    const backgroundElement = indicator.children[1];
+                    if (backgroundElement) {
+                        const backgroundPosition = getComputedStyle(backgroundElement).backgroundPositionX;
+                        if (backgroundPosition !== '0px') {
+                            participant.isSpeaking = true;
+                        }
                     }
+                });
+                
+                // Mettre à jour la map avec les données potentiellement modifiées
+                uniqueParticipants.set(uniqueKey, participant);
+            }
+        }
+        
+        // Remplacer les noms des groupes fusionnés par les noms des membres
+        for (const [key, participant] of uniqueParticipants.entries()) {
+            if (participant.name === 'Merged audio' && participant.cohortId && mergedGroups.has(participant.cohortId)) {
+                const members = mergedGroups.get(participant.cohortId)!.members;
+                if (members.length > 0) {
+                    participant.name = members.join(', ');
+                    uniqueParticipants.set(key, participant);
                 }
-            })
-
-            // Update the map with potentially modified participant data
-            uniqueParticipants.set(ariaLabel, participant)
-            // console.debug(
-            //     '[getSpeakerFromDocument] - Current status for',
-            //     ariaLabel,
-            //     ':',
-            //     {
-            //         isSpeaking: participant.isSpeaking,
-            //         isPresenting: participant.isPresenting,
-            //     },
-            // )
-        })
-
-        // Avant le return final, sauvegarder l'état
+            }
+        }
+        
+        // Créer la liste finale des participants
         const speakers = Array.from(uniqueParticipants.values()).map(participant => ({
             name: participant.name,
             id: 0,
             timestamp,
-            isSpeaking: participant.isSpeaking,
+            isSpeaking: participant.isSpeaking
         }));
         
         lastValidSpeakers = speakers;
         lastValidSpeakerCheck = currentTime;
         return speakers;
-
     } catch (e) {
-        // console.error('[getSpeakerFromDocument] - Error:', e)
         return lastValidSpeakers;
     }
 }
