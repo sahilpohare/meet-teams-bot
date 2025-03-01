@@ -36,6 +36,7 @@ export interface MeetingProviderInterface {
         _bot_name: string,
         _enter_message?: string,
     ): string
+    closeMeeting(page: Page): Promise<void>
 }
 
 

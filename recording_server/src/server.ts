@@ -11,6 +11,7 @@ import { unlinkSync } from 'fs'
 import { MeetingHandle } from './meeting'
 import { TRANSCODER } from './recording/Transcoder'
 import { SpeakerManager } from './speaker-manager'
+import { RecordingEndReason } from './state-machine/types'
 
 const HOST = '0.0.0.0'
 export const PORT = 8080
@@ -109,7 +110,7 @@ export async function server() {
     app.post('/stop_record', async (req, res) => {
         const data: StopRecordParams = req.body
         console.log('end meeting from api server :', data)
-        stop_record(res, 'api request')
+        stop_record(res, RecordingEndReason.ApiRequest)
     })
 
     //logger zoom
@@ -151,7 +152,7 @@ export async function server() {
         res.sendStatus(200)
     })
 
-    async function stop_record(res: any, reason: string) {
+    async function stop_record(res: any, reason: RecordingEndReason) {
         try {
             const meetingHandle = MeetingHandle.instance
 

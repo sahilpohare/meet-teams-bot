@@ -1,11 +1,13 @@
 import { Events } from '../../events';
 import { MEETING_CONSTANTS } from '../constants';
 
-import { MeetingStateType, StateExecuteResult } from '../types';
+import { MeetingStateType, RecordingEndReason, StateExecuteResult } from '../types';
 import { BaseState } from './base-state';
 
 import { TRANSCODER } from '../../recording/Transcoder';
 import { PathManager } from '../../utils/PathManager';
+
+
 
 export class RecordingState extends BaseState {
     private isProcessing: boolean = true;
@@ -109,7 +111,7 @@ export class RecordingState extends BaseState {
         console.info('Event listeners setup complete');
     }
 
-    private async checkEndConditions(): Promise<{ shouldEnd: boolean; reason?: string }> {
+    private async checkEndConditions(): Promise<{ shouldEnd: boolean; reason?: RecordingEndReason }> {
         const now = Date.now();
     
         try {
@@ -120,36 +122,36 @@ export class RecordingState extends BaseState {
     
             // Vérifier si le bot a été retiré
             if (await this.checkBotRemoved()) {
-                return { shouldEnd: true, reason: 'bot_removed' };
+                return { shouldEnd: true, reason: RecordingEndReason.BotRemoved };
             }
     
             // Vérifier les participants
             if (await this.checkNoAttendees(now)) {
-                return { shouldEnd: true, reason: 'no_attendees' };
+                return { shouldEnd: true, reason: RecordingEndReason.NoAttendees };
             }
     
             // Vérifier l'activité audio
             if (await this.checkNoSpeaker(now)) {
-                return { shouldEnd: true, reason: 'no_speaker' };
+                return { shouldEnd: true, reason: RecordingEndReason.NoSpeaker };
             }
     
             // Vérifier le timeout global
             if (this.checkRecordingTimeout(now)) {
-                return { shouldEnd: true, reason: 'recording_timeout' };
+                return { shouldEnd: true, reason: RecordingEndReason.RecordingTimeout };
             }
     
             return { shouldEnd: false };
         } catch (error) {
             console.error('Error checking end conditions:', error);
-            return { shouldEnd: true, reason: 'error_during_check' };
+            return { shouldEnd: true, reason: RecordingEndReason.ApiRequest };
         }
     }
 
-private async handleMeetingEnd(reason: string): Promise<void> {
+private async handleMeetingEnd(reason: RecordingEndReason): Promise<void> {
     try {
         this.context.endReason = reason;
+        this.context.provider.closeMeeting(this.context.playwrightPage);
         Events.callEnded();
-        
         // Arrêter dans l'ordre correct
         await this.stopVideoRecording();
         await this.stopAudioStreaming();

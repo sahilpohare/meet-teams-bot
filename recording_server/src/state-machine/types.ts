@@ -18,6 +18,15 @@ export enum MeetingStateType {
     Error = 'error',
 }
 
+export enum RecordingEndReason {
+    ManualStop = 'manual_stop',
+    BotRemoved = 'bot_removed',
+    NoAttendees = 'no_attendees',
+    NoSpeaker = 'no_speaker',
+    RecordingTimeout = 'recording_timeout',
+    ApiRequest = 'api_request'
+}
+
 export interface MeetingContext {
     // Références aux objets principaux
     meetingHandle: MeetingHandle
@@ -45,7 +54,7 @@ export interface MeetingContext {
 
     // Gestion des erreurs et statut
     error?: Error
-    endReason?: string
+    endReason?: RecordingEndReason
     retryCount?: number
 
     // Identifiants et tokens

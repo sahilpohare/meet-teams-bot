@@ -5,7 +5,7 @@ import { MeetingParams, MeetingProviderInterface } from './types'
 import { MeetProvider } from './meeting/meet'
 import { TeamsProvider } from './meeting/teams'
 import { MeetingStateMachine } from './state-machine/machine'
-import { MeetingStateType, ParticipantState } from './state-machine/types'
+import { MeetingStateType, ParticipantState, RecordingEndReason } from './state-machine/types'
 
 export class MeetingHandle {
     static instance: MeetingHandle = null
@@ -76,7 +76,7 @@ export class MeetingHandle {
         await this.stateMachine.start()
     }
 
-    public async stopMeeting(reason: string = 'manual_stop'): Promise<void> {
+    public async stopMeeting(reason: RecordingEndReason): Promise<void> {
         await this.stateMachine.requestStop(reason)
     }
 

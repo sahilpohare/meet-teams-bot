@@ -80,8 +80,6 @@ async function upload(speaker: SpeakerData, end: boolean) {
                     start_time:
                         (speaker.timestamp - MeetingHandle.instance.getStartTime()) /
                         1000,
-                    end_time: null,
-                    lang: null,
                 } as ApiTypes.PostableTranscript)
             } catch (e) {
                 console.error('Failed to post transcript, continuing execution:', e)

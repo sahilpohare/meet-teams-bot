@@ -11,6 +11,7 @@ import {
 import { parseMeetingUrlFromJoinInfos } from '../urlParser/meetUrlParser'
 import { sleep } from '../utils'
 import { takeScreenshot } from '../utils/takeScreenshot'
+import { closeMeeting } from './meet/closeMeeting'
 
 export class MeetProvider implements MeetingProviderInterface {
 
@@ -186,6 +187,10 @@ export class MeetProvider implements MeetingProviderInterface {
             console.error('Error in findEndMeeting:', error)
             return false
         }
+    }
+    
+    async closeMeeting(page: Page): Promise<void> {
+        await closeMeeting(page)
     }
 }
 

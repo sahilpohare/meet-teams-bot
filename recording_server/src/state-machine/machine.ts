@@ -1,4 +1,4 @@
-import { MeetingStateType, ParticipantState, StateTransition } from './types'
+import { MeetingStateType, ParticipantState, RecordingEndReason, StateTransition } from './types'
 
 import { getStateInstance } from './states'
 import { MeetingContext } from './types'
@@ -27,7 +27,7 @@ export class MeetingStateMachine {
 
                 if (this.forceStop) {
                     this.context.endReason =
-                        this.context.endReason || 'forced_stop'
+                        this.context.endReason || RecordingEndReason.ApiRequest
                     await this.transitionToCleanup()
                     break
                 }
@@ -44,7 +44,7 @@ export class MeetingStateMachine {
         }
     }
 
-    public async requestStop(reason: string): Promise<void> {
+    public async requestStop(reason: RecordingEndReason): Promise<void> {
         console.info(`Stop requested with reason: ${reason}`)
         this.forceStop = true
         this.context.endReason = reason
