@@ -484,18 +484,29 @@ async function handlePermissionDialog(page: Page): Promise<void> {
 async function activateCamera(page: Page): Promise<void> {
     console.log('activating camera')
     try {
+        // Essayer d'abord l'interface normale de Teams
         const cameraOffText = page.locator('text="Your camera is turned off"')
         if ((await cameraOffText.count()) > 0) {
             const cameraButton = page.locator('button[title="Turn camera on"]')
             if ((await cameraButton.count()) > 0) {
                 await cameraButton.click()
-                console.log('Camera button clicked successfully')
+                console.log('Camera button clicked successfully (normal interface)')
                 await sleep(500)
+                return
             } else {
-                console.log('Failed to find camera button')
+                console.log('Camera button not found in normal interface, trying light interface')
             }
+        }
+        
+        // Essayer l'interface light de Teams
+        const lightCameraButton = page.locator('[data-tid="toggle-video"][aria-checked="false"], [aria-label="Camera"][aria-checked="false"]')
+        if ((await lightCameraButton.count()) > 0) {
+            await lightCameraButton.click()
+            console.log('Camera button clicked successfully (light interface)')
+            await sleep(500)
+            return
         } else {
-            console.log('Camera is already on or text not found')
+            console.log('Camera is already on or button not found in both interfaces')
         }
     } catch (error) {
         console.error('Failed to activate camera:', error)
