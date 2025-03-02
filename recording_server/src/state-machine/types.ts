@@ -17,6 +17,7 @@ export enum MeetingStateType {
     Resuming = 'resuming',
     Cleanup = 'cleanup',
     Error = 'error',
+    Terminated = 'terminated',
 }
 
 export enum RecordingEndReason {

@@ -25,8 +25,18 @@ export class RecordingState extends BaseState {
             // Initialiser l'enregistrement
             await this.initializeRecording();
 
+            // Définir un timeout global pour l'état d'enregistrement
+            const startTime = Date.now();
+            
             // Boucle principale
             while (this.isProcessing) {
+                // Vérifier le timeout global
+                if (Date.now() - startTime > MEETING_CONSTANTS.RECORDING_TIMEOUT) {
+                    console.warn('Global recording state timeout reached, forcing end');
+                    await this.handleMeetingEnd(RecordingEndReason.RecordingTimeout);
+                    break;
+                }
+                
                 // Vérifier si on doit s'arrêter
                 const { shouldEnd, reason } = await this.checkEndConditions();
 
@@ -118,37 +128,45 @@ export class RecordingState extends BaseState {
     }
 
     private async checkEndConditions(): Promise<{ shouldEnd: boolean; reason?: RecordingEndReason }> {
-        const now = Date.now();
+        const checkPromise = async () => {
+            const now = Date.now();
     
+            try {
+                // On vérifie si un arrêt a été demandé via la machine d'état
+                if (this.context.endReason) {
+                    return { shouldEnd: true, reason: this.context.endReason };
+                }
+    
+                // Vérifier si le bot a été retiré
+                if (await this.checkBotRemoved()) {
+                    return { shouldEnd: true, reason: RecordingEndReason.BotRemoved };
+                }
+    
+                // Vérifier les participants
+                if (await this.checkNoAttendees(now)) {
+                    return { shouldEnd: true, reason: RecordingEndReason.NoAttendees };
+                }
+    
+                // Vérifier l'activité audio
+                if (await this.checkNoSpeaker(now)) {
+                    return { shouldEnd: true, reason: RecordingEndReason.NoSpeaker };
+                }
+    
+                return { shouldEnd: false };
+            } catch (error) {
+                console.error('Error checking end conditions:', error);
+                return { shouldEnd: true, reason: RecordingEndReason.ApiRequest };
+            }
+        };
+        
+        const timeoutPromise = new Promise<{ shouldEnd: boolean; reason?: RecordingEndReason }>((_, reject) => 
+            setTimeout(() => reject(new Error('Check end conditions timeout')), 5000)
+        );
+        
         try {
-            // On vérifie si un arrêt a été demandé via la machine d'état
-            if (this.context.endReason) {
-                return { shouldEnd: true, reason: this.context.endReason };
-            }
-    
-            // Vérifier si le bot a été retiré
-            if (await this.checkBotRemoved()) {
-                return { shouldEnd: true, reason: RecordingEndReason.BotRemoved };
-            }
-    
-            // Vérifier les participants
-            if (await this.checkNoAttendees(now)) {
-                return { shouldEnd: true, reason: RecordingEndReason.NoAttendees };
-            }
-    
-            // Vérifier l'activité audio
-            if (await this.checkNoSpeaker(now)) {
-                return { shouldEnd: true, reason: RecordingEndReason.NoSpeaker };
-            }
-    
-            // Vérifier le timeout global
-            if (this.checkRecordingTimeout(now)) {
-                return { shouldEnd: true, reason: RecordingEndReason.RecordingTimeout };
-            }
-    
-            return { shouldEnd: false };
+            return await Promise.race([checkPromise(), timeoutPromise]);
         } catch (error) {
-            console.error('Error checking end conditions:', error);
+            console.error('Error or timeout in checkEndConditions:', error);
             return { shouldEnd: true, reason: RecordingEndReason.ApiRequest };
         }
     }
@@ -269,11 +287,6 @@ private async handleMeetingEnd(reason: RecordingEndReason): Promise<void> {
 
         // Vérifier si la période de silence a dépassé le timeout
         return noSpeakerDetectedTime + MEETING_CONSTANTS.SILENCE_TIMEOUT < now;
-    }
-
-    private checkRecordingTimeout(now: number): boolean {
-        const startTime = this.context.startTime || 0
-        return startTime + MEETING_CONSTANTS.RECORDING_TIMEOUT < now
     }
 
     private sleep(ms: number): Promise<void> {

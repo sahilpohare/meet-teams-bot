@@ -1,6 +1,7 @@
 import { Events } from '../../events';
 import { TRANSCODER } from '../../recording/Transcoder';
 import { TranscriptionService } from '../../transcription/TranscriptionService';
+import { MEETING_CONSTANTS } from '../constants';
 import { MeetingStateType, StateExecuteResult } from '../types';
 import { BaseState } from './base-state';
 
@@ -31,6 +32,9 @@ export class PausedState extends BaseState {
             // Notifier de la pause
             Events.recordingPaused();
 
+ // 1 heure par exemple
+            const pauseStartTime = Date.now();
+
             // Attendre la demande de reprise
             while (this.context.isPaused) {
                 await new Promise(resolve => setTimeout(resolve, 100));
@@ -38,6 +42,13 @@ export class PausedState extends BaseState {
                 // Vérifier si on doit arrêter complètement
                 if (this.context.endReason) {
                     return this.transition(MeetingStateType.Cleanup);
+                }
+                
+                // Vérifier si la pause a duré trop longtemps
+                if (Date.now() - pauseStartTime > MEETING_CONSTANTS.RESUMING_TIMEOUT) {
+                    console.warn('Maximum pause duration exceeded, forcing resume');
+                    this.context.isPaused = false;
+                    break;
                 }
             }
 
@@ -55,7 +66,7 @@ export class PausedState extends BaseState {
     }
 
     private async pauseRecording(): Promise<void> {
-        try {
+        const pausePromise = async () => {
             // Pause du MediaRecorder dans le navigateur
             await this.context.backgroundPage?.evaluate(() => {
                 const w = window as any;
@@ -76,8 +87,16 @@ export class PausedState extends BaseState {
             }
 
             console.log('Recording paused successfully');
+        };
+        
+        const timeoutPromise = new Promise<void>((_, reject) => 
+            setTimeout(() => reject(new Error('Pause recording timeout')), 20000) // 20 secondes
+        );
+        
+        try {
+            await Promise.race([pausePromise(), timeoutPromise]);
         } catch (error) {
-            console.error('Error pausing recording:', error);
+            console.error('Error or timeout in pauseRecording:', error);
             throw error;
         }
     }

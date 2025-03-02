@@ -10,6 +10,7 @@ export const MEETING_CONSTANTS = {
     INITIAL_WAIT_TIME: 1000 * 60 * 7, // 7 minutes
     SILENCE_TIMEOUT: 1000 * 60 * 15, // 15 minutes
     CLEANUP_TIMEOUT: 1000 * 60 * 60, // 1 heure
+    RESUMING_TIMEOUT: 1000 * 60 * 60, // 1 heure
 
     // Autres constantes
     FIND_END_MEETING_SLEEP: 250,

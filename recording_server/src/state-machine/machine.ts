@@ -21,6 +21,7 @@ export class MeetingStateMachine {
         try {
             while (
                 this.currentState !== MeetingStateType.Cleanup &&
+                this.currentState !== MeetingStateType.Terminated &&
                 !this.forceStop
             ) {
                 console.info(`Current state: ${this.currentState}`)
@@ -99,6 +100,7 @@ export class MeetingStateMachine {
 
         console.info('Resume requested');
         this.context.isPaused = false;
+        this.currentState = MeetingStateType.Resuming;
     }
 
     public isPaused(): boolean {

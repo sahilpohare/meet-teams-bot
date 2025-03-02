@@ -8,6 +8,9 @@ import { InCallState } from './in-call-state'
 import { InitializationState } from './initialization-state'
 import { RecordingState } from './recording-state'
 
+import { PausedState } from './paused-state'
+import { ResumingState } from './resuming-state'
+import { TerminatedState } from './terminated-state'
 import { WaitingRoomState } from './waiting-room-state'
 
 export function getStateInstance(
@@ -23,10 +26,16 @@ export function getStateInstance(
             return new InCallState(context, type)
         case MeetingStateType.Recording:
             return new RecordingState(context, type)
+        case MeetingStateType.Paused:
+            return new PausedState(context, type)
+        case MeetingStateType.Resuming:
+            return new ResumingState(context, type)
         case MeetingStateType.Cleanup:
             return new CleanupState(context, type)
         case MeetingStateType.Error:
             return new ErrorState(context, type)
+        case MeetingStateType.Terminated:
+            return new TerminatedState(context, type)
         default:
             throw new Error(`Unknown state type: ${type}`)
     }

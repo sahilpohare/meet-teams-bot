@@ -28,7 +28,6 @@ export class InitializationState extends BaseState {
             }
 
             // Setup path manager
-
             this.setupPathManager().then(() => {
                 this.setupPinoLogger()
             })
@@ -54,15 +53,34 @@ export class InitializationState extends BaseState {
     }
 
     private async setupBrowser(): Promise<void> {
-       
-        const { browser, backgroundPage } = await openBrowser(
-       
-            false,
-            false,
-        )
+        try {
+            // Définir le type de retour attendu de openBrowser
+            type BrowserResult = {
+                browser: any
+                backgroundPage: any
+            }
 
-        this.context.browserContext = browser
-        this.context.backgroundPage = backgroundPage
+            // Créer une promesse qui se rejette après un délai
+            const timeoutPromise = new Promise<BrowserResult>((_, reject) => {
+                const id = setTimeout(() => {
+                    clearTimeout(id)
+                    reject(new Error('Browser setup timeout'))
+                }, 30000)
+            })
+
+            // Exécuter la promesse d'ouverture du navigateur avec un timeout
+            const result = await Promise.race<BrowserResult>([
+                openBrowser(false, false),
+                timeoutPromise,
+            ])
+
+            // Si on arrive ici, c'est que openBrowser a réussi
+            this.context.browserContext = result.browser
+            this.context.backgroundPage = result.backgroundPage
+        } catch (error) {
+            console.error('Browser setup failed or timed out:', error)
+            throw error
+        }
     }
 
     private async setupPathManager(): Promise<void> {

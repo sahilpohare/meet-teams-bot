@@ -42,7 +42,7 @@ export class ResumingState extends BaseState {
     }
 
     private async resumeRecording(): Promise<void> {
-        try {
+        const resumePromise = async () => {
             // Reprendre le MediaRecorder dans le navigateur
             await this.context.backgroundPage?.evaluate(() => {
                 const w = window as any;
@@ -63,8 +63,16 @@ export class ResumingState extends BaseState {
             }
 
             console.log('Recording resumed successfully');
+        };
+        
+        const timeoutPromise = new Promise<void>((_, reject) => 
+            setTimeout(() => reject(new Error('Resume recording timeout')), 20000) // 20 secondes
+        );
+        
+        try {
+            await Promise.race([resumePromise(), timeoutPromise]);
         } catch (error) {
-            console.error('Error resuming recording:', error);
+            console.error('Error or timeout in resumeRecording:', error);
             throw error;
         }
     }

@@ -23,7 +23,7 @@ export class CleanupState extends BaseState {
             } catch (error) {
                 console.error('Cleanup failed or timed out:', error);
             }
-            return this.transition(MeetingStateType.Cleanup); // État final
+            return this.transition(MeetingStateType.Terminated); // État final
         } catch (error) {
             console.error('Error during cleanup:', error);
             // Même en cas d'erreur, on reste dans l'état Cleanup
@@ -36,7 +36,7 @@ export class CleanupState extends BaseState {
             // 1. Arrêter le Transcoder et la transcription
             await this.stopTranscoderAndTranscription();
             
-            // 2. Arrêter le streaming
+            // 2.Arrêter le streaming
             if (this.context.streamingService) {
                 this.context.streamingService.stop();
             }

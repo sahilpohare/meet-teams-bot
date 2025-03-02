@@ -211,25 +211,31 @@ async function sendWebhookOnce(params: {
     }
 
     try {
-        // Attendre que l'événement soit envoyé
-        await Events.callEnded()
+        const callEndedPromise = Events.callEnded();
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Call ended event timeout')), 30000)
+        );
 
+        await Promise.race([callEndedPromise, timeoutPromise]);
+        
         if (!params.success) {
-            // Attendre que la notification d'échec soit envoyée
-            await meetingBotStartRecordFailed(
+            const webhookPromise = meetingBotStartRecordFailed(
                 params.meetingUrl,
                 params.botUuid,
-                params.errorMessage || 'Unknown error',
-            )
+                params.errorMessage || 'Unknown error'
+            );
+            
+            await Promise.race([
+                webhookPromise, 
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Webhook timeout')), 10000))
+            ]);
         }
 
         console.log('All webhooks sent successfully');
         webhookSent = true
     } catch (e) {
-        console.error('Failed to send webhook:', e)
-        // Ne pas mettre webhookSent à true en cas d'erreur
-        // pour permettre une nouvelle tentative
-        throw e; // Propager l'erreur pour que le code appelant puisse la gérer
+        console.error('Webhook operation timed out:', e);
+        webhookSent = true; // Marquer comme envoyé même en cas d'échec pour éviter de bloquer
     }
 }
 
