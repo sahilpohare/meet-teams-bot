@@ -63,6 +63,11 @@ export function getSpeakerFromDocument(
             ? newInterfaceElements
             : liveElements
 
+    // If no participants are found, return an empty array
+    if (speakerElements.length === 0) {
+        return []
+    }
+
     const speakers = Array.from(speakerElements)
         .map((element) => {
             if (element.hasAttribute('data-cid')) {
@@ -94,25 +99,27 @@ export function getSpeakerFromDocument(
                 //live platform: Handle live platform
                 const name =
                     element.getAttribute('aria-label')?.split(',')[0] || ''
-                const micIcon = element.querySelector(
-                    '[data-cid="roster-participant-muted"]',
-                )
-                const isMuted = micIcon ? true : false
-                const voiceLevelIndicator = element.querySelector(
-                    '[data-tid="voice-level-stream-outline"]',
-                )
-                const isSpeaking =
-                    !isMuted && voiceLevelIndicator
-                        ? checkElementAndPseudo(
-                              voiceLevelIndicator as HTMLElement,
-                          )
-                        : false
+                if (name) {  // Only process if we have a name
+                    const micIcon = element.querySelector(
+                        '[data-cid="roster-participant-muted"]',
+                    )
+                    const isMuted = micIcon ? true : false
+                    const voiceLevelIndicator = element.querySelector(
+                        '[data-tid="voice-level-stream-outline"]',
+                    )
+                    const isSpeaking =
+                        !isMuted && voiceLevelIndicator
+                            ? checkElementAndPseudo(
+                                voiceLevelIndicator as HTMLElement,
+                            )
+                            : false
 
-                return {
-                    name,
-                    id: 0,
-                    timestamp,
-                    isSpeaking,
+                    return {
+                        name,
+                        id: 0,
+                        timestamp,
+                        isSpeaking,
+                    }
                 }
             } else {
                 // new teams
@@ -130,8 +137,8 @@ export function getSpeakerFromDocument(
                     const isSpeaking =
                         voiceLevelIndicator && !isMuted
                             ? checkElementAndPseudo(
-                                  voiceLevelIndicator as HTMLElement,
-                              )
+                                voiceLevelIndicator as HTMLElement,
+                            )
                             : false
 
                     return {
@@ -142,8 +149,12 @@ export function getSpeakerFromDocument(
                     }
                 }
             }
+            // Log pour le débogage
+            console.debug('[Teams] Could not determine participant info for element:', element);
+            return undefined;  // Explicitly return undefined for filtering
         })
-        .filter((value) => value !== undefined) as SpeakerData[]
+        .filter((value): value is SpeakerData => value !== undefined)
+    
     // console.table(speakers)
     return speakers
 }
