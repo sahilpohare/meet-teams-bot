@@ -33,6 +33,8 @@ export class TeamsProvider implements MeetingProviderInterface {
     ): Promise<Page> {
         const url = new URL(link)
         const page = await browserContext.newPage()
+        let attempts = 0
+        const maxAttempts = 10
 
         page.setDefaultTimeout(30000)
         page.setDefaultNavigationTimeout(30000)
@@ -51,13 +53,26 @@ export class TeamsProvider implements MeetingProviderInterface {
                 timeout: 30000,
             })
             console.log('page loaded')
-            
             await Promise.race([
                 page.getByRole('button', { name: 'Join now' }).waitFor({ timeout: 30000 }),
                 page.getByRole('button', { name: 'Continue without audio or video' }).waitFor({ timeout: 30000 })
             ]).catch(() => {
                 console.log('Initial button wait timed out, continuing anyway')
             })
+            const currentUrl = await page.url()
+            const isLightInterface: boolean = currentUrl.includes('light-meetings')
+
+            if (isLightInterface === true) {
+                await page.close()
+                console.log('light interface  🥕🥕🥕🥕🥕🥕 , closing page and retrying attempt : ', attempts)
+                await sleep(1000)
+                attempts++
+                if (attempts < maxAttempts) {
+                    return await this.openMeetingPage(browserContext, link, streaming_input)
+                } else {
+                    throw new Error('Failed to load meeting page')
+                }
+            }
 
             console.log('page loaded 2')
 
