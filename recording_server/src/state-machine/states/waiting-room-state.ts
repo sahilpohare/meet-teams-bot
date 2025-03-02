@@ -83,24 +83,32 @@ export class WaitingRoomState extends BaseState {
         } catch (error) {
             console.error('Failed to open meeting page:', {
                 error,
-                message: error instanceof Error ? error.message : 'Unknown error',
-                stack: error instanceof Error ? error.stack : undefined
+                message:
+                    error instanceof Error ? error.message : 'Unknown error',
+                stack: error instanceof Error ? error.stack : undefined,
             })
-            
+
             // Take screenshot if possible
             if (this.context.playwrightPage) {
                 try {
-                    await this.context.playwrightPage.screenshot({ 
+                    await this.context.playwrightPage.screenshot({
                         path: 'error-screenshot.png',
-                        fullPage: true 
+                        fullPage: true,
                     })
                     console.info('Error screenshot saved')
                 } catch (screenshotError) {
-                    console.error('Failed to take error screenshot:', screenshotError)
+                    console.error(
+                        'Failed to take error screenshot:',
+                        screenshotError,
+                    )
                 }
             }
 
-            throw new Error(error instanceof Error ? error.message : 'Failed to open meeting page')
+            throw new Error(
+                error instanceof Error
+                    ? error.message
+                    : 'Failed to open meeting page',
+            )
         }
     }
 

@@ -6,7 +6,6 @@ import { ApiTypes } from './types'
 import { RecognizerWord } from '../transcription/WordPoster'
 import { MeetingParams } from '../types'
 
-
 export class Api {
     public static instance: Api | null = null // Singleton class
 

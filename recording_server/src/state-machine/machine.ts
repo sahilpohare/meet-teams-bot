@@ -1,4 +1,9 @@
-import { MeetingStateType, ParticipantState, RecordingEndReason, StateTransition } from './types'
+import {
+    MeetingStateType,
+    ParticipantState,
+    RecordingEndReason,
+    StateTransition,
+} from './types'
 
 import { getStateInstance } from './states'
 import { MeetingContext } from './types'
@@ -82,33 +87,33 @@ export class MeetingStateMachine {
             await this.transitionToCleanup()
         }
     }
-    
+
     public async pauseRecording(): Promise<void> {
         if (this.currentState !== MeetingStateType.Recording) {
-            throw new Error('Cannot pause: meeting is not in recording state');
+            throw new Error('Cannot pause: meeting is not in recording state')
         }
 
-        console.info('Pause requested');
-        this.context.isPaused = true;
-        this.currentState = MeetingStateType.Paused;
+        console.info('Pause requested')
+        this.context.isPaused = true
+        this.currentState = MeetingStateType.Paused
     }
 
     public async resumeRecording(): Promise<void> {
         if (this.currentState !== MeetingStateType.Paused) {
-            throw new Error('Cannot resume: meeting is not paused');
+            throw new Error('Cannot resume: meeting is not paused')
         }
 
-        console.info('Resume requested');
-        this.context.isPaused = false;
-        this.currentState = MeetingStateType.Resuming;
+        console.info('Resume requested')
+        this.context.isPaused = false
+        this.currentState = MeetingStateType.Resuming
     }
 
     public isPaused(): boolean {
-        return this.currentState === MeetingStateType.Paused;
+        return this.currentState === MeetingStateType.Paused
     }
 
     public getPauseDuration(): number {
-        return this.context.totalPauseDuration || 0;
+        return this.context.totalPauseDuration || 0
     }
 
     public updateParticipantState(state: ParticipantState): void {

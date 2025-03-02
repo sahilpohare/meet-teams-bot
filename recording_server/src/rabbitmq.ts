@@ -56,10 +56,10 @@ export class Consumer {
     static async init(): Promise<Consumer> {
         const connection = await connect(process.env.AMQP_ADDRESS)
         console.log('connected to rabbitmq: ', process.env.AMQP_ADDRESS)
-        
+
         const channel = await connection.createChannel()
         console.log('declaring queue: ', Consumer.QUEUE_NAME)
-        
+
         channel.prefetch(Consumer.PREFETCH_COUNT)
         return new Consumer(channel)
     }
@@ -86,7 +86,9 @@ export class Consumer {
                             this.channel.ack(message)
 
                             console.log('canceling channel')
-                            await this.channel.cancel(message.fields.consumerTag)
+                            await this.channel.cancel(
+                                message.fields.consumerTag,
+                            )
 
                             const meetingParams = JSON.parse(
                                 message.content.toString(),
@@ -99,23 +101,28 @@ export class Consumer {
                                 console.log('awaiting handler...')
                                 await handler(meetingParams)
                             } catch (e) {
-                                console.error('error while awaiting handler:', e)
+                                console.error(
+                                    'error while awaiting handler:',
+                                    e,
+                                )
                                 error = e
                             }
 
                             resolve({ params: meetingParams, error: error })
                         } catch (e) {
                             console.error('Error processing message:', e)
-                            resolve({ 
-                                params: null, 
-                                error: new Error(`Failed to process message: ${(e as Error).message}`) 
+                            resolve({
+                                params: null,
+                                error: new Error(
+                                    `Failed to process message: ${(e as Error).message}`,
+                                ),
                             })
                         }
                     } else {
                         console.log('Consumer cancelled by server')
-                        resolve({ 
-                            params: null, 
-                            error: new Error('Consumer cancelled by server') 
+                        resolve({
+                            params: null,
+                            error: new Error('Consumer cancelled by server'),
                         })
                     }
                 })
@@ -124,9 +131,11 @@ export class Consumer {
                 })
                 .catch((e) => {
                     console.error('Failed to start consumer:', e)
-                    resolve({ 
-                        params: null, 
-                        error: new Error(`Failed to start consumer: ${e.message}`) 
+                    resolve({
+                        params: null,
+                        error: new Error(
+                            `Failed to start consumer: ${e.message}`,
+                        ),
                     })
                 })
         })
@@ -137,41 +146,54 @@ export class Consumer {
         console.log('handleStartRecord')
         const grafanaService = GrafanaService.getInstance()
         grafanaService.setBotUuid(data.bot_uuid)
-        
+
         // Mettre à jour la configuration de Grafana Agent
         await grafanaService.updateGrafanaAgentWithBotUuid()
 
         console.log('####### DATA #######', data)
         // Prevent instance for being scaled down
-        let protectionSet = false;
-        let retryCount = 0;
-        const maxRetries = 5;
-        
+        let protectionSet = false
+        let retryCount = 0
+        const maxRetries = 5
+
         while (!protectionSet && retryCount < maxRetries) {
             try {
-                await setProtection(true);
-                protectionSet = true;
-                console.log('Instance protection successfully set');
+                await setProtection(true)
+                protectionSet = true
+                console.log('Instance protection successfully set')
             } catch (e) {
-                console.error(`Attempt ${retryCount + 1}/${maxRetries}: Failed to set protection`, e);
-                
-                if (e instanceof Error && e.message.includes('not in InService')) {
-                    console.warn('Instance not fully ready (not InService). Waiting before retry...');
+                console.error(
+                    `Attempt ${retryCount + 1}/${maxRetries}: Failed to set protection`,
+                    e,
+                )
+
+                if (
+                    e instanceof Error &&
+                    e.message.includes('not in InService')
+                ) {
+                    console.warn(
+                        'Instance not fully ready (not InService). Waiting before retry...',
+                    )
                     // Wait for 5 seconds before retrying
-                    await new Promise(resolve => setTimeout(resolve, 5000));
-                    retryCount++;
+                    await new Promise((resolve) => setTimeout(resolve, 5000))
+                    retryCount++
                 } else {
                     // For other errors, just log and continue
-                    console.error('Unable to set protection due to unexpected error:', e);
-                    break;
+                    console.error(
+                        'Unable to set protection due to unexpected error:',
+                        e,
+                    )
+                    break
                 }
             }
         }
-        
+
         if (!protectionSet) {
-            console.warn('Could not set instance protection after multiple attempts. Proceeding anyway, but instance might be terminated unexpectedly.');
+            console.warn(
+                'Could not set instance protection after multiple attempts. Proceeding anyway, but instance might be terminated unexpectedly.',
+            )
         }
-        
+
         let meetingSession = {
             bot_ip: POD_IP,
             user_id: data.user_id,

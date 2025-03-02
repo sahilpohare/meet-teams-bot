@@ -9,7 +9,6 @@ import {
 } from './providers/TranscriptionProvider'
 import { WordsPoster } from './WordPoster'
 
-
 export type SpeechToTextProvider = 'Gladia' | 'Runpod' | 'Default'
 
 export interface TranscriptionSegment {
@@ -66,7 +65,6 @@ export class TranscriptionService extends EventEmitter {
                     console.error('Error saving transcription results:', error)
                     this.emit('error', error)
                 }
-
             })
         }
         if (this.wordsPoster) {
@@ -90,7 +88,9 @@ export class TranscriptionService extends EventEmitter {
                 return new GladiaProvider(this.apiKey)
 
             default:
-                throw new Error(`Unknown provider type or unsuported provider: ${type}`)
+                throw new Error(
+                    `Unknown provider type or unsuported provider: ${type}`,
+                )
         }
     }
 
@@ -145,7 +145,10 @@ export class TranscriptionService extends EventEmitter {
                 try {
                     await this.processSegment(segmentId)
                 } catch (error) {
-                    console.error(`Error processing segment ${segmentId}:`, error)
+                    console.error(
+                        `Error processing segment ${segmentId}:`,
+                        error,
+                    )
                 } finally {
                     resolve()
                 }
@@ -163,8 +166,11 @@ export class TranscriptionService extends EventEmitter {
 
             // Ajouter un timeout pour éviter les blocages
             const timeoutPromise = new Promise<never>((_, reject) => {
-                setTimeout(() => reject(new Error('Transcription timeout')), 60000); // 60 secondes
-            });
+                setTimeout(
+                    () => reject(new Error('Transcription timeout')),
+                    60000,
+                ) // 60 secondes
+            })
 
             // Tentative de transcription avec timeout
             const results = await Promise.race([
@@ -172,11 +178,13 @@ export class TranscriptionService extends EventEmitter {
                     segment.audioUrl!,
                     this.options.vocabulary || [],
                 ),
-                timeoutPromise
-            ]).catch(error => {
-                console.warn(`Transcription failed or timed out: ${error.message}`);
-                return []; // Retourner un tableau vide en cas d'erreur
-            });
+                timeoutPromise,
+            ]).catch((error) => {
+                console.warn(
+                    `Transcription failed or timed out: ${error.message}`,
+                )
+                return [] // Retourner un tableau vide en cas d'erreur
+            })
 
             // Mise à jour du segment avec les résultats
             segment.status = 'completed'
@@ -210,7 +218,7 @@ export class TranscriptionService extends EventEmitter {
                     error,
                     segment,
                 })
-                
+
                 // Fournir un résultat vide mais valide pour éviter les erreurs en aval
                 segment.results = []
                 this.segments.set(segmentId, segment)

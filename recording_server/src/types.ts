@@ -39,8 +39,6 @@ export interface MeetingProviderInterface {
     closeMeeting(page: Page): Promise<void>
 }
 
-
-
 export type MeetingParams = {
     id: string
     use_my_vocabulary: boolean

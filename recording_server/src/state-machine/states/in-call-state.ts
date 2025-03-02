@@ -52,48 +52,50 @@ export class InCallState extends BaseState {
         }
     }
 
-
     private async initializeServices(): Promise<void> {
-        console.info('Initializing services');
-    
+        console.info('Initializing services')
+
         if (!this.context.pathManager) {
-            throw new Error('PathManager not initialized');
+            throw new Error('PathManager not initialized')
         }
-    
+
         // Initialiser le streaming si nécessaire
-        if (this.context.params.streaming_input || this.context.params.streaming_output) {
+        if (
+            this.context.params.streaming_input ||
+            this.context.params.streaming_output
+        ) {
             this.context.streamingService = new Streaming(
                 this.context.params.streaming_input,
                 this.context.params.streaming_output,
                 this.context.params.streaming_audio_frequency,
-                this.context.params.bot_uuid
-            );
+                this.context.params.bot_uuid,
+            )
             // Ne pas démarrer tout de suite, attendre l'état Recording
         }
-    
+
         // Créer le WordsPoster
-        const wordsPoster = new WordsPoster();
-        
+        const wordsPoster = new WordsPoster()
+
         // Initialiser le service de transcription avec le WordsPoster
         this.context.transcriptionService = new TranscriptionService(
             this.context.params.speech_to_text_provider || 'Default',
             this.context.params.speech_to_text_api_key,
             {}, // options
-            wordsPoster // passer le WordsPoster ici
-        );
-    
+            wordsPoster, // passer le WordsPoster ici
+        )
+
         // Configurer le transcoder avec le mode d'enregistrement
         TRANSCODER.configure(
             this.context.pathManager,
             this.context.transcriptionService,
-            this.context.params.recording_mode
-        );
-    
-        await TRANSCODER.start();
-        
-        console.info('Services initialized successfully');
+            this.context.params.recording_mode,
+        )
+
+        await TRANSCODER.start()
+
+        console.info('Services initialized successfully')
     }
-    
+
     private async setupBrowserComponents(): Promise<void> {
         if (!this.context.backgroundPage) {
             throw new Error('Background page not initialized')
@@ -114,7 +116,7 @@ export class InCallState extends BaseState {
             },
         )
 
-       SpeakerManager.start()
+        SpeakerManager.start()
 
         // Démarrer l'observation des speakers
         await this.context.backgroundPage.evaluate(

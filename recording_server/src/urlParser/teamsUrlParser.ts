@@ -1,4 +1,4 @@
-import { JoinError, JoinErrorCode } from '../types';
+import { JoinError, JoinErrorCode } from '../types'
 
 export interface TeamsUrlComponents {
     meetingId: string
@@ -13,7 +13,8 @@ function convertLightMeetingToStandard(url: URL): string {
 
     try {
         const decodedCoords = JSON.parse(decodeURIComponent(atob(coords)))
-        const { conversationId, tenantId, messageId, organizerId } = decodedCoords
+        const { conversationId, tenantId, messageId, organizerId } =
+            decodedCoords
         if (!conversationId || !tenantId || !messageId) {
             throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
         }
@@ -21,10 +22,10 @@ function convertLightMeetingToStandard(url: URL): string {
         // Build the working link format directly instead of standard format
         const context = {
             Tid: tenantId,
-            ...(organizerId ? { Oid: organizerId } : {})
+            ...(organizerId ? { Oid: organizerId } : {}),
         }
-        
-        return `https://teams.microsoft.com/v2/?meetingjoin=true#/l/meetup-join/${conversationId}/${messageId}?context=${encodeURIComponent(JSON.stringify(context))}&anon=true`;
+
+        return `https://teams.microsoft.com/v2/?meetingjoin=true#/l/meetup-join/${conversationId}/${messageId}?context=${encodeURIComponent(JSON.stringify(context))}&anon=true`
     } catch (e) {
         console.error('🥕❌ Error converting light meeting URL:', e)
         throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
@@ -35,32 +36,35 @@ function transformTeamsLink(originalLink: string): string {
     try {
         // Check if it's already in the working format
         if (originalLink.includes('/v2/?meetingjoin=true')) {
-            return originalLink;
+            return originalLink
         }
 
-        const url = new URL(originalLink);
-        
+        const url = new URL(originalLink)
+
         // Handle light-meetings format
         if (url.pathname.includes('/light-meetings/launch')) {
-            console.log('🥕➡️ Detected light-meetings URL, converting to working format')
-            return convertLightMeetingToStandard(url);
+            console.log(
+                '🥕➡️ Detected light-meetings URL, converting to working format',
+            )
+            return convertLightMeetingToStandard(url)
         }
-        
+
         // Extract the important parts from the original URL
-        const regex = /https:\/\/teams\.microsoft\.com\/l\/meetup-join\/(.*?)\/(\d+)\?context=(.*?)(?:$|&)/;
-        const match = originalLink.match(regex);
-        
+        const regex =
+            /https:\/\/teams\.microsoft\.com\/l\/meetup-join\/(.*?)\/(\d+)\?context=(.*?)(?:$|&)/
+        const match = originalLink.match(regex)
+
         if (!match || match.length < 4) {
-            return originalLink;
+            return originalLink
         }
-        
-        const [_, threadId, timestamp, context] = match;
-        
+
+        const [_, threadId, timestamp, context] = match
+
         // Build the working link format
-        return `https://teams.microsoft.com/v2/?meetingjoin=true#/l/meetup-join/${threadId}/${timestamp}?context=${context}&anon=true`;
+        return `https://teams.microsoft.com/v2/?meetingjoin=true#/l/meetup-join/${threadId}/${timestamp}?context=${context}&anon=true`
     } catch (error) {
-        console.error('Error transforming Teams link:', error);
-        return originalLink;
+        console.error('Error transforming Teams link:', error)
+        return originalLink
     }
 }
 
@@ -101,7 +105,9 @@ export function parseMeetingUrlFromJoinInfos(
 
         // Handle teams.microsoft.com URLs
         if (url.hostname.includes('teams.microsoft.com')) {
-            console.log(`🥕🥕🥕 Detected teams.microsoft.com URL ${meeting_url}\n, transforming to more compatible format 🥕🥕🥕`)
+            console.log(
+                `🥕🥕🥕 Detected teams.microsoft.com URL ${meeting_url}\n, transforming to more compatible format 🥕🥕🥕`,
+            )
             // Transform the URL to the more compatible format
             const transformedUrl = transformTeamsLink(meeting_url)
             console.log('Using transformed Teams URL:', transformedUrl)

@@ -21,12 +21,14 @@ describe('Teams URL Parser', () => {
 
     describe('Teams urls standard', () => {
         const standardUrls = [
-            "https://teams.microsoft.com/l/meetup-join/19%3aalTrvfJlXitdMLLxjio8rfnHDhKWaZ3_M-EwK5ewWHg1%40thread.tacv2/1740503107049?context=%7b%22Tid%22%3a%221eba988e-f725-4323-976e-38aaba6ee3a3%22%2c%22Oid%22%3a%222f8f4d50-3e1b-41ea-99fe-4361ba60ada5%22%7d"
+            'https://teams.microsoft.com/l/meetup-join/19%3aalTrvfJlXitdMLLxjio8rfnHDhKWaZ3_M-EwK5ewWHg1%40thread.tacv2/1740503107049?context=%7b%22Tid%22%3a%221eba988e-f725-4323-976e-38aaba6ee3a3%22%2c%22Oid%22%3a%222f8f4d50-3e1b-41ea-99fe-4361ba60ada5%22%7d',
         ]
 
         test.each(standardUrls)('should parse Teams Live URL: %s', (url) => {
             const result = parseMeetingUrlFromJoinInfos(url)
-            expect(result.meetingId).toBe(url + (url.includes('?') ? '&' : '?') + 'anon=true')
+            expect(result.meetingId).toBe(
+                url + (url.includes('?') ? '&' : '?') + 'anon=true',
+            )
             expect(result.password).toBe('')
         })
     })

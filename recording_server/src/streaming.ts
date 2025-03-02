@@ -19,12 +19,12 @@ export class Streaming {
     private input_ws: WebSocket | null = null
     private sample_rate: number = DEFAULT_SAMPLE_RATE
     private stdinStream: Writable | null = null
-    
+
     // Paramètres stockés pour démarrage différé
     private inputUrl: string | undefined
     private outputUrl: string | undefined
     private botId: string
-    
+
     // État du streaming
     private isInitialized: boolean = false
     private isPaused: boolean = false
@@ -40,20 +40,20 @@ export class Streaming {
             input,
             output,
             sample_rate,
-            bot_id
-        });
-        
+            bot_id,
+        })
+
         // Stocker les paramètres pour une utilisation ultérieure
-        this.inputUrl = input;
-        this.outputUrl = output;
-        this.botId = bot_id;
-        
+        this.inputUrl = input
+        this.outputUrl = output
+        this.botId = bot_id
+
         if (sample_rate) {
             this.sample_rate = sample_rate
         }
-        
+
         // Ne pas démarrer immédiatement, attendre l'appel à start()
-        Streaming.instance = this;
+        Streaming.instance = this
     }
 
     /**
@@ -61,21 +61,23 @@ export class Streaming {
      */
     public start(): void {
         if (this.isInitialized) {
-            console.warn('Streaming service already started');
-            return;
+            console.warn('Streaming service already started')
+            return
         }
-        
-        console.log('Starting streaming service');
-        
+
+        console.log('Starting streaming service')
+
         try {
             if (this.outputUrl) {
                 console.log(`output = ${this.outputUrl}`)
                 try {
                     this.extension_ws = new WebSocket.Server({
                         port: EXTENSION_WEBSOCKET_PORT,
-                    });
+                    })
                 } catch (error) {
-                    throw new Error(`Failed to create WebSocket server on port ${EXTENSION_WEBSOCKET_PORT}: ${(error as Error).message}`);
+                    throw new Error(
+                        `Failed to create WebSocket server on port ${EXTENSION_WEBSOCKET_PORT}: ${(error as Error).message}`,
+                    )
                 }
 
                 // Event 'connection' on client extension WebSocket
@@ -85,9 +87,11 @@ export class Streaming {
                     try {
                         this.output_ws = new WebSocket(this.outputUrl)
                     } catch (error) {
-                        throw new Error(`Failed to connect to output WebSocket at ${this.outputUrl}: ${(error as Error).message}`);
+                        throw new Error(
+                            `Failed to connect to output WebSocket at ${this.outputUrl}: ${(error as Error).message}`,
+                        )
                     }
-                    
+
                     // Send initial message to output webSocket
                     this.output_ws.on('open', () => {
                         this.output_ws.send(
@@ -107,10 +111,10 @@ export class Streaming {
                     client.on('message', (message) => {
                         if (this.isPaused) {
                             // Si en pause, stocker les chunks pour traitement ultérieur
-                            this.pausedChunks.push(message);
-                            return;
+                            this.pausedChunks.push(message)
+                            return
                         }
-                        
+
                         if (message instanceof Buffer) {
                             const uint8Array = new Uint8Array(message)
                             const f32Array = new Float32Array(uint8Array.buffer)
@@ -151,13 +155,15 @@ export class Streaming {
                     })
                 })
             }
-            
+
             if (this.inputUrl && this.outputUrl !== this.inputUrl) {
                 console.log(`input = ${this.inputUrl}`)
                 try {
                     this.input_ws = new WebSocket(this.inputUrl)
                 } catch (error) {
-                    throw new Error(`Failed to connect to input WebSocket at ${this.inputUrl}: ${(error as Error).message}`);
+                    throw new Error(
+                        `Failed to connect to input WebSocket at ${this.inputUrl}: ${(error as Error).message}`,
+                    )
                 }
                 // Event 'open' on input WebSocket
                 this.input_ws.on('open', () => {
@@ -169,130 +175,129 @@ export class Streaming {
                 })
                 this.play_incoming_audio_chunks(this.input_ws)
             }
-            
-            this.isInitialized = true;
-            this.isPaused = false;
-            
+
+            this.isInitialized = true
+            this.isPaused = false
         } catch (error) {
-            console.error(`Streaming setup failed: ${(error as Error).message}`);
+            console.error(`Streaming setup failed: ${(error as Error).message}`)
             throw {
                 code: JoinErrorCode.StreamingSetupFailed,
-                message: `Failed to setup streaming: ${(error as Error).message}`
-            };
+                message: `Failed to setup streaming: ${(error as Error).message}`,
+            }
         }
     }
-    
+
     /**
      * Met en pause le service de streaming
      */
     public pause(): void {
         if (!this.isInitialized) {
-            console.warn('Cannot pause: streaming service not started');
-            return;
+            console.warn('Cannot pause: streaming service not started')
+            return
         }
-        
+
         if (this.isPaused) {
-            console.warn('Streaming service already paused');
-            return;
+            console.warn('Streaming service already paused')
+            return
         }
-        
-        console.log('Pausing streaming service');
-        this.isPaused = true;
+
+        console.log('Pausing streaming service')
+        this.isPaused = true
     }
-    
+
     /**
      * Reprend le service de streaming après une pause
      */
     public resume(): void {
         if (!this.isInitialized) {
-            console.warn('Cannot resume: streaming service not started');
-            return;
+            console.warn('Cannot resume: streaming service not started')
+            return
         }
-        
+
         if (!this.isPaused) {
-            console.warn('Streaming service not paused');
-            return;
+            console.warn('Streaming service not paused')
+            return
         }
-        
-        console.log('Resuming streaming service');
-        this.isPaused = false;
-        
+
+        console.log('Resuming streaming service')
+        this.isPaused = false
+
         // Traiter les chunks mis en pause
-        this.processPausedChunks();
+        this.processPausedChunks()
     }
-    
+
     /**
      * Arrête complètement le service de streaming
      */
     public stop(): void {
         if (!this.isInitialized) {
-            console.warn('Cannot stop: streaming service not started');
-            return;
+            console.warn('Cannot stop: streaming service not started')
+            return
         }
-        
-        console.log('Stopping streaming service');
-        
+
+        console.log('Stopping streaming service')
+
         // Fermer le flux stdin s'il existe
         if (this.stdinStream) {
             try {
-                this.stdinStream.end();
+                this.stdinStream.end()
             } catch (error) {
-                console.error('Error closing stdin stream:', error);
+                console.error('Error closing stdin stream:', error)
             }
-            this.stdinStream = null;
+            this.stdinStream = null
         }
-        
+
         // Fermer les connexions WebSocket
         if (this.extension_ws) {
-            this.extension_ws.close();
-            this.extension_ws = null;
+            this.extension_ws.close()
+            this.extension_ws = null
         }
-        
+
         if (this.output_ws) {
-            this.output_ws.close();
-            this.output_ws = null;
+            this.output_ws.close()
+            this.output_ws = null
         }
-        
+
         if (this.input_ws) {
-            this.input_ws.close();
-            this.input_ws = null;
+            this.input_ws.close()
+            this.input_ws = null
         }
-        
+
         // Réinitialiser l'état
-        this.isInitialized = false;
-        this.isPaused = false;
-        this.pausedChunks = [];
-        
+        this.isInitialized = false
+        this.isPaused = false
+        this.pausedChunks = []
+
         // Réinitialiser l'instance statique
-        Streaming.instance = null;
+        Streaming.instance = null
     }
 
     // Send Speaker Data to Output WebSocket
     public send_speaker_state(speakers: SpeakerData[]) {
         if (!this.isInitialized) {
-            return;
+            return
         }
-        
+
         if (this.isPaused) {
             // On pourrait stocker les états des speakers pendant la pause
-            return;
+            return
         }
-        
+
         if (this.output_ws?.readyState === WebSocket.OPEN) {
             this.output_ws.send(JSON.stringify(speakers))
         }
     }
-    
+
     /**
      * Traite les chunks audio mis en pause
      */
     private processPausedChunks(): void {
         if (this.pausedChunks.length === 0) {
-            return;
+            return
         }
-        
-        console.log(`Processing ${this.pausedChunks.length} paused chunks`);
-        
+
+        console.log(`Processing ${this.pausedChunks.length} paused chunks`)
+
         // Traiter les chunks stockés pendant la pause
         for (const message of this.pausedChunks) {
             // Réutiliser la logique de traitement des messages
@@ -304,10 +309,7 @@ export class Streaming {
                 const s16Array = new Int16Array(f32Array.length)
                 for (let i = 0; i < f32Array.length; i++) {
                     s16Array[i] = Math.round(
-                        Math.max(
-                            -32768,
-                            Math.min(32767, f32Array[i] * 32768),
-                        ),
+                        Math.max(-32768, Math.min(32767, f32Array[i] * 32768)),
                     )
                 }
                 // Send audio chunk to output webSocket
@@ -316,11 +318,11 @@ export class Streaming {
                 }
             }
         }
-        
+
         // Vider le tableau des chunks en pause
-        this.pausedChunks = [];
+        this.pausedChunks = []
     }
-    
+
     // Inject audio stream into microphone
     private play_incoming_audio_chunks = (input_ws: WebSocket) => {
         new SoundContext(this.sample_rate)
@@ -329,9 +331,9 @@ export class Streaming {
         audio_stream.on('data', (chunk) => {
             // Si en pause, ne pas traiter les chunks audio
             if (this.isPaused) {
-                return;
+                return
             }
-            
+
             // I think that here, in order to prevent the sound from being choppy,
             // it would be necessary to wait a bit (like 4 or 5 chunks) before writing to the stdin.
             if (this.stdinStream && this.stdinStream.writable) {
@@ -354,9 +356,9 @@ export class Streaming {
         input_ws.on('message', (message: RawData) => {
             // Si en pause, ne pas traiter les messages
             if (this.isPaused) {
-                return;
+                return
             }
-            
+
             if (message instanceof Buffer) {
                 const uint8Array = new Uint8Array(message)
                 try {

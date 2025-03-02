@@ -78,7 +78,7 @@ export class SpeakerManager {
         }
 
         if (speakersCount > 0) {
-            this.lastSpeakerTime = Date.now();
+            this.lastSpeakerTime = Date.now()
         }
 
         const participantState: ParticipantState = {

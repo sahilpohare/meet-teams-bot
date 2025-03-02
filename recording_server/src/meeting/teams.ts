@@ -11,7 +11,6 @@ import { parseMeetingUrlFromJoinInfos } from '../urlParser/teamsUrlParser'
 import { sleep } from '../utils'
 import { takeScreenshot } from '../utils/takeScreenshot'
 
-
 export class TeamsProvider implements MeetingProviderInterface {
     constructor() {}
     async parseMeetingUrl(meeting_url: string) {
@@ -41,9 +40,13 @@ export class TeamsProvider implements MeetingProviderInterface {
 
         // Set permissions based on streaming_input
         if (streaming_input) {
-            await browserContext.grantPermissions(['microphone', 'camera'], { origin: url.origin })
+            await browserContext.grantPermissions(['microphone', 'camera'], {
+                origin: url.origin,
+            })
         } else {
-            await browserContext.grantPermissions(['camera'], { origin: url.origin })
+            await browserContext.grantPermissions(['camera'], {
+                origin: url.origin,
+            })
         }
 
         try {
@@ -54,21 +57,35 @@ export class TeamsProvider implements MeetingProviderInterface {
             })
             console.log('page loaded')
             await Promise.race([
-                page.getByRole('button', { name: 'Join now' }).waitFor({ timeout: 30000 }),
-                page.getByRole('button', { name: 'Continue without audio or video' }).waitFor({ timeout: 30000 })
+                page
+                    .getByRole('button', { name: 'Join now' })
+                    .waitFor({ timeout: 30000 }),
+                page
+                    .getByRole('button', {
+                        name: 'Continue without audio or video',
+                    })
+                    .waitFor({ timeout: 30000 }),
             ]).catch(() => {
                 console.log('Initial button wait timed out, continuing anyway')
             })
             const currentUrl = await page.url()
-            const isLightInterface: boolean = currentUrl.includes('light-meetings')
+            const isLightInterface: boolean =
+                currentUrl.includes('light-meetings')
 
             if (isLightInterface === true) {
                 await page.close()
-                console.log('light interface  🥕🥕🥕🥕🥕🥕 , closing page and retrying attempt : ', attempts)
+                console.log(
+                    'light interface  🥕🥕🥕🥕🥕🥕 , closing page and retrying attempt : ',
+                    attempts,
+                )
                 await sleep(1000)
                 attempts++
                 if (attempts < maxAttempts) {
-                    return await this.openMeetingPage(browserContext, link, streaming_input)
+                    return await this.openMeetingPage(
+                        browserContext,
+                        link,
+                        streaming_input,
+                    )
                 } else {
                     throw new Error('Failed to load meeting page')
                 }
@@ -99,64 +116,70 @@ export class TeamsProvider implements MeetingProviderInterface {
 
         try {
             // Try to find and click "Continue on this browser" for up to 30 seconds
-            const maxAttempts = 30;
-            const attemptInterval = 1000; // 1 second between attempts
-            
+            const maxAttempts = 30
+            const attemptInterval = 1000 // 1 second between attempts
+
             for (let i = 0; i < maxAttempts; i++) {
                 if (cancelCheck?.()) {
-                    break;
+                    break
                 }
-                
+
                 const continueOnBrowserExists = await clickWithInnerText(
                     page,
                     'button',
                     'Continue on this browser',
                     1,
-                    true
+                    true,
                 )
-                
+
                 if (continueOnBrowserExists) {
                     console.log('Clicked "Continue on this browser" button')
-                    break;
+                    break
                 }
-                
+
                 // Check if we've already moved past this screen by looking for other buttons
                 const joinNowExists = await clickWithInnerText(
                     page,
                     'button',
                     'Join now',
                     1,
-                    false
+                    false,
                 )
-                
+
                 const continueWithoutAudioExists = await clickWithInnerText(
                     page,
                     'button',
                     'Continue without audio or video',
                     1,
-                    false
+                    false,
                 )
-                
+
                 if (joinNowExists) {
-                    console.log('Already at Join now screen, skipping "Continue on this browser"')
-                    break;
+                    console.log(
+                        'Already at Join now screen, skipping "Continue on this browser"',
+                    )
+                    break
                 }
-                
+
                 if (continueWithoutAudioExists) {
-                    console.log('Found "Continue without audio or video" button')
+                    console.log(
+                        'Found "Continue without audio or video" button',
+                    )
                     await clickWithInnerText(
                         page,
                         'button',
                         'Continue without audio or video',
                         5,
-                        true
+                        true,
                     )
-                    console.log('Clicked "Continue without audio or video" button')
-                    break;
+                    console.log(
+                        'Clicked "Continue without audio or video" button',
+                    )
+                    break
                 }
-                
+
                 if (i < maxAttempts - 1) {
-                    await sleep(attemptInterval);
+                    await sleep(attemptInterval)
                 }
             }
         } catch (e) {
@@ -166,7 +189,7 @@ export class TeamsProvider implements MeetingProviderInterface {
         const currentUrl = await page.url()
         const isLightInterface = currentUrl.includes('light')
         const isLiveInterface = currentUrl.includes('live')
-        
+
         console.log(
             'interface : ',
             isLightInterface
@@ -186,7 +209,7 @@ export class TeamsProvider implements MeetingProviderInterface {
             try {
                 await handlePermissionDialog(page)
                 await activateCamera(page)
-                
+
                 // Control microphone based on streaming_input
                 const streaming_input = meetingParams.streaming_input
                 if (streaming_input) {
@@ -253,7 +276,6 @@ export class TeamsProvider implements MeetingProviderInterface {
         }
     }
 
-
     async findEndMeeting(
         _meetingParams: MeetingParams,
         page: Page,
@@ -265,7 +287,7 @@ export class TeamsProvider implements MeetingProviderInterface {
         console.log('Attempting to leave the meeting')
         try {
             // Try multiple approaches to find and click the leave button
-            
+
             // Approach 1: Try to find by aria-label
             // const leaveButton = page.locator('button[aria-label="Leave (⌘+Shift+H)"], button[aria-label*="Leave"]')
             // if (await leaveButton.count() > 0) {
@@ -273,7 +295,7 @@ export class TeamsProvider implements MeetingProviderInterface {
             //     console.log('Clicked leave button by aria-label')
             //     return
             // }
-            
+
             // // Approach 2: Try to find by data-tid attribute
             // const hangupButton = page.locator('button[data-tid="hangup-main-btn"]')
             // if (await hangupButton.count() > 0) {
@@ -281,21 +303,21 @@ export class TeamsProvider implements MeetingProviderInterface {
             //     console.log('Clicked leave button by data-tid')
             //     return
             // }
-            
+
             // Approach 3: Try to find by text content
             if (await clickWithInnerText(page, 'button', 'Leave', 5, true)) {
                 console.log('Clicked leave button by text content')
                 return
             }
-            
+
             // Approach 4: Try to find by role and name
             const leaveByRole = page.getByRole('button', { name: 'Leave' })
-            if (await leaveByRole.count() > 0) {
+            if ((await leaveByRole.count()) > 0) {
                 await leaveByRole.click()
                 console.log('Clicked leave button by role and name')
                 return
             }
-            
+
             console.log('Could not find leave button, closing page instead')
         } catch (error) {
             console.error('Error while trying to leave meeting:', error)
@@ -392,7 +414,6 @@ export async function clickWithInnerText(
     }
     return continueButton
 }
-
 
 async function typeBotName(
     page: Page,
@@ -505,23 +526,31 @@ async function activateCamera(page: Page): Promise<void> {
             const cameraButton = page.locator('button[title="Turn camera on"]')
             if ((await cameraButton.count()) > 0) {
                 await cameraButton.click()
-                console.log('Camera button clicked successfully (normal interface)')
+                console.log(
+                    'Camera button clicked successfully (normal interface)',
+                )
                 await sleep(500)
                 return
             } else {
-                console.log('Camera button not found in normal interface, trying light interface')
+                console.log(
+                    'Camera button not found in normal interface, trying light interface',
+                )
             }
         }
-        
+
         // Essayer l'interface light de Teams
-        const lightCameraButton = page.locator('[data-tid="toggle-video"][aria-checked="false"], [aria-label="Camera"][aria-checked="false"]')
+        const lightCameraButton = page.locator(
+            '[data-tid="toggle-video"][aria-checked="false"], [aria-label="Camera"][aria-checked="false"]',
+        )
         if ((await lightCameraButton.count()) > 0) {
             await lightCameraButton.click()
             console.log('Camera button clicked successfully (light interface)')
             await sleep(500)
             return
         } else {
-            console.log('Camera is already on or button not found in both interfaces')
+            console.log(
+                'Camera is already on or button not found in both interfaces',
+            )
         }
     } catch (error) {
         console.error('Failed to activate camera:', error)

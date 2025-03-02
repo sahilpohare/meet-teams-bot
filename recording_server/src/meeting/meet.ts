@@ -14,7 +14,6 @@ import { takeScreenshot } from '../utils/takeScreenshot'
 import { closeMeeting } from './meet/closeMeeting'
 
 export class MeetProvider implements MeetingProviderInterface {
-
     async parseMeetingUrl(meeting_url: string) {
         return parseMeetingUrlFromJoinInfos(meeting_url)
     }
@@ -36,7 +35,7 @@ export class MeetProvider implements MeetingProviderInterface {
         try {
             console.log('Creating new page in existing context...')
             const page = await browserContext.newPage()
-            
+
             // Set permissions based on streaming_input
             if (streaming_input) {
                 await browserContext.grantPermissions(['microphone', 'camera'])
@@ -96,7 +95,7 @@ export class MeetProvider implements MeetingProviderInterface {
         }
 
         await takeScreenshot(page, `after_typing_bot_name`)
-        
+
         // Control microphone based on streaming_input
         if (meetingParams.streaming_input) {
             await activateMicrophone(page)
@@ -188,7 +187,7 @@ export class MeetProvider implements MeetingProviderInterface {
             return false
         }
     }
-    
+
     async closeMeeting(page: Page): Promise<void> {
         await closeMeeting(page)
     }
@@ -399,10 +398,7 @@ async function changeLayout(
             return true
         } catch (e) {
             console.error(`Error in changeLayout (attempt ${attempt}):`, e)
-            await takeScreenshot(
-                page,
-                `change_layout_error_${attempt}`,
-            )
+            await takeScreenshot(page, `change_layout_error_${attempt}`)
 
             // Try to close any open modals before retrying
             try {
@@ -459,8 +455,10 @@ async function activateMicrophone(page: Page): Promise<boolean> {
     console.log('Activating microphone...')
     try {
         // Look for the microphone button that's turned off
-        const microphoneButton = page.locator('div[aria-label="Turn on microphone"]')
-        if (await microphoneButton.count() > 0) {
+        const microphoneButton = page.locator(
+            'div[aria-label="Turn on microphone"]',
+        )
+        if ((await microphoneButton.count()) > 0) {
             await microphoneButton.click()
             console.log('Microphone activated successfully')
             return true
@@ -478,8 +476,10 @@ async function deactivateMicrophone(page: Page): Promise<boolean> {
     console.log('Deactivating microphone...')
     try {
         // Look for the microphone button that's turned on
-        const microphoneButton = page.locator('div[aria-label="Turn off microphone"]')
-        if (await microphoneButton.count() > 0) {
+        const microphoneButton = page.locator(
+            'div[aria-label="Turn off microphone"]',
+        )
+        if ((await microphoneButton.count()) > 0) {
             await microphoneButton.click()
             console.log('Microphone deactivated successfully')
             return true

@@ -17,21 +17,22 @@ import { JoinError, JoinErrorCode, MeetingParams } from './types'
 
 import { spawn } from 'child_process'
 import { Events } from './events'
-import { logger, setupConsoleLogger, setupExitHandler } from './utils/pinoLogger'
+import {
+    logger,
+    setupConsoleLogger,
+    setupExitHandler,
+} from './utils/pinoLogger'
 
 const ZOOM_SDK_DEBUG_EXECUTABLE_PATHNAME = './target/debug/client'
 const ZOOM_SDK_RELEASE_EXECUTABLE_PATHNAME = './target/release/client'
 const ZOOM_SDK_LIBRARY_PATH = './zoom-sdk-linux-rs/zoom-meeting-sdk-linux'
 const ZOOM_SDK_RELATIVE_DIRECTORY = '../zoom'
 
-
-
 // Setup initial console logging
-setupConsoleLogger();
+setupConsoleLogger()
 
 // Setup exit handler for proper log file cleanup
-setupExitHandler();
-
+setupExitHandler()
 
 // ENTRY POINT
 // syntax convention
@@ -41,160 +42,157 @@ setupExitHandler();
 // PascalCase => Classes
 
 ;(async () => {
+    // set default axios config
+    axios.defaults.baseURL = API_SERVER_BASEURL
+    axios.defaults.withCredentials = true
 
-        // set default axios config
-        axios.defaults.baseURL = API_SERVER_BASEURL
-        axios.defaults.withCredentials = true
+    let environ: string = process.env.ENVIRON
 
-        let environ: string = process.env.ENVIRON
+    console.log('Before REDIS.connect()')
+    await clientRedis.connect().catch((e) => {
+        console.error(`Fail to connect to redis: ${e}`)
+        throw e
+    })
 
-        console.log('Before REDIS.connect()')
-        await clientRedis.connect().catch((e) => {
-            console.error(`Fail to connect to redis: ${e}`)
-            throw e
-        })
+    console.log('Before RABBIT.connect()')
+    const consumer = await Consumer.init().catch((e) => {
+        console.error(`Fail to init consumer: ${e}`)
+        throw e
+    })
 
-        console.log('Before RABBIT.connect()')
-        const consumer = await Consumer.init().catch((e) => {
-            console.error(`Fail to init consumer: ${e}`)
-            throw e
-        })
-
-        console.log('start consuming rabbitmq messages')
-        let consumeResult: {
-            params: MeetingParams
-            error: Error
-        }
-        try {
-            consumeResult = await consumer.consume(Consumer.handleStartRecord)
-        } catch (e) {
-            if (LOCK_INSTANCE_AT_STARTUP) {
-                await consumer.deleteQueue().catch((e) => {
-                    console.error('fail to delete queue', e)
-                })
-                throw e
-            }
-        }
-
-        if (consumeResult.error) {
-            // Assuming Recording does not start at this point
-            // So there are not video to upload. Just send webhook failure
-            console.error(
-                'error in start meeting:',
-                consumeResult.error instanceof JoinError
-                    ? consumeResult.error.message
-                    : consumeResult.error,
-            )
-
-            await handleErrorInStartRecording(
-                consumeResult.error,
-                consumeResult.params,
-            ).catch((e) => {
-                console.error(
-                    'error in handleErrorInStartRecording:',
-                    e instanceof JoinError ? e.message : e,
-                )
-            })
-        } else if (consumeResult.params.meetingProvider !== 'Zoom') {
-            // Assuming that recording is active at this point
-            try {
-
-                // Démarrer le meeting avec la machine à états
-                await MeetingHandle.instance.startRecordMeeting()
-
-                // Si on arrive ici, c'est que tout s'est bien passé
-                console.log(
-                    `${Date.now()} Finalize project && Sending WebHook complete`,
-                )
-                await Api.instance.endMeetingTrampoline()
-            } catch (error) {
-                // La machine à états a déjà géré le nettoyage
-                console.error('Meeting failed:', error)
-                // Attendre que le webhook soit envoyé avant de continuer
-                await sendWebhookOnce({
-                    meetingUrl: consumeResult.params.meeting_url,
-                    botUuid: consumeResult.params.bot_uuid,
-                    success: false,
-                    errorMessage:
-                        error instanceof JoinError
-                            ? error.message
-                            : 'Recording failed to complete',
-                })
-            }
-        } else {
-            // Configuring and launching LINUX ZOOM SDK
-            console.log('Current Directory :', process.cwd())
-            process.chdir(ZOOM_SDK_RELATIVE_DIRECTORY)
-            console.log('Switching to :', process.cwd())
-
-            const libraryPath = ZOOM_SDK_LIBRARY_PATH
-            process.env.LD_LIBRARY_PATH = `${libraryPath}:${process.env.LD_LIBRARY_PATH || ''}`
-            console.log(
-                'LD_LIBRARY_PATH :',
-                process.env.LD_LIBRARY_PATH || 'Undefined',
-            )
-
-            async function runClient(params: MeetingParams) {
-                try {
-                    console.log('Executing client...')
-
-                    const clientProcess = spawn(
-                        environ === 'local'
-                            ? ZOOM_SDK_DEBUG_EXECUTABLE_PATHNAME
-                            : ZOOM_SDK_RELEASE_EXECUTABLE_PATHNAME,
-                        process.argv[2]?.includes('--zoom-no-recursive-env')
-                            ? ['--no-recursive-env', '--pulse']
-                            : ['--pulse'],
-                        {
-                            env: process.env,
-                            stdio: ['pipe', 'inherit', 'inherit'],
-                        },
-                    )
-
-                    clientProcess.stdin?.write(JSON.stringify(params))
-                    clientProcess.stdin?.end()
-
-                    const exitCode = await new Promise<number>(
-                        (resolve, reject) => {
-                            clientProcess.on('close', resolve)
-                            clientProcess.on('error', reject)
-                        },
-                    )
-
-                    console.log(`Process terminated with code: ${exitCode}`)
-                } catch (error) {
-                    console.error('Error while loading Zoom: ', error)
-                }
-            }
-            try {
-                await runClient(consumeResult.params)
-            } catch (e) {
-                // Add handling for Zoom client errors
-                console.error(`Promise rejected : ${e}`)
-                await sendWebhookOnce({
-                    meetingUrl: consumeResult.params.meeting_url,
-                    botUuid: consumeResult.params.bot_uuid,
-                    success: false,
-                    errorMessage: 'Zoom client error',
-                })
-            }
-        }
-
-        await delSessionInRedis(consumeResult.params.session_id).catch((e) => {
-            console.error('fail delete session in redis: ', e)
-        })
-
+    console.log('start consuming rabbitmq messages')
+    let consumeResult: {
+        params: MeetingParams
+        error: Error
+    }
+    try {
+        consumeResult = await consumer.consume(Consumer.handleStartRecord)
+    } catch (e) {
         if (LOCK_INSTANCE_AT_STARTUP) {
             await consumer.deleteQueue().catch((e) => {
                 console.error('fail to delete queue', e)
             })
-            await terminateInstance().catch((e) => {
-                console.error('fail to terminate instance', e)
+            throw e
+        }
+    }
+
+    if (consumeResult.error) {
+        // Assuming Recording does not start at this point
+        // So there are not video to upload. Just send webhook failure
+        console.error(
+            'error in start meeting:',
+            consumeResult.error instanceof JoinError
+                ? consumeResult.error.message
+                : consumeResult.error,
+        )
+
+        await handleErrorInStartRecording(
+            consumeResult.error,
+            consumeResult.params,
+        ).catch((e) => {
+            console.error(
+                'error in handleErrorInStartRecording:',
+                e instanceof JoinError ? e.message : e,
+            )
+        })
+    } else if (consumeResult.params.meetingProvider !== 'Zoom') {
+        // Assuming that recording is active at this point
+        try {
+            // Démarrer le meeting avec la machine à états
+            await MeetingHandle.instance.startRecordMeeting()
+
+            // Si on arrive ici, c'est que tout s'est bien passé
+            console.log(
+                `${Date.now()} Finalize project && Sending WebHook complete`,
+            )
+            await Api.instance.endMeetingTrampoline()
+        } catch (error) {
+            // La machine à états a déjà géré le nettoyage
+            console.error('Meeting failed:', error)
+            // Attendre que le webhook soit envoyé avant de continuer
+            await sendWebhookOnce({
+                meetingUrl: consumeResult.params.meeting_url,
+                botUuid: consumeResult.params.bot_uuid,
+                success: false,
+                errorMessage:
+                    error instanceof JoinError
+                        ? error.message
+                        : 'Recording failed to complete',
             })
         }
-        console.log('exiting instance')
-        exit(0)
-    
+    } else {
+        // Configuring and launching LINUX ZOOM SDK
+        console.log('Current Directory :', process.cwd())
+        process.chdir(ZOOM_SDK_RELATIVE_DIRECTORY)
+        console.log('Switching to :', process.cwd())
+
+        const libraryPath = ZOOM_SDK_LIBRARY_PATH
+        process.env.LD_LIBRARY_PATH = `${libraryPath}:${process.env.LD_LIBRARY_PATH || ''}`
+        console.log(
+            'LD_LIBRARY_PATH :',
+            process.env.LD_LIBRARY_PATH || 'Undefined',
+        )
+
+        async function runClient(params: MeetingParams) {
+            try {
+                console.log('Executing client...')
+
+                const clientProcess = spawn(
+                    environ === 'local'
+                        ? ZOOM_SDK_DEBUG_EXECUTABLE_PATHNAME
+                        : ZOOM_SDK_RELEASE_EXECUTABLE_PATHNAME,
+                    process.argv[2]?.includes('--zoom-no-recursive-env')
+                        ? ['--no-recursive-env', '--pulse']
+                        : ['--pulse'],
+                    {
+                        env: process.env,
+                        stdio: ['pipe', 'inherit', 'inherit'],
+                    },
+                )
+
+                clientProcess.stdin?.write(JSON.stringify(params))
+                clientProcess.stdin?.end()
+
+                const exitCode = await new Promise<number>(
+                    (resolve, reject) => {
+                        clientProcess.on('close', resolve)
+                        clientProcess.on('error', reject)
+                    },
+                )
+
+                console.log(`Process terminated with code: ${exitCode}`)
+            } catch (error) {
+                console.error('Error while loading Zoom: ', error)
+            }
+        }
+        try {
+            await runClient(consumeResult.params)
+        } catch (e) {
+            // Add handling for Zoom client errors
+            console.error(`Promise rejected : ${e}`)
+            await sendWebhookOnce({
+                meetingUrl: consumeResult.params.meeting_url,
+                botUuid: consumeResult.params.bot_uuid,
+                success: false,
+                errorMessage: 'Zoom client error',
+            })
+        }
+    }
+
+    await delSessionInRedis(consumeResult.params.session_id).catch((e) => {
+        console.error('fail delete session in redis: ', e)
+    })
+
+    if (LOCK_INSTANCE_AT_STARTUP) {
+        await consumer.deleteQueue().catch((e) => {
+            console.error('fail to delete queue', e)
+        })
+        await terminateInstance().catch((e) => {
+            console.error('fail to terminate instance', e)
+        })
+    }
+    console.log('exiting instance')
+    exit(0)
 })()
 
 let webhookSent = false
@@ -211,31 +209,39 @@ async function sendWebhookOnce(params: {
     }
 
     try {
-        const callEndedPromise = Events.callEnded();
-        const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Call ended event timeout')), 30000)
-        );
+        const callEndedPromise = Events.callEnded()
+        const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(
+                () => reject(new Error('Call ended event timeout')),
+                30000,
+            ),
+        )
 
-        await Promise.race([callEndedPromise, timeoutPromise]);
-        
+        await Promise.race([callEndedPromise, timeoutPromise])
+
         if (!params.success) {
             const webhookPromise = meetingBotStartRecordFailed(
                 params.meetingUrl,
                 params.botUuid,
-                params.errorMessage || 'Unknown error'
-            );
-            
+                params.errorMessage || 'Unknown error',
+            )
+
             await Promise.race([
-                webhookPromise, 
-                new Promise((_, reject) => setTimeout(() => reject(new Error('Webhook timeout')), 10000))
-            ]);
+                webhookPromise,
+                new Promise((_, reject) =>
+                    setTimeout(
+                        () => reject(new Error('Webhook timeout')),
+                        10000,
+                    ),
+                ),
+            ])
         }
 
-        console.log('All webhooks sent successfully');
+        console.log('All webhooks sent successfully')
         webhookSent = true
     } catch (e) {
-        console.error('Webhook operation timed out:', e);
-        webhookSent = true; // Marquer comme envoyé même en cas d'échec pour éviter de bloquer
+        console.error('Webhook operation timed out:', e)
+        webhookSent = true // Marquer comme envoyé même en cas d'échec pour éviter de bloquer
     }
 }
 
@@ -284,11 +290,11 @@ export function meetingBotStartRecordFailed(
         params: { bot_uuid },
     })
         .then(() => {
-            console.log('Successfully notified backend of recording failure');
+            console.log('Successfully notified backend of recording failure')
         })
         .catch((error) => {
-            console.error('Failed to notify recording failure:', error.message);
+            console.error('Failed to notify recording failure:', error.message)
             // Rethrow the error to ensure the promise is rejected
-            throw error;
-        });
+            throw error
+        })
 }

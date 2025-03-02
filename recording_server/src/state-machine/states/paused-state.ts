@@ -1,21 +1,21 @@
-import { Events } from '../../events';
-import { TRANSCODER } from '../../recording/Transcoder';
-import { TranscriptionService } from '../../transcription/TranscriptionService';
-import { MEETING_CONSTANTS } from '../constants';
-import { MeetingStateType, StateExecuteResult } from '../types';
-import { BaseState } from './base-state';
+import { Events } from '../../events'
+import { TRANSCODER } from '../../recording/Transcoder'
+import { TranscriptionService } from '../../transcription/TranscriptionService'
+import { MEETING_CONSTANTS } from '../constants'
+import { MeetingStateType, StateExecuteResult } from '../types'
+import { BaseState } from './base-state'
 
 export class PausedState extends BaseState {
-    private transcriptionService: TranscriptionService;
+    private transcriptionService: TranscriptionService
 
     async execute(): StateExecuteResult {
         try {
             // Récupérer le service de transcription depuis le contexte
-            this.transcriptionService = this.context.transcriptionService;
+            this.transcriptionService = this.context.transcriptionService
 
             // Marquer le début de la pause
             if (!this.context.pauseStartTime) {
-                this.context.pauseStartTime = Date.now();
+                this.context.pauseStartTime = Date.now()
             }
 
             // Sauvegarder l'état actuel
@@ -23,45 +23,51 @@ export class PausedState extends BaseState {
                 timestamp: Date.now(),
                 attendeesCount: this.context.attendeesCount,
                 lastSpeakerTime: this.context.lastSpeakerTime,
-                noSpeakerDetectedTime: this.context.noSpeakerDetectedTime
-            };
+                noSpeakerDetectedTime: this.context.noSpeakerDetectedTime,
+            }
 
             // Pause de l'enregistrement et de la transcription
-            await this.pauseRecording();
+            await this.pauseRecording()
 
             // Notifier de la pause
-            Events.recordingPaused();
+            Events.recordingPaused()
 
- // 1 heure par exemple
-            const pauseStartTime = Date.now();
+            // 1 heure par exemple
+            const pauseStartTime = Date.now()
 
             // Attendre la demande de reprise
             while (this.context.isPaused) {
-                await new Promise(resolve => setTimeout(resolve, 100));
+                await new Promise((resolve) => setTimeout(resolve, 100))
 
                 // Vérifier si on doit arrêter complètement
                 if (this.context.endReason) {
-                    return this.transition(MeetingStateType.Cleanup);
+                    return this.transition(MeetingStateType.Cleanup)
                 }
-                
+
                 // Vérifier si la pause a duré trop longtemps
-                if (Date.now() - pauseStartTime > MEETING_CONSTANTS.RESUMING_TIMEOUT) {
-                    console.warn('Maximum pause duration exceeded, forcing resume');
-                    this.context.isPaused = false;
-                    break;
+                if (
+                    Date.now() - pauseStartTime >
+                    MEETING_CONSTANTS.RESUMING_TIMEOUT
+                ) {
+                    console.warn(
+                        'Maximum pause duration exceeded, forcing resume',
+                    )
+                    this.context.isPaused = false
+                    break
                 }
             }
 
             // Calculer la durée de pause
             if (this.context.pauseStartTime) {
-                const pauseDuration = Date.now() - this.context.pauseStartTime;
-                this.context.totalPauseDuration = (this.context.totalPauseDuration || 0) + pauseDuration;
+                const pauseDuration = Date.now() - this.context.pauseStartTime
+                this.context.totalPauseDuration =
+                    (this.context.totalPauseDuration || 0) + pauseDuration
             }
 
-            return this.transition(MeetingStateType.Resuming);
+            return this.transition(MeetingStateType.Resuming)
         } catch (error) {
-            console.error('Error in paused state:', error);
-            return this.handleError(error as Error);
+            console.error('Error in paused state:', error)
+            return this.handleError(error as Error)
         }
     }
 
@@ -69,35 +75,39 @@ export class PausedState extends BaseState {
         const pausePromise = async () => {
             // Pause du MediaRecorder dans le navigateur
             await this.context.backgroundPage?.evaluate(() => {
-                const w = window as any;
-                return w.pauseMediaRecorder?.();
-            });
+                const w = window as any
+                return w.pauseMediaRecorder?.()
+            })
 
             // Pause du Transcoder
-            await TRANSCODER.pause();
+            await TRANSCODER.pause()
 
             // Pause du service de transcription
             if (this.transcriptionService) {
-                await this.transcriptionService.pause();
-            }
-            
-            // Pause du streaming
-            if (this.context.streamingService) {
-                this.context.streamingService.pause();
+                await this.transcriptionService.pause()
             }
 
-            console.log('Recording paused successfully');
-        };
-        
-        const timeoutPromise = new Promise<void>((_, reject) => 
-            setTimeout(() => reject(new Error('Pause recording timeout')), 20000) // 20 secondes
-        );
-        
+            // Pause du streaming
+            if (this.context.streamingService) {
+                this.context.streamingService.pause()
+            }
+
+            console.log('Recording paused successfully')
+        }
+
+        const timeoutPromise = new Promise<void>(
+            (_, reject) =>
+                setTimeout(
+                    () => reject(new Error('Pause recording timeout')),
+                    20000,
+                ), // 20 secondes
+        )
+
         try {
-            await Promise.race([pausePromise(), timeoutPromise]);
+            await Promise.race([pausePromise(), timeoutPromise])
         } catch (error) {
-            console.error('Error or timeout in pauseRecording:', error);
-            throw error;
+            console.error('Error or timeout in pauseRecording:', error)
+            throw error
         }
     }
 }

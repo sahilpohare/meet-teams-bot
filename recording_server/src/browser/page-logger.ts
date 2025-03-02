@@ -4,7 +4,7 @@ import { Page } from '@playwright/test'
 const IGNORED_URLS = [
     'api.flightproxy.teams.microsoft.com',
     'broker.skype.com',
-    'meet.google.com/$rpc/google.rtc.meetings.v1.MeetingDeviceService/UpdateMeetingDevice'
+    'meet.google.com/$rpc/google.rtc.meetings.v1.MeetingDeviceService/UpdateMeetingDevice',
 ]
 
 // Liste des erreurs à ignorer

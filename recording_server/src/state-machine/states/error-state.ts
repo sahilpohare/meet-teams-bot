@@ -56,40 +56,40 @@ export class ErrorState extends BaseState {
             const error = this.context.error
 
             if (!error) {
-                console.warn('No error found in context');
-                return;
+                console.warn('No error found in context')
+                return
             }
 
             if (error instanceof JoinError) {
                 switch (error.message) {
                     case JoinErrorCode.BotNotAccepted:
-                        await Events.botRejected();
-                        break;
+                        await Events.botRejected()
+                        break
                     case JoinErrorCode.BotRemoved:
-                        await Events.botRemoved();
-                        break;
+                        await Events.botRemoved()
+                        break
                     case JoinErrorCode.TimeoutWaitingToStart:
-                        await Events.waitingRoomTimeout();
-                        break;
+                        await Events.waitingRoomTimeout()
+                        break
                     case JoinErrorCode.InvalidMeetingUrl:
-                        await Events.invalidMeetingUrl();
-                        break;
+                        await Events.invalidMeetingUrl()
+                        break
                     default:
-                        await Events.meetingError(error);
+                        await Events.meetingError(error)
                 }
             } else {
-                await Events.meetingError(error);
+                await Events.meetingError(error)
             }
-        };
-        
-        const timeoutPromise = new Promise<void>((_, reject) => 
-            setTimeout(() => reject(new Error('Notify error timeout')), 5000)
-        );
-        
+        }
+
+        const timeoutPromise = new Promise<void>((_, reject) =>
+            setTimeout(() => reject(new Error('Notify error timeout')), 5000),
+        )
+
         try {
-            await Promise.race([notifyPromise(), timeoutPromise]);
+            await Promise.race([notifyPromise(), timeoutPromise])
         } catch (error) {
-            console.error('Error notification timed out:', error);
+            console.error('Error notification timed out:', error)
             // Continue even if notification fails
         }
     }

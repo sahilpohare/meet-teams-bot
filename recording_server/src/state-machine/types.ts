@@ -26,7 +26,7 @@ export enum RecordingEndReason {
     NoAttendees = 'no_attendees',
     NoSpeaker = 'no_speaker',
     RecordingTimeout = 'recording_timeout',
-    ApiRequest = 'api_request'
+    ApiRequest = 'api_request',
 }
 
 export interface MeetingContext {
@@ -68,21 +68,21 @@ export interface MeetingContext {
     pathManager?: PathManager
 
     // Service de transcription
-    transcriptionService?: TranscriptionService;
+    transcriptionService?: TranscriptionService
 
     // Recording state (Play/Pause)
-    isPaused?: boolean;
-    pauseStartTime?: number;
-    totalPauseDuration?: number;
+    isPaused?: boolean
+    pauseStartTime?: number
+    totalPauseDuration?: number
     lastRecordingState?: {
-        timestamp?: number;
-        attendeesCount?: number;
-        lastSpeakerTime?: number;
-        noSpeakerDetectedTime?: number;
+        timestamp?: number
+        attendeesCount?: number
+        lastSpeakerTime?: number
+        noSpeakerDetectedTime?: number
     }
 
     // Streaming
-    streamingService?: Streaming;
+    streamingService?: Streaming
 }
 
 export interface StateTransition {

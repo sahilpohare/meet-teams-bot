@@ -13,8 +13,6 @@ export abstract class BaseState {
         this.setupPageLoggers()
     }
 
-
-
     private setupPageLoggers(): void {
         if (this.context.playwrightPage) {
             listenPage(this.context.playwrightPage)

@@ -27,12 +27,11 @@ export async function uploadTranscriptTask(
     speaker: SpeakerData,
     end: boolean,
 ): Promise<void> {
-
     if (speaker.timestamp === null || speaker.timestamp === undefined) {
-        console.log("Skipping transcript upload - timestamps not yet available");
-        return;
+        console.log('Skipping transcript upload - timestamps not yet available')
+        return
     }
-    
+
     return new Promise((resolve, reject) => {
         TRANSCRIPT_QUEUE.push(async () => {
             try {
@@ -50,7 +49,7 @@ async function upload(speaker: SpeakerData, end: boolean) {
         console.info('Transcriber is stoped')
         return
     }
-    
+
     try {
         const api = Api.instance
         if (LAST_TRANSRIPT) {
@@ -58,15 +57,19 @@ async function upload(speaker: SpeakerData, end: boolean) {
                 await api.patchTranscript({
                     id: LAST_TRANSRIPT.id,
                     end_time:
-                        (speaker.timestamp - MeetingHandle.instance.getStartTime()) /
+                        (speaker.timestamp -
+                            MeetingHandle.instance.getStartTime()) /
                         1000,
                 } as ApiTypes.ChangeableTranscript)
             } catch (e) {
-                console.error('Failed to patch transcript, continuing execution:', e)
+                console.error(
+                    'Failed to patch transcript, continuing execution:',
+                    e,
+                )
                 // Continue execution despite error
             }
         }
-        
+
         if (end === true) {
             // Just patch the last transcript if in end
             TRANSCIBER_STOPED = true
@@ -78,16 +81,23 @@ async function upload(speaker: SpeakerData, end: boolean) {
                     bot_id: bot.bot.id,
                     speaker: speaker.name,
                     start_time:
-                        (speaker.timestamp - MeetingHandle.instance.getStartTime()) /
+                        (speaker.timestamp -
+                            MeetingHandle.instance.getStartTime()) /
                         1000,
                 } as ApiTypes.PostableTranscript)
             } catch (e) {
-                console.error('Failed to post transcript, continuing execution:', e)
+                console.error(
+                    'Failed to post transcript, continuing execution:',
+                    e,
+                )
                 // Continue execution despite error
             }
         }
     } catch (e) {
-        console.error('Unexpected error in transcript upload, continuing execution:', e)
+        console.error(
+            'Unexpected error in transcript upload, continuing execution:',
+            e,
+        )
         // Continue execution despite any errors
     }
 }

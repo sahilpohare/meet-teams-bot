@@ -16,7 +16,6 @@ export class Events {
         )
     }
 
-
     static async joiningCall() {
         return Events.EVENTS?.send('joining_call')
     }
