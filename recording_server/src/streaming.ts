@@ -1,9 +1,9 @@
 import { IncomingMessage } from 'http'
-import { Readable, Writable } from 'stream'
+import { Readable } from 'stream'
 import { RawData, Server, WebSocket } from 'ws'
 
 import { SoundContext } from './media_context'
-import { JoinErrorCode, SpeakerData } from './types'
+import { SpeakerData } from './types'
 
 const EXTENSION_WEBSOCKET_PORT: number = 8081
 const DEFAULT_SAMPLE_RATE: number = 24_000
@@ -18,7 +18,6 @@ export class Streaming {
     private output_ws: WebSocket | null = null // May be used as dual channel, input and output
     private input_ws: WebSocket | null = null
     private sample_rate: number = DEFAULT_SAMPLE_RATE
-    private stdinStream: Writable | null = null
 
     // Paramètres stockés pour démarrage différé
     private inputUrl: string | undefined
@@ -43,7 +42,7 @@ export class Streaming {
             bot_id,
         })
 
-        // Stocker les paramètres pour une utilisation ultérieure
+        // Initialiser directement au lieu de stocker pour plus tard
         this.inputUrl = input
         this.outputUrl = output
         this.botId = bot_id
@@ -52,7 +51,9 @@ export class Streaming {
             this.sample_rate = sample_rate
         }
 
-        // Ne pas démarrer immédiatement, attendre l'appel à start()
+        // Démarrer immédiatement comme dans l'ancien code
+        this.start()
+
         Streaming.instance = this
     }
 
@@ -67,124 +68,118 @@ export class Streaming {
 
         console.log('Starting streaming service')
 
-        try {
-            if (this.outputUrl) {
-                console.log(`output = ${this.outputUrl}`)
+        if (this.outputUrl) {
+            console.log(`output = ${this.outputUrl}`)
+            try {
+                this.extension_ws = new WebSocket.Server({
+                    port: EXTENSION_WEBSOCKET_PORT,
+                })
+            } catch (error) {
+                console.error(`Failed to create WebSocket server: ${error}`)
+                return
+            }
+
+            // Event 'connection' on client extension WebSocket
+            this.extension_ws.on('connection', (client: WebSocket) => {
+                console.log(`Client connected`)
+
                 try {
-                    this.extension_ws = new WebSocket.Server({
-                        port: EXTENSION_WEBSOCKET_PORT,
-                    })
+                    this.output_ws = new WebSocket(this.outputUrl)
                 } catch (error) {
-                    throw new Error(
-                        `Failed to create WebSocket server on port ${EXTENSION_WEBSOCKET_PORT}: ${(error as Error).message}`,
+                    console.error(
+                        `Failed to connect to output WebSocket: ${error}`,
                     )
+                    return
                 }
 
-                // Event 'connection' on client extension WebSocket
-                this.extension_ws.on('connection', (client: WebSocket) => {
-                    console.log(`Client connected`)
-
-                    try {
-                        this.output_ws = new WebSocket(this.outputUrl)
-                    } catch (error) {
-                        throw new Error(
-                            `Failed to connect to output WebSocket at ${this.outputUrl}: ${(error as Error).message}`,
-                        )
-                    }
-
-                    // Send initial message to output webSocket
-                    this.output_ws.on('open', () => {
-                        this.output_ws.send(
-                            JSON.stringify({
-                                protocol_version: 1,
-                                bot_id: this.botId,
-                                offset: 0.0,
-                            }),
-                        )
-                    })
-                    // Dual channel
-                    if (this.inputUrl === this.outputUrl) {
-                        console.log(`input = ${this.inputUrl}`)
-                        this.play_incoming_audio_chunks(this.output_ws)
-                    }
-                    // Event 'message' on client extension WebSocket
-                    client.on('message', (message) => {
-                        if (this.isPaused) {
-                            // Si en pause, stocker les chunks pour traitement ultérieur
-                            this.pausedChunks.push(message)
-                            return
-                        }
-
-                        if (message instanceof Buffer) {
-                            const uint8Array = new Uint8Array(message)
-                            const f32Array = new Float32Array(uint8Array.buffer)
-
-                            // Convert f32Array to s16Array
-                            const s16Array = new Int16Array(f32Array.length)
-                            for (let i = 0; i < f32Array.length; i++) {
-                                s16Array[i] = Math.round(
-                                    Math.max(
-                                        -32768,
-                                        Math.min(32767, f32Array[i] * 32768),
-                                    ),
-                                )
-                            }
-                            // Send audio chunk to output webSocket
-                            if (this.output_ws.readyState === WebSocket.OPEN) {
-                                this.output_ws.send(s16Array.buffer)
-                            }
-                        }
-                    })
-                    // Event 'close' on client extension WebSocket
-                    client.on('close', () => {
-                        console.log(`Client has left`)
-
-                        this.output_ws.close()
-                    })
-                    // Event 'error' on client extension WebSocket
-                    client.on('error', (err: Error) => {
-                        console.error(`WebSocket error : ${err}`)
-                    })
-                    // Event 'close' on output WebSocket
-                    this.output_ws.on('close', () => {
-                        console.log(`Output WebSocket closed`)
-                    })
-                    // Event 'error' on output WebSocket
-                    this.output_ws.on('error', (err: Error) => {
-                        console.error(`Output WebSocket error : ${err}`)
-                    })
-                })
-            }
-
-            if (this.inputUrl && this.outputUrl !== this.inputUrl) {
-                console.log(`input = ${this.inputUrl}`)
-                try {
-                    this.input_ws = new WebSocket(this.inputUrl)
-                } catch (error) {
-                    throw new Error(
-                        `Failed to connect to input WebSocket at ${this.inputUrl}: ${(error as Error).message}`,
+                // Send initial message to output webSocket
+                this.output_ws.on('open', () => {
+                    this.output_ws.send(
+                        JSON.stringify({
+                            protocol_version: 1,
+                            bot_id: this.botId,
+                            offset: 0.0,
+                        }),
                     )
-                }
-                // Event 'open' on input WebSocket
-                this.input_ws.on('open', () => {
-                    console.log(`Input WebSocket opened`)
                 })
-                // Event 'error' on input WebSocket
-                this.input_ws.on('error', (err: Error) => {
-                    console.error(`Input WebSocket error : ${err}`)
-                })
-                this.play_incoming_audio_chunks(this.input_ws)
-            }
 
-            this.isInitialized = true
-            this.isPaused = false
-        } catch (error) {
-            console.error(`Streaming setup failed: ${(error as Error).message}`)
-            throw {
-                code: JoinErrorCode.StreamingSetupFailed,
-                message: `Failed to setup streaming: ${(error as Error).message}`,
-            }
+                // Dual channel
+                if (this.inputUrl === this.outputUrl) {
+                    console.log(`input = ${this.inputUrl}`)
+                    this.play_incoming_audio_chunks(this.output_ws)
+                }
+
+                // Event 'message' on client extension WebSocket
+                client.on('message', (message) => {
+                    if (this.isPaused) {
+                        // Si en pause, stocker les chunks pour traitement ultérieur
+                        this.pausedChunks.push(message)
+                        return
+                    }
+
+                    if (message instanceof Buffer) {
+                        const uint8Array = new Uint8Array(message)
+                        const f32Array = new Float32Array(uint8Array.buffer)
+
+                        // Convert f32Array to s16Array
+                        const s16Array = new Int16Array(f32Array.length)
+                        for (let i = 0; i < f32Array.length; i++) {
+                            s16Array[i] = Math.round(
+                                Math.max(
+                                    -32768,
+                                    Math.min(32767, f32Array[i] * 32768),
+                                ),
+                            )
+                        }
+                        // Send audio chunk to output webSocket
+                        if (this.output_ws.readyState === WebSocket.OPEN) {
+                            this.output_ws.send(s16Array.buffer)
+                        }
+                    }
+                })
+                // Event 'close' on client extension WebSocket
+                client.on('close', () => {
+                    console.log(`Client has left`)
+
+                    this.output_ws.close()
+                })
+                // Event 'error' on client extension WebSocket
+                client.on('error', (err: Error) => {
+                    console.error(`WebSocket error : ${err}`)
+                })
+                // Event 'close' on output WebSocket
+                this.output_ws.on('close', () => {
+                    console.log(`Output WebSocket closed`)
+                })
+                // Event 'error' on output WebSocket
+                this.output_ws.on('error', (err: Error) => {
+                    console.error(`Output WebSocket error : ${err}`)
+                })
+            })
         }
+
+        if (this.inputUrl && this.outputUrl !== this.inputUrl) {
+            console.log(`input = ${this.inputUrl}`)
+            try {
+                this.input_ws = new WebSocket(this.inputUrl)
+            } catch (error) {
+                console.error(`Failed to connect to input WebSocket: ${error}`)
+                return
+            }
+
+            // Event 'open' on input WebSocket
+            this.input_ws.on('open', () => {
+                console.log(`Input WebSocket opened`)
+            })
+            // Event 'error' on input WebSocket
+            this.input_ws.on('error', (err: Error) => {
+                console.error(`Input WebSocket error : ${err}`)
+            })
+            this.play_incoming_audio_chunks(this.input_ws)
+        }
+
+        this.isInitialized = true
+        this.isPaused = false
     }
 
     /**
@@ -238,21 +233,6 @@ export class Streaming {
         console.log('Stopping streaming service')
 
         // Fermer le flux stdin s'il existe
-        if (this.stdinStream) {
-            try {
-                this.stdinStream.end()
-            } catch (error) {
-                console.error('Error closing stdin stream:', error)
-            }
-            this.stdinStream = null
-        }
-
-        // Fermer les connexions WebSocket
-        if (this.extension_ws) {
-            this.extension_ws.close()
-            this.extension_ws = null
-        }
-
         if (this.output_ws) {
             this.output_ws.close()
             this.output_ws = null
@@ -326,24 +306,15 @@ export class Streaming {
     // Inject audio stream into microphone
     private play_incoming_audio_chunks = (input_ws: WebSocket) => {
         new SoundContext(this.sample_rate)
-        this.stdinStream = SoundContext.instance.play_stdin()
+        let stdin = SoundContext.instance.play_stdin()
         let audio_stream = this.createAudioStreamFromWebSocket(input_ws)
         audio_stream.on('data', (chunk) => {
-            // Si en pause, ne pas traiter les chunks audio
-            if (this.isPaused) {
-                return
-            }
-
             // I think that here, in order to prevent the sound from being choppy,
             // it would be necessary to wait a bit (like 4 or 5 chunks) before writing to the stdin.
-            if (this.stdinStream && this.stdinStream.writable) {
-                this.stdinStream.write(chunk) // Write data to stdin
-            }
+            stdin.write(chunk) // Write data to stdin
         })
         audio_stream.on('end', () => {
-            if (this.stdinStream) {
-                this.stdinStream.end() // Close stdin
-            }
+            stdin.end() // Close stdin
         })
     }
 
@@ -354,7 +325,8 @@ export class Streaming {
         })
         let hasLoggedError = false
         input_ws.on('message', (message: RawData) => {
-            // Si en pause, ne pas traiter les messages
+            // I think that here, in order to prevent the sound from being choppy,
+            // it would be necessary to wait a bit (like 4 or 5 chunks) before writing to the stdin.
             if (this.isPaused) {
                 return
             }
