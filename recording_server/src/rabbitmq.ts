@@ -9,7 +9,6 @@ import {
 import { Events } from './events'
 import { Logger } from './logger'
 import { MeetingHandle } from './meeting'
-import { Streaming } from './streaming'
 import { MeetingParams, MeetingProvider } from './types'
 
 import { server } from './server'
@@ -194,14 +193,14 @@ export class Consumer {
                 console.error(`Fail to start server: ${e}`)
                 throw e
             })
-            if (data.streaming_input || data.streaming_output) {
-                new Streaming(
-                    data.streaming_input,
-                    data.streaming_output,
-                    data.streaming_audio_frequency,
-                    data.bot_uuid,
-                )
-            }
+            // if (data.streaming_input || data.streaming_output) {
+            //     new Streaming(
+            //         data.streaming_input,
+            //         data.streaming_output,
+            //         data.streaming_audio_frequency,
+            //         data.bot_uuid,
+            //     )
+            // }
             console.log('Server started succesfully')
 
             MeetingHandle.init(data)

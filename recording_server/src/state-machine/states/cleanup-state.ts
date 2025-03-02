@@ -36,17 +36,22 @@ export class CleanupState extends BaseState {
         try {
             // 1. Arrêter le Transcoder et la transcription
             await this.stopTranscoderAndTranscription();
+            
+            // Arrêter le streaming
+            if (this.context.streamingService) {
+                this.context.streamingService.stop();
+            }
 
             // 2. Upload des logs avant toute opération destructive
             await this.uploadLogs();
 
-            // 2. Nettoyage des ressources de l'extension et du navigateur
+            // 3. Nettoyage des ressources de l'extension et du navigateur
             await this.cleanupBrowserResources();
 
-            // 3. Upload de la vidéo à S3 avant de nettoyer les fichiers locaux
+            // 4. Upload de la vidéo à S3 avant de nettoyer les fichiers locaux
             await this.uploadVideoToS3();
 
-            // 4. Nettoyage final Redis
+            // 5. Nettoyage final Redis
             await this.cleanupRedisSession();
 
         } catch (error) {

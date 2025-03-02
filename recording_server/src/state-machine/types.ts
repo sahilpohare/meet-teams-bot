@@ -3,6 +3,7 @@ import { MeetingParams } from '../types'
 import { BrowserContext, Page } from '@playwright/test'
 import { BrandingHandle } from '../branding'
 import { MeetingHandle } from '../meeting'
+import { Streaming } from '../streaming'
 import { TranscriptionService } from '../transcription/TranscriptionService'
 import { MeetingProviderInterface } from '../types'
 import { PathManager } from '../utils/PathManager'
@@ -78,6 +79,9 @@ export interface MeetingContext {
         lastSpeakerTime?: number;
         noSpeakerDetectedTime?: number;
     }
+
+    // Streaming
+    streamingService?: Streaming;
 }
 
 export interface StateTransition {

@@ -57,6 +57,11 @@ export class ResumingState extends BaseState {
                 await this.transcriptionService.resume();
             }
 
+            // Reprendre le streaming
+            if (this.context.streamingService) {
+                this.context.streamingService.resume();
+            }
+
             console.log('Recording resumed successfully');
         } catch (error) {
             console.error('Error resuming recording:', error);

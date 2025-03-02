@@ -60,10 +60,16 @@ export class RecordingState extends BaseState {
             throw new Error('TranscriptionService not initialized');
         }
     
+        // Démarrer le streaming si disponible
+        if (this.context.streamingService) {
+            this.context.streamingService.start();
+        }
+    
         // Log l'état du contexte
         console.info('Context state:', {
             hasTranscriptionService: !!this.context.transcriptionService,
             hasPathManager: !!this.context.pathManager,
+            hasStreamingService: !!this.context.streamingService,
             isTranscoderConfigured: TRANSCODER.getStatus().isConfigured
         });
     
