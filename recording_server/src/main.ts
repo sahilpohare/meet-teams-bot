@@ -35,8 +35,9 @@ setupConsoleLogger()
 setupExitHandler()
 
 // Add a constant for the maximum meeting duration (5 hours in milliseconds)
-const MAX_INSTANCE_DURATION_AFTER_RABBIT_MESSAGE_RECIEVED_MS = 5 * 60 * 60 * 1000; // 5 hours
-let forceTerminationTimeout: NodeJS.Timeout | null = null;
+const MAX_INSTANCE_DURATION_AFTER_RABBIT_MESSAGE_RECIEVED_MS =
+    5 * 60 * 60 * 1000 // 5 hours
+let forceTerminationTimeout: NodeJS.Timeout | null = null
 
 // ENTRY POINT
 // syntax convention
@@ -71,9 +72,9 @@ let forceTerminationTimeout: NodeJS.Timeout | null = null;
     }
     try {
         consumeResult = await consumer.consume(Consumer.handleStartRecord)
-        
+
         // Set up force termination timer once we've received a message
-        setupForceTermination();
+        setupForceTermination()
     } catch (e) {
         if (LOCK_INSTANCE_AT_STARTUP) {
             await consumer.deleteQueue().catch((e) => {
@@ -310,32 +311,39 @@ export function meetingBotStartRecordFailed(
 function setupForceTermination() {
     // Clear any existing timeout
     if (forceTerminationTimeout) {
-        clearTimeout(forceTerminationTimeout);
+        clearTimeout(forceTerminationTimeout)
     }
-    
+
     // Set up new timeout
     forceTerminationTimeout = setTimeout(() => {
-        logger.warn(`Force terminating instance after ${MAX_INSTANCE_DURATION_AFTER_RABBIT_MESSAGE_RECIEVED_MS/1000/60/60} hours for safety`);
-        
+        logger.warn(
+            `Force terminating instance after ${MAX_INSTANCE_DURATION_AFTER_RABBIT_MESSAGE_RECIEVED_MS / 1000 / 60 / 60} hours for safety`,
+        )
+
         try {
             // Log the forced termination
-            logger.error('CRITICAL: Forcing immediate process termination after timeout');
-            
+            logger.error(
+                'CRITICAL: Forcing immediate process termination after timeout',
+            )
+
             // Use process.kill with SIGKILL for immediate termination
-            process.kill(process.pid, 'SIGKILL');
+            process.kill(process.pid, 'SIGKILL')
         } catch (e) {
             // This should never execute with SIGKILL, but just in case
-            logger.error('Failed to terminate with SIGKILL, using alternative method');
-            
+            logger.error(
+                'Failed to terminate with SIGKILL, using alternative method',
+            )
+
             // As a last resort, use exit code 9 (same as SIGKILL)
-            process.exit(9);
+            process.exit(9)
         }
-        
+
         // This line should never be reached, but as an absolute fallback
-        require('os').setPriority(process.pid, 19); // Set lowest priority
-        process.abort(); // Force core dump
-        
-    }, MAX_INSTANCE_DURATION_AFTER_RABBIT_MESSAGE_RECIEVED_MS);
-    
-    logger.info(`Hard kill timer set: instance will be forcefully terminated after ${MAX_INSTANCE_DURATION_AFTER_RABBIT_MESSAGE_RECIEVED_MS/1000/60/60} hours`);
+        require('os').setPriority(process.pid, 19) // Set lowest priority
+        process.abort() // Force core dump
+    }, MAX_INSTANCE_DURATION_AFTER_RABBIT_MESSAGE_RECIEVED_MS)
+
+    logger.info(
+        `Hard kill timer set: instance will be forcefully terminated after ${MAX_INSTANCE_DURATION_AFTER_RABBIT_MESSAGE_RECIEVED_MS / 1000 / 60 / 60} hours`,
+    )
 }

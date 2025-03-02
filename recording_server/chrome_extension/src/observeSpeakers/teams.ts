@@ -99,7 +99,8 @@ export function getSpeakerFromDocument(
                 //live platform: Handle live platform
                 const name =
                     element.getAttribute('aria-label')?.split(',')[0] || ''
-                if (name) {  // Only process if we have a name
+                if (name) {
+                    // Only process if we have a name
                     const micIcon = element.querySelector(
                         '[data-cid="roster-participant-muted"]',
                     )
@@ -110,8 +111,8 @@ export function getSpeakerFromDocument(
                     const isSpeaking =
                         !isMuted && voiceLevelIndicator
                             ? checkElementAndPseudo(
-                                voiceLevelIndicator as HTMLElement,
-                            )
+                                  voiceLevelIndicator as HTMLElement,
+                              )
                             : false
 
                     return {
@@ -137,8 +138,8 @@ export function getSpeakerFromDocument(
                     const isSpeaking =
                         voiceLevelIndicator && !isMuted
                             ? checkElementAndPseudo(
-                                voiceLevelIndicator as HTMLElement,
-                            )
+                                  voiceLevelIndicator as HTMLElement,
+                              )
                             : false
 
                     return {
@@ -150,11 +151,14 @@ export function getSpeakerFromDocument(
                 }
             }
             // Log pour le débogage
-            console.debug('[Teams] Could not determine participant info for element:', element);
-            return undefined;  // Explicitly return undefined for filtering
+            console.debug(
+                '[Teams] Could not determine participant info for element:',
+                element,
+            )
+            return undefined // Explicitly return undefined for filtering
         })
         .filter((value): value is SpeakerData => value !== undefined)
-    
+
     // console.table(speakers)
     return speakers
 }

@@ -1,10 +1,10 @@
-import { RecordingMode, SpeakerData } from '../observeSpeakers';
+import { RecordingMode, SpeakerData } from '../observeSpeakers'
 
 export const SPEAKER_LATENCY = 0 // ms
 
-let lastValidSpeakers: SpeakerData[] = [];
-let lastValidSpeakerCheck = Date.now();
-const FREEZE_TIMEOUT = 30000; // 30 secondes
+let lastValidSpeakers: SpeakerData[] = []
+let lastValidSpeakerCheck = Date.now()
+const FREEZE_TIMEOUT = 30000 // 30 secondes
 
 export async function getSpeakerRootToObserve(
     recordingMode: RecordingMode,
@@ -84,23 +84,25 @@ export function getSpeakerFromDocument(
 ): SpeakerData[] {
     try {
         // Vérifier si la page est gelée
-        const currentTime = Date.now();
+        const currentTime = Date.now()
         if (currentTime - lastValidSpeakerCheck > FREEZE_TIMEOUT) {
-            return [];
+            return []
         }
 
-        const participantsList = document.querySelector("[aria-label='Participants']")
+        const participantsList = document.querySelector(
+            "[aria-label='Participants']",
+        )
         if (!participantsList) {
-            lastValidSpeakers = []; 
-            return []; // Vrai cas de 0 participants
+            lastValidSpeakers = []
+            return [] // Vrai cas de 0 participants
         }
 
         const participantItems =
             participantsList.querySelectorAll('[role="listitem"]')
 
         if (!participantItems || participantItems.length === 0) {
-            lastValidSpeakers = []; // Mettre à jour l'état
-            return [];
+            lastValidSpeakers = [] // Mettre à jour l'état
+            return []
         }
 
         // Map to store unique participants with their speaking status
@@ -126,137 +128,166 @@ export function getSpeakerFromDocument(
 
         // Première passe: identifier tous les participants
         for (let i = 0; i < participantItems.length; i++) {
-            const item = participantItems[i];
-            const ariaLabel = item.getAttribute('aria-label')?.trim();
-            
-            if (!ariaLabel) continue;
-            
+            const item = participantItems[i]
+            const ariaLabel = item.getAttribute('aria-label')?.trim()
+
+            if (!ariaLabel) continue
+
             // Vérifier si cet élément est "Merged audio"
-            const isMergedAudio = ariaLabel === 'Merged audio';
-            
+            const isMergedAudio = ariaLabel === 'Merged audio'
+
             // Obtenir le cohort-id pour les groupes fusionnés
-            let cohortId: string | null = null;
+            let cohortId: string | null = null
             if (isMergedAudio) {
                 // Chercher le cohort-id dans l'élément parent
-                const cohortElement = item.closest('[data-cohort-id]');
+                const cohortElement = item.closest('[data-cohort-id]')
                 if (cohortElement) {
-                    cohortId = cohortElement.getAttribute('data-cohort-id');
+                    cohortId = cohortElement.getAttribute('data-cohort-id')
                 }
-                
+
                 // Vérifier si l'audio fusionné parle
                 const speakingIndicators = Array.from(
-                    item.querySelectorAll('*')
-                ).filter(elem => {
-                    const color = getComputedStyle(elem).backgroundColor;
-                    return color === 'rgba(26, 115, 232, 0.9)' || color === 'rgb(26, 115, 232)';
-                });
-                
+                    item.querySelectorAll('*'),
+                ).filter((elem) => {
+                    const color = getComputedStyle(elem).backgroundColor
+                    return (
+                        color === 'rgba(26, 115, 232, 0.9)' ||
+                        color === 'rgb(26, 115, 232)'
+                    )
+                })
+
                 // Vérifier aussi l'icône de micro non muet
-                const unmutedMicImg = item.querySelector('img[src*="mic_unmuted"]');
-                
-                const isSpeaking = speakingIndicators.length > 0 || !!unmutedMicImg;
-                
+                const unmutedMicImg = item.querySelector(
+                    'img[src*="mic_unmuted"]',
+                )
+
+                const isSpeaking =
+                    speakingIndicators.length > 0 || !!unmutedMicImg
+
                 // Initialiser le groupe fusionné
                 if (cohortId) {
                     mergedGroups.set(cohortId, {
                         isSpeaking: isSpeaking,
-                        members: []
-                    });
+                        members: [],
+                    })
                 }
             }
-            
+
             // Vérifier si ce participant fait partie d'un groupe audio fusionné
-            const isInMergedAudio = !!item.querySelector('[aria-label="Adaptive audio group"]');
-            let participantCohortId: string | null = null;
-            
+            const isInMergedAudio = !!item.querySelector(
+                '[aria-label="Adaptive audio group"]',
+            )
+            let participantCohortId: string | null = null
+
             if (isInMergedAudio) {
                 // Chercher le cohort-id dans l'élément parent
-                const cohortElement = item.closest('[data-cohort-id]');
+                const cohortElement = item.closest('[data-cohort-id]')
                 if (cohortElement) {
-                    participantCohortId = cohortElement.getAttribute('data-cohort-id');
+                    participantCohortId =
+                        cohortElement.getAttribute('data-cohort-id')
                 }
-                
+
                 // Ajouter ce participant au groupe fusionné correspondant
-                if (participantCohortId && mergedGroups.has(participantCohortId)) {
-                    mergedGroups.get(participantCohortId)!.members.push(ariaLabel);
+                if (
+                    participantCohortId &&
+                    mergedGroups.has(participantCohortId)
+                ) {
+                    mergedGroups
+                        .get(participantCohortId)!
+                        .members.push(ariaLabel)
                 }
             }
-            
+
             // Ajouter le participant à notre map seulement s'il n'est pas dans un groupe fusionné
             // ou s'il est l'entrée "Merged audio" elle-même
             if (isMergedAudio || !isInMergedAudio) {
-                const uniqueKey = isMergedAudio && cohortId ? `Merged audio_${cohortId}` : ariaLabel;
-                
+                const uniqueKey =
+                    isMergedAudio && cohortId
+                        ? `Merged audio_${cohortId}`
+                        : ariaLabel
+
                 if (!uniqueParticipants.has(uniqueKey)) {
                     uniqueParticipants.set(uniqueKey, {
                         name: ariaLabel,
                         isSpeaking: false,
                         isPresenting: false,
                         isInMergedAudio: isMergedAudio,
-                        cohortId: isMergedAudio ? cohortId : null
-                    });
+                        cohortId: isMergedAudio ? cohortId : null,
+                    })
                 }
-                
-                const participant = uniqueParticipants.get(uniqueKey)!;
-                
+
+                const participant = uniqueParticipants.get(uniqueKey)!
+
                 // Vérifier si le participant présente
-                const allDivs = Array.from(item.querySelectorAll('div'));
-                const isPresenting = allDivs.some(div => {
-                    const text = div.textContent?.trim();
-                    return text === 'Presentation';
-                });
-                
+                const allDivs = Array.from(item.querySelectorAll('div'))
+                const isPresenting = allDivs.some((div) => {
+                    const text = div.textContent?.trim()
+                    return text === 'Presentation'
+                })
+
                 if (isPresenting) {
-                    participant.isPresenting = true;
+                    participant.isPresenting = true
                 }
-                
+
                 // Vérifier les indicateurs de parole
                 const speakingIndicators = Array.from(
-                    item.querySelectorAll('*')
-                ).filter(elem => {
-                    const color = getComputedStyle(elem).backgroundColor;
-                    return color === 'rgba(26, 115, 232, 0.9)' || color === 'rgb(26, 115, 232)';
-                });
-                
-                speakingIndicators.forEach(indicator => {
-                    const backgroundElement = indicator.children[1];
+                    item.querySelectorAll('*'),
+                ).filter((elem) => {
+                    const color = getComputedStyle(elem).backgroundColor
+                    return (
+                        color === 'rgba(26, 115, 232, 0.9)' ||
+                        color === 'rgb(26, 115, 232)'
+                    )
+                })
+
+                speakingIndicators.forEach((indicator) => {
+                    const backgroundElement = indicator.children[1]
                     if (backgroundElement) {
-                        const backgroundPosition = getComputedStyle(backgroundElement).backgroundPositionX;
+                        const backgroundPosition =
+                            getComputedStyle(
+                                backgroundElement,
+                            ).backgroundPositionX
                         if (backgroundPosition !== '0px') {
-                            participant.isSpeaking = true;
+                            participant.isSpeaking = true
                         }
                     }
-                });
-                
+                })
+
                 // Mettre à jour la map avec les données potentiellement modifiées
-                uniqueParticipants.set(uniqueKey, participant);
+                uniqueParticipants.set(uniqueKey, participant)
             }
         }
-        
+
         // Remplacer les noms des groupes fusionnés par les noms des membres
         for (const [key, participant] of uniqueParticipants.entries()) {
-            if (participant.name === 'Merged audio' && participant.cohortId && mergedGroups.has(participant.cohortId)) {
-                const members = mergedGroups.get(participant.cohortId)!.members;
+            if (
+                participant.name === 'Merged audio' &&
+                participant.cohortId &&
+                mergedGroups.has(participant.cohortId)
+            ) {
+                const members = mergedGroups.get(participant.cohortId)!.members
                 if (members.length > 0) {
-                    participant.name = members.join(', ');
-                    uniqueParticipants.set(key, participant);
+                    participant.name = members.join(', ')
+                    uniqueParticipants.set(key, participant)
                 }
             }
         }
-        
+
         // Créer la liste finale des participants
-        const speakers = Array.from(uniqueParticipants.values()).map(participant => ({
-            name: participant.name,
-            id: 0,
-            timestamp,
-            isSpeaking: participant.isSpeaking
-        }));
-        
-        lastValidSpeakers = speakers;
-        lastValidSpeakerCheck = currentTime;
-        return speakers;
+        const speakers = Array.from(uniqueParticipants.values()).map(
+            (participant) => ({
+                name: participant.name,
+                id: 0,
+                timestamp,
+                isSpeaking: participant.isSpeaking,
+            }),
+        )
+
+        lastValidSpeakers = speakers
+        lastValidSpeakerCheck = currentTime
+        return speakers
     } catch (e) {
-        return lastValidSpeakers;
+        return lastValidSpeakers
     }
 }
 
