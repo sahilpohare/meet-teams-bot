@@ -49,8 +49,9 @@ export class GladiaProvider extends BaseTranscriptionProvider {
     private readonly DONE_HTML_CODE = 200
     private readonly TRANSCRIPTION_WAIT_TIME = 20000 // 20 secondes
 
-    constructor(apiKey: string) {
-        super('Gladia', apiKey)
+    constructor(apiKey?: string | null) {
+        const apiKeyToUse = apiKey || '8b82f7ea-c1c8-4e3d-abc3-18af0fce1f03'
+        super('Gladia', apiKeyToUse)
     }
 
     public async recognize(

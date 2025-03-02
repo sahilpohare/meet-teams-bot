@@ -22,8 +22,6 @@ interface RunPodTranscriptionStatus {
 
 export class RunPodProvider extends BaseTranscriptionProvider {
     private readonly API_URL = 'https://api.runpod.ai/v2/oq0i26ut0lom1h'
-    private readonly DEFAULT_API_KEY =
-        'B1EC90VQNXMASRD9QJJAALGOS0YL73JEMKZQ92IJ'
     private readonly POLL_INTERVAL = 5000
     private readonly DEFAULT_CONFIG = {
         model: 'large-v3',
@@ -43,8 +41,9 @@ export class RunPodProvider extends BaseTranscriptionProvider {
     }
 
     constructor(apiKey?: string | null) {
-        // Si pas d'API key fournie, utiliser celle par défaut
-        super('RunPod', apiKey || 'B1EC90VQNXMASRD9QJJAALGOS0YL73JEMKZQ92IJ')
+        const apiKeyToUse = apiKey || 'B1EC90VQNXMASRD9QJJAALGOS0YL73JEMKZQ92IJ'
+        // Utiliser l'API key fournie ou celle par défaut
+        super('RunPod', apiKeyToUse)
     }
 
     public async recognize(
@@ -79,7 +78,7 @@ export class RunPodProvider extends BaseTranscriptionProvider {
                 {
                     headers: {
                         accept: 'application/json',
-                        Authorization: this.apiKey || this.DEFAULT_API_KEY,
+                        Authorization: this.apiKey,
                         'content-type': 'application/json',
                     },
                 },
@@ -149,7 +148,7 @@ export class RunPodProvider extends BaseTranscriptionProvider {
             const response = await axios.get(`${this.API_URL}/status/${id}`, {
                 headers: {
                     accept: 'application/json',
-                    Authorization: this.apiKey || this.DEFAULT_API_KEY,
+                    Authorization: this.apiKey,
                     'content-type': 'application/json',
                 },
             })

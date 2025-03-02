@@ -82,10 +82,10 @@ export class TranscriptionService extends EventEmitter {
     private createProvider(type: SpeechToTextProvider): TranscriptionProvider {
         switch (type) {
             case 'Default':
-            case 'Runpod':
-                return new RunPodProvider(this.apiKey)
             case 'Gladia':
                 return new GladiaProvider(this.apiKey)
+            case 'Runpod':
+                return new RunPodProvider(this.apiKey)
 
             default:
                 throw new Error(
