@@ -1,5 +1,4 @@
 import { delSessionInRedis } from '../../instance'
-import { Logger } from '../../logger'
 import { SoundContext, VideoContext } from '../../media_context'
 import { TRANSCODER } from '../../recording/Transcoder'
 import { MEETING_CONSTANTS } from '../constants'
@@ -37,13 +36,10 @@ export class CleanupState extends BaseState {
             // 1. Arrêter le Transcoder et la transcription
             await this.stopTranscoderAndTranscription();
             
-            // Arrêter le streaming
+            // 2. Arrêter le streaming
             if (this.context.streamingService) {
                 this.context.streamingService.stop();
             }
-
-            // 2. Upload des logs avant toute opération destructive
-            await this.uploadLogs();
 
             // 3. Nettoyage des ressources de l'extension et du navigateur
             await this.cleanupBrowserResources();
@@ -72,15 +68,6 @@ export class CleanupState extends BaseState {
             throw error;
         }
     }
-
-    private async uploadLogs(): Promise<void> {
-        try {
-            await Logger.instance.upload_log();
-        } catch (error) {
-            console.error('Failed to upload logs:', error);
-        }
-    }
-
     private async cleanupBrowserResources(): Promise<void> {
         try {
             // 1. Arrêter le branding

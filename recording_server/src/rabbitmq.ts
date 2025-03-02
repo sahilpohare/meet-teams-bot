@@ -7,13 +7,14 @@ import {
 } from './instance'
 
 import { Events } from './events'
-import { Logger } from './logger'
+
 import { MeetingHandle } from './meeting'
 import { MeetingParams, MeetingProvider } from './types'
 
 import { server } from './server'
 
 import { Api } from './api/methods'
+import { GrafanaService } from './utils/GrafanaService'
 
 const NODE_NAME = process.env.NODE_NAME
 
@@ -91,10 +92,6 @@ export class Consumer {
                                 message.content.toString(),
                             ) as MeetingParams
 
-                            console.log('initializing logger')
-                            let logger = new Logger(meetingParams)
-                            await logger.init()
-
                             new Api(meetingParams)
 
                             let error = null
@@ -138,7 +135,11 @@ export class Consumer {
     // throw error if start recoridng fail
     static async handleStartRecord(data: MeetingParams) {
         console.log('handleStartRecord')
-        await Logger.instance.updateGrafanaAgentAddBotUuid()
+        const grafanaService = GrafanaService.getInstance()
+        grafanaService.setBotUuid(data.bot_uuid)
+        
+        // Mettre à jour la configuration de Grafana Agent
+        await grafanaService.updateGrafanaAgentWithBotUuid()
 
         console.log('####### DATA #######', data)
         // Prevent instance for being scaled down

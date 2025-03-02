@@ -8,10 +8,10 @@ export class PathManager {
     private environment: string;
     private botUuid: string | null;
 
-
     private constructor() {
         this.environment = process.env.ENVIRON || 'dev';
         this.botUuid = null;
+        console.log('ENVIRON:', this.environment);
     }
     
     public static getInstance(botUuid?: string): PathManager {
@@ -30,13 +30,17 @@ export class PathManager {
 
     private ensureBotUuid(): void {
         if (!this.botUuid) {
-            console.error('botUuid must be set before using PathManager methods');
+            throw new Error('botUuid must be set before using PathManager methods');
         }
     }
 
     public async initializePaths(): Promise<void> {
         const basePath = this.getBasePath();
-        await fs.mkdir(basePath, { recursive: true });
+        await fs.mkdir(basePath, { recursive: true })
+            .catch((e) => {
+                console.error('Unable to create base directory:', e);
+                throw e;
+            });
     }
 
     public getBasePath(): string {
@@ -53,7 +57,7 @@ export class PathManager {
 
     public getWebmPath(): string {
         const basePath = path.join(this.getBasePath(), 'temp');
-        const filePath = path.join(basePath, 'output.webm');  // Inclure l'extension directement
+        const filePath = path.join(basePath, 'output.webm');
         
         console.log('Generated WebM path:', {
             basePath,
@@ -64,30 +68,20 @@ export class PathManager {
     }
 
     public getOutputPath(): string {
-        // Ajout de l'extension .mp4
         return path.join(this.getBasePath(), 'output');
     }
+
     public getAudioTmpPath(): string {
         return path.join(this.getBasePath(), 'audio_tmp');
-    }
-
-    public getSpeakerLogPath(): string {
-        return path.join(this.getBasePath(), 'SeparationSpeakerLog.txt');
     }
 
     public getLogPath(): string {
         return path.join(this.getBasePath(), 'logs.log');
     }
 
-    public getFramesPath(): string {
-        return path.join(this.getBasePath(), 'frames');
+    public getSpeakerLogPath(): string {
+        return path.join(this.getBasePath(), 'SeparationSpeakerLog.txt');
     }
-
-    // public getOutputPath(): string {
-    //     // Ajout de l'extension .mp4
-    //     const timestamp = Date.now();
-    //     return path.join(this.getBasePath(), `output_${timestamp}.mp4`);
-    // }
 
     public getTempPath(): string {
         return path.join(this.getBasePath(), 'temp');
@@ -98,7 +92,6 @@ export class PathManager {
             this.getBasePath(),
             path.dirname(this.getOutputPath()),
             this.getTempPath(),
-            this.getFramesPath(),
             this.getAudioTmpPath(),
         ];
 
@@ -108,8 +101,7 @@ export class PathManager {
         }
     }
 
-
-     public async moveFile(sourcePath: string, destPath: string): Promise<void> {
+    public async moveFile(sourcePath: string, destPath: string): Promise<void> {
         try {
             // Vérifier que le fichier source existe
             await fs.access(sourcePath);
@@ -140,17 +132,4 @@ export class PathManager {
             s3Path: `${this.botUuid}`
         };
     }
-
-    // public getTranscriberConfig(): {
-    //     outputPath: string;
-    //     bucketName: string;
-    //     s3Path: string;
-    // } {
-    //     const { bucketName, s3Path } = this.getS3Paths();
-    //     return {
-    //         outputPath: this.getOutputPath(),
-    //         bucketName,
-    //         s3Path
-    //     };
-    // }
 }

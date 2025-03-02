@@ -1,5 +1,4 @@
 import { Events } from '../../events'
-import { Logger } from '../../logger'
 import { JoinError, JoinErrorCode } from '../../types'
 import { MeetingStateType, StateExecuteResult } from '../types'
 import { BaseState } from './base-state'
@@ -50,13 +49,6 @@ export class ErrorState extends BaseState {
 
         // Log de l'erreur avec tous les détails
         console.error('Meeting error occurred:', errorDetails)
-
-        // Upload immédiat des logs en cas d'erreur
-        try {
-            await Logger.instance.upload_log()
-        } catch (uploadError) {
-            console.error('Failed to upload error logs:', uploadError)
-        }
     }
 
     private async notifyError(): Promise<void> {

@@ -1,5 +1,4 @@
 import { exec } from 'child_process'
-import { Logger } from './logger'
 import { clientRedis } from './server'
 
 export const PORT = 8080
@@ -59,11 +58,6 @@ export function setProtection(enabled: boolean): Promise<void> {
 }
 
 export async function terminateInstance() {
-    try {
-        await Logger.instance.upload_log()
-    } catch (e) {
-        console.error('fail to upload logs: ', e)
-    }
     await new Promise<void>((res, _rej) => {
         exec('terminate_instance.sh', (_error, stdout, stderr) => {
             console.log(`terminate instance`, { stdout, stderr })
