@@ -60,30 +60,36 @@ export class ErrorState extends BaseState {
                 return
             }
 
-            if (error instanceof JoinError) {
-                switch (error.message) {
-                    case JoinErrorCode.BotNotAccepted:
-                        await Events.botRejected()
-                        break
-                    case JoinErrorCode.BotRemoved:
-                        await Events.botRemoved()
-                        break
-                    case JoinErrorCode.TimeoutWaitingToStart:
-                        await Events.waitingRoomTimeout()
-                        break
-                    case JoinErrorCode.InvalidMeetingUrl:
-                        await Events.invalidMeetingUrl()
-                        break
-                    default:
-                        await Events.meetingError(error)
+            try {
+                if (error instanceof JoinError) {
+                    switch (error.message) {
+                        case JoinErrorCode.BotNotAccepted:
+                            await Events.botRejected()
+                            break
+                        case JoinErrorCode.BotRemoved:
+                            await Events.botRemoved()
+                            break
+                        case JoinErrorCode.TimeoutWaitingToStart:
+                            await Events.waitingRoomTimeout()
+                            break
+                        case JoinErrorCode.InvalidMeetingUrl:
+                            await Events.invalidMeetingUrl()
+                            break
+                        default:
+                            await Events.meetingError(error)
+                    }
+                } else {
+                    await Events.meetingError(error)
                 }
-            } else {
-                await Events.meetingError(error)
+            } catch (eventError) {
+                console.error('Failed to send event notification:', eventError);
+                // Ne pas propager l'erreur pour continuer le processus
             }
         }
 
+        // Augmenter le timeout pour la notification d'erreur
         const timeoutPromise = new Promise<void>((_, reject) =>
-            setTimeout(() => reject(new Error('Notify error timeout')), 5000),
+            setTimeout(() => reject(new Error('Notify error timeout')), 15000), // 15 secondes au lieu de 5
         )
 
         try {

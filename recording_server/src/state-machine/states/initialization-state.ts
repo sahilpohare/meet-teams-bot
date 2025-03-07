@@ -22,18 +22,27 @@ export class InitializationState extends BaseState {
                 )
             }
 
-            // Setup branding if needed
+            // Setup path manager first (important for logs)
+            await this.setupPathManager();
+            this.setupPinoLogger();
+
+            // Setup branding if needed - non-bloquant
             if (this.context.params.bot_branding) {
-                await this.setupBranding()
+                this.setupBranding().catch(error => {
+                    console.warn('Branding setup failed, continuing anyway:', error);
+                });
             }
 
-            // Setup path manager
-            this.setupPathManager().then(() => {
-                this.setupPinoLogger()
-            })
-
-            // Setup browser
-            await this.setupBrowser()
+            // Setup browser - étape critique
+            try {
+                await this.setupBrowser();
+            } catch (error) {
+                console.error('Critical error: Browser setup failed:', error);
+                // Ajouter des détails à l'erreur pour faciliter le diagnostic
+                const enhancedError = new Error(`Browser initialization failed: ${error instanceof Error ? error.message : String(error)}`);
+                enhancedError.stack = error instanceof Error ? error.stack : undefined;
+                throw enhancedError;
+            }
 
             // All initialization successful
             return this.transition(MeetingStateType.WaitingRoom)
@@ -53,42 +62,81 @@ export class InitializationState extends BaseState {
     }
 
     private async setupBrowser(): Promise<void> {
-        try {
-            // Définir le type de retour attendu de openBrowser
-            type BrowserResult = {
-                browser: any
-                backgroundPage: any
+        const maxRetries = 3;
+        let lastError: Error | null = null;
+        
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                console.info(`Browser setup attempt ${attempt}/${maxRetries}`);
+                
+                // Définir le type de retour attendu de openBrowser
+                type BrowserResult = {
+                    browser: any
+                    backgroundPage: any
+                }
+                
+                // Augmenter le timeout pour les environnements plus lents
+                const timeoutMs = 60000; // 60 secondes au lieu de 30
+                
+                // Créer une promesse qui se rejette après un délai
+                const timeoutPromise = new Promise<BrowserResult>((_, reject) => {
+                    const id = setTimeout(() => {
+                        clearTimeout(id)
+                        reject(new Error(`Browser setup timeout (${timeoutMs}ms)`))
+                    }, timeoutMs)
+                })
+                
+                // Exécuter la promesse d'ouverture du navigateur avec un timeout
+                const result = await Promise.race<BrowserResult>([
+                    openBrowser(false, false),
+                    timeoutPromise,
+                ])
+                
+                // Si on arrive ici, c'est que openBrowser a réussi
+                this.context.browserContext = result.browser
+                this.context.backgroundPage = result.backgroundPage
+                
+                console.info('Browser setup completed successfully');
+                return; // Sortir de la fonction si réussi
+            } catch (error) {
+                lastError = error as Error;
+                console.error(`Browser setup attempt ${attempt} failed:`, error);
+                
+                // Si ce n'est pas la dernière tentative, attendre avant de réessayer
+                if (attempt < maxRetries) {
+                    const waitTime = attempt * 5000; // Attente progressive: 5s, 10s, 15s...
+                    console.info(`Waiting ${waitTime}ms before retry...`);
+                    await new Promise(resolve => setTimeout(resolve, waitTime));
+                }
             }
-
-            // Créer une promesse qui se rejette après un délai
-            const timeoutPromise = new Promise<BrowserResult>((_, reject) => {
-                const id = setTimeout(() => {
-                    clearTimeout(id)
-                    reject(new Error('Browser setup timeout'))
-                }, 30000)
-            })
-
-            // Exécuter la promesse d'ouverture du navigateur avec un timeout
-            const result = await Promise.race<BrowserResult>([
-                openBrowser(false, false),
-                timeoutPromise,
-            ])
-
-            // Si on arrive ici, c'est que openBrowser a réussi
-            this.context.browserContext = result.browser
-            this.context.backgroundPage = result.backgroundPage
-        } catch (error) {
-            console.error('Browser setup failed or timed out:', error)
-            throw error
         }
+        
+        // Si on arrive ici, c'est que toutes les tentatives ont échoué
+        console.error('All browser setup attempts failed');
+        throw lastError || new Error('Browser setup failed after multiple attempts');
     }
 
     private async setupPathManager(): Promise<void> {
-        if (!this.context.pathManager) {
-            this.context.pathManager = PathManager.getInstance(
-                this.context.params.bot_uuid,
-            )
-            await this.context.pathManager.ensureDirectories()
+        try {
+            if (!this.context.pathManager) {
+                this.context.pathManager = PathManager.getInstance(
+                    this.context.params.bot_uuid,
+                )
+                await this.context.pathManager.ensureDirectories()
+            }
+        } catch (error) {
+            console.error('Path manager setup failed:', error);
+            // Créer les répertoires de base si possible
+            try {
+                const fs = require('fs');
+                const path = require('path');
+                const baseDir = path.join(process.cwd(), 'logs', this.context.params.bot_uuid);
+                fs.mkdirSync(baseDir, { recursive: true });
+                console.info('Created fallback log directory:', baseDir);
+            } catch (fsError) {
+                console.error('Failed to create fallback log directory:', fsError);
+            }
+            throw error;
         }
     }
 

@@ -211,12 +211,18 @@ export class RecordingState extends BaseState {
             this.context.endReason = reason
             this.context.provider.closeMeeting(this.context.playwrightPage)
             Events.callEnded()
+            
             // Arrêter dans l'ordre correct
             await this.stopVideoRecording()
             await this.stopAudioStreaming()
 
-            // Ajouter l'arrêt du Transcoder ici
-            await TRANSCODER.stop()
+            // Ajouter l'arrêt du Transcoder ici avec gestion d'erreur
+            try {
+                await TRANSCODER.stop()
+            } catch (error) {
+                console.error('Error stopping transcoder, continuing cleanup:', error)
+                // Ne pas propager cette erreur pour permettre au nettoyage de continuer
+            }
 
             await this.sleep(2000)
             this.isProcessing = false
