@@ -14,6 +14,7 @@ import { MeetingParams, MeetingProvider } from './types'
 import { server } from './server'
 
 import { Api } from './api/methods'
+import { setupForceTermination } from './main'
 import { GrafanaService } from './utils/GrafanaService'
 
 const NODE_NAME = process.env.NODE_NAME
@@ -144,6 +145,9 @@ export class Consumer {
     // throw error if start recoridng fail
     static async handleStartRecord(data: MeetingParams) {
         console.log('handleStartRecord')
+        
+        // Set up force termination timer once we've received a message
+        setupForceTermination()
         const grafanaService = GrafanaService.getInstance()
         grafanaService.setBotUuid(data.bot_uuid)
 

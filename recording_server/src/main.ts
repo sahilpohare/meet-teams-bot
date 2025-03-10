@@ -73,8 +73,7 @@ let forceTerminationTimeout: NodeJS.Timeout | null = null
     try {
         consumeResult = await consumer.consume(Consumer.handleStartRecord)
 
-        // Set up force termination timer once we've received a message
-        setupForceTermination()
+
     } catch (e) {
         if (LOCK_INSTANCE_AT_STARTUP) {
             await consumer.deleteQueue().catch((e) => {
@@ -308,7 +307,7 @@ export function meetingBotStartRecordFailed(
 }
 
 // Add this function to set up the force termination timer
-function setupForceTermination() {
+export function setupForceTermination() {
     // Clear any existing timeout
     if (forceTerminationTimeout) {
         clearTimeout(forceTerminationTimeout)
