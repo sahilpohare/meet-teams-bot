@@ -58,12 +58,12 @@ export class Transcoder extends EventEmitter {
         this.setMaxListeners(20)
 
         // Determine which audio bucket to use based on environment
-        const env = process.env.NODE_ENV || 'development'
+        const env = process.env.ENVIRON || 'local'
         let transcriptionAudioBucket: string
         
-        if (env === 'production') {
+        if (env === 'prod') {
             transcriptionAudioBucket = 'meeting-baas-audio'
-        } else if (env === 'preprod' || env === 'staging') {
+        } else if (env === 'preprod') {
             transcriptionAudioBucket = 'preprod-meeting-baas-audio'
         } else {
             // Default to local bucket for development/test environments
@@ -532,6 +532,7 @@ export class Transcoder extends EventEmitter {
     }
 
     public async uploadToS3(): Promise<void> {
+        console.log(`Currently using transcription audio bucket: ${this.config.transcriptionAudioBucket}`);
         if (!this.pathManager) {
             throw new Error('PathManager not available for S3 upload')
         }
@@ -731,10 +732,10 @@ export class Transcoder extends EventEmitter {
         const audioFilePath = this.isAudioOnly ? this.config.outputPath : this.config.audioOutputPath!;
         
         // Get the appropriate bucket based on environment
-        const env = process.env.NODE_ENV || 'development';
+        const env = process.env.ENVIRON || 'local';
         const bucketName = this.config.transcriptionAudioBucket || 
-            (env === 'production' ? 'meeting-baas-audio' : 
-             env === 'preprod' || env === 'staging' ? 'preprod-meeting-baas-audio' : 
+            (env === 'prod' ? 'meeting-baas-audio' : 
+             env === 'preprod' ? 'preprod-meeting-baas-audio' : 
              process.env.AWS_S3_TEMPORARY_AUDIO_BUCKET || 'local-meeting-baas-audio');
         
         console.log('Starting audio chunking process for transcription');
@@ -922,5 +923,5 @@ export const TRANSCODER = new Transcoder({
     bucketName: process.env.AWS_S3_VIDEO_BUCKET || '',
     audioBucketName: process.env.AWS_S3_TEMPORARY_AUDIO_BUCKET || '',
     enableTranscriptionChunking: process.env.ENABLE_TRANSCRIPTION_CHUNKING === 'true',
-    transcriptionAudioBucket: process.env.TRANSCRIPTION_AUDIO_BUCKET || 'meeting-baas-audio',
+    transcriptionAudioBucket: process.env.TRANSCRIPTION_AUDIO_BUCKET,
 })

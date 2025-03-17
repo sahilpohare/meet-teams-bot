@@ -180,7 +180,7 @@ export class RecordingState extends BaseState {
             return await Promise.race([checkPromise(), timeoutPromise])
         } catch (error) {
             console.error('Error or timeout in checkEndConditions:', error)
-            return { shouldEnd: true, reason: RecordingEndReason.ApiRequest }
+            return { shouldEnd: true, reason: RecordingEndReason.BotRemoved }
         }
     }
 
