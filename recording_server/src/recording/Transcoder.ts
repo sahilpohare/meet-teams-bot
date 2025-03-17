@@ -783,10 +783,10 @@ export class Transcoder extends EventEmitter {
                 const chunkDuration = endTime - startTime;
                 
                 // Generate the output filename: bot_uuid-[chunk_number].wav
-                const chunkFilename = `${botUuid}-${i + 1}.wav`;
+                const chunkFilename = `${botUuid}-${i}.wav`;
                 const chunkPath = `${tempDir}/${chunkFilename}`;
                 
-                console.log(`Processing chunk ${i + 1}/${numChunks}: ${startTime}s to ${endTime}s (duration: ${chunkDuration}s)`);
+                console.log(`Processing chunk ${i}/${numChunks}: ${startTime}s to ${endTime}s (duration: ${chunkDuration}s)`);
                 
                 try {
                     // Extract the chunk using ffmpeg
