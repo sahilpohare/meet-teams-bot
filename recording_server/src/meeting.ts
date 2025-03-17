@@ -77,7 +77,18 @@ export class MeetingHandle {
     }
 
     public async startRecordMeeting(): Promise<void> {
-        await this.stateMachine.start()
+        try {
+            await this.stateMachine.start()
+            
+            // Vérifier si une erreur s'est produite pendant l'exécution
+            if (this.stateMachine.getError() || 
+                this.stateMachine.getCurrentState() === MeetingStateType.Error) {
+                throw this.stateMachine.getError() || new Error('Recording failed to complete');
+            }
+        } catch (error) {
+            console.error('Error in startRecordMeeting:', error);
+            throw error; // Remonter l'erreur au niveau supérieur
+        }
     }
 
     public async stopMeeting(reason: RecordingEndReason): Promise<void> {
@@ -90,5 +101,13 @@ export class MeetingHandle {
 
     public getParams(): MeetingParams {
         return this.param
+    }
+
+    public wasRecordingSuccessful(): boolean {
+        return this.stateMachine.wasRecordingSuccessful();
+    }
+    
+    public getEndReason(): RecordingEndReason | undefined {
+        return this.stateMachine.getContext().endReason;
     }
 }

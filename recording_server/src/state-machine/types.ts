@@ -4,7 +4,6 @@ import { BrowserContext, Page } from '@playwright/test'
 import { BrandingHandle } from '../branding'
 import { MeetingHandle } from '../meeting'
 import { Streaming } from '../streaming'
-import { TranscriptionService } from '../transcription/TranscriptionService'
 import { MeetingProviderInterface } from '../types'
 import { PathManager } from '../utils/PathManager'
 
@@ -67,10 +66,7 @@ export interface MeetingContext {
     // PathManager
     pathManager?: PathManager
 
-    // Service de transcription
-    transcriptionService?: TranscriptionService
-
-    // Recording state (Play/Pause)
+        // Recording state (Play/Pause)
     isPaused?: boolean
     pauseStartTime?: number
     totalPauseDuration?: number

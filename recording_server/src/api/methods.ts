@@ -3,7 +3,6 @@ import * as rax from 'retry-axios'
 
 import { ApiTypes } from './types'
 
-import { RecognizerWord } from '../transcription/WordPoster'
 import { MeetingParams } from '../types'
 
 export class Api {
@@ -115,20 +114,6 @@ export class Api {
                 method: 'PATCH',
                 url: `/bots/transcripts`,
                 data: transcript,
-            })
-        ).data
-    }
-
-    // Post words into server
-    public async postWords(
-        words: RecognizerWord[],
-        bot_id: number,
-    ): Promise<ApiTypes.Word[]> {
-        return (
-            await axios({
-                method: 'POST',
-                url: `/bots/transcripts/${bot_id}/words`,
-                data: words,
             })
         ).data
     }

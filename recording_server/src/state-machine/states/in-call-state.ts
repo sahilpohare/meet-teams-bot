@@ -2,8 +2,6 @@ import { Events } from '../../events'
 import { TRANSCODER } from '../../recording/Transcoder'
 import { SpeakerManager } from '../../speaker-manager'
 import { Streaming } from '../../streaming'
-import { TranscriptionService } from '../../transcription/TranscriptionService'
-import { WordsPoster } from '../../transcription/WordPoster'
 import { MEETING_CONSTANTS } from '../constants'
 import { MeetingStateType, StateExecuteResult } from '../types'
 import { BaseState } from './base-state'
@@ -73,21 +71,11 @@ export class InCallState extends BaseState {
             // Ne pas démarrer tout de suite, attendre l'état Recording
         }
 
-        // Créer le WordsPoster
-        const wordsPoster = new WordsPoster()
 
-        // Initialiser le service de transcription avec le WordsPoster
-        this.context.transcriptionService = new TranscriptionService(
-            this.context.params.speech_to_text_provider || 'Default',
-            this.context.params.speech_to_text_api_key,
-            {}, // options
-            wordsPoster, // passer le WordsPoster ici
-        )
 
         // Configurer le transcoder avec le mode d'enregistrement
         TRANSCODER.configure(
             this.context.pathManager,
-            this.context.transcriptionService,
             this.context.params.recording_mode,
         )
 

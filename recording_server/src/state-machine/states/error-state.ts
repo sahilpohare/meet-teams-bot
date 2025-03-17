@@ -120,9 +120,5 @@ export class ErrorState extends BaseState {
 
         // Log des métriques
         console.info('Error metrics:', metrics)
-
-        // Ici, vous pouvez envoyer les métriques à votre système de monitoring
-        // Par exemple :
-        // await MetricsService.recordError(metrics);
     }
 }

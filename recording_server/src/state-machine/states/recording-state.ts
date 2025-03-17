@@ -75,12 +75,6 @@ export class RecordingState extends BaseState {
     private async initializeRecording(): Promise<void> {
         console.info('Initializing recording...')
 
-        // Vérifier que les services sont bien initialisés
-        if (!this.context.transcriptionService) {
-            console.error('TranscriptionService missing from context')
-            throw new Error('TranscriptionService not initialized')
-        }
-
         // Démarrer le streaming si disponible
         if (this.context.streamingService) {
             this.context.streamingService.start()
@@ -88,7 +82,7 @@ export class RecordingState extends BaseState {
 
         // Log l'état du contexte
         console.info('Context state:', {
-            hasTranscriptionService: !!this.context.transcriptionService,
+           
             hasPathManager: !!this.context.pathManager,
             hasStreamingService: !!this.context.streamingService,
             isTranscoderConfigured: TRANSCODER.getStatus().isConfigured,
@@ -110,11 +104,7 @@ export class RecordingState extends BaseState {
                     hasAudioUrl: !!chunkInfo.audioUrl,
                 })
 
-                await this.context.transcriptionService?.transcribeSegment(
-                    chunkInfo.startTime,
-                    chunkInfo.endTime,
-                    chunkInfo.audioUrl,
-                )
+        
             } catch (error) {
                 console.error('Error during transcription:', error)
             }
@@ -125,18 +115,6 @@ export class RecordingState extends BaseState {
             this.context.error = error
             this.isProcessing = false
         })
-
-        this.context.transcriptionService?.on(
-            'transcriptionComplete',
-            (result) => {
-                console.info('Transcription complete:', {
-                    hasResults: result.results.length > 0,
-                })
-                if (result.results.length > 0) {
-                    this.context.lastSpeakerTime = Date.now()
-                }
-            },
-        )
 
         console.info('Event listeners setup complete')
     }
@@ -183,7 +161,7 @@ export class RecordingState extends BaseState {
                 console.error('Error checking end conditions:', error)
                 return {
                     shouldEnd: true,
-                    reason: RecordingEndReason.ApiRequest,
+                    reason: RecordingEndReason.BotRemoved,
                 }
             }
         }

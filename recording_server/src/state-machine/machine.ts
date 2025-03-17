@@ -13,6 +13,8 @@ export class MeetingStateMachine {
     private context: MeetingContext
     private error: Error | null = null
     private forceStop: boolean = false
+    private wasInRecordingState: boolean = false
+    private normalTermination: boolean = false
 
     constructor(initialContext: Partial<MeetingContext>) {
         this.currentState = MeetingStateType.Initialization
@@ -31,6 +33,10 @@ export class MeetingStateMachine {
             ) {
                 console.info(`Current state: ${this.currentState}`)
 
+                if (this.currentState === MeetingStateType.Recording) {
+                    this.wasInRecordingState = true;
+                }
+
                 if (this.forceStop) {
                     this.context.endReason =
                         this.context.endReason || RecordingEndReason.ApiRequest
@@ -43,6 +49,18 @@ export class MeetingStateMachine {
 
                 this.currentState = transition.nextState
                 this.context = transition.context
+            }
+            
+            if (this.wasInRecordingState && this.context.endReason) {
+                const normalReasons = [
+                    RecordingEndReason.ApiRequest,
+                    RecordingEndReason.BotRemoved,
+                    RecordingEndReason.ManualStop,
+                    RecordingEndReason.NoAttendees,
+                    RecordingEndReason.NoSpeaker,
+                    RecordingEndReason.RecordingTimeout
+                ];
+                this.normalTermination = normalReasons.includes(this.context.endReason);
             }
         } catch (error) {
             this.error = error as Error
@@ -146,5 +164,17 @@ export class MeetingStateMachine {
 
     public getContext(): MeetingContext {
         return this.context
+    }
+
+    public wasRecordingSuccessful(): boolean {
+        return this.wasInRecordingState && this.normalTermination && !this.error;
+    }
+    
+    public getWasInRecordingState(): boolean {
+        return this.wasInRecordingState;
+    }
+    
+    public getNormalTermination(): boolean {
+        return this.normalTermination;
     }
 }

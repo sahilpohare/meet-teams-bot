@@ -1,5 +1,5 @@
 import { Browser, BrowserContext, Page } from '@playwright/test'
-import { SpeechToTextProvider } from './transcription/TranscriptionService'
+
 
 export type Meeting = {
     page: Page
@@ -8,6 +8,7 @@ export type Meeting = {
     meetingTimeoutInterval: NodeJS.Timeout
 }
 
+export type SpeechToTextProvider = 'Default' | 'Gladia' | 'RunPod'
 export type RecordingMode = 'speaker_view' | 'gallery_view' | 'audio_only'
 
 export interface MeetingProviderInterface {

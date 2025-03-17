@@ -108,14 +108,33 @@ let forceTerminationTimeout: NodeJS.Timeout | null = null
             // Démarrer le meeting avec la machine à états
             await MeetingHandle.instance.startRecordMeeting()
 
-            // Si on arrive ici, c'est que tout s'est bien passé
-            console.log(
-                `${Date.now()} Finalize project && Sending WebHook complete`,
-            )
-            await Api.instance.endMeetingTrampoline()
+            // Vérifier si l'enregistrement a réussi et s'est terminé normalement
+            if (MeetingHandle.instance.wasRecordingSuccessful()) {
+                console.log(
+                    `${Date.now()} Finalize project && Sending WebHook complete`,
+                )
+                
+                // Enregistrer la raison de fin pour le logging
+                const endReason = MeetingHandle.instance.getEndReason();
+                console.log(`Recording ended normally with reason: ${endReason}`);
+                
+                await Api.instance.endMeetingTrampoline()
+            } else {
+                // L'enregistrement n'a pas atteint l'état Recording ou a échoué
+                console.error('Recording did not complete successfully');
+                
+                // On n'appelle pas endMeetingTrampoline ici
+                await sendWebhookOnce({
+                    meetingUrl: consumeResult.params.meeting_url,
+                    botUuid: consumeResult.params.bot_uuid,
+                    success: false,
+                    errorMessage: 'Recording did not complete successfully'
+                });
+            }
         } catch (error) {
-            // La machine à états a déjà géré le nettoyage
+            // Erreur explicite propagée depuis la machine à états
             console.error('Meeting failed:', error)
+            
             // Attendre que le webhook soit envoyé avant de continuer
             await sendWebhookOnce({
                 meetingUrl: consumeResult.params.meeting_url,
@@ -216,39 +235,42 @@ async function sendWebhookOnce(params: {
     }
 
     try {
-        const callEndedPromise = Events.callEnded()
-        const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(
-                () => reject(new Error('Call ended event timeout')),
-                30000,
-            ),
-        )
-
-        await Promise.race([callEndedPromise, timeoutPromise])
-
-        if (!params.success) {
-            const webhookPromise = meetingBotStartRecordFailed(
-                params.meetingUrl,
-                params.botUuid,
-                params.errorMessage || 'Unknown error',
-            )
-
-            await Promise.race([
-                webhookPromise,
-                new Promise((_, reject) =>
-                    setTimeout(
-                        () => reject(new Error('Webhook timeout')),
-                        10000,
-                    ),
-                ),
-            ])
+        // Tentatives multiples pour l'envoi du webhook
+        const maxRetries = 3
+        let attempt = 0
+        
+        while (attempt < maxRetries) {
+            try {
+                const callEndedPromise = Events.callEnded()
+                await Promise.race([
+                    callEndedPromise,
+                    new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Call ended event timeout')), 30000)
+                    )
+                ])
+                
+                if (!params.success) {
+                    await meetingBotStartRecordFailed(
+                        params.meetingUrl,
+                        params.botUuid,
+                        params.errorMessage || 'Unknown error'
+                    )
+                }
+                
+                console.log('All webhooks sent successfully')
+                break
+            } catch (e) {
+                attempt++
+                if (attempt === maxRetries) {
+                    console.error('Final webhook attempt failed:', e)
+                } else {
+                    console.warn(`Webhook attempt ${attempt} failed, retrying...`)
+                    await new Promise(resolve => setTimeout(resolve, 2000 * attempt))
+                }
+            }
         }
-
-        console.log('All webhooks sent successfully')
-        webhookSent = true
-    } catch (e) {
-        console.error('Webhook operation timed out:', e)
-        webhookSent = true // Marquer comme envoyé même en cas d'échec pour éviter de bloquer
+    } finally {
+        webhookSent = true // Marquer comme envoyé même en cas d'échec
     }
 }
 
@@ -269,9 +291,6 @@ async function handleErrorInStartRecording(error: Error, data: MeetingParams) {
                     ? error.message
                     : JoinErrorCode.Internal,
         })
-
-        // Les événements sont maintenant gérés par la machine à états
-        // Events.callEnded() n'est plus nécessaire ici
     } catch (e) {
         logger.error('Failed to handle start recording error:', e)
         throw e

@@ -61,7 +61,7 @@ export class CleanupState extends BaseState {
         try {
             await Promise.all([
                 TRANSCODER.stop(),
-                this.context.transcriptionService?.stop(),
+                
             ])
         } catch (error) {
             console.error('Error stopping processes:', error)
