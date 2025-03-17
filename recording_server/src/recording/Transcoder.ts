@@ -18,6 +18,9 @@ export interface TranscoderConfig {
     recordingMode: RecordingMode
     audioOutputPath?: string
     tempVideoPath?: string
+    enableTranscriptionChunking?: boolean
+    transcriptionChunkDuration?: number
+    transcriptionAudioBucket?: string
 }
 
 export class Transcoder extends EventEmitter {
@@ -47,9 +50,27 @@ export class Transcoder extends EventEmitter {
     // Nouveau processus pour l'extraction audio en parallèle
     private audioFfmpegProcess: ChildProcess | null = null
 
+    // Track if files have been uploaded
+    private filesUploaded = false;
+
     constructor(initialConfig: Partial<TranscoderConfig>) {
         super()
         this.setMaxListeners(20)
+
+        // Determine which audio bucket to use based on environment
+        const env = process.env.NODE_ENV || 'development'
+        let transcriptionAudioBucket: string
+        
+        if (env === 'production') {
+            transcriptionAudioBucket = 'meeting-baas-audio'
+        } else if (env === 'preprod' || env === 'staging') {
+            transcriptionAudioBucket = 'preprod-meeting-baas-audio'
+        } else {
+            // Default to local bucket for development/test environments
+            transcriptionAudioBucket = process.env.AWS_S3_TEMPORARY_AUDIO_BUCKET || 'local-meeting-baas-audio'
+        }
+        
+        console.log(`Using transcription audio bucket for environment ${env}: ${transcriptionAudioBucket}`)
 
         this.config = {
             chunkDuration: MEETING_CONSTANTS.CHUNK_DURATION,
@@ -64,6 +85,9 @@ export class Transcoder extends EventEmitter {
             audioBucketName: process.env.AWS_S3_TEMPORARY_AUDIO_BUCKET || '',
             s3Path: '',
             recordingMode: initialConfig.recordingMode || 'speaker_view',
+            enableTranscriptionChunking: initialConfig.enableTranscriptionChunking || false,
+            transcriptionChunkDuration: initialConfig.transcriptionChunkDuration || 3600, // 1 hour in seconds
+            transcriptionAudioBucket: initialConfig.transcriptionAudioBucket || process.env.TRANSCRIPTION_AUDIO_BUCKET || transcriptionAudioBucket,
         }
 
         // Vérifier si on est en mode audio-only
@@ -82,6 +106,7 @@ export class Transcoder extends EventEmitter {
     public configure(
         pathManager: PathManager,
         recordingMode?: RecordingMode,
+        meetingParams?: any
     ): void {
         if (!pathManager) {
             throw new Error('PathManager is required for configuration')
@@ -93,6 +118,23 @@ export class Transcoder extends EventEmitter {
         if (recordingMode) {
             this.config.recordingMode = recordingMode
             this.isAudioOnly = recordingMode === 'audio_only'
+        }
+
+        // Update transcription chunking settings if meeting params are provided
+        if (meetingParams) {
+            // Check both formats of speech-to-text configuration
+            const hasTranscription = 
+                (meetingParams.speech_to_text_provider && meetingParams.speech_to_text_provider !== 'None') ||
+                (meetingParams.speech_to_text && meetingParams.speech_to_text.provider && meetingParams.speech_to_text.provider !== 'None');
+            
+            this.config.enableTranscriptionChunking = hasTranscription;
+            
+            console.log('Transcription chunking setting:', {
+                speech_to_text_provider: meetingParams.speech_to_text_provider,
+                speech_to_text: meetingParams.speech_to_text,
+                hasTranscription: hasTranscription,
+                enableTranscriptionChunking: this.config.enableTranscriptionChunking
+            });
         }
 
         // Ajuster l'extension du fichier de sortie selon le mode
@@ -120,6 +162,7 @@ export class Transcoder extends EventEmitter {
             s3Path: this.config.s3Path,
             recordingMode: this.config.recordingMode,
             isAudioOnly: this.isAudioOnly,
+            enableTranscriptionChunking: this.config.enableTranscriptionChunking,
         })
     }
 
@@ -245,8 +288,15 @@ export class Transcoder extends EventEmitter {
                 await this.finalizeVideo()
             }
 
-            await this.uploadToS3()
+            // First, create and upload audio chunks for transcription before we delete any files
+            if (this.pathManager && this.config.enableTranscriptionChunking) {
+                console.log('Starting audio chunking process for transcription');
+                await this.createAndUploadTranscriptionChunks();
+            }
 
+            // Then upload the full recording and delete the files
+            await this.uploadToS3()
+            
             this.isRecording = false
             this.isStopped = true
             this.emit('stopped')
@@ -481,92 +531,106 @@ export class Transcoder extends EventEmitter {
         })
     }
 
-    public async uploadToS3(): Promise<string[]> {
-        if (!this.pathManager)
-            return Promise.reject(new Error('PathManager not configured'))
+    public async uploadToS3(): Promise<void> {
+        if (!this.pathManager) {
+            throw new Error('PathManager not available for S3 upload')
+        }
 
-        const uploadPromises: Promise<string>[] = [];
-        const filesToDelete: string[] = [];
-
-        if (this.isAudioOnly) {
-            // Upload WAV seulement
-            const localPath = this.config.outputPath;
-            const s3Key = `${this.config.s3Path}.wav`;
-            
-            console.log('Uploading audio to S3:', {
-                localPath,
-                bucketName: this.config.bucketName,
-                s3Key,
-            });
-            
-            uploadPromises.push(
-                this.s3Uploader.uploadFile(
-                    localPath,
-                    this.config.bucketName,
-                    s3Key,
-                )
-            );
-            filesToDelete.push(localPath);
-        } else {
-            // Upload MP4
-            const videoLocalPath = this.config.outputPath;
-            const videoS3Key = `${this.config.s3Path}.mp4`;
-            
-            console.log('Uploading video to S3:', {
-                localPath: videoLocalPath,
-                bucketName: this.config.bucketName,
-                s3Key: videoS3Key,
-            });
-            
-            uploadPromises.push(
-                this.s3Uploader.uploadFile(
-                    videoLocalPath,
-                    this.config.bucketName,
-                    videoS3Key,
-                )
-            );
-            filesToDelete.push(videoLocalPath);
-            
-            // Upload WAV
-            if (this.config.audioOutputPath) {
-                const audioLocalPath = this.config.audioOutputPath;
-                const audioS3Key = `${this.config.s3Path}.wav`;
-                
-                console.log('Uploading audio to S3:', {
-                    localPath: audioLocalPath,
-                    bucketName: this.config.bucketName,
-                    s3Key: audioS3Key,
-                });
-                
-                uploadPromises.push(
-                    this.s3Uploader.uploadFile(
-                        audioLocalPath,
-                        this.config.bucketName,
-                        audioS3Key,
-                    )
-                );
-                filesToDelete.push(audioLocalPath);
-            }
+        // Skip upload if files have already been uploaded
+        if (this.filesUploaded) {
+            console.log('Files already uploaded to S3, skipping duplicate upload')
+            return
         }
 
         try {
-            // Attendre que tous les uploads soient terminés
-            const uploadResults = await Promise.all(uploadPromises);
-            
-            // Supprimer les fichiers locaux
-            await Promise.all(filesToDelete.map(async (filePath) => {
-                try {
-                    await fs.promises.unlink(filePath);
-                    console.log(`Deleted local file: ${filePath}`);
-                } catch (error) {
-                    console.error(`Error deleting file ${filePath}:`, error);
+            // Upload video file if not in audio-only mode
+            if (!this.isAudioOnly) {
+                // Vérifier que le fichier existe
+                if (!fs.existsSync(this.config.outputPath)) {
+                    throw new Error(
+                        `Video file does not exist for upload: ${this.config.outputPath}`,
+                    )
                 }
-            }));
 
-            return uploadResults;
+                // Uploader le fichier vidéo
+                console.log('Uploading video to S3:', {
+                    localPath: this.config.outputPath,
+                    bucketName: this.config.bucketName,
+                    s3Key: `${this.pathManager.getBotUuid()}.mp4`,
+                })
+
+                await this.s3Uploader.uploadFile(
+                    this.config.outputPath,
+                    this.config.bucketName,
+                    `${this.pathManager.getBotUuid()}.mp4`,
+                )
+                
+                console.log(`Video uploaded successfully, deleting local file: ${this.config.outputPath}`);
+                try {
+                    fs.unlinkSync(this.config.outputPath);
+                    console.log('Local video file deleted successfully');
+                } catch (deleteError) {
+                    console.error('Failed to delete local video file:', deleteError);
+                }
+            }
+
+            // Upload audio file (WAV format)
+            if (this.isAudioOnly) {
+                // En mode audio-only, le fichier principal est déjà au format WAV
+                if (!fs.existsSync(this.config.outputPath)) {
+                    throw new Error(
+                        `Audio file does not exist for upload: ${this.config.outputPath}`,
+                    )
+                }
+
+                console.log('Uploading audio to S3:', {
+                    localPath: this.config.outputPath,
+                    bucketName: this.config.bucketName,
+                    s3Key: `${this.pathManager.getBotUuid()}.wav`,
+                })
+
+                await this.s3Uploader.uploadFile(
+                    this.config.outputPath,
+                    this.config.bucketName,
+                    `${this.pathManager.getBotUuid()}.wav`,
+                )
+                
+                console.log(`Audio uploaded successfully, deleting local file: ${this.config.outputPath}`);
+                try {
+                    fs.unlinkSync(this.config.outputPath);
+                    console.log('Local audio file deleted successfully');
+                } catch (deleteError) {
+                    console.error('Failed to delete local audio file:', deleteError);
+                }
+            } else if (this.config.audioOutputPath && fs.existsSync(this.config.audioOutputPath)) {
+                // En mode vidéo, uploader aussi le fichier audio séparé
+                console.log('Uploading audio to S3:', {
+                    localPath: this.config.audioOutputPath,
+                    bucketName: this.config.bucketName,
+                    s3Key: `${this.pathManager.getBotUuid()}.wav`,
+                })
+
+                await this.s3Uploader.uploadFile(
+                    this.config.audioOutputPath,
+                    this.config.bucketName,
+                    `${this.pathManager.getBotUuid()}.wav`,
+                )
+                
+                console.log(`Audio uploaded successfully, deleting local file: ${this.config.audioOutputPath}`);
+                try {
+                    fs.unlinkSync(this.config.audioOutputPath);
+                    console.log('Local audio file deleted successfully');
+                } catch (deleteError) {
+                    console.error('Failed to delete local audio file:', deleteError);
+                }
+            }
+
+            // Mark files as uploaded to prevent duplicate uploads
+            this.filesUploaded = true;
+            console.log('S3 upload completed')
         } catch (error) {
-            console.error('Error during S3 upload:', error);
-            throw error;
+            console.error('Error during S3 upload:', error)
+            throw error
         }
     }
 
@@ -655,6 +719,198 @@ export class Transcoder extends EventEmitter {
             isAudioOnly: this.isAudioOnly,
         }
     }
+
+    private async createAndUploadTranscriptionChunks(): Promise<void> {
+        // Check if transcription chunking is enabled
+        if (!this.config.enableTranscriptionChunking) {
+            console.log('Transcription chunking is disabled, skipping audio chunk creation');
+            return;
+        }
+
+        // Use the audio file that was created during recording
+        const audioFilePath = this.isAudioOnly ? this.config.outputPath : this.config.audioOutputPath!;
+        
+        // Get the appropriate bucket based on environment
+        const env = process.env.NODE_ENV || 'development';
+        const bucketName = this.config.transcriptionAudioBucket || 
+            (env === 'production' ? 'meeting-baas-audio' : 
+             env === 'preprod' || env === 'staging' ? 'preprod-meeting-baas-audio' : 
+             process.env.AWS_S3_TEMPORARY_AUDIO_BUCKET || 'local-meeting-baas-audio');
+        
+        console.log('Starting audio chunking process for transcription');
+        console.log(`Looking for audio file at: ${audioFilePath}`);
+        console.log(`Will upload chunks to bucket: ${bucketName} (environment: ${env})`);
+        
+        if (!fs.existsSync(audioFilePath)) {
+            console.error('Audio file not found for chunking:', audioFilePath);
+            return;
+        }
+
+        console.log('Found audio file for chunking:', audioFilePath);
+
+        try {
+            // Get the total duration of the audio file using ffprobe
+            const duration = await this.getAudioDuration(audioFilePath);
+            if (duration <= 0) {
+                console.error('Could not determine audio duration or file is empty');
+                return;
+            }
+
+            console.log(`Audio file duration: ${duration} seconds`);
+
+            // Calculate how many chunks we need
+            const chunkDurationSecs = this.config.transcriptionChunkDuration;
+            // Math.ceil ensures we create at least 1 chunk even for recordings shorter than 1 hour
+            const numChunks = Math.ceil(duration / chunkDurationSecs);
+            
+            console.log(`Splitting into ${numChunks} chunks of ${chunkDurationSecs} seconds (or less for the final chunk)`);
+
+            const botUuid = this.pathManager!.getBotUuid();
+
+            // Create a temporary directory for chunks
+            const tempDir = await fs.promises.mkdtemp(
+                `${this.pathManager!.getTempPath()}/audio_chunks_`
+            );
+
+            // Always upload at least one chunk, even for short recordings
+            console.log(`Will upload ${numChunks} audio chunk(s) for transcription to bucket: ${bucketName}`);
+            
+            // For each chunk
+            for (let i = 0; i < numChunks; i++) {
+                const startTime = i * chunkDurationSecs;
+                const endTime = Math.min((i + 1) * chunkDurationSecs, duration);
+                const chunkDuration = endTime - startTime;
+                
+                // Generate the output filename: bot_uuid-[chunk_number].wav
+                const chunkFilename = `${botUuid}-${i + 1}.wav`;
+                const chunkPath = `${tempDir}/${chunkFilename}`;
+                
+                console.log(`Processing chunk ${i + 1}/${numChunks}: ${startTime}s to ${endTime}s (duration: ${chunkDuration}s)`);
+                
+                try {
+                    // Extract the chunk using ffmpeg
+                    console.log(`Extracting audio chunk to: ${chunkPath}`);
+                    await this.extractAudioChunk(audioFilePath, startTime, chunkDuration, chunkPath);
+                    
+                    // Verify the chunk file exists and has data
+                    try {
+                        const stats = await fs.promises.stat(chunkPath);
+                        console.log(`Audio chunk created successfully: ${chunkPath} (${stats.size} bytes)`);
+                        
+                        // Upload the chunk to S3
+                        const s3Key = `${botUuid}/${chunkFilename}`;
+                        
+                        console.log(`Uploading chunk to S3: bucket=${bucketName}, key=${s3Key}`);
+                        
+                        const url = await this.s3Uploader.uploadFile(
+                            chunkPath,
+                            bucketName,
+                            s3Key,
+                            true
+                        );
+                        
+                        console.log(`Successfully uploaded chunk ${i+1} to: ${url}`);
+                    } catch (statErr) {
+                        console.error(`Error verifying chunk file: ${chunkPath}`, statErr);
+                    }
+                } catch (chunkErr) {
+                    console.error(`Error processing chunk ${i+1}:`, chunkErr);
+                }
+            }
+
+            // Clean up temporary files
+            try {
+                console.log(`Cleaning up temporary directory: ${tempDir}`);
+                for (const file of await fs.promises.readdir(tempDir)) {
+                    await fs.promises.unlink(`${tempDir}/${file}`);
+                }
+                await fs.promises.rmdir(tempDir);
+                console.log('Temporary chunk files cleaned up successfully');
+            } catch (error) {
+                console.error('Error cleaning up temporary chunk files:', error);
+            }
+            
+            console.log('Audio chunking for transcription completed successfully');
+        } catch (error) {
+            console.error('Error in audio chunking process:', error);
+            // Don't throw so it doesn't interrupt the rest of the stopping process
+        }
+    }
+
+    public getFilesUploaded(): boolean {
+        return this.filesUploaded;
+    }
+
+    private async getAudioDuration(filePath: string): Promise<number> {
+        return new Promise<number>((resolve, reject) => {
+            const ffprobe = spawn('ffprobe', [
+                '-v', 'error',
+                '-show_entries', 'format=duration',
+                '-of', 'default=noprint_wrappers=1:nokey=1',
+                filePath
+            ]);
+            
+            let output = '';
+            ffprobe.stdout.on('data', (data) => {
+                output += data.toString();
+            });
+            
+            ffprobe.on('close', (code) => {
+                if (code !== 0) {
+                    console.error(`ffprobe process exited with code ${code}`);
+                    reject(new Error(`ffprobe process exited with code ${code}`));
+                    return;
+                }
+                
+                const duration = parseFloat(output.trim());
+                if (isNaN(duration)) {
+                    reject(new Error('Failed to parse duration'));
+                    return;
+                }
+                
+                resolve(duration);
+            });
+            
+            ffprobe.on('error', (err) => {
+                reject(err);
+            });
+        });
+    }
+
+    private async extractAudioChunk(
+        inputPath: string,
+        startTime: number,
+        duration: number,
+        outputPath: string
+    ): Promise<void> {
+        return new Promise((resolve, reject) => {
+            const ffmpegArgs = [
+                '-y',                    // Overwrite output file
+                '-i', inputPath,         // Input file
+                '-ss', startTime.toString(),  // Start time
+                '-t', duration.toString(),    // Duration
+                '-vn',                   // No video
+                '-acodec', 'pcm_s16le',  // Audio codec
+                '-ar', '16000',          // Sample rate
+                '-ac', '1',              // Mono audio
+                outputPath               // Output file
+            ];
+            
+            const ffmpeg = spawn('ffmpeg', ffmpegArgs);
+            
+            ffmpeg.on('close', (code) => {
+                if (code === 0) {
+                    resolve();
+                } else {
+                    reject(new Error(`FFmpeg process exited with code ${code}`));
+                }
+            });
+            
+            ffmpeg.on('error', (err) => {
+                reject(err);
+            });
+        });
+    }
 }
 
 // Instance globale unique
@@ -665,4 +921,6 @@ export const TRANSCODER = new Transcoder({
         MEETING_CONSTANTS.CHUNK_DURATION,
     bucketName: process.env.AWS_S3_VIDEO_BUCKET || '',
     audioBucketName: process.env.AWS_S3_TEMPORARY_AUDIO_BUCKET || '',
+    enableTranscriptionChunking: process.env.ENABLE_TRANSCRIPTION_CHUNKING === 'true',
+    transcriptionAudioBucket: process.env.TRANSCRIPTION_AUDIO_BUCKET || 'meeting-baas-audio',
 })

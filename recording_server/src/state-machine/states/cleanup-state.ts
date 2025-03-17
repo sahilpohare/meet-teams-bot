@@ -99,8 +99,13 @@ export class CleanupState extends BaseState {
         if (!TRANSCODER) return
 
         try {
-            console.log('Uploading video to S3')
-            await TRANSCODER.uploadToS3()
+            // Only upload if not already done in the stop() method
+            if (!TRANSCODER.getFilesUploaded()) {
+                console.log('Uploading video to S3')
+                await TRANSCODER.uploadToS3()
+            } else {
+                console.log('Files already uploaded to S3 in stop() method, skipping')
+            }
         } catch (error) {
             console.error('Failed to upload video to S3:', error)
         }

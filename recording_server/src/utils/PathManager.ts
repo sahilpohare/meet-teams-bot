@@ -44,6 +44,10 @@ export class PathManager {
         })
     }
 
+    public getBotUuid(): string {
+        return this.botUuid
+    }
+
     public getBasePath(): string {
         this.ensureBotUuid()
         switch (this.environment) {

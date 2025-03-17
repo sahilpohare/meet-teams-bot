@@ -77,6 +77,7 @@ export class InCallState extends BaseState {
         TRANSCODER.configure(
             this.context.pathManager,
             this.context.params.recording_mode,
+            this.context.params,
         )
 
         await TRANSCODER.start()
