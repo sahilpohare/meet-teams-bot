@@ -187,7 +187,14 @@ export class RecordingState extends BaseState {
     private async handleMeetingEnd(reason: RecordingEndReason): Promise<void> {
         try {
             this.context.endReason = reason
-            this.context.provider.closeMeeting(this.context.playwrightPage)
+            
+            // Essayer de fermer la réunion mais ne pas laisser une erreur ici affecter le reste
+            try {
+                await this.context.provider.closeMeeting(this.context.playwrightPage)
+            } catch (closeError) {
+                console.error('Error closing meeting, but continuing process:', closeError)
+            }
+            
             Events.callEnded()
             
             // Arrêter dans l'ordre correct
