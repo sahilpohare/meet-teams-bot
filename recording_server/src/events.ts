@@ -16,6 +16,10 @@ export class Events {
         )
     }
 
+    static async apiRequestStop() {
+        return Events.EVENTS?.send('api_request_stop')
+    }
+
     static async joiningCall() {
         return Events.EVENTS?.send('joining_call')
     }

@@ -146,7 +146,8 @@ export class JoinError extends Error {
 export enum JoinErrorCode {
     CannotJoinMeeting = 'CannotJoinMeeting',
     BotNotAccepted = 'BotNotAccepted',
-    BotRemoved = 'BotRemoved',
+    BotRemoved = 'BotRemovedwefwef',
+    ApiRequest = 'ApiRequest',
     TimeoutWaitingToStart = 'TimeoutWaitingToStart',
     Internal = 'InternalError',
     InvalidMeetingUrl = 'InvalidMeetingUrl',

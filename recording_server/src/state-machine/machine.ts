@@ -10,7 +10,7 @@ import { MeetingContext } from './types'
 
 export class MeetingStateMachine {
     private currentState: MeetingStateType
-    private context: MeetingContext
+    public context: MeetingContext
     private error: Error | null = null
     private forceStop: boolean = false
     private wasInRecordingState: boolean = false
