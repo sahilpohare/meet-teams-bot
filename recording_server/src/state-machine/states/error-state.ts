@@ -60,9 +60,22 @@ export class ErrorState extends BaseState {
                 return
             }
 
+            // Log complet pour le débogage
+            console.log('Error in notifyError:', {
+                isJoinError: error instanceof JoinError,
+                name: error.name,
+                message: error.message,
+                code: error instanceof JoinError ? error.message : 'not a JoinError',
+                stack: error.stack?.substring(0, 200) // Limite la taille du stack
+            })
+
             try {
                 if (error instanceof JoinError) {
-                    switch (error.message) {
+                    // Vérification supplémentaire du code d'erreur
+                    const errorCode = error.message
+                    console.log('JoinError code:', errorCode)
+                    
+                    switch (errorCode) {
                         case JoinErrorCode.BotNotAccepted:
                             await Events.botRejected()
                             break
@@ -75,15 +88,19 @@ export class ErrorState extends BaseState {
                         case JoinErrorCode.InvalidMeetingUrl:
                             await Events.invalidMeetingUrl()
                             break
+                        case JoinErrorCode.ApiRequest:
+                            console.log('Notifying API request stop')
+                            await Events.apiRequestStop()
+                            break
                         default:
+                            console.log(`Unhandled JoinError code: ${errorCode}`)
                             await Events.meetingError(error)
                     }
                 } else {
                     await Events.meetingError(error)
                 }
             } catch (eventError) {
-                console.error('Failed to send event notification:', eventError);
-                // Ne pas propager l'erreur pour continuer le processus
+                console.error('Failed to send event notification:', eventError)
             }
         }
 

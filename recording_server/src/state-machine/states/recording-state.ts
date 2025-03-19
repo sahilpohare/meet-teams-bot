@@ -185,35 +185,51 @@ export class RecordingState extends BaseState {
     }
 
     private async handleMeetingEnd(reason: RecordingEndReason): Promise<void> {
+        console.info(`Handling meeting end with reason: ${reason}`)
+        this.context.endReason = reason
+        
         try {
-            this.context.endReason = reason
-            
             // Essayer de fermer la réunion mais ne pas laisser une erreur ici affecter le reste
             try {
-                await this.context.provider.closeMeeting(this.context.playwrightPage)
+                // If the reason is bot_removed, we know the meeting is already effectively closed
+                if (reason === RecordingEndReason.BotRemoved) {
+                    console.info('Bot was removed from meeting, skipping active closure step')
+                } else {
+                    await this.context.provider.closeMeeting(this.context.playwrightPage)
+                }
             } catch (closeError) {
                 console.error('Error closing meeting, but continuing process:', closeError)
             }
             
-            Events.callEnded()
+            // These critical steps must execute regardless of previous steps
+            console.info('Triggering call ended event')
+            await Events.callEnded()
             
-            // Arrêter dans l'ordre correct
-            await this.stopVideoRecording()
-            await this.stopAudioStreaming()
+            console.info('Stopping video recording')
+            await this.stopVideoRecording().catch(err => {
+                console.error('Error stopping video recording, continuing:', err)
+            })
+            
+            console.info('Stopping audio streaming')
+            await this.stopAudioStreaming().catch(err => {
+                console.error('Error stopping audio streaming, continuing:', err) 
+            })
 
-            // Ajouter l'arrêt du Transcoder ici avec gestion d'erreur
+            console.info('Stopping transcoder')
             try {
                 await TRANSCODER.stop()
             } catch (error) {
                 console.error('Error stopping transcoder, continuing cleanup:', error)
-                // Ne pas propager cette erreur pour permettre au nettoyage de continuer
             }
 
+            console.info('Setting isProcessing to false to end recording loop')
             await this.sleep(2000)
-            this.isProcessing = false
         } catch (error) {
-            console.error('Error during meeting end:', error)
-            throw error
+            console.error('Error during meeting end handling:', error)
+        } finally {
+            // Always ensure this flag is set to stop the processing loop
+            this.isProcessing = false
+            console.info('Meeting end handling completed')
         }
     }
 

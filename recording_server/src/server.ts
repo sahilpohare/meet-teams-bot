@@ -110,6 +110,12 @@ export async function server() {
     app.post('/stop_record', async (req, res) => {
         const data: StopRecordParams = req.body
         console.log('end meeting from api server :', data)
+        
+        // Mettre à jour immédiatement le contexte de la machine à états
+        if (MeetingHandle.instance) {
+            MeetingHandle.instance.stateMachine.context.endReason = RecordingEndReason.ApiRequest
+        }
+        
         stop_record(res, RecordingEndReason.ApiRequest)
     })
 

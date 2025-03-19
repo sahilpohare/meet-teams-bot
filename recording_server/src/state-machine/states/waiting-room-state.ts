@@ -1,6 +1,6 @@
 import { Events } from '../../events'
 import { JoinError, JoinErrorCode } from '../../types'
-import { MeetingStateType, StateExecuteResult } from '../types'
+import { MeetingStateType, RecordingEndReason, StateExecuteResult } from '../types'
 import { BaseState } from './base-state'
 
 export class WaitingRoomState extends BaseState {
@@ -117,30 +117,40 @@ export class WaitingRoomState extends BaseState {
             throw new Error('Meeting page not initialized')
         }
 
-        const timeoutMs =
-            this.context.params.automatic_leave.waiting_room_timeout * 1000
+        const timeoutMs = this.context.params.automatic_leave.waiting_room_timeout * 1000
         console.info(`Setting waiting room timeout to ${timeoutMs}ms`)
 
         return new Promise((resolve, reject) => {
+            // Référence au timeout pour pouvoir l'annuler
             const timeout = setTimeout(() => {
-                const timeoutError = new JoinError(
-                    JoinErrorCode.TimeoutWaitingToStart,
-                )
+                const timeoutError = new JoinError(JoinErrorCode.TimeoutWaitingToStart)
                 console.error('Waiting room timeout reached', timeoutError)
                 reject(timeoutError)
             }, timeoutMs)
 
+            // Ajouter un mécanisme de vérification périodique des signaux d'arrêt
+            const checkStopSignal = setInterval(() => {
+                if (this.context.endReason === RecordingEndReason.ApiRequest) {
+                    clearInterval(checkStopSignal)
+                    clearTimeout(timeout)
+                    console.log('API request to stop received while in waiting room')
+                    reject(new JoinError(JoinErrorCode.ApiRequest))
+                }
+            }, 1000)
+
             this.context.provider
                 .joinMeeting(
                     this.context.playwrightPage,
-                    () => false, // Pas besoin de stopCheck car géré par la machine à états
+                    () => this.context.endReason === RecordingEndReason.ApiRequest, // Vérifier aussi ici
                     this.context.params,
                 )
                 .then(() => {
+                    clearInterval(checkStopSignal)
                     clearTimeout(timeout)
                     resolve()
                 })
                 .catch((error) => {
+                    clearInterval(checkStopSignal)
                     clearTimeout(timeout)
                     if (error instanceof JoinError) {
                         console.error('Join meeting error:', error)

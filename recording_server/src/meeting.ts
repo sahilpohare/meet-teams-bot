@@ -13,7 +13,7 @@ import {
 
 export class MeetingHandle {
     static instance: MeetingHandle = null
-    private stateMachine: MeetingStateMachine
+    public stateMachine: MeetingStateMachine
     private param: MeetingParams
     private provider: MeetingProviderInterface
 

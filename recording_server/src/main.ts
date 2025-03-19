@@ -17,6 +17,7 @@ import { JoinError, JoinErrorCode, MeetingParams } from './types'
 
 import { spawn } from 'child_process'
 import { Events } from './events'
+import { RecordingEndReason } from './state-machine/types'
 import {
     logger,
     setupConsoleLogger,
@@ -135,7 +136,6 @@ let forceTerminationTimeout: NodeJS.Timeout | null = null
             // Erreur explicite propagée depuis la machine à états
             console.error('Meeting failed:', error)
             
-            // Attendre que le webhook soit envoyé avant de continuer
             await sendWebhookOnce({
                 meetingUrl: consumeResult.params.meeting_url,
                 botUuid: consumeResult.params.bot_uuid,
@@ -275,26 +275,30 @@ async function sendWebhookOnce(params: {
 }
 
 async function handleErrorInStartRecording(error: Error, data: MeetingParams) {
-    logger.error('Error during meeting start:', {
-        error: error instanceof JoinError ? error.message : 'Internal error',
-        details: error,
-    })
-
-    try {
-        // Envoyer le webhook d'erreur
-        await sendWebhookOnce({
-            meetingUrl: data.meeting_url,
-            botUuid: data.bot_uuid,
-            success: false,
-            errorMessage:
-                error instanceof JoinError
-                    ? error.message
-                    : JoinErrorCode.Internal,
-        })
-    } catch (e) {
-        logger.error('Failed to handle start recording error:', e)
-        throw e
+    console.log('Handling error in start recording:', {
+        errorType: error.constructor.name,
+        isJoinError: error instanceof JoinError,
+        message: error.message,
+        endReason: MeetingHandle.instance?.stateMachine?.context?.endReason
+    });
+    
+    // Utiliser le endReason du context si disponible
+    const endReason = MeetingHandle.instance?.stateMachine?.context?.endReason;
+    
+    let errorMessage;
+    if (endReason === RecordingEndReason.ApiRequest) {
+        errorMessage = JoinErrorCode.ApiRequest;
+    } else if (error instanceof JoinError) {
+        errorMessage = error.message;
+    } else {
+        errorMessage = JoinErrorCode.Internal;
     }
+    
+    await meetingBotStartRecordFailed(
+        data.meeting_url,
+        data.bot_uuid,
+        errorMessage
+    );
 }
 
 export function meetingBotStartRecordFailed(
