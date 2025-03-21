@@ -1,16 +1,21 @@
-import { RecordingMode } from '../api'
+import { RecordingMode } from '../api';
+// export async function removeInitialShityHtml(mode: RecordingMode) {
+//     // Fonction désactivée temporairement pour tests
+//     console.log('removeInitialShityHtml désactivé');
+//     return;
+// }
+// export function removeShityHtml(mode: RecordingMode) {
+//     // Fonction désactivée temporairement pour tests
+//     console.log('removeShityHtml désactivé');
+//     return;
+// }
 
 export async function removeInitialShityHtml(mode: RecordingMode) {
     let div
     try {
-        for (div of document.getElementsByTagName('div')) {
-            if (
-                div.clientHeight === 132 &&
-                (div.clientWidth === 235 || div.clientWidth === 234)
-            ) {
-                div.style.display = 'none'
-            }
-        }
+        document.querySelectorAll('[data-purpose="non-essential-ui"]').forEach(
+            elem => (elem as HTMLElement).style.display = 'none'
+        );
     } catch (e) {}
     try {
         for (div of document.getElementsByTagName('div')) {
@@ -300,4 +305,172 @@ function applyStylesRecursively(
     element.style.border = 'transparent'
 
     applyStylesRecursively(element.parentElement, depth - 1)
+}
+
+function applyStyles(mode: RecordingMode, doc = document) {
+    try {
+        // Find the main video using more stable criteria
+        const mainVideo = findMainVideo(doc);
+        
+        if (mainVideo) {
+            styleMainVideo(mainVideo, mode);
+        } else {
+            console.warn('No main video found to style');
+        }
+        
+        // Hide UI elements regardless of class names
+        hideInterfaceElements(doc);
+        
+    } catch (e) {
+        console.error('Error applying styles:', e);
+    }
+}
+
+function findMainVideo(doc: Document): HTMLVideoElement | null {
+    // Try multiple strategies to find the main video element
+    
+    // Strategy 1: Find video elements with autoplay attribute
+    const autoplayVideos = Array.from(doc.querySelectorAll('video[autoplay]'));
+    
+    // If we find autoplay videos, prioritize by size
+    if (autoplayVideos.length > 0) {
+        // Sort by area (width × height) to find the largest video
+        return autoplayVideos.sort((a, b) => {
+            const areaA = a.clientWidth * a.clientHeight;
+            const areaB = b.clientWidth * b.clientHeight;
+            return areaB - areaA; // Descending order (largest first)
+        })[0] as HTMLVideoElement;
+    }
+    
+    // Strategy 2: Look for video elements with specific attributes common in Meet
+    const videoCandidates = Array.from(doc.querySelectorAll('video[playsinline]'));
+    if (videoCandidates.length > 0) {
+        return videoCandidates.sort((a, b) => {
+            const areaA = a.clientWidth * a.clientHeight;
+            const areaB = b.clientWidth * b.clientHeight;
+            return areaB - areaA;
+        })[0] as HTMLVideoElement;
+    }
+    
+    // Strategy 3: Last resort - just get the largest video element
+    const allVideos = Array.from(doc.querySelectorAll('video'));
+    if (allVideos.length > 0) {
+        return allVideos.sort((a, b) => {
+            const areaA = a.clientWidth * a.clientHeight;
+            const areaB = b.clientWidth * b.clientHeight;
+            return areaB - areaA;
+        })[0] as HTMLVideoElement;
+    }
+    
+    return null;
+}
+
+function styleMainVideo(video: HTMLVideoElement, mode: RecordingMode): void {
+    // Style the video
+    video.style.position = 'fixed';
+    video.style.display = 'block';
+    video.style.left = '0';
+    video.style.top = '0';
+    video.style.width = '100vw';
+    video.style.height = '100vh';
+    video.style.objectFit = 'contain';
+    video.style.zIndex = '900000';
+    video.style.backgroundColor = '#000';
+    
+    // Try to style parent container too (up to 3 levels)
+    let parent = video.parentElement;
+    let level = 0;
+    
+    while (parent && level < 3) {
+        parent.style.position = 'fixed';
+        parent.style.left = '0';
+        parent.style.top = '0';
+        parent.style.width = '100vw';
+        parent.style.height = '100vh';
+        parent.style.overflow = 'hidden';
+        parent.style.zIndex = '899999';
+        
+        // Move up one level
+        parent = parent.parentElement;
+        level++;
+    }
+}
+
+function hideInterfaceElements(doc: Document): void {
+    // Hide elements by role (more stable than class names)
+    const rolesToHide = ['banner', 'toolbar', 'complementary', 'navigation'];
+    rolesToHide.forEach(role => {
+        doc.querySelectorAll(`[role="${role}"]`).forEach(
+            elem => (elem as HTMLElement).style.opacity = '0'
+        );
+    });
+    
+    // Hide polite announcements
+    doc.querySelectorAll('div[aria-live="polite"]').forEach(
+        div => (div as HTMLElement).style.opacity = '0'
+    );
+    
+    // Hide buttons
+    doc.querySelectorAll('button').forEach(button => {
+        // Only hide buttons that are not essential
+        // We can further refine this logic if needed
+        if (!button.hasAttribute('data-essential')) {
+            button.style.opacity = '0';
+        }
+    });
+    
+    // Hide notification areas typically at the bottom
+    const bottomElements = Array.from(doc.querySelectorAll('div'))
+        .filter(div => {
+            const rect = div.getBoundingClientRect();
+            // Elements at the bottom of the screen
+            return rect.bottom > window.innerHeight - 150 && 
+                   rect.height < 150 && 
+                   rect.width > 200;
+        });
+    
+    bottomElements.forEach(el => {
+        (el as HTMLElement).style.opacity = '0';
+    });
+}
+
+function observeIframes(callback: (iframe: HTMLIFrameElement) => void) {
+    // Process existing iframes
+    document.querySelectorAll('iframe').forEach(iframe => {
+        callback(iframe);
+    });
+    
+    // Watch for new iframes
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach(mutation => {
+            mutation.addedNodes.forEach(node => {
+                if (node.nodeName === 'IFRAME') {
+                    callback(node as HTMLIFrameElement);
+                }
+                
+                // Also check for iframes inside added nodes
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                    (node as Element).querySelectorAll('iframe').forEach(iframe => {
+                        callback(iframe);
+                    });
+                }
+            });
+        });
+    });
+    
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+    
+    return observer;
+}
+
+function getIframeDocument(iframe: HTMLIFrameElement): Document | null {
+    try {
+        return iframe.contentDocument || iframe.contentWindow?.document || null;
+    } catch (error) {
+        console.log('Cannot access iframe content (likely cross-origin):', error);
+        return null;
+    }
 }

@@ -40,13 +40,11 @@ export async function getSpeakerRootToObserve(
                         height === 66.63)
                 )
             })
-            // Log the filtered divs
-            // console.log(filteredDivs)
-
-            // Example action: outline the filtered divs
-            filteredDivs.forEach((div) => {
-                div.remove()
-            })
+            
+            // Nous ne supprimons plus ces divs pour ne pas perturber l'interface
+            // filteredDivs.forEach((div) => {
+            //     div.remove()
+            // })
 
             // Observer le document entier au lieu du panneau participants
             return [
@@ -59,11 +57,8 @@ export async function getSpeakerRootToObserve(
                     attributeFilter: ['class', 'aria-label'],
                 },
             ]
-        } catch (e) {
-            // console.error(
-            //     '[getSpeakerRootToObserve] on meet error removing useless divs',
-            //     e,
-            // )
+        } catch (error) {
+            console.error('Error in getSpeakerRootToObserve:', error)
             return [
                 document,
                 {
@@ -75,6 +70,50 @@ export async function getSpeakerRootToObserve(
                 },
             ]
         }
+    }
+}
+
+// Fonction pour observer toutes les iframes existantes et futures
+export function observeIframes(callback: (iframe: HTMLIFrameElement) => void) {
+    // Observer les iframes existantes
+    document.querySelectorAll('iframe').forEach(iframe => {
+        callback(iframe);
+    });
+
+    // Observer pour détecter les nouvelles iframes
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach(mutation => {
+            mutation.addedNodes.forEach(node => {
+                if (node.nodeName === 'IFRAME') {
+                    callback(node as HTMLIFrameElement);
+                }
+                // Rechercher les iframes dans les sous-éléments ajoutés
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                    (node as Element).querySelectorAll('iframe').forEach(iframe => {
+                        callback(iframe);
+                    });
+                }
+            });
+        });
+    });
+
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+
+    return observer;
+}
+
+// Fonction pour obtenir un document à partir d'une iframe
+export function getIframeDocument(iframe: HTMLIFrameElement): Document | null {
+    try {
+        // Vérifier si l'iframe est accessible (même origine)
+        return iframe.contentDocument || iframe.contentWindow?.document || null;
+    } catch (error) {
+        // Si l'iframe est cross-origin, on ne peut pas y accéder
+        console.log('Cannot access iframe content (likely cross-origin):', error);
+        return null;
     }
 }
 
@@ -317,3 +356,26 @@ export function getSpeakerFromDocument(
 //     }
 //     return names
 // }
+
+// Dans votre fonction qui initialise l'observation des haut-parleurs
+const iframeObserver = observeIframes((iframe) => {
+    const iframeDoc = getIframeDocument(iframe);
+    if (iframeDoc) {
+        // Créer un nouvel observateur pour le contenu de l'iframe
+        const observer = new MutationObserver((mutations) => {
+            // Même logique que votre observateur principal
+            // Traiter les mutations pour détecter les changements de haut-parleurs
+        });
+        
+        // Observer le document de l'iframe avec les mêmes paramètres
+        observer.observe(iframeDoc, {
+            attributes: true,
+            characterData: false,
+            childList: true,
+            subtree: true,
+            attributeFilter: ['class', 'aria-label'],
+        });
+    }
+});
+
+// Stockez cet iframeObserver pour pouvoir le déconnecter plus tard si nécessaire

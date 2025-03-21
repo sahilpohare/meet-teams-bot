@@ -242,14 +242,56 @@ export class RecordingState extends BaseState {
         }
 
         try {
-            // 1. Arrêter l'enregistrement média
-            await this.context.backgroundPage.evaluate(() => {
-                const w = window as any
-                return w.stopMediaRecorder()
-            })
+            // Vérifier si la fonction existe d'abord
+            const functionExists = await this.context.backgroundPage.evaluate(() => {
+                const w = window as any;
+                return {
+                    stopMediaRecorderExists: typeof w.stopMediaRecorder === 'function',
+                    recordExists: typeof w.record !== 'undefined',
+                    recordStopExists: w.record && typeof w.record.stop === 'function'
+                };
+            });
+            
+            console.log('Stop functions status:', functionExists);
+            
+            if (functionExists.stopMediaRecorderExists) {
+                // 1. Arrêter l'enregistrement média avec diagnostic détaillé
+                await this.context.backgroundPage.evaluate(() => {
+                    const w = window as any;
+                    try {
+                        console.log('Calling stopMediaRecorder...');
+                        const result = w.stopMediaRecorder();
+                        console.log('stopMediaRecorder called successfully, result:', result);
+                        return result;
+                    } catch (error) {
+                        console.error('Error in stopMediaRecorder:', error);
+                        // Essayer d'afficher plus de détails sur l'erreur
+                        console.error('Error details:', 
+                            JSON.stringify(error, Object.getOwnPropertyNames(error)));
+                        throw error;
+                    }
+                });
+            } else {
+                console.warn('stopMediaRecorder function not found in window object');
+                
+                // Tentative de workaround direct avec MediaRecorder si disponible
+                try {
+                    await this.context.backgroundPage.evaluate(() => {
+                        const w = window as any;
+                        if (w.MEDIA_RECORDER && w.MEDIA_RECORDER.state !== 'inactive') {
+                            console.log('Attempting direct stop of MEDIA_RECORDER');
+                            w.MEDIA_RECORDER.stop();
+                            return true;
+                        }
+                        return false;
+                    });
+                } catch (directStopError) {
+                    console.error('Failed direct stop attempt:', directStopError);
+                }
+            }
         } catch (error) {
-            console.error('Failed to stop video recording:', error)
-            throw error
+            console.error('Failed to stop video recording:', error);
+            throw error;
         }
     }
 

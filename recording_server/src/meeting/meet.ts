@@ -103,14 +103,51 @@ export class MeetProvider implements MeetingProviderInterface {
             await deactivateMicrophone(page)
         }
 
-        const askToJoinClicked = await clickWithInnerText(
+        await takeScreenshot(page, `before_join_button_attempts`);
+
+        // Try multiple approaches to find the join button
+        let askToJoinClicked = await clickWithInnerText(
             page,
             'span',
             ['Ask to join', 'Join now'],
-            10,
-        )
+            5,
+        );
+
         if (!askToJoinClicked) {
-            throw new JoinError(JoinErrorCode.CannotJoinMeeting)
+            console.log('First attempt to find join button failed, trying alternate selectors');
+            
+            // Try button element directly
+            askToJoinClicked = await clickWithInnerText(
+                page,
+                'button',
+                ['Ask to join', 'Join now', 'Join meeting', 'Join', 'Enter meeting'],
+                5,
+            );
+        }
+
+        if (!askToJoinClicked) {
+            console.log('Second attempt failed, trying by aria-label');
+            
+            // Try by aria-label which might be more stable
+            try {
+                const joinButtons = page.locator('button[aria-label*="Join"], button[aria-label*="join now"]');
+                const count = await joinButtons.count();
+                console.log(`Found ${count} buttons with Join in aria-label`);
+                
+                if (count > 0) {
+                    await joinButtons.first().click();
+                    console.log('Clicked join button by aria-label');
+                    askToJoinClicked = true;
+                }
+            } catch (e) {
+                console.error('Error trying to click by aria-label:', e);
+            }
+        }
+
+        if (!askToJoinClicked) {
+            // Take a screenshot to see what the UI looks like at failure
+            await takeScreenshot(page, `join_button_not_found`);
+            throw new JoinError(JoinErrorCode.CannotJoinMeeting);
         }
 
         await findShowEveryOne(page, false, cancelCheck)
@@ -322,27 +359,77 @@ async function clickWithInnerText(
     maxAttempts: number,
     shouldClick: boolean = true,
 ): Promise<boolean> {
+    console.log(`Attempting to find ${selector} with texts: ${texts.join(', ')}`)
+    
+    // First, take a screenshot to see what the page looks like
+    await takeScreenshot(page, `before_click_${texts.join('_')}_attempt`)
+    
     for (let i = 0; i < maxAttempts; i++) {
         try {
+            // Dump the page content to log for analysis
+            if (i === 0) {
+                console.log('Page content preview:', await page.content().then(c => c.slice(0, 500) + '...'))
+                
+                // Log visible buttons for debugging
+                const visibleButtons = await page.evaluate(() => {
+                    return Array.from(document.querySelectorAll('button, span[role="button"]'))
+                        .filter(el => {
+                            const style = window.getComputedStyle(el);
+                            return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+                        })
+                        .map(el => ({
+                            text: el.textContent?.trim(),
+                            role: el.getAttribute('role'),
+                            ariaLabel: el.getAttribute('aria-label')
+                        }));
+                });
+                console.log('Visible buttons:', JSON.stringify(visibleButtons, null, 2));
+            }
+            
             for (const text of texts) {
-                const element = await page.locator(
+                console.log(`Attempt ${i+1}/${maxAttempts} - Looking for "${text}" in ${selector}`)
+                
+                // Try multiple selector strategies
+                const selectors = [
                     `${selector}:has-text("${text}")`,
-                )
-                if ((await element.count()) > 0) {
-                    if (shouldClick) {
-                        await element.click()
+                    `${selector}:text-is("${text}")`,
+                    `${selector}[aria-label*="${text}"]`,
+                    `button:has(${selector}:has-text("${text}"))`
+                ];
+                
+                for (const sel of selectors) {
+                    const element = page.locator(sel);
+                    const count = await element.count();
+                    console.log(`  - Selector "${sel}" found ${count} elements`);
+                    
+                    if (count > 0) {
+                        console.log(`  - Found element with text "${text}" using selector "${sel}"`);
+                        if (shouldClick) {
+                            // Take screenshot before clicking
+                            await takeScreenshot(page, `before_click_${text.replace(/\s+/g, '_')}`);
+                            await element.click();
+                            console.log(`  - Clicked on element with text "${text}"`);
+                            await takeScreenshot(page, `after_click_${text.replace(/\s+/g, '_')}`);
+                        }
+                        return true;
                     }
-                    return true
                 }
             }
         } catch (e) {
-            if (i === maxAttempts - 1) {
-                console.error(`Error in clickWithInnerText (last attempt):`, e)
-            }
+            console.error(`Error in clickWithInnerText (attempt ${i+1}/${maxAttempts}):`, e);
         }
-        await page.waitForTimeout(100 + i * 100)
+        await page.waitForTimeout(100 + i * 100);
     }
-    return false
+    
+    // Take a final screenshot to see what the page looks like after all attempts
+    await takeScreenshot(page, `failed_click_${texts.join('_')}_final`);
+    
+    // Log all visible text on the page as a last resort
+    console.log('All visible text on page:', await page.evaluate(() => {
+        return document.body.innerText.slice(0, 1000) + '...';
+    }));
+    
+    return false;
 }
 
 async function changeLayout(
