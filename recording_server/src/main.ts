@@ -119,7 +119,21 @@ let forceTerminationTimeout: NodeJS.Timeout | null = null
                 const endReason = MeetingHandle.instance.getEndReason();
                 console.log(`Recording ended normally with reason: ${endReason}`);
                 
-                await Api.instance.endMeetingTrampoline()
+                try {
+                    // Tenter d'appeler l'API, mais isoler cette erreur
+                    await Api.instance.endMeetingTrampoline();
+                } catch (apiError) {
+                    // Logger l'erreur API mais ne pas la considérer comme un échec de l'enregistrement
+                    console.error('Error calling API (but recording was successful):', apiError);
+                    
+                    // Notifier que l'enregistrement était réussi malgré l'erreur API
+                    await sendWebhookOnce({
+                        meetingUrl: consumeResult.params.meeting_url,
+                        botUuid: consumeResult.params.bot_uuid,
+                        success: true, // Le recording a réussi malgré l'erreur API
+                        errorMessage: 'Recording completed successfully but API notification failed'
+                    });
+                }
             } else {
                 // L'enregistrement n'a pas atteint l'état Recording ou a échoué
                 console.error('Recording did not complete successfully');
@@ -133,7 +147,7 @@ let forceTerminationTimeout: NodeJS.Timeout | null = null
                 });
             }
         } catch (error) {
-            // Erreur explicite propagée depuis la machine à états
+            // Erreur explicite propagée depuis la machine à états (erreur durant l'enregistrement)
             console.error('Meeting failed:', error)
             
             await sendWebhookOnce({
