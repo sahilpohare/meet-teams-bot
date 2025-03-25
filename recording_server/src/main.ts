@@ -120,18 +120,22 @@ let forceTerminationTimeout: NodeJS.Timeout | null = null
                 console.log(`Recording ended normally with reason: ${endReason}`);
                 
                 try {
-                    // Tenter d'appeler l'API, mais isoler cette erreur
-                    await Api.instance.endMeetingTrampoline();
+                    // Utiliser la fonction de retry pour les appels API
+                    await retryApiCall(
+                        () => Api.instance.endMeetingTrampoline(),
+                        10,  // Maximum 10 retries
+                        5 * 60 * 1000  // Over a 5 minute period
+                    );
                 } catch (apiError) {
                     // Logger l'erreur API mais ne pas la considérer comme un échec de l'enregistrement
-                    console.error('Error calling API (but recording was successful):', apiError);
+                    console.error('Error calling API after multiple retries (but recording was successful):', apiError);
                     
                     // Notifier que l'enregistrement était réussi malgré l'erreur API
                     await sendWebhookOnce({
                         meetingUrl: consumeResult.params.meeting_url,
                         botUuid: consumeResult.params.bot_uuid,
                         success: true, // Le recording a réussi malgré l'erreur API
-                        errorMessage: 'Recording completed successfully but API notification failed'
+                        errorMessage: 'Recording completed successfully but API notification failed after multiple retries'
                     });
                 }
             } else {
@@ -382,4 +386,38 @@ export function setupForceTermination() {
     logger.info(
         `Hard kill timer set: instance will be forcefully terminated after ${MAX_INSTANCE_DURATION_AFTER_RABBIT_MESSAGE_RECIEVED_MS / 1000 / 60 / 60} hours`,
     )
+}
+
+async function retryApiCall<T>(
+    fn: () => Promise<T>,
+    maxRetries = 10,
+    maxRetryTime = 5 * 60 * 1000, // 5 minutes in milliseconds
+    initialDelay = 1000
+): Promise<T> {
+    const startTime = Date.now();
+    let lastError: any;
+    let retryCount = 0;
+    let delay = initialDelay;
+
+    while (retryCount < maxRetries && (Date.now() - startTime) < maxRetryTime) {
+        try {
+            return await fn();
+        } catch (error) {
+            lastError = error;
+            retryCount++;
+            
+            // Log retry attempt
+            console.log(`API call failed, attempt ${retryCount}/${maxRetries}. Retrying in ${delay/1000}s...`, error);
+            
+            // Wait before next retry with exponential backoff
+            await new Promise(resolve => setTimeout(resolve, delay));
+            
+            // Exponential backoff with a maximum of 30 seconds
+            delay = Math.min(delay * 1.5, 30000);
+        }
+    }
+    
+    // If we get here, all retries have failed
+    console.error(`API call failed after ${retryCount} attempts over ${(Date.now() - startTime)/1000}s`);
+    throw lastError;
 }
