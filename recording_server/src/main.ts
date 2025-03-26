@@ -185,14 +185,27 @@ let forceTerminationTimeout: NodeJS.Timeout | null = null
                 
                 // Récupérer la raison spécifique de l'échec
                 const endReason = MeetingHandle.instance.getEndReason();
-                console.log(`Recording failed with reason: ${endReason}`);
+                let errorMessage;
+                
+                // Vérifier si nous avons une erreur de type JoinError dans le contexte
+                const joinError = MeetingHandle.instance?.stateMachine?.context?.error;
+                if (joinError && joinError instanceof JoinError) {
+                    // Utiliser le message de JoinError directement
+                    errorMessage = joinError.message;
+                    console.log(`Found JoinError in context with code: ${errorMessage}`);
+                } else if (endReason) {
+                    // Utiliser endReason comme fallback
+                    errorMessage = String(endReason);
+                }
+                
+                console.log(`Recording failed with reason: ${errorMessage || 'Unknown'}`);
                 
                 // On n'appelle pas endMeetingTrampoline ici
                 await sendWebhookOnce({
                     meetingUrl: consumeResult.params.meeting_url,
                     botUuid: consumeResult.params.bot_uuid,
                     success: false,
-                    errorMessage: endReason || 'Recording did not complete successfully'
+                    errorMessage: errorMessage || 'Recording did not complete successfully'
                 });
             }
         } catch (error) {
