@@ -4,8 +4,7 @@ import {
     JoinError,
     JoinErrorCode,
     MeetingParams,
-    MeetingProviderInterface,
-    RecordingMode,
+    MeetingProviderInterface
 } from '../types'
 
 import { parseMeetingUrlFromJoinInfos } from '../urlParser/meetUrlParser'
@@ -164,7 +163,7 @@ export class MeetProvider implements MeetingProviderInterface {
         await clickOutsideModal(page)
         const maxAttempts = 5
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-            if (await changeLayout(page, meetingParams.recording_mode)) {
+            if (await changeLayout(page, attempt)) {
                 console.log(`Layout change successful on attempt ${attempt}`)
                 break
             }
@@ -432,79 +431,39 @@ async function clickWithInnerText(
     return false;
 }
 
-async function changeLayout(
-    page: Page,
-    recordingMode: RecordingMode,
-    maxRetries = 3,
-): Promise<boolean> {
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-            console.log(
-                `Starting layout change process (attempt ${attempt}/${maxRetries})...`,
-            )
-
-            // More options button - en utilisant Call controls comme parent
-            const moreOptionsButton = page.locator(
-                'div[role="region"][aria-label="Call controls"] button[aria-label="More options"]',
-            )
-            await moreOptionsButton.waitFor({ state: 'visible', timeout: 5000 })
-            await moreOptionsButton.click()
-            console.log('More options clicked successfully')
-
-            // Change layout option - using the menu item role with dashboard icon
-            const changeLayoutMenuItem = page
-                .locator('li[role="menuitem"]')
-                .filter({
-                    has: page.locator(
-                        'i.google-material-icons:has-text("dashboard")',
-                    ),
-                })
-            await changeLayoutMenuItem.waitFor({
-                state: 'visible',
-                timeout: 5000,
-            })
-            await changeLayoutMenuItem.click()
-            console.log('Change layout clicked successfully')
-
-            // Select layout option based on mode
-            const layoutOption =
-                recordingMode === 'gallery_view' ? 'Tiled' : 'Spotlight'
-
-            // Click on the label with the desired text
-            const layoutLabel = page.locator('label.DxvcU').filter({
-                has: page.locator(`span.xo15nd:has-text("${layoutOption}")`),
-            })
-            await layoutLabel.waitFor({ state: 'visible', timeout: 5000 })
-            await layoutLabel.click()
-            console.log(`${layoutOption} layout clicked successfully`)
-
-            // Cliquer en dehors de la modal pour la fermer
-            await page.mouse.click(0, 0)
-            console.log('Clicked outside modal to close it')
-
-            return true
-        } catch (e) {
-            console.error(`Error in changeLayout (attempt ${attempt}):`, e)
-            await takeScreenshot(page, `change_layout_error_${attempt}`)
-
-            // Try to close any open modals before retrying
-            try {
-                await page.mouse.click(0, 0)
-            } catch {}
-
-            if (attempt === maxRetries) {
-                return false
+async function changeLayout(page: Page, currentAttempt: number = 1, maxAttempts: number = 3): Promise<boolean> {
+    console.log(`Starting layout change process (attempt ${currentAttempt}/${maxAttempts})...`);
+    
+    try {
+        await page.waitForLoadState('networkidle');
+        
+        const button = await page.locator('button[aria-label="Show everyone"], button[aria-label="People"]');
+        
+        await page.evaluate((selector) => {
+            const element = document.querySelector(selector);
+            if (element) {
+                const clickEvent = new MouseEvent('click', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window
+                });
+                element.dispatchEvent(clickEvent);
             }
-        }
+        }, 'button[aria-label="Show everyone"], button[aria-label="People"]');
 
-        // Add a small delay between retries
-        if (attempt < maxRetries) {
-            await page.waitForTimeout(2000)
+        const panel = await page.locator('[aria-label="People"] >> visible=true');
+        await panel.waitFor({ timeout: 5000 });
+
+        return true;
+
+    } catch (error) {
+        if (currentAttempt < maxAttempts) {
+            await page.waitForTimeout(2000);
+            return changeLayout(page, currentAttempt + 1, maxAttempts);
         }
+        console.error(`Error in changeLayout (attempt ${currentAttempt}):`, error);
+        return false;
     }
-
-    console.error('All layout change attempts failed')
-    return false
 }
 
 async function clickOutsideModal(page: Page) {

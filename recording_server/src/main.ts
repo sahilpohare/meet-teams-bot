@@ -119,35 +119,93 @@ let forceTerminationTimeout: NodeJS.Timeout | null = null
                 const endReason = MeetingHandle.instance.getEndReason();
                 console.log(`Recording ended normally with reason: ${endReason}`);
                 
-                try {
-                    // Utiliser la fonction de retry pour les appels API
-                    await retryApiCall(
-                        () => Api.instance.endMeetingTrampoline(),
-                        10,  // Maximum 10 retries
-                        5 * 60 * 1000  // Over a 5 minute period
-                    );
-                } catch (apiError) {
-                    // Logger l'erreur API mais ne pas la considérer comme un échec de l'enregistrement
-                    console.error('Error calling API after multiple retries (but recording was successful):', apiError);
+                // Start retry process and set a timeout
+                let webhookSentForApiFailure = false;
+                const apiStartTime = Date.now();
+                const maxApiWaitTime = 20 * 60 * 1000; // 20 minutes
+                const retryDelay = 10000; // 10 seconds
+                
+                // Keep retrying until we succeed or time runs out
+                while (Date.now() - apiStartTime < maxApiWaitTime) {
+                    try {
+                        // Try to call the API
+                        await Api.instance.endMeetingTrampoline();
+                        console.log('API call to endMeetingTrampoline succeeded');
+                        break; // Success! Exit the loop
+                    } catch (apiError) {
+                        const elapsedSeconds = (Date.now() - apiStartTime) / 1000;
+                        const remainingSeconds = Math.max(0, maxApiWaitTime - (Date.now() - apiStartTime)) / 1000;
+                        
+                        console.log(
+                            `API call failed after ${elapsedSeconds.toFixed(1)}s, ` +
+                            `${remainingSeconds.toFixed(1)}s remaining before timeout. ` +
+                            `Retrying in ${retryDelay/1000}s...`, 
+                            apiError
+                        );
+                        
+                        // Only send the webhook once if we're going to keep trying
+                        if (!webhookSentForApiFailure && remainingSeconds < maxApiWaitTime/1000 - 60) {
+                            // If we've been retrying for more than a minute, send webhook but keep trying
+                            try {
+                                await sendWebhookOnce({
+                                    meetingUrl: consumeResult.params.meeting_url,
+                                    botUuid: consumeResult.params.bot_uuid,
+                                    success: true,
+                                    errorMessage: 'Recording completed successfully but having difficulty notifying API'
+                                });
+                                webhookSentForApiFailure = true;
+                                console.log('Sent webhook for successful recording while API retries continue');
+                            } catch (webhookError) {
+                                console.error('Failed to send interim webhook:', webhookError);
+                            }
+                        }
+                        
+                        // Wait before retrying
+                        await new Promise(resolve => setTimeout(resolve, retryDelay));
+                    }
+                }
+                
+                // If we exited the loop without breaking, it means we timed out
+                if (Date.now() - apiStartTime >= maxApiWaitTime) {
+                    console.error('API call failed after 20 minutes of retries');
                     
-                    // Notifier que l'enregistrement était réussi malgré l'erreur API
-                    await sendWebhookOnce({
-                        meetingUrl: consumeResult.params.meeting_url,
-                        botUuid: consumeResult.params.bot_uuid,
-                        success: true, // Le recording a réussi malgré l'erreur API
-                        errorMessage: 'Recording completed successfully but API notification failed after multiple retries'
-                    });
+                    // Send final webhook if we haven't already
+                    if (!webhookSentForApiFailure) {
+                        await sendWebhookOnce({
+                            meetingUrl: consumeResult.params.meeting_url,
+                            botUuid: consumeResult.params.bot_uuid,
+                            success: true,
+                            errorMessage: 'Recording completed successfully but API notification failed after 20 minutes'
+                        });
+                    }
                 }
             } else {
                 // L'enregistrement n'a pas atteint l'état Recording ou a échoué
                 console.error('Recording did not complete successfully');
+                
+                // Récupérer la raison spécifique de l'échec
+                const endReason = MeetingHandle.instance.getEndReason();
+                let errorMessage;
+                
+                // Vérifier si nous avons une erreur de type JoinError dans le contexte
+                const joinError = MeetingHandle.instance?.stateMachine?.context?.error;
+                if (joinError && joinError instanceof JoinError) {
+                    // Utiliser le message de JoinError directement
+                    errorMessage = joinError.message;
+                    console.log(`Found JoinError in context with code: ${errorMessage}`);
+                } else if (endReason) {
+                    // Utiliser endReason comme fallback
+                    errorMessage = String(endReason);
+                }
+                
+                console.log(`Recording failed with reason: ${errorMessage || 'Unknown'}`);
                 
                 // On n'appelle pas endMeetingTrampoline ici
                 await sendWebhookOnce({
                     meetingUrl: consumeResult.params.meeting_url,
                     botUuid: consumeResult.params.bot_uuid,
                     success: false,
-                    errorMessage: 'Recording did not complete successfully'
+                    errorMessage: errorMessage || 'Recording did not complete successfully'
                 });
             }
         } catch (error) {
@@ -390,34 +448,38 @@ export function setupForceTermination() {
 
 async function retryApiCall<T>(
     fn: () => Promise<T>,
-    maxRetries = 10,
-    maxRetryTime = 5 * 60 * 1000, // 5 minutes in milliseconds
-    initialDelay = 1000
+    maxRetries = 120, // Default 120 retries for 20 minutes with 10s delay
+    maxRetryTime = 20 * 60 * 1000, // 20 minutes in milliseconds
+    retryDelay = 10000 // Fixed 10 second delay between retries
 ): Promise<T> {
     const startTime = Date.now();
     let lastError: any;
     let retryCount = 0;
-    let delay = initialDelay;
 
     while (retryCount < maxRetries && (Date.now() - startTime) < maxRetryTime) {
         try {
-            return await fn();
+            const result = await fn();
+            console.log(`API call succeeded after ${retryCount} attempts`);
+            return result;
         } catch (error) {
             lastError = error;
             retryCount++;
             
-            // Log retry attempt
-            console.log(`API call failed, attempt ${retryCount}/${maxRetries}. Retrying in ${delay/1000}s...`, error);
+            const elapsedTime = (Date.now() - startTime) / 1000;
+            const remainingTime = Math.max(0, maxRetryTime - (Date.now() - startTime)) / 1000;
             
-            // Wait before next retry with exponential backoff
-            await new Promise(resolve => setTimeout(resolve, delay));
+            // Log retry attempt with more detailed information
+            console.log(`API call failed, attempt ${retryCount}/${maxRetries} (${elapsedTime.toFixed(1)}s elapsed, ${remainingTime.toFixed(1)}s remaining). Retrying in ${retryDelay/1000}s...`, error);
             
-            // Exponential backoff with a maximum of 30 seconds
-            delay = Math.min(delay * 1.5, 30000);
+            // Wait before next retry - ensure this actually waits the full duration
+            if (retryCount < maxRetries && (Date.now() - startTime) < maxRetryTime) {
+                await new Promise(resolve => setTimeout(resolve, retryDelay));
+            }
         }
     }
     
     // If we get here, all retries have failed
-    console.error(`API call failed after ${retryCount} attempts over ${(Date.now() - startTime)/1000}s`);
+    const totalTime = (Date.now() - startTime)/1000;
+    console.error(`API call failed after ${retryCount} attempts over ${totalTime.toFixed(1)}s - exhausted retry attempts`);
     throw lastError;
 }
