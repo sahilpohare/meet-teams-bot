@@ -23,13 +23,15 @@ if (MEETING_PROVIDER === 'Teams') {
 // S'assurer que le provider est initialisé avant d'utiliser les fonctions
 if (PROVIDER) {
     // Initialisation
-    PROVIDER.removeInitialShityHtml(RECORDING_MODE).catch((e) =>
-        console.warn('Error in initial HTML cleanup:', e),
-    )
+    if (RECORDING_MODE !== 'audio_only') {
+        PROVIDER.removeInitialShityHtml(RECORDING_MODE).catch((e) =>
+            console.warn('Error in initial HTML cleanup:', e),
+        )
+    }
 
     // Observer les changements
     const observer = new MutationObserver(() => {
-        if (PROVIDER) {
+        if (PROVIDER && RECORDING_MODE !== 'audio_only') {
             PROVIDER.removeShityHtml(RECORDING_MODE)
         }
     })

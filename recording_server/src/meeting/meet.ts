@@ -162,6 +162,7 @@ export class MeetProvider implements MeetingProviderInterface {
 
         await clickOutsideModal(page)
         const maxAttempts = 5
+        if (meetingParams.recording_mode !== 'audio_only') {
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
             if (await changeLayout(page, attempt)) {
                 console.log(`Layout change successful on attempt ${attempt}`)
@@ -175,6 +176,7 @@ export class MeetProvider implements MeetingProviderInterface {
             await clickOutsideModal(page)
             await page.waitForTimeout(500)
         }
+    }
 
         if (meetingParams.recording_mode !== 'gallery_view') {
             await findShowEveryOne(page, true, cancelCheck)
@@ -238,12 +240,27 @@ async function findShowEveryOne(
     let i = 0
 
     while (!showEveryOneFound) {
-        const button = page.locator(
-            'button[aria-label="Show everyone"], button[aria-label="People"]',
+        // On cible le bouton dans la nav principale, en utilisant des attributs stables
+        const buttons = page.locator(
+            [
+                'nav button[aria-label="People"][role="button"]',
+                'nav button[aria-label="Show everyone"][role="button"]',
+                // Le data-panel-id="1" semble être un identifiant stable pour le panneau des participants
+                'nav button[data-panel-id="1"][role="button"]',
+            ].join(', ')
         )
-        showEveryOneFound = (await button.count()) > 0
+        
+        const count = await buttons.count()
+        showEveryOneFound = count > 0
+
         if (showEveryOneFound && click) {
-            await button.click()
+            try {
+                await buttons.first().click()
+                console.log('Successfully clicked People button')
+            } catch (e) {
+                console.log('Failed to click People button:', e)
+                showEveryOneFound = false
+            }
         }
 
         await takeScreenshot(page, `findShowEveryone`)
@@ -437,20 +454,7 @@ async function changeLayout(page: Page, currentAttempt: number = 1, maxAttempts:
     try {
         await page.waitForLoadState('networkidle');
         
-        const button = await page.locator('button[aria-label="Show everyone"], button[aria-label="People"]');
-        
-        await page.evaluate((selector) => {
-            const element = document.querySelector(selector);
-            if (element) {
-                const clickEvent = new MouseEvent('click', {
-                    bubbles: true,
-                    cancelable: true,
-                    view: window
-                });
-                element.dispatchEvent(clickEvent);
-            }
-        }, 'button[aria-label="Show everyone"], button[aria-label="People"]');
-
+        // On attend juste que le panneau soit visible
         const panel = await page.locator('[aria-label="People"] >> visible=true');
         await panel.waitFor({ timeout: 5000 });
 
