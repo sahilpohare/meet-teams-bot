@@ -65,121 +65,129 @@ export class MeetProvider implements MeetingProviderInterface {
         cancelCheck: () => boolean,
         meetingParams: MeetingParams,
     ): Promise<void> {
-        await clickDismiss(page)
-        await sleep(300)
+        try {
+            await clickDismiss(page)
+            await sleep(300)
 
-        console.log(
-            'useWithoutAccountClicked:',
-            await clickWithInnerText(
+            console.log(
+                'useWithoutAccountClicked:',
+                await clickWithInnerText(
+                    page,
+                    'span',
+                    ['Use without an account'],
+                    5,
+                ),
+            )
+
+            await takeScreenshot(page, `before_typing_bot_name`)
+
+            for (let attempt = 1; attempt <= 5; attempt++) {
+                if (await typeBotName(page, meetingParams.bot_name)) {
+                    console.log('Bot name typed at attempt', attempt)
+                    break
+                }
+                await takeScreenshot(
+                    page,
+                    `bot_name_typing_failed_attempt_${attempt}`,
+                )
+                await clickOutsideModal(page)
+                await page.waitForTimeout(500)
+            }
+
+            await takeScreenshot(page, `after_typing_bot_name`)
+
+            // Control microphone based on streaming_input
+            if (meetingParams.streaming_input) {
+                await activateMicrophone(page)
+            } else {
+                await deactivateMicrophone(page)
+            }
+
+            await takeScreenshot(page, `before_join_button_attempts`);
+
+            // Try multiple approaches to find the join button
+            let askToJoinClicked = await clickWithInnerText(
                 page,
                 'span',
-                ['Use without an account'],
-                5,
-            ),
-        )
-
-        await takeScreenshot(page, `before_typing_bot_name`)
-
-        for (let attempt = 1; attempt <= 5; attempt++) {
-            if (await typeBotName(page, meetingParams.bot_name)) {
-                console.log('Bot name typed at attempt', attempt)
-                break
-            }
-            await takeScreenshot(
-                page,
-                `bot_name_typing_failed_attempt_${attempt}`,
-            )
-            await clickOutsideModal(page)
-            await page.waitForTimeout(500)
-        }
-
-        await takeScreenshot(page, `after_typing_bot_name`)
-
-        // Control microphone based on streaming_input
-        if (meetingParams.streaming_input) {
-            await activateMicrophone(page)
-        } else {
-            await deactivateMicrophone(page)
-        }
-
-        await takeScreenshot(page, `before_join_button_attempts`);
-
-        // Try multiple approaches to find the join button
-        let askToJoinClicked = await clickWithInnerText(
-            page,
-            'span',
-            ['Ask to join', 'Join now'],
-            5,
-        );
-
-        if (!askToJoinClicked) {
-            console.log('First attempt to find join button failed, trying alternate selectors');
-            
-            // Try button element directly
-            askToJoinClicked = await clickWithInnerText(
-                page,
-                'button',
-                ['Ask to join', 'Join now', 'Join meeting', 'Join', 'Enter meeting'],
+                ['Ask to join', 'Join now'],
                 5,
             );
-        }
 
-        if (!askToJoinClicked) {
-            console.log('Second attempt failed, trying by aria-label');
-            
-            // Try by aria-label which might be more stable
-            try {
-                const joinButtons = page.locator('button[aria-label*="Join"], button[aria-label*="join now"]');
-                const count = await joinButtons.count();
-                console.log(`Found ${count} buttons with Join in aria-label`);
+            if (!askToJoinClicked) {
+                console.log('First attempt to find join button failed, trying alternate selectors');
                 
-                if (count > 0) {
-                    await joinButtons.first().click();
-                    console.log('Clicked join button by aria-label');
-                    askToJoinClicked = true;
+                // Try button element directly
+                askToJoinClicked = await clickWithInnerText(
+                    page,
+                    'button',
+                    ['Ask to join', 'Join now', 'Join meeting', 'Join', 'Enter meeting'],
+                    5,
+                );
+            }
+
+            if (!askToJoinClicked) {
+                console.log('Second attempt failed, trying by aria-label');
+                
+                // Try by aria-label which might be more stable
+                try {
+                    const joinButtons = page.locator('button[aria-label*="Join"], button[aria-label*="join now"]');
+                    const count = await joinButtons.count();
+                    console.log(`Found ${count} buttons with Join in aria-label`);
+                    
+                    if (count > 0) {
+                        await joinButtons.first().click();
+                        console.log('Clicked join button by aria-label');
+                        askToJoinClicked = true;
+                    }
+                } catch (e) {
+                    console.error('Error trying to click by aria-label:', e);
                 }
-            } catch (e) {
-                console.error('Error trying to click by aria-label:', e);
             }
-        }
 
-        if (!askToJoinClicked) {
-            // Take a screenshot to see what the UI looks like at failure
-            await takeScreenshot(page, `join_button_not_found`);
-            throw new JoinError(JoinErrorCode.CannotJoinMeeting);
-        }
-
-        await findShowEveryOne(page, false, cancelCheck)
-
-        if (meetingParams.enter_message) {
-            console.log('Sending entry message...')
-            console.log(
-                'send message?',
-                await sendEntryMessage(page, meetingParams.enter_message),
-            )
-            await sleep(100)
-        }
-
-        await clickOutsideModal(page)
-        const maxAttempts = 5
-        if (meetingParams.recording_mode !== 'audio_only') {
-        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-            if (await changeLayout(page, attempt)) {
-                console.log(`Layout change successful on attempt ${attempt}`)
-                break
+            if (!askToJoinClicked) {
+                // Take a screenshot to see what the UI looks like at failure
+                await takeScreenshot(page, `join_button_not_found`);
+                throw new JoinError(JoinErrorCode.CannotJoinMeeting);
             }
-            console.log(`Attempt ${attempt} failed`)
-            await takeScreenshot(
-                page,
-                `layout_change_failed_attempt_${attempt}`,
-            )
+
+            await findShowEveryOne(page, false, cancelCheck)
+
+            if (meetingParams.enter_message) {
+                console.log('Sending entry message...')
+                console.log(
+                    'send message?',
+                    await sendEntryMessage(page, meetingParams.enter_message),
+                )
+                await sleep(100)
+            }
+
             await clickOutsideModal(page)
-            await page.waitForTimeout(500)
-        }
-    }
+            const maxAttempts = 5
+            if (meetingParams.recording_mode !== 'audio_only') {
+                for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                    if (await changeLayout(page, attempt)) {
+                        console.log(`Layout change successful on attempt ${attempt}`)
+                        break
+                    }
+                    console.log(`Attempt ${attempt} failed`)
+                    await takeScreenshot(page, `layout_change_failed_attempt_${attempt}`)
+                    await clickOutsideModal(page)
+                    await page.waitForTimeout(500)
+                }
+            }
 
-        if (meetingParams.recording_mode !== 'gallery_view') {
-            await findShowEveryOne(page, true, cancelCheck)
+            if (meetingParams.recording_mode !== 'gallery_view') {
+                await findShowEveryOne(page, true, cancelCheck)
+            }
+
+        } catch (error) {
+            console.error('Error in joinMeeting:', {
+                message: (error as Error).message,
+                stack: (error as Error).stack
+            });
+            
+            // On continue le meeting même en cas d'erreur
+            console.log('Continuing meeting despite error...');
         }
     }
 
@@ -454,18 +462,54 @@ async function changeLayout(page: Page, currentAttempt: number = 1, maxAttempts:
     try {
         await page.waitForLoadState('networkidle');
         
-        // On attend juste que le panneau soit visible
-        const panel = await page.locator('[aria-label="People"] >> visible=true');
-        await panel.waitFor({ timeout: 5000 });
+        // 1. Cliquer sur le bouton "More options"
+        console.log('Looking for More options button in call controls...');
+        const moreOptionsButton = page.locator('div[role="region"][aria-label="Call controls"] button[aria-label="More options"]');
+        await moreOptionsButton.waitFor({ state: 'visible', timeout: 5000 });
+        await moreOptionsButton.click();
+        await page.waitForTimeout(1000);
+        
+        // 2. Cliquer sur "Change layout"
+        console.log('Looking for Change layout menu item...');
+        const changeLayoutItem = page.locator('[role="menu"] [role="menuitem"]:has(span:has-text("Change layout"))');
+        await changeLayoutItem.waitFor({ state: 'visible', timeout: 5000 });
+        await changeLayoutItem.click();
+        await page.waitForTimeout(1000);
 
+        // 3. Cliquer sur "Spotlight"
+        console.log('Looking for Spotlight option...');
+        const spotlightOption = page.locator([
+            // Plusieurs sélecteurs pour plus de résilience
+            'label:has-text("Spotlight"):has(input[type="radio"])',
+            'label:has(input[name="preferences"]):has-text("Spotlight")',
+            'label:has(span:text-is("Spotlight"))',
+        ].join(','));
+
+        // Ajouter des logs pour le debug
+        const count = await spotlightOption.count();
+        console.log(`Found ${count} Spotlight options`);
+
+        await spotlightOption.waitFor({ state: 'visible', timeout: 5000 });
+        console.log('Clicking Spotlight option...');
+        await spotlightOption.click();
+        await page.waitForTimeout(1000);
+        await clickOutsideModal(page)
         return true;
 
     } catch (error) {
+        console.error(`Error in changeLayout attempt ${currentAttempt}:`, {
+            message: (error as Error).message,
+            stack: (error as Error).stack
+        });
+        
+        // Prendre une capture d'écran en cas d'erreur
+        await page.screenshot({ path: `error-layout-change-${currentAttempt}.png` });
+        
         if (currentAttempt < maxAttempts) {
+            console.log(`Retrying layout change (attempt ${currentAttempt + 1}/${maxAttempts})...`);
             await page.waitForTimeout(2000);
             return changeLayout(page, currentAttempt + 1, maxAttempts);
         }
-        console.error(`Error in changeLayout (attempt ${currentAttempt}):`, error);
         return false;
     }
 }
