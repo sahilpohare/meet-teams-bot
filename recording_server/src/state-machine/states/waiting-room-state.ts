@@ -120,15 +120,19 @@ export class WaitingRoomState extends BaseState {
         const timeoutMs = this.context.params.automatic_leave.waiting_room_timeout * 1000
         console.info(`Setting waiting room timeout to ${timeoutMs}ms`)
 
+        let joinStarted = false;  // Flag pour suivre si le join a commencé
+
         return new Promise((resolve, reject) => {
             // Référence au timeout pour pouvoir l'annuler
             const timeout = setTimeout(() => {
-                const timeoutError = new JoinError(JoinErrorCode.TimeoutWaitingToStart)
-                console.error('Waiting room timeout reached', timeoutError)
-                reject(timeoutError)
+                // Ne déclencher le timeout que si le join n'a pas commencé
+                if (!joinStarted) {
+                    const timeoutError = new JoinError(JoinErrorCode.TimeoutWaitingToStart)
+                    console.error('Waiting room timeout reached', timeoutError)
+                    reject(timeoutError)
+                }
             }, timeoutMs)
 
-            // Ajouter un mécanisme de vérification périodique des signaux d'arrêt
             const checkStopSignal = setInterval(() => {
                 if (this.context.endReason === RecordingEndReason.ApiRequest) {
                     clearInterval(checkStopSignal)
@@ -141,10 +145,11 @@ export class WaitingRoomState extends BaseState {
             this.context.provider
                 .joinMeeting(
                     this.context.playwrightPage,
-                    () => this.context.endReason === RecordingEndReason.ApiRequest, // Vérifier aussi ici
+                    () => this.context.endReason === RecordingEndReason.ApiRequest,
                     this.context.params,
                 )
                 .then(() => {
+                    joinStarted = true;  // Marquer que le join a réussi
                     clearInterval(checkStopSignal)
                     clearTimeout(timeout)
                     resolve()

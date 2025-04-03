@@ -10,6 +10,7 @@ import { RecordingMode } from '../api';
 //     return;
 // }
 
+
 export async function removeInitialShityHtml(mode: RecordingMode) {
     let div
     try {
@@ -120,6 +121,8 @@ export async function removeInitialShityHtml(mode: RecordingMode) {
         } catch (e) {}
     }
 }
+
+
 
 export function removeShityHtml(mode: RecordingMode) {
     // '#a8c7fa'

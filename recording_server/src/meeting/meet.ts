@@ -150,7 +150,22 @@ export class MeetProvider implements MeetingProviderInterface {
                 throw new JoinError(JoinErrorCode.CannotJoinMeeting);
             }
 
+            // Attendre un peu après avoir rejoint avant de chercher le dialog
+            await page.waitForTimeout(2000);
+            
+            // Essayer plusieurs fois de fermer le dialog
+            for (let i = 0; i < 3; i++) {
+                if (await dismissGotItDialog(page)) {
+                    console.log('Successfully dismissed Got it dialog');
+                    break;
+                }
+                await page.waitForTimeout(1000);
+            }
+
             await findShowEveryOne(page, false, cancelCheck)
+
+            // Essayer de fermer le dialog avant tout
+            await dismissGotItDialog(page);
 
             if (meetingParams.enter_message) {
                 console.log('Sending entry message...')
@@ -456,7 +471,7 @@ async function clickWithInnerText(
     return false;
 }
 
-async function changeLayout(page: Page, currentAttempt: number = 1, maxAttempts: number = 3): Promise<boolean> {
+async function changeLayout(page: Page, currentAttempt = 1, maxAttempts = 3): Promise<boolean> {
     console.log(`Starting layout change process (attempt ${currentAttempt}/${maxAttempts})...`);
     
     try {
@@ -618,3 +633,36 @@ async function deactivateMicrophone(page: Page): Promise<boolean> {
 //         console.error('Error when trying to turn off the microphone:', e)
 //     }
 // }
+
+async function dismissGotItDialog(page: Page): Promise<boolean> {
+    try {
+        console.log('Looking for "Got it" dialog...');
+        
+        // Vérification rapide de la présence du dialog (500ms)
+        const dialog = page.locator('[role="dialog"][aria-modal="true"][aria-label="Others may see your video differently"]');
+        const isDialogVisible = await dialog.isVisible({ timeout: 500 })
+            .catch(() => false);
+
+        if (!isDialogVisible) {
+            console.log('No video visibility dialog found');
+            return false;
+        }
+
+        console.log('Found dialog about video visibility');
+        const gotItButton = dialog.locator('button:has-text("Got it")');
+        
+        // Si le dialog est visible, on clique
+        await gotItButton.click({ timeout: 1000 });
+        console.log('Clicked Got it button');
+        
+        // Vérification rapide que le dialog a disparu
+        await dialog.waitFor({ state: 'hidden', timeout: 1000 })
+            .catch(() => console.log('Dialog might still be visible'));
+        
+        return true;
+
+    } catch (error) {
+        console.log('Error handling Got it dialog:', error);
+        return false;
+    }
+}
