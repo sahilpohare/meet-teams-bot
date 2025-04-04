@@ -64,6 +64,7 @@ export class MeetProvider implements MeetingProviderInterface {
         page: Page,
         cancelCheck: () => boolean,
         meetingParams: MeetingParams,
+        onJoinSuccess: () => void,
     ): Promise<void> {
         try {
             await clickDismiss(page)
@@ -150,29 +151,33 @@ export class MeetProvider implements MeetingProviderInterface {
                 throw new JoinError(JoinErrorCode.CannotJoinMeeting);
             }
 
-            // Attendre un peu après avoir rejoint avant de chercher le dialog
-            await page.waitForTimeout(2000);
-            
-            // Essayer plusieurs fois de fermer le dialog
-            for (let i = 0; i < 3; i++) {
-                if (await dismissGotItDialog(page)) {
-                    console.log('Successfully dismissed Got it dialog');
+            // Attendre d'être dans le meeting avec vérification régulière du cancelCheck
+            console.log('Waiting to confirm meeting join...');
+            while (true) {
+                if (cancelCheck()) {
+                    throw new JoinError(JoinErrorCode.ApiRequest);
+                }
+
+                if (await isInMeeting(page)) {
+                    console.log('Successfully confirmed we are in the meeting');
+                    onJoinSuccess();
                     break;
                 }
-                await page.waitForTimeout(1000);
+                
+                if (await notAcceptedInMeeting(page)) {
+                    throw new JoinError(JoinErrorCode.BotNotAccepted);
+                }
+                
+                await sleep(1000);
             }
 
-            await findShowEveryOne(page, false, cancelCheck)
-
-            // Essayer de fermer le dialog avant tout
+            // Une fois dans le meeting, on exécute toutes les actions post-join
+            // SANS vérifier le cancelCheck puisqu'on est déjà dans le meeting
             await dismissGotItDialog(page);
 
             if (meetingParams.enter_message) {
                 console.log('Sending entry message...')
-                console.log(
-                    'send message?',
-                    await sendEntryMessage(page, meetingParams.enter_message),
-                )
+                await sendEntryMessage(page, meetingParams.enter_message)
                 await sleep(100)
             }
 
@@ -200,9 +205,7 @@ export class MeetProvider implements MeetingProviderInterface {
                 message: (error as Error).message,
                 stack: (error as Error).stack
             });
-            
-            // On continue le meeting même en cas d'erreur
-            console.log('Continuing meeting despite error...');
+            throw error;
         }
     }
 
@@ -261,55 +264,98 @@ async function findShowEveryOne(
 ) {
     let showEveryOneFound = false
     let i = 0
+    let inMeetingConfirmed = false
 
     while (!showEveryOneFound) {
-        // On cible le bouton dans la nav principale, en utilisant des attributs stables
-        const buttons = page.locator(
-            [
-                'nav button[aria-label="People"][role="button"]',
-                'nav button[aria-label="Show everyone"][role="button"]',
-                // Le data-panel-id="1" semble être un identifiant stable pour le panneau des participants
-                'nav button[data-panel-id="1"][role="button"]',
-            ].join(', ')
-        )
-        
-        const count = await buttons.count()
-        showEveryOneFound = count > 0
-
-        if (showEveryOneFound && click) {
-            try {
-                await buttons.first().click()
-                console.log('Successfully clicked People button')
-            } catch (e) {
-                console.log('Failed to click People button:', e)
-                showEveryOneFound = false
-            }
-        }
-
-        await takeScreenshot(page, `findShowEveryone`)
-        console.log({ showEveryOneFound })
-
-        if (cancelCheck()) {
-            throw new JoinError(JoinErrorCode.TimeoutWaitingToStart)
-        }
-
         try {
+            // Vérifier si on est effectivement dans le meeting
+            inMeetingConfirmed = await isInMeeting(page);
+            if (inMeetingConfirmed) {
+                console.log('Successfully confirmed we are in the meeting');
+            }
+
+            // Chercher le bouton People comme avant
+            const buttons = page.locator(
+                [
+                    'nav button[aria-label="People"][role="button"]',
+                    'nav button[aria-label="Show everyone"][role="button"]',
+                    'nav button[data-panel-id="1"][role="button"]',
+                ].join(', ')
+            )
+            
+            const count = await buttons.count()
+            showEveryOneFound = count > 0
+
+            if (showEveryOneFound && click) {
+                try {
+                    await buttons.first().click()
+                    console.log('Successfully clicked People button')
+                } catch (e) {
+                    console.log('Failed to click People button:', e)
+                    showEveryOneFound = false
+                }
+            }
+
+            // Si on n'a pas trouvé le bouton mais qu'on est dans le meeting,
+            // on considère que c'est un succès (certaines réunions n'ont pas ce bouton)
+            if (!showEveryOneFound && inMeetingConfirmed) {
+                console.log('Meeting confirmed but People button not found - continuing anyway');
+                return;
+            }
+
+            await takeScreenshot(page, `findShowEveryone`)
+
+            if (cancelCheck()) {
+                throw new JoinError(JoinErrorCode.TimeoutWaitingToStart)
+            }
+
             if (await notAcceptedInMeeting(page)) {
                 console.log('Bot not accepted, exiting meeting')
                 throw new JoinError(JoinErrorCode.BotNotAccepted)
             }
+
+            if (!showEveryOneFound && !inMeetingConfirmed) {
+                await sleep(1000)
+            }
+            i++
         } catch (error) {
             if (error instanceof JoinError) {
-                console.log('Caught JoinError, exiting meeting')
-                throw error
+                throw error;
             }
-            console.error('Unexpected error:', error)
+            console.error('Error in findShowEveryOne:', error);
+            await sleep(1000);
         }
+    }
+}
 
-        if (!showEveryOneFound) {
-            await sleep(1000)
-        }
-        i++
+// Nouvelle fonction pour vérifier si on est effectivement dans le meeting
+async function isInMeeting(page: Page): Promise<boolean> {
+    try {
+        // Vérifier des éléments qui n'apparaissent QUE dans le meeting actif
+        const indicators = [
+            // La présence des contrôles de réunion complets (pas juste micro/caméra)
+            await page.locator('div[role="region"][aria-label="Call controls"]').isVisible(),
+            
+            // La présence du bouton "People" ou du nombre de participants
+            await page.locator('[aria-label*="participant"], [aria-label="Show everyone"]').isVisible(),
+            
+            // La présence du bouton de chat (n'existe pas dans la waiting room)
+            await page.locator('button[aria-label*="Chat with everyone"]').isVisible(),
+            
+            // L'absence de boutons "Join now" ou "Ask to join" (qui n'existent que dans la waiting room)
+            !(await page.locator('button:has-text("Join now"), button:has-text("Ask to join")').isVisible()),
+            
+            // L'absence des messages d'erreur/rejet
+            !(await notAcceptedInMeeting(page)),
+        ];
+
+        const confirmedIndicators = indicators.filter(Boolean).length;
+        console.log(`Meeting presence indicators: ${confirmedIndicators}/5`);
+        
+        return confirmedIndicators >= 3; // On exige au moins 3 indicateurs positifs
+    } catch (error) {
+        console.error('Error checking if in meeting:', error);
+        return false;
     }
 }
 

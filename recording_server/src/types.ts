@@ -21,6 +21,7 @@ export interface MeetingProviderInterface {
         page: Page,
         cancelCheck: () => boolean,
         meetingParams: MeetingParams,
+        onJoinSuccess: () => void,
     ): Promise<void>
     findEndMeeting(
         meetingParams: MeetingParams,

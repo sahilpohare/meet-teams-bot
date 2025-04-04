@@ -120,13 +120,11 @@ export class WaitingRoomState extends BaseState {
         const timeoutMs = this.context.params.automatic_leave.waiting_room_timeout * 1000
         console.info(`Setting waiting room timeout to ${timeoutMs}ms`)
 
-        let joinStarted = false;  // Flag pour suivre si le join a commencé
+        let joinSuccessful = false;  // Flag pour indiquer si on est dans le meeting
 
         return new Promise((resolve, reject) => {
-            // Référence au timeout pour pouvoir l'annuler
             const timeout = setTimeout(() => {
-                // Ne déclencher le timeout que si le join n'a pas commencé
-                if (!joinStarted) {
+                if (!joinSuccessful) {  // Ne déclencher le timeout que si on n'est pas dans le meeting
                     const timeoutError = new JoinError(JoinErrorCode.TimeoutWaitingToStart)
                     console.error('Waiting room timeout reached', timeoutError)
                     reject(timeoutError)
@@ -137,7 +135,6 @@ export class WaitingRoomState extends BaseState {
                 if (this.context.endReason === RecordingEndReason.ApiRequest) {
                     clearInterval(checkStopSignal)
                     clearTimeout(timeout)
-                    console.log('API request to stop received while in waiting room')
                     reject(new JoinError(JoinErrorCode.ApiRequest))
                 }
             }, 1000)
@@ -147,9 +144,13 @@ export class WaitingRoomState extends BaseState {
                     this.context.playwrightPage,
                     () => this.context.endReason === RecordingEndReason.ApiRequest,
                     this.context.params,
+                    // Ajouter un callback pour notifier le succès du join
+                    () => {
+                        joinSuccessful = true;
+                        console.log('Join successful notification received');
+                    }
                 )
                 .then(() => {
-                    joinStarted = true;  // Marquer que le join a réussi
                     clearInterval(checkStopSignal)
                     clearTimeout(timeout)
                     resolve()
@@ -157,11 +158,6 @@ export class WaitingRoomState extends BaseState {
                 .catch((error) => {
                     clearInterval(checkStopSignal)
                     clearTimeout(timeout)
-                    if (error instanceof JoinError) {
-                        console.error('Join meeting error:', error)
-                    } else {
-                        console.error('Unexpected error during join:', error)
-                    }
                     reject(error)
                 })
         })
