@@ -2,6 +2,7 @@ import { Events } from '../../events'
 import { JoinError, JoinErrorCode } from '../../types'
 import { MeetingStateType, RecordingEndReason, StateExecuteResult } from '../types'
 import { BaseState } from './base-state'
+import { takeScreenshot } from '../../utils/takeScreenshot'
 
 export class WaitingRoomState extends BaseState {
     async execute(): StateExecuteResult {
@@ -97,10 +98,7 @@ export class WaitingRoomState extends BaseState {
             // Take screenshot if possible
             if (this.context.playwrightPage) {
                 try {
-                    await this.context.playwrightPage.screenshot({
-                        path: 'error-screenshot.png',
-                        fullPage: true,
-                    })
+                    await takeScreenshot(this.context.playwrightPage, 'waiting-room-error');
                     console.info('Error screenshot saved')
                 } catch (screenshotError) {
                     console.error(

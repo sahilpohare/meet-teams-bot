@@ -564,7 +564,7 @@ async function changeLayout(page: Page, currentAttempt = 1, maxAttempts = 3): Pr
         });
         
         // Prendre une capture d'écran en cas d'erreur
-        await page.screenshot({ path: `error-layout-change-${currentAttempt}.png` });
+        await takeScreenshot(page, `error-layout-change-${currentAttempt}`);
         
         if (currentAttempt < maxAttempts) {
             console.log(`Retrying layout change (attempt ${currentAttempt + 1}/${maxAttempts})...`);
