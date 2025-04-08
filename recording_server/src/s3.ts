@@ -2,7 +2,7 @@ import { ChildProcess, spawn } from 'child_process'
 
 let environ: string = process.env.ENVIRON
 const BUCKET_NAME =
-    environ === 'preprod' ? 'preprod-meeting-baas-debug' : 'meeting-baas-debug'
+    environ === 'preprod' ? 'preprod-meeting-baas-logs' : 'meeting-baas-logs'
 
 export async function s3cp(local: string, s3path: string) {
     const s3Args = process.env.S3_ARGS ? process.env.S3_ARGS.split(' ') : []
