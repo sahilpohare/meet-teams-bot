@@ -27,6 +27,9 @@ export class WaitingRoomState extends BaseState {
 
             // Ouvrir la page de réunion
             await this.openMeetingPage(meetingLink)
+            
+            // Démarrer l'observateur de dialogue dès que la page est ouverte
+            this.startDialogObserver()
 
             // Attendre l'acceptation dans la réunion
             await this.waitForAcceptance()
@@ -35,6 +38,9 @@ export class WaitingRoomState extends BaseState {
             // Si tout est OK, passer à l'état InCall
             return this.transition(MeetingStateType.InCall)
         } catch (error) {
+            // Arrêter l'observateur en cas d'erreur
+            this.stopDialogObserver()
+            
             console.error('Error in waiting room state:', error)
 
             if (error instanceof JoinError) {

@@ -9,10 +9,16 @@ import { BaseState } from './base-state'
 export class InCallState extends BaseState {
     async execute(): StateExecuteResult {
         try {
+            // Démarrer l'observateur de dialogue dès l'entrée dans l'état
+            this.startDialogObserver()
+            
             // Démarrer avec un timeout global pour le setup
             await Promise.race([this.setupRecording(), this.createTimeout()])
             return this.transition(MeetingStateType.Recording)
         } catch (error) {
+            // Arrêter l'observateur en cas d'erreur
+            this.stopDialogObserver()
+            
             console.error('Setup recording failed:', error)
             return this.handleError(error as Error)
         }

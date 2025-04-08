@@ -20,6 +20,9 @@ export class RecordingState extends BaseState {
         try {
             console.info('Starting recording state')
 
+            // Démarrer l'observateur de dialogue dès l'entrée dans l'état
+            this.startDialogObserver()
+
             // Initialiser PathManager
             this.pathManager = PathManager.getInstance(
                 this.context.params.bot_uuid,
@@ -59,14 +62,21 @@ export class RecordingState extends BaseState {
 
                 // Si pause demandée, transitionner vers l'état Paused
                 if (this.context.isPaused) {
+                    // Arrêter l'observateur avant de passer à l'état Paused
+                    this.stopDialogObserver()
                     return this.transition(MeetingStateType.Paused)
                 }
 
                 await this.sleep(this.CHECK_INTERVAL)
             }
 
+            // Arrêter l'observateur avant de passer à l'état Cleanup
+            this.stopDialogObserver()
             return this.transition(MeetingStateType.Cleanup)
         } catch (error) {
+            // Arrêter l'observateur en cas d'erreur
+            this.stopDialogObserver()
+            
             console.error('Error in recording state:', error)
             return this.handleError(error as Error)
         }
@@ -189,6 +199,9 @@ export class RecordingState extends BaseState {
         this.context.endReason = reason
         
         try {
+            // Arrêter l'observateur de dialogue
+            this.stopDialogObserver()
+            
             // Essayer de fermer la réunion mais ne pas laisser une erreur ici affecter le reste
             try {
                 // If the reason is bot_removed, we know the meeting is already effectively closed

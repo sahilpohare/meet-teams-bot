@@ -66,7 +66,7 @@ export interface MeetingContext {
     // PathManager
     pathManager?: PathManager
 
-        // Recording state (Play/Pause)
+    // Recording state (Play/Pause)
     isPaused?: boolean
     pauseStartTime?: number
     totalPauseDuration?: number
@@ -79,6 +79,13 @@ export interface MeetingContext {
 
     // Streaming
     streamingService?: Streaming
+
+    errorTime?: number
+    hasResumed?: boolean
+    speakers?: string[]
+    dialogObserverInterval?: NodeJS.Timeout
+    lastActivityTime?: number
+    lastFrameTime?: number
 }
 
 export interface StateTransition {

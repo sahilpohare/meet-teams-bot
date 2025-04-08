@@ -684,8 +684,12 @@ async function dismissGotItDialog(page: Page): Promise<boolean> {
     try {
         console.log('Looking for "Got it" dialog...');
         
-        // Vérification rapide de la présence du dialog (500ms)
-        const dialog = page.locator('[role="dialog"][aria-modal="true"][aria-label="Others may see your video differently"]');
+        // Vérification rapide de la présence du dialog
+        const dialog = page.locator([
+            '[role="dialog"][aria-modal="true"][aria-label="Others may see your video differently"]',
+            '[role="dialog"]:has(button:has-text("Got it"))'
+        ].join(','));
+        
         const isDialogVisible = await dialog.isVisible({ timeout: 500 })
             .catch(() => false);
 
@@ -697,8 +701,8 @@ async function dismissGotItDialog(page: Page): Promise<boolean> {
         console.log('Found dialog about video visibility');
         const gotItButton = dialog.locator('button:has-text("Got it")');
         
-        // Si le dialog est visible, on clique
-        await gotItButton.click({ timeout: 1000 });
+        // Si le dialog est visible, on clique avec force=true
+        await gotItButton.click({ timeout: 1000, force: true });
         console.log('Clicked Got it button');
         
         // Vérification rapide que le dialog a disparu
@@ -706,7 +710,6 @@ async function dismissGotItDialog(page: Page): Promise<boolean> {
             .catch(() => console.log('Dialog might still be visible'));
         
         return true;
-
     } catch (error) {
         console.log('Error handling Got it dialog:', error);
         return false;
