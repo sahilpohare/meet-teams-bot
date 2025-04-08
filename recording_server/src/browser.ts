@@ -2,8 +2,11 @@ import { BrowserContext, chromium, Page } from '@playwright/test'
 import { join } from 'path'
 
 // const EXTENSION_NAME = 'spoke'
-const GOOGLE_CHROME_EXECUTABLE_PATH =
-    process.env.GOOGLE_CHROME_EXECTUTABLE_PATH || '/usr/bin/google-chrome'
+const GOOGLE_CHROME_EXECUTABLE_PATH = 
+    process.env.GOOGLE_CHROME_EXECUTABLE_PATH || 
+    (process.platform === 'darwin' 
+        ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" 
+        : '/usr/bin/google-chrome')
 const EXTENSION_ID = 'eahilodcoaonodbfiijhpmfnddkfhmbl'
 const USER_DATA_DIR = '/tmp/test-user-data-dir'
 
@@ -71,7 +74,8 @@ export async function openBrowser(
                 '--autoplay-policy=no-user-gesture-required',
                 '--disable-background-timer-throttling',
                 '--enable-features=SharedArrayBuffer',
-                `--whitelisted-extension-id=${EXTENSION_ID}`,
+                `--allowlisted-extension-id=${EXTENSION_ID}`,
+                // `--whitelisted-extension-id=${EXTENSION_ID}`,
                 '--ignore-certificate-errors',
                 '--allow-insecure-localhost',
                 '--disable-blink-features=TrustedDOMTypes',
