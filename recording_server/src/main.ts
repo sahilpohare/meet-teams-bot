@@ -24,7 +24,7 @@ import {
     setupExitHandler,
 } from './utils/pinoLogger'
 import { PathManager } from './utils/PathManager'
-import { s3cp } from './s3'
+import { s3cp } from './utils/s3-api'
 
 const ZOOM_SDK_DEBUG_EXECUTABLE_PATHNAME = './target/debug/client'
 const ZOOM_SDK_RELEASE_EXECUTABLE_PATHNAME = './target/release/client'

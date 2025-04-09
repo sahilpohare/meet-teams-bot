@@ -557,13 +557,13 @@ export class Transcoder extends EventEmitter {
                 console.log('Uploading video to S3:', {
                     localPath: this.config.outputPath,
                     bucketName: this.config.bucketName,
-                    s3Key: `${this.pathManager.getBotUuid()}.mp4`,
+                    s3Key: `${this.pathManager.getIdentifier()}.mp4`,
                 })
 
                 await this.s3Uploader.uploadFile(
                     this.config.outputPath,
                     this.config.bucketName,
-                    `${this.pathManager.getBotUuid()}.mp4`,
+                    `${this.pathManager.getIdentifier()}.mp4`,
                 )
                 
                 console.log(`Video uploaded successfully, deleting local file: ${this.config.outputPath}`);
@@ -587,13 +587,13 @@ export class Transcoder extends EventEmitter {
                 console.log('Uploading audio to S3:', {
                     localPath: this.config.outputPath,
                     bucketName: this.config.bucketName,
-                    s3Key: `${this.pathManager.getBotUuid()}.wav`,
+                    s3Key: `${this.pathManager.getIdentifier()}.wav`,
                 })
 
                 await this.s3Uploader.uploadFile(
                     this.config.outputPath,
                     this.config.bucketName,
-                    `${this.pathManager.getBotUuid()}.wav`,
+                    `${this.pathManager.getIdentifier()}.wav`,
                 )
                 
                 console.log(`Audio uploaded successfully, deleting local file: ${this.config.outputPath}`);
@@ -608,13 +608,13 @@ export class Transcoder extends EventEmitter {
                 console.log('Uploading audio to S3:', {
                     localPath: this.config.audioOutputPath,
                     bucketName: this.config.bucketName,
-                    s3Key: `${this.pathManager.getBotUuid()}.wav`,
+                    s3Key: `${this.pathManager.getIdentifier()}.wav`,
                 })
 
                 await this.s3Uploader.uploadFile(
                     this.config.audioOutputPath,
                     this.config.bucketName,
-                    `${this.pathManager.getBotUuid()}.wav`,
+                    `${this.pathManager.getIdentifier()}.wav`,
                 )
                 
                 console.log(`Audio uploaded successfully, deleting local file: ${this.config.audioOutputPath}`);

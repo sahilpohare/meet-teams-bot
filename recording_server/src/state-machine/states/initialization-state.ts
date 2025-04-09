@@ -121,6 +121,7 @@ export class InitializationState extends BaseState {
             if (!this.context.pathManager) {
                 this.context.pathManager = PathManager.getInstance(
                     this.context.params.bot_uuid,
+                    this.context.params.secret
                 )
                 await this.context.pathManager.ensureDirectories()
             }

@@ -7,19 +7,24 @@ export class PathManager {
     private static instance: PathManager
     private environment: string
     private botUuid: string | null
+    private secret: string | null
 
     private constructor() {
         this.environment = process.env.ENVIRON || 'dev'
         this.botUuid = null
+        this.secret = null
         console.log('ENVIRON:', this.environment)
     }
 
-    public static getInstance(botUuid?: string): PathManager {
+    public static getInstance(botUuid?: string, secret?: string): PathManager {
         if (!PathManager.instance) {
             PathManager.instance = new PathManager()
         }
         if (botUuid) {
             PathManager.instance.setBotUuid(botUuid)
+        }
+        if (secret) {
+            PathManager.instance.setSecret(secret)
         }
         return PathManager.instance
     }
@@ -28,10 +33,22 @@ export class PathManager {
         this.botUuid = botUuid
     }
 
+    public setSecret(secret: string): void {
+        this.secret = secret
+    }
+
     private ensureBotUuid(): void {
         if (!this.botUuid) {
             throw new Error(
                 'botUuid must be set before using PathManager methods',
+            )
+        }
+    }
+
+    private ensureSecret(): void {
+        if (!this.secret) {
+            throw new Error(
+                'secret must be set before using PathManager methods',
             )
         }
     }
@@ -48,15 +65,23 @@ export class PathManager {
         return this.botUuid
     }
 
+    public getIdentifier(): string {
+        this.ensureBotUuid()
+        this.ensureSecret()
+        return `${this.secret}-${this.botUuid}`
+    }
+
     public getBasePath(): string {
         this.ensureBotUuid()
+        this.ensureSecret()
+        const identifier = this.getIdentifier()
         switch (this.environment) {
             case 'prod':
-                return path.join(EFS_MOUNT_POINT, 'prod', this.botUuid)
+                return path.join(EFS_MOUNT_POINT, 'prod', identifier)
             case 'preprod':
-                return path.join(EFS_MOUNT_POINT, 'preprod', this.botUuid)
+                return path.join(EFS_MOUNT_POINT, 'preprod', identifier)
             default:
-                return path.join('./data', this.botUuid)
+                return path.join('./data', identifier)
         }
     }
 
@@ -134,9 +159,12 @@ export class PathManager {
     }
 
     public getS3Paths(): { bucketName: string; s3Path: string } {
+        this.ensureBotUuid()
+        this.ensureSecret()
+        const identifier = this.getIdentifier()
         return {
             bucketName: process.env.AWS_S3_VIDEO_BUCKET || '',
-            s3Path: `${this.botUuid}`,
+            s3Path: `${identifier}`,
         }
     }
 }
