@@ -182,7 +182,7 @@ export class MeetProvider implements MeetingProviderInterface {
             }
 
             await clickOutsideModal(page)
-            const maxAttempts = 5
+            const maxAttempts = 3
             if (meetingParams.recording_mode !== 'audio_only') {
                 for (let attempt = 1; attempt <= maxAttempts; attempt++) {
                     if (await changeLayout(page, attempt)) {
@@ -331,39 +331,43 @@ async function findShowEveryOne(
 // Nouvelle fonction pour vérifier si on est effectivement dans le meeting
 async function isInMeeting(page: Page): Promise<boolean> {
     try {
-        // Vérifier des éléments qui n'apparaissent QUE dans le meeting actif
+        // Vérifier d'abord si on a été retiré de la réunion
+        if (await notAcceptedInMeeting(page)) {
+            console.log('Bot has been removed from the meeting');
+            return false;
+        }
+
+        // Vérifier des éléments qui indiquent qu'on est dans la réunion
         const indicators = [
-            // La présence des contrôles de réunion complets (pas juste micro/caméra)
+            // La présence des contrôles de réunion
             await page.locator('div[role="region"][aria-label="Call controls"]').isVisible(),
             
             // La présence du bouton "People" ou du nombre de participants
             await page.locator('[aria-label*="participant"], [aria-label="Show everyone"]').isVisible(),
             
-            // La présence du bouton de chat (n'existe pas dans la waiting room)
+            // La présence du bouton de chat
             await page.locator('button[aria-label*="Chat with everyone"]').isVisible(),
-            
-            // L'absence de boutons "Join now" ou "Ask to join" (qui n'existent que dans la waiting room)
-            !(await page.locator('button:has-text("Join now"), button:has-text("Ask to join")').isVisible()),
-            
-            // L'absence des messages d'erreur/rejet
-            !(await notAcceptedInMeeting(page)),
         ];
 
         const confirmedIndicators = indicators.filter(Boolean).length;
-        console.log(`Meeting presence indicators: ${confirmedIndicators}/5`);
+        console.log(`Meeting presence indicators: ${confirmedIndicators}/3`);
         
-        return confirmedIndicators >= 3; // On exige au moins 3 indicateurs positifs
+        // On considère qu'on est dans la réunion si au moins 2 indicateurs sont présents
+        return confirmedIndicators >= 2;
     } catch (error) {
         console.error('Error checking if in meeting:', error);
         return false;
     }
 }
 
-async function sendEntryMessage(
-    page: Page,
-    enterMessage: string,
-): Promise<boolean> {
+async function sendEntryMessage(page: Page, enterMessage: string): Promise<boolean> {
     console.log('Attempting to send entry message...')
+    // Vérifier d'abord si on est toujours dans la réunion
+    if (!(await isInMeeting(page))) {
+        console.log('Bot is no longer in the meeting, cannot send entry message');
+        return false;
+    }
+
     // truncate the message as meet only allows 516 characters
     enterMessage = enterMessage.substring(0, 500)
     try {
@@ -372,6 +376,12 @@ async function sendEntryMessage(
             'textarea[placeholder="Send a message"], textarea[aria-label="Send a message to everyone"]',
             { state: 'visible' },
         )
+
+        // Vérifier à nouveau si on est toujours dans la réunion
+        if (!(await isInMeeting(page))) {
+            console.log('Bot is no longer in the meeting after opening chat');
+            return false;
+        }
 
         const textarea = page.locator(
             'textarea[placeholder="Send a message"], textarea[aria-label="Send a message to everyone"]',
@@ -521,40 +531,66 @@ async function changeLayout(page: Page, currentAttempt = 1, maxAttempts = 3): Pr
     console.log(`Starting layout change process (attempt ${currentAttempt}/${maxAttempts})...`);
     
     try {
-        await page.waitForLoadState('networkidle');
+        // Vérifier d'abord si on est toujours dans la réunion
+        if (!(await isInMeeting(page))) {
+            console.log('Bot is no longer in the meeting, stopping layout change');
+            return false;
+        }
+
+        // Réduire le timeout de networkidle et ajouter un timeout plus court pour les éléments
+        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {
+            console.log('Network idle timeout, continuing anyway...');
+        });
         
         // 1. Cliquer sur le bouton "More options"
         console.log('Looking for More options button in call controls...');
         const moreOptionsButton = page.locator('div[role="region"][aria-label="Call controls"] button[aria-label="More options"]');
-        await moreOptionsButton.waitFor({ state: 'visible', timeout: 5000 });
+        await moreOptionsButton.waitFor({ state: 'visible', timeout: 3000 });
         await moreOptionsButton.click();
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(500);
+
+        // Vérifier à nouveau si on est toujours dans la réunion
+        if (!(await isInMeeting(page))) {
+            console.log('Bot is no longer in the meeting after clicking More options');
+            return false;
+        }
         
         // 2. Cliquer sur "Change layout"
         console.log('Looking for Change layout menu item...');
         const changeLayoutItem = page.locator('[role="menu"] [role="menuitem"]:has(span:has-text("Change layout"))');
-        await changeLayoutItem.waitFor({ state: 'visible', timeout: 5000 });
+        await changeLayoutItem.waitFor({ state: 'visible', timeout: 3000 });
         await changeLayoutItem.click();
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(500);
+
+        // Vérifier à nouveau si on est toujours dans la réunion
+        if (!(await isInMeeting(page))) {
+            console.log('Bot is no longer in the meeting after clicking Change layout');
+            return false;
+        }
 
         // 3. Cliquer sur "Spotlight"
         console.log('Looking for Spotlight option...');
         const spotlightOption = page.locator([
-            // Plusieurs sélecteurs pour plus de résilience
             'label:has-text("Spotlight"):has(input[type="radio"])',
             'label:has(input[name="preferences"]):has-text("Spotlight")',
             'label:has(span:text-is("Spotlight"))',
         ].join(','));
 
-        // Ajouter des logs pour le debug
         const count = await spotlightOption.count();
         console.log(`Found ${count} Spotlight options`);
 
-        await spotlightOption.waitFor({ state: 'visible', timeout: 5000 });
+        await spotlightOption.waitFor({ state: 'visible', timeout: 3000 });
         console.log('Clicking Spotlight option...');
         await spotlightOption.click();
-        await page.waitForTimeout(1000);
-        await clickOutsideModal(page)
+        await page.waitForTimeout(500);
+
+        // Vérifier une dernière fois si on est toujours dans la réunion
+        if (!(await isInMeeting(page))) {
+            console.log('Bot is no longer in the meeting after clicking Spotlight');
+            return false;
+        }
+
+        await clickOutsideModal(page);
         return true;
 
     } catch (error) {
@@ -563,12 +599,11 @@ async function changeLayout(page: Page, currentAttempt = 1, maxAttempts = 3): Pr
             stack: (error as Error).stack
         });
         
-        // Prendre une capture d'écran en cas d'erreur
         await takeScreenshot(page, `error-layout-change-${currentAttempt}`);
         
         if (currentAttempt < maxAttempts) {
             console.log(`Retrying layout change (attempt ${currentAttempt + 1}/${maxAttempts})...`);
-            await page.waitForTimeout(2000);
+            await page.waitForTimeout(1000);
             return changeLayout(page, currentAttempt + 1, maxAttempts);
         }
         return false;
@@ -684,6 +719,12 @@ async function dismissGotItDialog(page: Page): Promise<boolean> {
     try {
         console.log('Looking for "Got it" dialog...');
         
+        // Vérifier d'abord si on est toujours dans la réunion
+        if (!(await isInMeeting(page))) {
+            console.log('Bot is no longer in the meeting, cannot dismiss dialog');
+            return false;
+        }
+        
         // Vérification rapide de la présence du dialog
         const dialog = page.locator([
             '[role="dialog"][aria-modal="true"][aria-label="Others may see your video differently"]',
@@ -701,6 +742,12 @@ async function dismissGotItDialog(page: Page): Promise<boolean> {
         console.log('Found dialog about video visibility');
         const gotItButton = dialog.locator('button:has-text("Got it")');
         
+        // Vérifier à nouveau si on est toujours dans la réunion avant de cliquer
+        if (!(await isInMeeting(page))) {
+            console.log('Bot is no longer in the meeting before clicking Got it');
+            return false;
+        }
+
         // Si le dialog est visible, on clique avec force=true
         await gotItButton.click({ timeout: 1000, force: true });
         console.log('Clicked Got it button');
