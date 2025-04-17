@@ -85,6 +85,7 @@ export type MeetingParams = {
         // recording_permission_denied_timeout?: number
     }
     mp4_s3_path: string
+    secret: string
     extra?: any
 }
 

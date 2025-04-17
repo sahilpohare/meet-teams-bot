@@ -18,13 +18,13 @@ import { JoinError, JoinErrorCode, MeetingParams } from './types'
 import { spawn } from 'child_process'
 import { Events } from './events'
 import { RecordingEndReason } from './state-machine/types'
+import { PathManager } from './utils/PathManager'
 import {
     logger,
     setupConsoleLogger,
     setupExitHandler,
 } from './utils/pinoLogger'
-import { PathManager } from './utils/PathManager'
-import { s3cp } from './s3'
+import { s3cp } from './utils/s3-api'
 
 const ZOOM_SDK_DEBUG_EXECUTABLE_PATHNAME = './target/debug/client'
 const ZOOM_SDK_RELEASE_EXECUTABLE_PATHNAME = './target/release/client'
@@ -75,8 +75,6 @@ let forceTerminationTimeout: NodeJS.Timeout | null = null
     }
     try {
         consumeResult = await consumer.consume(Consumer.handleStartRecord)
-
-
     } catch (e) {
         if (LOCK_INSTANCE_AT_STARTUP) {
             await consumer.deleteQueue().catch((e) => {
@@ -116,104 +114,133 @@ let forceTerminationTimeout: NodeJS.Timeout | null = null
                 console.log(
                     `${Date.now()} Finalize project && Sending WebHook complete`,
                 )
-                
+
                 // Enregistrer la raison de fin pour le logging
-                const endReason = MeetingHandle.instance.getEndReason();
-                console.log(`Recording ended normally with reason: ${endReason}`);
-                
+                const endReason = MeetingHandle.instance.getEndReason()
+                console.log(
+                    `Recording ended normally with reason: ${endReason}`,
+                )
+
                 // Start retry process and set a timeout
-                let webhookSentForApiFailure = false;
-                const apiStartTime = Date.now();
-                const maxApiWaitTime = 20 * 60 * 1000; // 20 minutes
-                const retryDelay = 10000; // 10 seconds
-                
+                let webhookSentForApiFailure = false
+                const apiStartTime = Date.now()
+                const maxApiWaitTime = 20 * 60 * 1000 // 20 minutes
+                const retryDelay = 10000 // 10 seconds
+
                 // Keep retrying until we succeed or time runs out
                 while (Date.now() - apiStartTime < maxApiWaitTime) {
                     try {
                         // Try to call the API
-                        await Api.instance.endMeetingTrampoline();
-                        console.log('API call to endMeetingTrampoline succeeded');
-                        break; // Success! Exit the loop
+                        await Api.instance.endMeetingTrampoline()
+                        console.log(
+                            'API call to endMeetingTrampoline succeeded',
+                        )
+                        break // Success! Exit the loop
                     } catch (apiError) {
-                        const elapsedSeconds = (Date.now() - apiStartTime) / 1000;
-                        const remainingSeconds = Math.max(0, maxApiWaitTime - (Date.now() - apiStartTime)) / 1000;
-                        
+                        const elapsedSeconds =
+                            (Date.now() - apiStartTime) / 1000
+                        const remainingSeconds =
+                            Math.max(
+                                0,
+                                maxApiWaitTime - (Date.now() - apiStartTime),
+                            ) / 1000
+
                         console.log(
                             `API call failed after ${elapsedSeconds.toFixed(1)}s, ` +
-                            `${remainingSeconds.toFixed(1)}s remaining before timeout. ` +
-                            `Retrying in ${retryDelay/1000}s...`, 
-                            apiError
-                        );
-                        
+                                `${remainingSeconds.toFixed(1)}s remaining before timeout. ` +
+                                `Retrying in ${retryDelay / 1000}s...`,
+                            apiError,
+                        )
+
                         // Only send the webhook once if we're going to keep trying
-                        if (!webhookSentForApiFailure && remainingSeconds < maxApiWaitTime/1000 - 60) {
+                        if (
+                            !webhookSentForApiFailure &&
+                            remainingSeconds < maxApiWaitTime / 1000 - 60
+                        ) {
                             // If we've been retrying for more than a minute, send webhook but keep trying
                             try {
                                 await sendWebhookOnce({
-                                    meetingUrl: consumeResult.params.meeting_url,
+                                    meetingUrl:
+                                        consumeResult.params.meeting_url,
                                     botUuid: consumeResult.params.bot_uuid,
                                     success: true,
-                                    errorMessage: 'Recording completed successfully but having difficulty notifying API'
-                                });
-                                webhookSentForApiFailure = true;
-                                console.log('Sent webhook for successful recording while API retries continue');
+                                    errorMessage:
+                                        'Recording completed successfully but having difficulty notifying API',
+                                })
+                                webhookSentForApiFailure = true
+                                console.log(
+                                    'Sent webhook for successful recording while API retries continue',
+                                )
                             } catch (webhookError) {
-                                console.error('Failed to send interim webhook:', webhookError);
+                                console.error(
+                                    'Failed to send interim webhook:',
+                                    webhookError,
+                                )
                             }
                         }
-                        
+
                         // Wait before retrying
-                        await new Promise(resolve => setTimeout(resolve, retryDelay));
+                        await new Promise((resolve) =>
+                            setTimeout(resolve, retryDelay),
+                        )
                     }
                 }
-                
+
                 // If we exited the loop without breaking, it means we timed out
                 if (Date.now() - apiStartTime >= maxApiWaitTime) {
-                    console.error('API call failed after 20 minutes of retries');
-                    
+                    console.error('API call failed after 20 minutes of retries')
+
                     // Send final webhook if we haven't already
                     if (!webhookSentForApiFailure) {
                         await sendWebhookOnce({
                             meetingUrl: consumeResult.params.meeting_url,
                             botUuid: consumeResult.params.bot_uuid,
                             success: true,
-                            errorMessage: 'Recording completed successfully but API notification failed after 20 minutes'
-                        });
+                            errorMessage:
+                                'Recording completed successfully but API notification failed after 20 minutes',
+                        })
                     }
                 }
             } else {
                 // L'enregistrement n'a pas atteint l'état Recording ou a échoué
-                console.error('Recording did not complete successfully');
-                
+                console.error('Recording did not complete successfully')
+
                 // Récupérer la raison spécifique de l'échec
-                const endReason = MeetingHandle.instance.getEndReason();
-                let errorMessage;
-                
+                const endReason = MeetingHandle.instance.getEndReason()
+                let errorMessage
+
                 // Vérifier si nous avons une erreur de type JoinError dans le contexte
-                const joinError = MeetingHandle.instance?.stateMachine?.context?.error;
+                const joinError =
+                    MeetingHandle.instance?.stateMachine?.context?.error
                 if (joinError && joinError instanceof JoinError) {
                     // Utiliser le message de JoinError directement
-                    errorMessage = joinError.message;
-                    console.log(`Found JoinError in context with code: ${errorMessage}`);
+                    errorMessage = joinError.message
+                    console.log(
+                        `Found JoinError in context with code: ${errorMessage}`,
+                    )
                 } else if (endReason) {
                     // Utiliser endReason comme fallback
-                    errorMessage = String(endReason);
+                    errorMessage = String(endReason)
                 }
-                
-                console.log(`Recording failed with reason: ${errorMessage || 'Unknown'}`);
-                
+
+                console.log(
+                    `Recording failed with reason: ${errorMessage || 'Unknown'}`,
+                )
+
                 // On n'appelle pas endMeetingTrampoline ici
                 await sendWebhookOnce({
                     meetingUrl: consumeResult.params.meeting_url,
                     botUuid: consumeResult.params.bot_uuid,
                     success: false,
-                    errorMessage: errorMessage || 'Recording did not complete successfully'
-                });
+                    errorMessage:
+                        errorMessage ||
+                        'Recording did not complete successfully',
+                })
             }
         } catch (error) {
             // Erreur explicite propagée depuis la machine à états (erreur durant l'enregistrement)
             console.error('Meeting failed:', error)
-            
+
             await sendWebhookOnce({
                 meetingUrl: consumeResult.params.meeting_url,
                 botUuid: consumeResult.params.bot_uuid,
@@ -298,15 +325,17 @@ let forceTerminationTimeout: NodeJS.Timeout | null = null
 
     // Upload logs to S3 before exiting
     try {
-        const pathManager = PathManager.getInstance(consumeResult.params.bot_uuid);
-        const logPath = pathManager.getLogPath();
-        const s3LogPath = `${consumeResult.params.bot_uuid}/logs.log`;
-        
-        console.log('Uploading logs to S3...');
-        await s3cp(logPath, s3LogPath);
-        console.log('Logs uploaded successfully to S3');
+        const pathManager = PathManager.getInstance(
+            consumeResult.params.bot_uuid,
+        )
+        const logPath = pathManager.getLogPath()
+        const s3LogPath = `${consumeResult.params.secret}-${consumeResult.params.bot_uuid}/logs.log`
+
+        console.log('Uploading logs to S3...')
+        await s3cp(logPath, s3LogPath)
+        console.log('Logs uploaded successfully to S3')
     } catch (error) {
-        console.error('Failed to upload logs to S3:', error);
+        console.error('Failed to upload logs to S3:', error)
     }
 
     console.log('exiting instance')
@@ -330,25 +359,28 @@ async function sendWebhookOnce(params: {
         // Tentatives multiples pour l'envoi du webhook
         const maxRetries = 3
         let attempt = 0
-        
+
         while (attempt < maxRetries) {
             try {
                 const callEndedPromise = Events.callEnded()
                 await Promise.race([
                     callEndedPromise,
-                    new Promise((_, reject) => 
-                        setTimeout(() => reject(new Error('Call ended event timeout')), 30000)
-                    )
+                    new Promise((_, reject) =>
+                        setTimeout(
+                            () => reject(new Error('Call ended event timeout')),
+                            30000,
+                        ),
+                    ),
                 ])
-                
+
                 if (!params.success) {
                     await meetingBotStartRecordFailed(
                         params.meetingUrl,
                         params.botUuid,
-                        params.errorMessage || 'Unknown error'
+                        params.errorMessage || 'Unknown error',
                     )
                 }
-                
+
                 console.log('All webhooks sent successfully')
                 break
             } catch (e) {
@@ -356,8 +388,12 @@ async function sendWebhookOnce(params: {
                 if (attempt === maxRetries) {
                     console.error('Final webhook attempt failed:', e)
                 } else {
-                    console.warn(`Webhook attempt ${attempt} failed, retrying...`)
-                    await new Promise(resolve => setTimeout(resolve, 2000 * attempt))
+                    console.warn(
+                        `Webhook attempt ${attempt} failed, retrying...`,
+                    )
+                    await new Promise((resolve) =>
+                        setTimeout(resolve, 2000 * attempt),
+                    )
                 }
             }
         }
@@ -371,26 +407,26 @@ async function handleErrorInStartRecording(error: Error, data: MeetingParams) {
         errorType: error.constructor.name,
         isJoinError: error instanceof JoinError,
         message: error.message,
-        endReason: MeetingHandle.instance?.stateMachine?.context?.endReason
-    });
-    
+        endReason: MeetingHandle.instance?.stateMachine?.context?.endReason,
+    })
+
     // Utiliser le endReason du context si disponible
-    const endReason = MeetingHandle.instance?.stateMachine?.context?.endReason;
-    
-    let errorMessage;
+    const endReason = MeetingHandle.instance?.stateMachine?.context?.endReason
+
+    let errorMessage
     if (endReason === RecordingEndReason.ApiRequest) {
-        errorMessage = JoinErrorCode.ApiRequest;
+        errorMessage = JoinErrorCode.ApiRequest
     } else if (error instanceof JoinError) {
-        errorMessage = error.message;
+        errorMessage = error.message
     } else {
-        errorMessage = JoinErrorCode.Internal;
+        errorMessage = JoinErrorCode.Internal
     }
-    
+
     await meetingBotStartRecordFailed(
         data.meeting_url,
         data.bot_uuid,
-        errorMessage
-    );
+        errorMessage,
+    )
 }
 
 export function meetingBotStartRecordFailed(
@@ -466,36 +502,45 @@ async function retryApiCall<T>(
     fn: () => Promise<T>,
     maxRetries = 120, // Default 120 retries for 20 minutes with 10s delay
     maxRetryTime = 20 * 60 * 1000, // 20 minutes in milliseconds
-    retryDelay = 10000 // Fixed 10 second delay between retries
+    retryDelay = 10000, // Fixed 10 second delay between retries
 ): Promise<T> {
-    const startTime = Date.now();
-    let lastError: any;
-    let retryCount = 0;
+    const startTime = Date.now()
+    let lastError: any
+    let retryCount = 0
 
-    while (retryCount < maxRetries && (Date.now() - startTime) < maxRetryTime) {
+    while (retryCount < maxRetries && Date.now() - startTime < maxRetryTime) {
         try {
-            const result = await fn();
-            console.log(`API call succeeded after ${retryCount} attempts`);
-            return result;
+            const result = await fn()
+            console.log(`API call succeeded after ${retryCount} attempts`)
+            return result
         } catch (error) {
-            lastError = error;
-            retryCount++;
-            
-            const elapsedTime = (Date.now() - startTime) / 1000;
-            const remainingTime = Math.max(0, maxRetryTime - (Date.now() - startTime)) / 1000;
-            
+            lastError = error
+            retryCount++
+
+            const elapsedTime = (Date.now() - startTime) / 1000
+            const remainingTime =
+                Math.max(0, maxRetryTime - (Date.now() - startTime)) / 1000
+
             // Log retry attempt with more detailed information
-            console.log(`API call failed, attempt ${retryCount}/${maxRetries} (${elapsedTime.toFixed(1)}s elapsed, ${remainingTime.toFixed(1)}s remaining). Retrying in ${retryDelay/1000}s...`, error);
-            
+            console.log(
+                `API call failed, attempt ${retryCount}/${maxRetries} (${elapsedTime.toFixed(1)}s elapsed, ${remainingTime.toFixed(1)}s remaining). Retrying in ${retryDelay / 1000}s...`,
+                error,
+            )
+
             // Wait before next retry - ensure this actually waits the full duration
-            if (retryCount < maxRetries && (Date.now() - startTime) < maxRetryTime) {
-                await new Promise(resolve => setTimeout(resolve, retryDelay));
+            if (
+                retryCount < maxRetries &&
+                Date.now() - startTime < maxRetryTime
+            ) {
+                await new Promise((resolve) => setTimeout(resolve, retryDelay))
             }
         }
     }
-    
+
     // If we get here, all retries have failed
-    const totalTime = (Date.now() - startTime)/1000;
-    console.error(`API call failed after ${retryCount} attempts over ${totalTime.toFixed(1)}s - exhausted retry attempts`);
-    throw lastError;
+    const totalTime = (Date.now() - startTime) / 1000
+    console.error(
+        `API call failed after ${retryCount} attempts over ${totalTime.toFixed(1)}s - exhausted retry attempts`,
+    )
+    throw lastError
 }
