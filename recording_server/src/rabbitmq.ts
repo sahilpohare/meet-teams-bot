@@ -79,8 +79,15 @@ export class Consumer {
         handler: (data: MeetingParams) => Promise<void>,
     ): Promise<StartRecordingResult> {
         return new Promise((resolve, reject) => {
+            let isProcessing = false;
             this.channel
                 .consume(Consumer.QUEUE_NAME, async (message) => {
+                    if (isProcessing) {
+                        console.log('Already processing a message, skipping...');
+                        return;
+                    }
+                    
+                    isProcessing = true;
                     console.log(`consume message : ${message}`)
                     if (message !== null) {
                         try {
