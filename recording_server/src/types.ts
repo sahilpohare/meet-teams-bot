@@ -87,6 +87,8 @@ export type MeetingParams = {
     mp4_s3_path: string
     secret: string
     extra?: any
+    zoom_sdk_id?: string
+    zoom_sdk_pwd?: string
 }
 
 export class CancellationToken {
