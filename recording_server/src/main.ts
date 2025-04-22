@@ -327,6 +327,7 @@ let forceTerminationTimeout: NodeJS.Timeout | null = null
     try {
         const pathManager = PathManager.getInstance(
             consumeResult.params.bot_uuid,
+            consumeResult.params.secret
         )
         const logPath = pathManager.getLogPath()
         const s3LogPath = `${consumeResult.params.secret}-${consumeResult.params.bot_uuid}/logs.log`
