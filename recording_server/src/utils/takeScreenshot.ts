@@ -1,7 +1,7 @@
 import { Page } from '@playwright/test'
 import * as path from 'path'
 import { PathManager } from '../utils/PathManager'
-import { s3cp } from './s3-api'
+import { s3cp } from './S3Uploader'
 import sharp from 'sharp'
 import { promises as fs } from 'fs'
 

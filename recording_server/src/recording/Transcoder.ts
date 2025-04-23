@@ -93,14 +93,14 @@ export class Transcoder extends EventEmitter {
         // Vérifier si on est en mode audio-only
         this.isAudioOnly = this.config.recordingMode === 'audio_only'
 
+        this.s3Uploader = S3Uploader.getInstance()
+
         this.initializeComponents()
         this.setupEventListeners()
     }
 
     private initializeComponents(): void {
         this.videoProcessor = new VideoChunkProcessor(this.config)
-        this.s3Uploader = new S3Uploader()
-        
     }
 
     public configure(

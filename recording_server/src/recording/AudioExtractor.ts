@@ -31,7 +31,7 @@ export class AudioExtractor extends EventEmitter {
         super()
         this.options = { ...this.DEFAULT_OPTIONS, ...options }
         this.pathManager = PathManager.getInstance()
-        this.s3Uploader = new S3Uploader()
+        this.s3Uploader = S3Uploader.getInstance()
     }
 
     public async extract(

@@ -24,7 +24,8 @@ import {
     setupConsoleLogger,
     setupExitHandler,
 } from './utils/pinoLogger'
-import { s3cp } from './utils/s3-api'
+import { s3cp } from './utils/S3Uploader'
+import fs from 'fs'
 
 const ZOOM_SDK_DEBUG_EXECUTABLE_PATHNAME = './target/debug/client'
 const ZOOM_SDK_RELEASE_EXECUTABLE_PATHNAME = './target/release/client'
@@ -332,9 +333,14 @@ let forceTerminationTimeout: NodeJS.Timeout | null = null
         const logPath = pathManager.getLogPath()
         const s3LogPath = `${consumeResult.params.secret}-${consumeResult.params.bot_uuid}/logs.log`
 
-        console.log('Uploading logs to S3...')
-        await s3cp(logPath, s3LogPath)
-        console.log('Logs uploaded successfully to S3')
+        // Vérifier si le fichier existe avant d'uploader
+        if (fs.existsSync(logPath)) {
+            console.log('Uploading logs to S3...')
+            await s3cp(logPath, s3LogPath)
+            console.log('Logs uploaded successfully to S3')
+        } else {
+            console.error('No log file found to upload')
+        }
     } catch (error) {
         console.error('Failed to upload logs to S3:', error)
     }

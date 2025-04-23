@@ -2,6 +2,8 @@ import { join } from 'path'
 import pino from 'pino'
 import caller from 'pino-caller'
 import { PathManager } from './PathManager'
+import { s3cp } from './S3Uploader'
+import fs from 'fs'
 
 // Variable pour garder une référence au fichier de log du bot
 let currentBotLogFile: any = null
@@ -124,7 +126,6 @@ export function redirectLogsToBot(botUuid: string) {
     const logPath = pathManager.getLogPath()
 
     // Copier les logs initiaux vers le nouveau fichier
-    const fs = require('fs')
     fs.copyFileSync('./data/initial.log', logPath)
 
     // Supprimer initial.log après la copie
@@ -180,8 +181,56 @@ export function redirectLogsToBot(botUuid: string) {
     currentBotLogFile = botLogFile
 }
 
-// Gérer la fermeture propre des fichiers de log
+// Gérer la fermeture propre des fichiers de log et les erreurs non gérées
 export function setupExitHandler() {
+    // Gestion des erreurs non gérées
+    process.on('uncaughtException', async (error) => {
+        logger.error('Uncaught Exception:', error);
+        
+        try {
+            // Upload logs to S3 before exiting
+            const pathManager = PathManager.getInstance();
+            const logPath = pathManager.getLogPath();
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const s3LogPath = `crash-logs/${timestamp}-uncaught-exception.log`;
+            
+            // Vérifier si le fichier existe avant d'essayer de l'uploader
+            if (fs.existsSync(logPath)) {
+                logger.error('Uploading crash logs to S3...');
+                await s3cp(logPath, s3LogPath);
+                logger.error('Crash logs uploaded successfully to S3');
+            } else {
+                logger.error('No log file found to upload');
+            }
+        } catch (uploadError) {
+            logger.error('Failed to upload crash logs to S3:', uploadError);
+        }
+    });
+
+    process.on('unhandledRejection', async (reason, promise) => {
+        logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+        
+        try {
+            // Upload logs to S3 before exiting
+            const pathManager = PathManager.getInstance();
+            const logPath = pathManager.getLogPath();
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const s3LogPath = `crash-logs/${timestamp}-unhandled-rejection.log`;
+            
+            // Vérifier si le fichier existe avant d'essayer de l'uploader
+            if (fs.existsSync(logPath)) {
+                logger.error('Uploading crash logs to S3...');
+                await s3cp(logPath, s3LogPath);
+                logger.error('Crash logs uploaded successfully to S3');
+            } else {
+                logger.error('No log file found to upload');
+            }
+        } catch (uploadError) {
+            logger.error('Failed to upload crash logs to S3:', uploadError);
+        }
+    });
+
+    // Fermeture propre des fichiers de log
     process.on('exit', () => {
         // Fermer le fichier de log initial
         if (initialLogFile) {
