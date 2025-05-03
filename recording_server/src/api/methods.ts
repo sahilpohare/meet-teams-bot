@@ -82,16 +82,6 @@ export class Api {
         return resp.data
     }
 
-    // Simply get Bot structure
-    public async getBot(): Promise<ApiTypes.GetableBot> {
-        return (
-            await axios({
-                method: 'GET',
-                url: `/bots/${this.bot_uuid}`,
-            })
-        ).data
-    }
-
     // Post transcript to server
     public async postTranscript(
         transcript: ApiTypes.PostableTranscript,
