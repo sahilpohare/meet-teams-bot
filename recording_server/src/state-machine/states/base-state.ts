@@ -73,6 +73,22 @@ export abstract class BaseState {
 
         // Créer un nouvel observateur avec un intervalle de vérification
         console.info(`Starting dialog observer in state ${this.constructor.name}`);
+        
+        // Fonction pour vérifier et redémarrer l'observateur si nécessaire
+        const checkAndRestartObserver = () => {
+            if (!this.context.dialogObserverInterval) {
+                console.warn('Dialog observer was stopped, restarting...');
+                this.startDialogObserver();
+                return;
+            }
+        };
+
+        // Heartbeat pour vérifier l'état de l'observateur toutes les 2 secondes
+        const heartbeatInterval = setInterval(checkAndRestartObserver, 2000);
+
+        // Stocker l'intervalle de heartbeat pour pouvoir le nettoyer plus tard
+        this.context.dialogObserverHeartbeat = heartbeatInterval;
+
         this.context.dialogObserverInterval = setInterval(async () => {
             try {
                 if (this.context.playwrightPage?.isClosed()) {
@@ -114,6 +130,9 @@ export abstract class BaseState {
                 }
             } catch (error) {
                 console.error(`[DialogObserver] Error checking for dialogs: ${error}`);
+                // En cas d'erreur, on redémarre l'observateur
+                this.stopDialogObserver();
+                this.startDialogObserver();
             }
         }, 2000); // Vérifier toutes les 2 secondes
     }
@@ -126,6 +145,11 @@ export abstract class BaseState {
             clearInterval(this.context.dialogObserverInterval);
             this.context.dialogObserverInterval = undefined;
             console.info(`Stopped dialog observer in state ${this.constructor.name}`);
+        }
+        if (this.context.dialogObserverHeartbeat) {
+            clearInterval(this.context.dialogObserverHeartbeat);
+            this.context.dialogObserverHeartbeat = undefined;
+            console.info(`Stopped dialog observer heartbeat in state ${this.constructor.name}`);
         }
     }
 }

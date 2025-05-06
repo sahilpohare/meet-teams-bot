@@ -62,8 +62,6 @@ export class RecordingState extends BaseState {
 
                 // Si pause demandée, transitionner vers l'état Paused
                 if (this.context.isPaused) {
-                    // Arrêter l'observateur avant de passer à l'état Paused
-                    this.stopDialogObserver()
                     return this.transition(MeetingStateType.Paused)
                 }
 

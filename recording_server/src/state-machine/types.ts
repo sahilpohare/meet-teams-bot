@@ -84,6 +84,7 @@ export interface MeetingContext {
     hasResumed?: boolean
     speakers?: string[]
     dialogObserverInterval?: NodeJS.Timeout
+    dialogObserverHeartbeat?: NodeJS.Timeout
     lastActivityTime?: number
     lastFrameTime?: number
 }
