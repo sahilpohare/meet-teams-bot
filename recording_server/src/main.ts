@@ -16,16 +16,16 @@ import { Consumer } from './rabbitmq'
 import { JoinError, JoinErrorCode, MeetingParams } from './types'
 
 import { spawn } from 'child_process'
+import fs from 'fs'
 import { Events } from './events'
 import { RecordingEndReason } from './state-machine/types'
-import { PathManager } from './utils/PathManager'
 import {
     logger,
     setupConsoleLogger,
-    setupExitHandler,
-} from './utils/pinoLogger'
+    setupExitHandler
+} from './utils/Logger'
+import { PathManager } from './utils/PathManager'
 import { s3cp } from './utils/S3Uploader'
-import fs from 'fs'
 
 const ZOOM_SDK_DEBUG_EXECUTABLE_PATHNAME = './target/debug/client'
 const ZOOM_SDK_RELEASE_EXECUTABLE_PATHNAME = './target/release/client'

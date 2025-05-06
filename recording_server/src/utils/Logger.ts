@@ -1,9 +1,7 @@
-import { join } from 'path'
-import pino from 'pino'
-import caller from 'pino-caller'
+import fs from 'fs'
+import winston from 'winston'
 import { PathManager } from './PathManager'
 import { s3cp } from './S3Uploader'
-import fs from 'fs'
 
 // Variable pour garder une référence au fichier de log du bot
 let currentBotLogFile: any = null
@@ -68,43 +66,35 @@ function formatArgs(msg: string, args: any[]) {
     )
 }
 
-// Créer un logger initial pour la phase de démarrage
-const initialLogFile = pino.destination({
-    dest: './data/initial.log',
-    sync: false,
-    mkdir: true,
-})
-
-const baseLogger = pino(
-    {
-        level: 'debug',
-        timestamp: true,
-        formatters: {
-            level: (label) => {
-                return { level: label }
-            },
-        },
-    },
-    pino.multistream([
-        { stream: initialLogFile },
-        {
-            stream: pino.transport({
-                target: 'pino-pretty',
-                options: {
-                    colorize: true,
-                    translateTime: 'SYS:standard',
-                    ignore: 'pid,hostname',
-                    colorizeObjects: true,
-                },
-            }),
-        },
-    ]),
-)
-
-// Add caller information to logs
-export const logger = caller(baseLogger, {
-    relativeTo: join(__dirname, '..', '..', 'src'),
-    stackAdjustment: 1,
+// Winston logger global
+export let logger = winston.createLogger({
+    level: 'debug',
+    format: winston.format.combine(
+        winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+        winston.format.printf(({ timestamp, level, message }) => {
+            return `[${timestamp}] ${level.toUpperCase()} : ${message}`
+        })
+    ),
+    transports: [
+        new winston.transports.Console({
+            format: winston.format.combine(
+                winston.format.colorize({
+                    all: true,
+                    colors: {
+                        info: 'cyan',
+                        warn: 'yellow',
+                        error: 'red',
+                        debug: 'blue',
+                    }
+                }),
+                winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+                winston.format.printf(({ timestamp, level, message }) => {
+                    return `[${timestamp}] ${level} : ${message}`
+                })
+            )
+        }),
+        new winston.transports.File({ filename: './data/initial.log' })
+    ]
 })
 
 export function setupConsoleLogger() {
@@ -127,74 +117,41 @@ export function redirectLogsToBot(botUuid: string) {
 
     // Copier les logs initiaux vers le nouveau fichier
     fs.copyFileSync('./data/initial.log', logPath)
-
-    // Supprimer initial.log après la copie
     fs.unlinkSync('./data/initial.log')
 
-    // Créer le nouveau fichier de log en mode append
-    const botLogFile = pino.destination({
-        dest: logPath,
-        sync: false,
-        mkdir: true,
-        append: true,
-    })
-
-    // Créer un nouveau logger
-    const newLogger = pino(
-        {
-            level: 'debug',
-            timestamp: true,
-            formatters: {
-                level: (label) => {
-                    return { level: label }
-                },
-            },
-        },
-        pino.multistream([
-            { stream: botLogFile },
-            {
-                stream: pino.transport({
-                    target: 'pino-pretty',
-                    options: {
-                        colorize: true,
-                        translateTime: 'SYS:standard',
-                        ignore: 'pid,hostname',
-                        colorizeObjects: true,
-                    },
-                }),
-            },
-        ]),
-    )
-
-    // Mettre à jour le logger global
-    Object.assign(
-        logger,
-        caller(newLogger, {
-            relativeTo: join(__dirname, '..', '..', 'src'),
-            stackAdjustment: 1,
-        }),
-    )
+    // Remplacer le transport fichier par le nouveau fichier de log du bot
+    logger.clear();
+    logger.add(new winston.transports.Console({
+        format: winston.format.combine(
+            winston.format.colorize({
+                all: true,
+                colors: {
+                    info: 'cyan',
+                    warn: 'yellow',
+                    error: 'red',
+                    debug: 'blue',
+                }
+            }),
+            winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+            winston.format.printf(({ timestamp, level, message }) => {
+                return `[${timestamp}] ${level} : ${message}`
+            })
+        )
+    }));
+    logger.add(new winston.transports.File({ filename: logPath }));
 
     setupConsoleLogger()
-
-    // Garder une référence au nouveau fichier de log
-    currentBotLogFile = botLogFile
+    currentBotLogFile = logPath
 }
 
-// Gérer la fermeture propre des fichiers de log et les erreurs non gérées
 export function setupExitHandler() {
-    // Gestion des erreurs non gérées
     process.on('uncaughtException', async (error) => {
-        logger.error('Uncaught Exception:', error);
-        
+        logger.error('Uncaught Exception: ' + error);
         try {
-            // Upload logs to S3 before exiting
             const pathManager = PathManager.getInstance();
             const logPath = pathManager.getLogPath();
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
             const s3LogPath = `crash-logs/${timestamp}-uncaught-exception.log`;
-            
-            // Vérifier si le fichier existe avant d'essayer de l'uploader
             if (fs.existsSync(logPath)) {
                 logger.error('Uploading crash logs to S3...');
                 await s3cp(logPath, s3LogPath);
@@ -203,21 +160,17 @@ export function setupExitHandler() {
                 logger.error('No log file found to upload');
             }
         } catch (uploadError) {
-            logger.error('Failed to upload crash logs to S3:', uploadError);
+            logger.error('Failed to upload crash logs to S3: ' + uploadError);
         }
     });
 
     process.on('unhandledRejection', async (reason, promise) => {
-        logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
-        
+        logger.error('Unhandled Rejection at: ' + promise + ' reason: ' + reason);
         try {
-            // Upload logs to S3 before exiting
             const pathManager = PathManager.getInstance();
             const logPath = pathManager.getLogPath();
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
             const s3LogPath = `crash-logs/${timestamp}-unhandled-rejection.log`;
-            
-            // Vérifier si le fichier existe avant d'essayer de l'uploader
             if (fs.existsSync(logPath)) {
                 logger.error('Uploading crash logs to S3...');
                 await s3cp(logPath, s3LogPath);
@@ -226,20 +179,7 @@ export function setupExitHandler() {
                 logger.error('No log file found to upload');
             }
         } catch (uploadError) {
-            logger.error('Failed to upload crash logs to S3:', uploadError);
+            logger.error('Failed to upload crash logs to S3: ' + uploadError);
         }
     });
-
-    // Fermeture propre des fichiers de log
-    process.on('exit', () => {
-        // Fermer le fichier de log initial
-        if (initialLogFile) {
-            initialLogFile.flushSync()
-        }
-
-        // Fermer le fichier de log du bot s'il existe
-        if (currentBotLogFile) {
-            currentBotLogFile.flushSync()
-        }
-    })
 }
