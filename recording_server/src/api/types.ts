@@ -11,7 +11,6 @@ export namespace ApiTypes {
     }
 
     export type PostableTranscript = {
-        bot_id: number
         speaker: string
         start_time: number
         end_time: number | null

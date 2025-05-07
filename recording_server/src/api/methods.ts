@@ -8,7 +8,7 @@ import { MeetingParams } from '../types'
 export class Api {
     public static instance: Api | null = null // Singleton class
 
-    private bot_uuid: string
+    public bot_uuid: string
 
     constructor(params: MeetingParams) {
         if (Api.instance instanceof Api) {
@@ -82,24 +82,15 @@ export class Api {
         return resp.data
     }
 
-    // Simply get Bot structure
-    public async getBot(): Promise<ApiTypes.GetableBot> {
-        return (
-            await axios({
-                method: 'GET',
-                url: `/bots/${this.bot_uuid}`,
-            })
-        ).data
-    }
-
     // Post transcript to server
     public async postTranscript(
         transcript: ApiTypes.PostableTranscript,
+        bot_uuid: string,
     ): Promise<ApiTypes.QueryableTranscript> {
         return (
             await axios({
                 method: 'POST',
-                url: `/bots/transcripts`,
+                url: `/bots/transcripts/${bot_uuid}/diarization`,
                 data: transcript,
             })
         ).data
@@ -108,11 +99,12 @@ export class Api {
     // Patch existing transcript
     public async patchTranscript(
         transcript: ApiTypes.ChangeableTranscript,
+        bot_uuid: string,
     ): Promise<ApiTypes.QueryableTranscript> {
         return (
             await axios({
                 method: 'PATCH',
-                url: `/bots/transcripts`,
+                url: `/bots/transcripts/${bot_uuid}/diarization`,
                 data: transcript,
             })
         ).data
