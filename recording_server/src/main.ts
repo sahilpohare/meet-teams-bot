@@ -426,7 +426,7 @@ async function handleErrorInStartRecording(error: Error, data: MeetingParams) {
     } else if (error instanceof JoinError) {
         errorMessage = error.message
     } else {
-        errorMessage = JoinErrorCode.Internal
+        errorMessage = JoinErrorCode.Internal + ": " + error.message
     }
 
     await meetingBotStartRecordFailed(
