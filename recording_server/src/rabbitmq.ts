@@ -154,13 +154,12 @@ export class Consumer {
         console.log('handleStartRecord')
         
         const grafanaService = GrafanaService.getInstance()
+        // Mettre à jour la configuration de Grafana Agent
+        await grafanaService.updateGrafanaAgentWithBotUuid()
+        grafanaService.setBotUuid(data.bot_uuid)
         
         // Set up force termination timer once we've received a message
         setupForceTermination()
-        grafanaService.setBotUuid(data.bot_uuid)
-
-        // Mettre à jour la configuration de Grafana Agent
-        await grafanaService.updateGrafanaAgentWithBotUuid()
 
         console.log('####### DATA #######', data)
         // Prevent instance for being scaled down
