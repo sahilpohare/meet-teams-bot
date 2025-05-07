@@ -153,13 +153,13 @@ export class Consumer {
     static async handleStartRecord(data: MeetingParams) {
         console.log('handleStartRecord')
         
-        // Set up force termination timer once we've received a message
-        setupForceTermination()
         const grafanaService = GrafanaService.getInstance()
-        grafanaService.setBotUuid(data.bot_uuid)
-
         // Mettre à jour la configuration de Grafana Agent
         await grafanaService.updateGrafanaAgentWithBotUuid()
+        grafanaService.setBotUuid(data.bot_uuid)
+        
+        // Set up force termination timer once we've received a message
+        setupForceTermination()
 
         console.log('####### DATA #######', data)
         // Prevent instance for being scaled down

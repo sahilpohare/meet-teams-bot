@@ -153,7 +153,7 @@ export enum JoinErrorCode {
     BotRemoved = 'BotRemoved',
     ApiRequest = 'ApiRequest',
     TimeoutWaitingToStart = 'TimeoutWaitingToStart',
-    Internal = 'InternalError',
+    Internal = 'InternalError classic',
     InvalidMeetingUrl = 'InvalidMeetingUrl',
     StreamingSetupFailed = 'StreamingSetupFailed',
 }
