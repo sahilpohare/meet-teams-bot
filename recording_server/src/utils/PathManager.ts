@@ -72,9 +72,7 @@ export class PathManager {
     }
 
     public getBasePath(): string {
-        this.ensureBotUuid()
-        this.ensureSecret()
-        const identifier = this.getIdentifier()
+        const identifier = this.botUuid
         switch (this.environment) {
             case 'prod':
                 return path.join(EFS_MOUNT_POINT, 'prod', identifier)

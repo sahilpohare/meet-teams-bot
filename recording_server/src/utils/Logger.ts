@@ -5,6 +5,23 @@ import { s3cp } from './S3Uploader'
 
 // Variable pour garder une référence au fichier de log du bot
 let currentBotLogFile: any = null
+let format = winston.format.combine(
+    winston.format.colorize({
+        all: true,
+        colors: {
+            info: 'cyan',
+            warn: 'yellow',
+            error: 'red',
+            debug: 'blue',
+        }
+    }),
+    winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+    winston.format.printf(({ timestamp, level, message }) => {
+        return `[${timestamp}] ${level} : ${message}`
+    })
+)
+
+
 
 function formatTable(data: any): string {
     if (!Array.isArray(data) && typeof data !== 'object') {
@@ -69,31 +86,12 @@ function formatArgs(msg: string, args: any[]) {
 // Winston logger global
 export let logger = winston.createLogger({
     level: 'debug',
-    format: winston.format.combine(
-        winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-        winston.format.printf(({ timestamp, level, message }) => {
-            return `[${timestamp}] ${level.toUpperCase()} : ${message}`
-        })
-    ),
+    format: format,
     transports: [
         new winston.transports.Console({
-            format: winston.format.combine(
-                winston.format.colorize({
-                    all: true,
-                    colors: {
-                        info: 'cyan',
-                        warn: 'yellow',
-                        error: 'red',
-                        debug: 'blue',
-                    }
-                }),
-                winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-                winston.format.printf(({ timestamp, level, message }) => {
-                    return `[${timestamp}] ${level} : ${message}`
-                })
-            )
+            format: format
         }),
-        new winston.transports.File({ filename: './data/initial.log' })
+        new winston.transports.File({ filename: './data/initial.log', format: format })
     ]
 })
 
@@ -111,6 +109,7 @@ export function setupConsoleLogger() {
     console.table = (data: any) => logger.info(formatTable(data))
 }
 
+
 export function redirectLogsToBot(botUuid: string) {
     const pathManager = PathManager.getInstance(botUuid)
     const logPath = pathManager.getLogPath()
@@ -122,23 +121,9 @@ export function redirectLogsToBot(botUuid: string) {
     // Remplacer le transport fichier par le nouveau fichier de log du bot
     logger.clear();
     logger.add(new winston.transports.Console({
-        format: winston.format.combine(
-            winston.format.colorize({
-                all: true,
-                colors: {
-                    info: 'cyan',
-                    warn: 'yellow',
-                    error: 'red',
-                    debug: 'blue',
-                }
-            }),
-            winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-            winston.format.printf(({ timestamp, level, message }) => {
-                return `[${timestamp}] ${level} : ${message}`
-            })
-        )
+        format: format
     }));
-    logger.add(new winston.transports.File({ filename: logPath }));
+    logger.add(new winston.transports.File({ filename: logPath, format: format }));
 
     setupConsoleLogger()
     currentBotLogFile = logPath
