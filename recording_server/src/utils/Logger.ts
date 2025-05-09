@@ -1,4 +1,6 @@
-import fs from 'fs'
+import fs, { promises as fsPromises } from 'fs'
+import os from 'os'
+import path from 'path'
 import winston from 'winston'
 import { PathManager } from './PathManager'
 import { s3cp } from './S3Uploader'
@@ -110,12 +112,19 @@ export function setupConsoleLogger() {
 }
 
 
-export function redirectLogsToBot(botUuid: string) {
+export async function redirectLogsToBot(botUuid: string) {
     const pathManager = PathManager.getInstance(botUuid)
     const logPath = pathManager.getLogPath()
-
+    
     // Copier les logs initiaux vers le nouveau fichier
-    fs.copyFileSync('./data/initial.log', logPath)
+    const homeDir = os.homedir()
+    const logsPath = path.join(homeDir, 'logs.txt')
+    
+    await fsPromises.copyFile(logsPath, logPath).catch(err => {
+        console.error('Failed to copy logs.txt to logPath:', err)
+    })
+
+    fs.appendFileSync('./data/initial.log', logPath)
     fs.unlinkSync('./data/initial.log')
 
     // Remplacer le transport fichier par le nouveau fichier de log du bot
