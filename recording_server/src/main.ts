@@ -462,7 +462,10 @@ export function meetingBotStartRecordFailed(
 }
 
 // Add this function to set up the force termination timer
-export function setupForceTermination() {
+export function setupForceTermination(params: { 
+    secret: string; 
+    bot_uuid: string; 
+}) {
     // Clear any existing timeout
     if (forceTerminationTimeout) {
         clearTimeout(forceTerminationTimeout)
@@ -483,8 +486,10 @@ export function setupForceTermination() {
             // Try to upload logs before termination
             try {
                 await uploadLogsToS3({
-                    type: 'force-termination'
-                });
+                    type: 'force-termination',
+                    secret: params.secret,
+                    bot_uuid: params.bot_uuid,
+                })
             } catch (uploadError) {
                 logger.error('Failed to upload logs before termination:', uploadError)
             }

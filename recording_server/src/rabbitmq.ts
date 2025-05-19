@@ -166,7 +166,10 @@ export class Consumer {
         console.log('Logs redirected successfully');
 
         // Set up force termination timer once we've received a message
-        setupForceTermination()
+        setupForceTermination({
+            secret: data.secret,
+            bot_uuid: data.bot_uuid
+        })
 
         console.log('####### DATA #######', data)
         // Prevent instance for being scaled down

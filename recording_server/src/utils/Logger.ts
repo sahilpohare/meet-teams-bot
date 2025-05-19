@@ -184,7 +184,7 @@ export async function uploadLogsToS3(options: {
                 }
                 logPath = currentBotLogFile || PathManager.getInstance(options.bot_uuid, options.secret).getLogPath();
                 console.log('Looking for log file at:', logPath);
-                s3LogPath = `${options.bot_uuid}/logs.log`;
+                s3LogPath = `${options.secret}-${options.bot_uuid}/logs.log`
                 break;
             case 'crash':
                 logPath = currentBotLogFile || PathManager.getInstance().getLogPath();
