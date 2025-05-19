@@ -161,7 +161,9 @@ export class Consumer {
         await grafanaService.updateGrafanaAgentWithBotUuid()
         
         // Redirect logs to bot-specific file
-        redirectLogsToBot(data.bot_uuid)
+        console.log('About to redirect logs to bot:', data.bot_uuid);
+        await redirectLogsToBot(data.bot_uuid);
+        console.log('Logs redirected successfully');
 
         // Set up force termination timer once we've received a message
         setupForceTermination()

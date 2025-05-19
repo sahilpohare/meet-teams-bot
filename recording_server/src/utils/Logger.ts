@@ -5,8 +5,8 @@ import winston from 'winston'
 import { PathManager } from './PathManager'
 import { s3cp } from './S3Uploader'
 
-// Variable pour garder une référence au fichier de log du bot
-let currentBotLogFile: any = null
+// Reference to current bot log file
+let currentBotLogFile: string | null = null
 let format = winston.format.combine(
     winston.format.colorize({
         all: true,
@@ -22,8 +22,6 @@ let format = winston.format.combine(
         return `[${timestamp}] ${level} : ${message}`
     })
 )
-
-
 
 function formatTable(data: any): string {
     if (!Array.isArray(data) && typeof data !== 'object') {
@@ -85,7 +83,7 @@ function formatArgs(msg: string, args: any[]) {
     )
 }
 
-// Winston logger global
+// Global winston logger
 export let logger = winston.createLogger({
     level: 'debug',
     format: format,
@@ -98,6 +96,7 @@ export let logger = winston.createLogger({
 })
 
 export function setupConsoleLogger() {
+    console.log('Setting up console logger');
     console.log = (msg: string, ...args: any[]) =>
         logger.info(formatArgs(msg, args))
     console.info = (msg: string, ...args: any[]) =>
@@ -109,33 +108,61 @@ export function setupConsoleLogger() {
     console.debug = (msg: string, ...args: any[]) =>
         logger.debug(formatArgs(msg, args))
     console.table = (data: any) => logger.info(formatTable(data))
+    console.log('Console logger setup complete');
 }
 
-
 export async function redirectLogsToBot(botUuid: string) {
+    console.log('Starting redirectLogsToBot for bot:', botUuid);
     const pathManager = PathManager.getInstance(botUuid)
     const logPath = pathManager.getLogPath()
+    console.log('New log path will be:', logPath);
     
-    // Copier les logs initiaux vers le nouveau fichier
-    const homeDir = os.homedir()
-    const logsPath = path.join(homeDir, 'logs.txt')
-    
-    await fsPromises.copyFile(logsPath, logPath).catch(err => {
-        console.error('Failed to copy logs.txt to logPath:', err)
-    })
+    try {
+        // Create parent directory if needed
+        await fsPromises.mkdir(path.dirname(logPath), { recursive: true })
+        
+        // Copy initial logs to new file
+        const homeDir = os.homedir()
+        const logsPath = path.join(homeDir, 'logs.txt')
+        const initialLogsPath = './data/initial.log'
+        
+        // 1. Copy logs.txt to the new log file
+        if (fs.existsSync(logsPath)) {
+            await fsPromises.copyFile(logsPath, logPath)
+        } else {
+            await fsPromises.writeFile(logPath, '')
+        }
+        
+        // 2. Append initial.log content to the new file
+        if (fs.existsSync(initialLogsPath)) {
+            const initialContent = await fsPromises.readFile(initialLogsPath, 'utf8')
+            await fsPromises.appendFile(logPath, initialContent)
+            await fsPromises.unlink(initialLogsPath)
+        }
+        
+        // Create and configure transports
+        const consoleTransport = new winston.transports.Console({ format });
+        const fileTransport = new winston.transports.File({ 
+            filename: logPath, 
+            format
+        });
 
-    fs.appendFileSync('./data/initial.log', logPath)
-    fs.unlinkSync('./data/initial.log')
-
-    // Remplacer le transport fichier par le nouveau fichier de log du bot
-    logger.clear();
-    logger.add(new winston.transports.Console({
-        format: format
-    }));
-    logger.add(new winston.transports.File({ filename: logPath, format: format }));
-
-    setupConsoleLogger()
-    currentBotLogFile = logPath
+        // Replace existing transports
+        logger.clear();
+        logger.add(consoleTransport);
+        logger.add(fileTransport);
+        
+        currentBotLogFile = logPath
+        console.log('Logger redirection complete');
+    } catch (err) {
+        console.error('Failed to setup logs:', err)
+        // Fall back to console-only logging
+        logger.configure({
+            level: 'debug',
+            format: format,
+            transports: [new winston.transports.Console({ format })]
+        });
+    }
 }
 
 export async function uploadLogsToS3(options: {
@@ -145,7 +172,6 @@ export async function uploadLogsToS3(options: {
     error?: Error;
 }): Promise<void> {
     try {
-        let pathManager: PathManager;
         let logPath: string;
         let s3LogPath: string;
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -156,28 +182,28 @@ export async function uploadLogsToS3(options: {
                 if (!options.bot_uuid || !options.secret) {
                     throw new Error('bot_uuid and secret are required for normal log upload');
                 }
-                pathManager = PathManager.getInstance(options.bot_uuid, options.secret);
-                logPath = pathManager.getLogPath();
+                logPath = currentBotLogFile || PathManager.getInstance(options.bot_uuid, options.secret).getLogPath();
+                console.log('Looking for log file at:', logPath);
                 s3LogPath = `${options.bot_uuid}/logs.log`;
                 break;
             case 'crash':
-                pathManager = PathManager.getInstance();  // Sans paramètres pour les crashs
-                logPath = pathManager.getLogPath();
+                logPath = currentBotLogFile || PathManager.getInstance().getLogPath();
+                console.log('Looking for crash log file at:', logPath);
                 s3LogPath = `crash-logs/${timestamp}-${options.error?.name || 'unknown'}.log`;
                 break;
         }
         
         if (!fs.existsSync(logPath)) {
-            logger.error('No log file found to upload');
+            console.error('No log file found at path:', logPath);
             return;
         }
 
         logger.info(`Uploading ${options.type} logs to S3...`);
         await s3cp(logPath, s3LogPath);
-        logger.info(`${options.type} logs uploaded successfully to S3`);
+        logger.info(`${options.type} logs uploaded to S3`);
     } catch (error) {
         logger.error(`Failed to upload ${options.type} logs to S3:`, error);
-        throw error; // Re-throw to let caller handle it
+        throw error;
     }
 }
 
@@ -185,10 +211,7 @@ export function setupExitHandler() {
     process.on('uncaughtException', async (error) => {
         logger.error('Uncaught Exception: ' + error);
         try {
-            await uploadLogsToS3({
-                type: 'crash',
-                error
-            });
+            await uploadLogsToS3({ type: 'crash', error });
         } catch (uploadError) {
             logger.error('Failed to upload crash logs to S3: ' + uploadError);
         }

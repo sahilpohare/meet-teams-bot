@@ -54,6 +54,9 @@ let forceTerminationTimeout: NodeJS.Timeout | null = null
     axios.defaults.withCredentials = true
 
     let environ: string = process.env.ENVIRON
+    
+    // Enregistrer le répertoire original
+    const originalDirectory = process.cwd()
 
     console.log('Before REDIS.connect()')
     await clientRedis.connect().catch((e) => {
@@ -324,6 +327,12 @@ let forceTerminationTimeout: NodeJS.Timeout | null = null
 
     // Upload logs to S3 before exiting
     try {
+        // Return to the original directory before uploading logs
+        if (originalDirectory) {
+            console.log(`Switching back to original directory: ${originalDirectory}`)
+            process.chdir(originalDirectory)
+        }
+        
         await uploadLogsToS3({
             type: 'normal',
             bot_uuid: consumeResult.params.bot_uuid,
@@ -479,18 +488,7 @@ export function setupForceTermination() {
             } catch (uploadError) {
                 logger.error('Failed to upload logs before termination:', uploadError)
             }
-
-            // Use SIGTERM first to allow cleanup
-            process.kill(process.pid, 'SIGTERM')
-            
-            // If still running after 5 seconds, force kill
-            setTimeout(() => {
-                try {
-                    process.kill(process.pid, 'SIGKILL')
-                } catch (e) {
-                    process.exit(9)
-                }
-            }, 5000)
+            process.kill(process.pid, 'SIGKILL')
         } catch (e) {
             logger.error(
                 'Failed to terminate gracefully, using immediate exit',
