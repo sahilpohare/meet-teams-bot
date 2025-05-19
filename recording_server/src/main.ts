@@ -16,16 +16,14 @@ import { Consumer } from './rabbitmq'
 import { JoinError, JoinErrorCode, MeetingParams } from './types'
 
 import { spawn } from 'child_process'
-import fs from 'fs'
 import { Events } from './events'
 import { RecordingEndReason } from './state-machine/types'
 import {
     logger,
     setupConsoleLogger,
-    setupExitHandler
+    setupExitHandler,
+    uploadLogsToS3
 } from './utils/Logger'
-import { PathManager } from './utils/PathManager'
-import { s3cp } from './utils/S3Uploader'
 
 const ZOOM_SDK_DEBUG_EXECUTABLE_PATHNAME = './target/debug/client'
 const ZOOM_SDK_RELEASE_EXECUTABLE_PATHNAME = './target/release/client'
@@ -326,21 +324,11 @@ let forceTerminationTimeout: NodeJS.Timeout | null = null
 
     // Upload logs to S3 before exiting
     try {
-        const pathManager = PathManager.getInstance(
-            consumeResult.params.bot_uuid,
-            consumeResult.params.secret
-        )
-        const logPath = pathManager.getLogPath()
-        const s3LogPath = `${consumeResult.params.secret}-${consumeResult.params.bot_uuid}/logs.log`
-
-        // Vérifier si le fichier existe avant d'uploader
-        if (fs.existsSync(logPath)) {
-            console.log('Uploading logs to S3...')
-            await s3cp(logPath, s3LogPath)
-            console.log('Logs uploaded successfully to S3')
-        } else {
-            console.error('No log file found to upload')
-        }
+        await uploadLogsToS3({
+            type: 'normal',
+            bot_uuid: consumeResult.params.bot_uuid,
+            secret: consumeResult.params.secret
+        });
     } catch (error) {
         console.error('Failed to upload logs to S3:', error)
     }
@@ -472,7 +460,7 @@ export function setupForceTermination() {
     }
 
     // Set up new timeout
-    forceTerminationTimeout = setTimeout(() => {
+    forceTerminationTimeout = setTimeout(async () => {
         logger.warn(
             `Force terminating instance after ${MAX_INSTANCE_DURATION_AFTER_RABBIT_MESSAGE_RECIEVED_MS / 1000 / 60 / 60} hours for safety`,
         )
@@ -483,71 +471,31 @@ export function setupForceTermination() {
                 'CRITICAL: Forcing immediate process termination after timeout',
             )
 
-            // Use process.kill with SIGKILL for immediate termination
-            process.kill(process.pid, 'SIGKILL')
-        } catch (e) {
-            // This should never execute with SIGKILL, but just in case
-            logger.error(
-                'Failed to terminate with SIGKILL, using alternative method',
-            )
+            // Try to upload logs before termination
+            try {
+                await uploadLogsToS3({
+                    type: 'force-termination'
+                });
+            } catch (uploadError) {
+                logger.error('Failed to upload logs before termination:', uploadError)
+            }
 
-            // As a last resort, use exit code 9 (same as SIGKILL)
+            // Use SIGTERM first to allow cleanup
+            process.kill(process.pid, 'SIGTERM')
+            
+            // If still running after 5 seconds, force kill
+            setTimeout(() => {
+                try {
+                    process.kill(process.pid, 'SIGKILL')
+                } catch (e) {
+                    process.exit(9)
+                }
+            }, 5000)
+        } catch (e) {
+            logger.error(
+                'Failed to terminate gracefully, using immediate exit',
+            )
             process.exit(9)
         }
-
-        // This line should never be reached, but as an absolute fallback
-        require('os').setPriority(process.pid, 19) // Set lowest priority
-        process.abort() // Force core dump
     }, MAX_INSTANCE_DURATION_AFTER_RABBIT_MESSAGE_RECIEVED_MS)
-
-    logger.info(
-        `Hard kill timer set: instance will be forcefully terminated after ${MAX_INSTANCE_DURATION_AFTER_RABBIT_MESSAGE_RECIEVED_MS / 1000 / 60 / 60} hours`,
-    )
-}
-
-async function retryApiCall<T>(
-    fn: () => Promise<T>,
-    maxRetries = 120, // Default 120 retries for 20 minutes with 10s delay
-    maxRetryTime = 20 * 60 * 1000, // 20 minutes in milliseconds
-    retryDelay = 10000, // Fixed 10 second delay between retries
-): Promise<T> {
-    const startTime = Date.now()
-    let lastError: any
-    let retryCount = 0
-
-    while (retryCount < maxRetries && Date.now() - startTime < maxRetryTime) {
-        try {
-            const result = await fn()
-            console.log(`API call succeeded after ${retryCount} attempts`)
-            return result
-        } catch (error) {
-            lastError = error
-            retryCount++
-
-            const elapsedTime = (Date.now() - startTime) / 1000
-            const remainingTime =
-                Math.max(0, maxRetryTime - (Date.now() - startTime)) / 1000
-
-            // Log retry attempt with more detailed information
-            console.log(
-                `API call failed, attempt ${retryCount}/${maxRetries} (${elapsedTime.toFixed(1)}s elapsed, ${remainingTime.toFixed(1)}s remaining). Retrying in ${retryDelay / 1000}s...`,
-                error,
-            )
-
-            // Wait before next retry - ensure this actually waits the full duration
-            if (
-                retryCount < maxRetries &&
-                Date.now() - startTime < maxRetryTime
-            ) {
-                await new Promise((resolve) => setTimeout(resolve, retryDelay))
-            }
-        }
-    }
-
-    // If we get here, all retries have failed
-    const totalTime = (Date.now() - startTime) / 1000
-    console.error(
-        `API call failed after ${retryCount} attempts over ${totalTime.toFixed(1)}s - exhausted retry attempts`,
-    )
-    throw lastError
 }

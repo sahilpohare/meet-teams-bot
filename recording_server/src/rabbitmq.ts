@@ -16,6 +16,7 @@ import { server } from './server'
 import { Api } from './api/methods'
 import { setupForceTermination } from './main'
 import { GrafanaService } from './utils/GrafanaService'
+import { redirectLogsToBot } from './utils/Logger'
 
 const NODE_NAME = process.env.NODE_NAME
 
@@ -159,6 +160,9 @@ export class Consumer {
         grafanaService.setBotUuid(data.bot_uuid)
         await grafanaService.updateGrafanaAgentWithBotUuid()
         
+        // Redirect logs to bot-specific file
+        redirectLogsToBot(data.bot_uuid)
+
         // Set up force termination timer once we've received a message
         setupForceTermination()
 

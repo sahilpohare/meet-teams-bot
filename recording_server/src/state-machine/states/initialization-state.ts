@@ -2,7 +2,6 @@ import { generateBranding, playBranding } from '../../branding'
 import { openBrowser } from '../../browser'
 import { MeetingHandle } from '../../meeting'
 import { JoinError, JoinErrorCode } from '../../types'
-import { redirectLogsToBot } from '../../utils/Logger'
 import { PathManager } from '../../utils/PathManager'
 import { MeetingStateType, StateExecuteResult } from '../types'
 import { BaseState } from './base-state'
@@ -24,7 +23,6 @@ export class InitializationState extends BaseState {
 
             // Setup path manager first (important for logs)
             await this.setupPathManager();
-            this.setupPinoLogger();
 
             // Setup branding if needed - non-bloquant
             if (this.context.params.bot_branding) {
@@ -139,9 +137,5 @@ export class InitializationState extends BaseState {
             }
             throw error;
         }
-    }
-
-    private setupPinoLogger(): void {
-        redirectLogsToBot(this.context.params.bot_uuid)
     }
 }
