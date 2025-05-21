@@ -55,101 +55,21 @@ export abstract class BaseState {
      * et les gère automatiquement en arrière-plan
      */
     protected startDialogObserver() {
-        // Ne démarrer l'observateur que pour Google Meet
-        if (this.context.params.meetingProvider !== 'Meet') {
-            console.info(`Dialog observer not started: provider is not Google Meet (${this.context.params.meetingProvider})`);
-            return;
+        // Utiliser l'observateur global au lieu de créer une instance locale
+        if (this.context.startGlobalDialogObserver) {
+            this.context.startGlobalDialogObserver();
+            console.info(`Requested global dialog observer from state ${this.constructor.name}`);
+        } else {
+            console.warn(`Global dialog observer not available in state ${this.constructor.name}`);
         }
-
-        if (!this.context.playwrightPage) {
-            console.warn('Cannot start dialog observer: page not available');
-            return;
-        }
-
-        // Nettoyer tout observateur existant
-        if (this.context.dialogObserverInterval) {
-            clearInterval(this.context.dialogObserverInterval);
-        }
-
-        // Créer un nouvel observateur avec un intervalle de vérification
-        console.info(`Starting dialog observer in state ${this.constructor.name}`);
-        
-        // Fonction pour vérifier et redémarrer l'observateur si nécessaire
-        const checkAndRestartObserver = () => {
-            if (!this.context.dialogObserverInterval) {
-                console.warn('Dialog observer was stopped, restarting...');
-                this.startDialogObserver();
-                return;
-            }
-        };
-
-        // Heartbeat pour vérifier l'état de l'observateur toutes les 2 secondes
-        const heartbeatInterval = setInterval(checkAndRestartObserver, 2000);
-
-        // Stocker l'intervalle de heartbeat pour pouvoir le nettoyer plus tard
-        this.context.dialogObserverHeartbeat = heartbeatInterval;
-
-        this.context.dialogObserverInterval = setInterval(async () => {
-            try {
-                if (this.context.playwrightPage?.isClosed()) {
-                    this.stopDialogObserver();
-                    return;
-                }
-
-                // Chercher le dialogue "Got it"
-                const gotItDialog = this.context.playwrightPage.locator([
-                    '[role="dialog"][aria-modal="true"][aria-label="Others may see your video differently"]',
-                    '[role="dialog"]:has(button:has-text("Got it"))',
-                    '[aria-modal="true"]:has(button:has-text("Got it"))'
-                ].join(','));
-
-                const isVisible = await gotItDialog.isVisible({ timeout: 300 }).catch(() => false);
-                
-                if (isVisible) {
-                    console.info(`[DialogObserver] Found "Got it" dialog in state ${this.constructor.name}`);
-                    
-                    // Trouver le bouton Got it
-                    const gotItButton = gotItDialog.locator('button:has-text("Got it")');
-                    await gotItButton.click({ force: true, timeout: 1000 }).catch(async (err) => {
-                        console.warn(`[DialogObserver] Failed to click with regular method: ${err.message}`);
-                        
-                        // Fallback: essayer de cliquer avec JavaScript directement
-                        await this.context.playwrightPage.evaluate(() => {
-                            const buttons = document.querySelectorAll('button');
-                            for (const button of buttons) {
-                                if (button.textContent?.includes('Got it')) {
-                                    (button as HTMLElement).click();
-                                    return true;
-                                }
-                            }
-                            return false;
-                        }).catch(e => console.error(`[DialogObserver] JavaScript click failed: ${e.message}`));
-                    });
-                    
-                    console.info(`[DialogObserver] Clicked "Got it" button`);
-                }
-            } catch (error) {
-                console.error(`[DialogObserver] Error checking for dialogs: ${error}`);
-                // En cas d'erreur, on redémarre l'observateur
-                this.stopDialogObserver();
-                this.startDialogObserver();
-            }
-        }, 2000); // Vérifier toutes les 2 secondes
     }
 
     /**
      * Arrête l'observateur de dialogue
      */
     protected stopDialogObserver() {
-        if (this.context.dialogObserverInterval) {
-            clearInterval(this.context.dialogObserverInterval);
-            this.context.dialogObserverInterval = undefined;
-            console.info(`Stopped dialog observer in state ${this.constructor.name}`);
-        }
-        if (this.context.dialogObserverHeartbeat) {
-            clearInterval(this.context.dialogObserverHeartbeat);
-            this.context.dialogObserverHeartbeat = undefined;
-            console.info(`Stopped dialog observer heartbeat in state ${this.constructor.name}`);
-        }
+        // Cette méthode est gardée pour compatibilité, mais ne fait plus rien
+        // L'observateur global sera arrêté au niveau de la machine à états
+        console.info(`Dialog observer stop requested from state ${this.constructor.name} (ignored - using global observer)`);
     }
 }

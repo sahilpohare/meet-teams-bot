@@ -87,6 +87,12 @@ export interface MeetingContext {
     dialogObserverHeartbeat?: NodeJS.Timeout
     lastActivityTime?: number
     lastFrameTime?: number
+
+    // Méthodes pour la gestion globale des observateurs
+    startGlobalDialogObserver?: () => void
+    stopGlobalDialogObserver?: () => void
+
+    meetingUrl?: string
 }
 
 export interface StateTransition {

@@ -76,7 +76,7 @@ export class MeetProvider implements MeetingProviderInterface {
                     page,
                     'span',
                     ['Use without an account'],
-                    5,
+                    2,
                 ),
             )
 
@@ -107,27 +107,49 @@ export class MeetProvider implements MeetingProviderInterface {
             await takeScreenshot(page, `before_join_button_attempts`);
 
             // Try multiple approaches to find the join button
-            let askToJoinClicked = await clickWithInnerText(
-                page,
-                'span',
-                ['Ask to join', 'Join now'],
-                5,
-            );
-
-            if (!askToJoinClicked) {
-                console.log('First attempt to find join button failed, trying alternate selectors');
+            let askToJoinClicked = false;
+            const joinButtonMaxAttempts = 5;
+            
+            // Alternating between span and button selectors for 5 iterations total
+            for (let attempt = 1; attempt <= joinButtonMaxAttempts; attempt++) {
+                console.log(`Join button search attempt ${attempt}/${joinButtonMaxAttempts}`);
                 
-                // Try button element directly
-                askToJoinClicked = await clickWithInnerText(
-                    page,
-                    'button',
-                    ['Ask to join', 'Join now', 'Join meeting', 'Join', 'Enter meeting'],
-                    5,
-                );
+                // First try with span selector (odd attempts)
+                if (!askToJoinClicked && attempt % 2 === 1) {
+                    askToJoinClicked = await clickWithInnerText(
+                        page,
+                        'span',
+                        ['Ask to join', 'Join now'],
+                        1, // Only try once per iteration
+                    );
+                    if (askToJoinClicked) {
+                        console.log(`Found join button in span element on attempt ${attempt}`);
+                        break;
+                    }
+                }
+                
+                // Then try with button selector (even attempts or after span failed)
+                if (!askToJoinClicked) {
+                    askToJoinClicked = await clickWithInnerText(
+                        page,
+                        'button',
+                        ['Ask to join', 'Join now', 'Join meeting', 'Join', 'Enter meeting'],
+                        1, // Only try once per iteration
+                    );
+                    if (askToJoinClicked) {
+                        console.log(`Found join button in button element on attempt ${attempt}`);
+                        break;
+                    }
+                }
+                
+                // Short pause between attempts
+                if (!askToJoinClicked && attempt < joinButtonMaxAttempts) {
+                    await page.waitForTimeout(100);
+                }
             }
 
             if (!askToJoinClicked) {
-                console.log('Second attempt failed, trying by aria-label');
+                console.log('All attempts with alternating selectors failed, trying by aria-label');
                 
                 // Try by aria-label which might be more stable
                 try {
@@ -173,7 +195,6 @@ export class MeetProvider implements MeetingProviderInterface {
 
             // Une fois dans le meeting, on exécute toutes les actions post-join
             // SANS vérifier le cancelCheck puisqu'on est déjà dans le meeting
-            await dismissGotItDialog(page);
 
             if (meetingParams.enter_message) {
                 console.log('Sending entry message...')
@@ -682,7 +703,6 @@ async function deactivateMicrophone(page: Page): Promise<boolean> {
         return false
     }
 }
-
 // async function MuteMicrophone(page: Page) {
 //     try {
 //         await page.evaluate(() => {
@@ -715,50 +735,3 @@ async function deactivateMicrophone(page: Page): Promise<boolean> {
 //     }
 // }
 
-async function dismissGotItDialog(page: Page): Promise<boolean> {
-    try {
-        console.log('Looking for "Got it" dialog...');
-        
-        // Vérifier d'abord si on est toujours dans la réunion
-        if (!(await isInMeeting(page))) {
-            console.log('Bot is no longer in the meeting, cannot dismiss dialog');
-            return false;
-        }
-        
-        // Vérification rapide de la présence du dialog
-        const dialog = page.locator([
-            '[role="dialog"][aria-modal="true"][aria-label="Others may see your video differently"]',
-            '[role="dialog"]:has(button:has-text("Got it"))'
-        ].join(','));
-        
-        const isDialogVisible = await dialog.isVisible({ timeout: 500 })
-            .catch(() => false);
-
-        if (!isDialogVisible) {
-            console.log('No video visibility dialog found');
-            return false;
-        }
-
-        console.log('Found dialog about video visibility');
-        const gotItButton = dialog.locator('button:has-text("Got it")');
-        
-        // Vérifier à nouveau si on est toujours dans la réunion avant de cliquer
-        if (!(await isInMeeting(page))) {
-            console.log('Bot is no longer in the meeting before clicking Got it');
-            return false;
-        }
-
-        // Si le dialog est visible, on clique avec force=true
-        await gotItButton.click({ timeout: 1000, force: true });
-        console.log('Clicked Got it button');
-        
-        // Vérification rapide que le dialog a disparu
-        await dialog.waitFor({ state: 'hidden', timeout: 1000 })
-            .catch(() => console.log('Dialog might still be visible'));
-        
-        return true;
-    } catch (error) {
-        console.log('Error handling Got it dialog:', error);
-        return false;
-    }
-}
