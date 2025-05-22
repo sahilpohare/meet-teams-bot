@@ -23,39 +23,56 @@ export class InitializationState extends BaseState {
             }
 
             // Setup path manager first (important for logs)
-            await this.setupPathManager();
+            await this.setupPathManager()
 
             // Setup branding if needed - non-bloquant
             if (this.context.params.bot_branding) {
-                this.setupBranding().catch(error => {
-                    console.warn('Branding setup failed, continuing anyway:', error);
-                });
+                this.setupBranding().catch((error) => {
+                    console.warn(
+                        'Branding setup failed, continuing anyway:',
+                        error,
+                    )
+                })
             }
 
             // Setup browser - étape critique
             try {
-                await this.setupBrowser();
+                await this.setupBrowser()
             } catch (error) {
-                console.error('Critical error: Browser setup failed:', error);
+                console.error('Critical error: Browser setup failed:', error)
                 // Ajouter des détails à l'erreur pour faciliter le diagnostic
-                const enhancedError = new Error(`Browser initialization failed: ${error instanceof Error ? error.message : String(error)}`);
-                enhancedError.stack = error instanceof Error ? error.stack : undefined;
-                throw enhancedError;
+                const enhancedError = new Error(
+                    `Browser initialization failed: ${error instanceof Error ? error.message : String(error)}`,
+                )
+                enhancedError.stack =
+                    error instanceof Error ? error.stack : undefined
+                throw enhancedError
             }
 
-             // Initialiser le streaming si nécessaire
-        if (
-            this.context.params.streaming_input ||
-            this.context.params.streaming_output
-        ) {
-            this.context.streamingService = new Streaming(
-                this.context.params.streaming_input,
-                this.context.params.streaming_output,
-                this.context.params.streaming_audio_frequency,
-                this.context.params.bot_uuid,
-            )
-            // Ne pas démarrer tout de suite, attendre l'état Recording
-        }
+            // Always initialize the streaming service
+            // If streaming_input or streaming_output is provided, use them
+            // Otherwise, create a local-only streaming instance to collect audio data for analysis
+            if (
+                this.context.params.streaming_input ||
+                this.context.params.streaming_output
+            ) {
+                console.info('Initializing full streaming service with input/output URLs')
+                this.context.streamingService = new Streaming(
+                    this.context.params.streaming_input,
+                    this.context.params.streaming_output,
+                    this.context.params.streaming_audio_frequency,
+                    this.context.params.bot_uuid,
+                )
+            } else {
+                console.info('Initializing local-only streaming service for audio analysis')
+                // Create a streaming service with no URLs but still able to receive audio from extension
+                this.context.streamingService = new Streaming(
+                    undefined, // No input URL
+                    undefined, // No output URL
+                    this.context.params.streaming_audio_frequency,
+                    this.context.params.bot_uuid,
+                )
+            }
 
             // All initialization successful
             return this.transition(MeetingStateType.WaitingRoom)
@@ -75,58 +92,69 @@ export class InitializationState extends BaseState {
     }
 
     private async setupBrowser(): Promise<void> {
-        const maxRetries = 3;
-        let lastError: Error | null = null;
-        
+        const maxRetries = 3
+        let lastError: Error | null = null
+
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-                console.info(`Browser setup attempt ${attempt}/${maxRetries}`);
-                
+                console.info(`Browser setup attempt ${attempt}/${maxRetries}`)
+
                 // Définir le type de retour attendu de openBrowser
                 type BrowserResult = {
                     browser: any
                     backgroundPage: any
                 }
-                
+
                 // Augmenter le timeout pour les environnements plus lents
-                const timeoutMs = 60000; // 60 secondes au lieu de 30
-                
+                const timeoutMs = 60000 // 60 secondes au lieu de 30
+
                 // Créer une promesse qui se rejette après un délai
-                const timeoutPromise = new Promise<BrowserResult>((_, reject) => {
-                    const id = setTimeout(() => {
-                        clearTimeout(id)
-                        reject(new Error(`Browser setup timeout (${timeoutMs}ms)`))
-                    }, timeoutMs)
-                })
-                
+                const timeoutPromise = new Promise<BrowserResult>(
+                    (_, reject) => {
+                        const id = setTimeout(() => {
+                            clearTimeout(id)
+                            reject(
+                                new Error(
+                                    `Browser setup timeout (${timeoutMs}ms)`,
+                                ),
+                            )
+                        }, timeoutMs)
+                    },
+                )
+
                 // Exécuter la promesse d'ouverture du navigateur avec un timeout
                 const result = await Promise.race<BrowserResult>([
                     openBrowser(false, false),
                     timeoutPromise,
                 ])
-                
+
                 // Si on arrive ici, c'est que openBrowser a réussi
                 this.context.browserContext = result.browser
                 this.context.backgroundPage = result.backgroundPage
-                
-                console.info('Browser setup completed successfully');
-                return; // Sortir de la fonction si réussi
+
+                console.info('Browser setup completed successfully')
+                return // Sortir de la fonction si réussi
             } catch (error) {
-                lastError = error as Error;
-                console.error(`Browser setup attempt ${attempt} failed:`, error);
-                
+                lastError = error as Error
+                console.error(`Browser setup attempt ${attempt} failed:`, error)
+
                 // Si ce n'est pas la dernière tentative, attendre avant de réessayer
                 if (attempt < maxRetries) {
-                    const waitTime = attempt * 5000; // Attente progressive: 5s, 10s, 15s...
-                    console.info(`Waiting ${waitTime}ms before retry...`);
-                    await new Promise(resolve => setTimeout(resolve, waitTime));
+                    const waitTime = attempt * 5000 // Attente progressive: 5s, 10s, 15s...
+                    console.info(`Waiting ${waitTime}ms before retry...`)
+                    await new Promise((resolve) =>
+                        setTimeout(resolve, waitTime),
+                    )
                 }
             }
         }
-        
+
         // Si on arrive ici, c'est que toutes les tentatives ont échoué
-        console.error('All browser setup attempts failed');
-        throw lastError || new Error('Browser setup failed after multiple attempts');
+        console.error('All browser setup attempts failed')
+        throw (
+            lastError ||
+            new Error('Browser setup failed after multiple attempts')
+        )
     }
 
     private async setupPathManager(): Promise<void> {
@@ -134,23 +162,30 @@ export class InitializationState extends BaseState {
             if (!this.context.pathManager) {
                 this.context.pathManager = PathManager.getInstance(
                     this.context.params.bot_uuid,
-                    this.context.params.secret
+                    this.context.params.secret,
                 )
                 await this.context.pathManager.ensureDirectories()
             }
         } catch (error) {
-            console.error('Path manager setup failed:', error);
+            console.error('Path manager setup failed:', error)
             // Créer les répertoires de base si possible
             try {
-                const fs = require('fs');
-                const path = require('path');
-                const baseDir = path.join(process.cwd(), 'logs', this.context.params.bot_uuid);
-                fs.mkdirSync(baseDir, { recursive: true });
-                console.info('Created fallback log directory:', baseDir);
+                const fs = require('fs')
+                const path = require('path')
+                const baseDir = path.join(
+                    process.cwd(),
+                    'logs',
+                    this.context.params.bot_uuid,
+                )
+                fs.mkdirSync(baseDir, { recursive: true })
+                console.info('Created fallback log directory:', baseDir)
             } catch (fsError) {
-                console.error('Failed to create fallback log directory:', fsError);
+                console.error(
+                    'Failed to create fallback log directory:',
+                    fsError,
+                )
             }
-            throw error;
+            throw error
         }
     }
 }

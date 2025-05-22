@@ -1,9 +1,11 @@
+import * as fs from 'fs'
 import { IncomingMessage } from 'http'
 import { Readable } from 'stream'
 import { RawData, Server, WebSocket } from 'ws'
 
 import { SoundContext } from './media_context'
 import { SpeakerData } from './types'
+import { PathManager } from './utils/PathManager'
 
 const EXTENSION_WEBSOCKET_PORT: number = 8081
 const DEFAULT_SAMPLE_RATE: number = 24_000
@@ -28,6 +30,13 @@ export class Streaming {
     private isInitialized: boolean = false
     private isPaused: boolean = false
     private pausedChunks: RawData[] = []
+    private localOnlyMode: boolean = false
+    
+    // Sound level monitoring
+    private currentSoundLevel: number = 0
+    
+    // Statistiques pour le débogage
+    private audioPacketsReceived: number = 0
 
     constructor(
         input: string | undefined,
@@ -35,21 +44,20 @@ export class Streaming {
         sample_rate: number | undefined,
         bot_id: string,
     ) {
-        console.log('Streaming service initialized with params:', {
-            input,
-            output,
-            sample_rate,
-            bot_id,
-        })
-
         // Initialiser directement au lieu de stocker pour plus tard
         this.inputUrl = input
         this.outputUrl = output
         this.botId = bot_id
 
+        // Check if we're in local-only mode (no input/output URLs)
+        this.localOnlyMode = !input && !output
+
         if (sample_rate) {
             this.sample_rate = sample_rate
         }
+        
+        // Initialiser les statistiques
+        this.audioPacketsReceived = 0;
 
         // Démarrer immédiatement comme dans l'ancien code
         this.start()
@@ -66,61 +74,70 @@ export class Streaming {
             return
         }
 
-        console.log('Starting streaming service')
+        // Always create the extension WebSocket server to receive audio from the extension
+        try {
+            this.extension_ws = new WebSocket.Server({
+                port: EXTENSION_WEBSOCKET_PORT,
+            })
+        } catch (error) {
+            console.error(`Failed to create WebSocket server: ${error}`)
+            return
+        }
 
-        if (this.outputUrl) {
-            console.log(`output = ${this.outputUrl}`)
-            try {
-                this.extension_ws = new WebSocket.Server({
-                    port: EXTENSION_WEBSOCKET_PORT,
-                })
-            } catch (error) {
-                console.error(`Failed to create WebSocket server: ${error}`)
-                return
-            }
-
-            // Event 'connection' on client extension WebSocket
-            this.extension_ws.on('connection', (client: WebSocket) => {
-                console.log(`Client connected`)
-
+        // Event 'connection' on client extension WebSocket
+        this.extension_ws.on('connection', (client: WebSocket) => {
+            // In local-only mode, we don't connect to any external WebSockets
+            if (!this.localOnlyMode && this.outputUrl) {
                 try {
                     this.output_ws = new WebSocket(this.outputUrl)
+                    
+                    // Send initial message to output webSocket
+                    this.output_ws.on('open', () => {
+                        this.output_ws.send(
+                            JSON.stringify({
+                                protocol_version: 1,
+                                bot_id: this.botId,
+                                offset: 0.0,
+                            }),
+                        )
+                    })
+                    
+                    // Dual channel
+                    if (this.inputUrl === this.outputUrl) {
+                        this.play_incoming_audio_chunks(this.output_ws)
+                    }
+                    
+                    // Event 'error' on output WebSocket
+                    this.output_ws.on('error', (err: Error) => {
+                        console.error(`Output WebSocket error : ${err}`)
+                    })
                 } catch (error) {
                     console.error(
                         `Failed to connect to output WebSocket: ${error}`,
                     )
+                }
+            }
+
+            // Event 'message' on client extension WebSocket
+            client.on('message', (message) => {
+                // Incrémenter le compteur de paquets audio reçus
+                this.audioPacketsReceived++;
+                
+                if (this.isPaused) {
+                    // Si en pause, stocker les chunks pour traitement ultérieur
+                    this.pausedChunks.push(message)
                     return
                 }
 
-                // Send initial message to output webSocket
-                this.output_ws.on('open', () => {
-                    this.output_ws.send(
-                        JSON.stringify({
-                            protocol_version: 1,
-                            bot_id: this.botId,
-                            offset: 0.0,
-                        }),
-                    )
-                })
+                if (message instanceof Buffer) {
+                    const uint8Array = new Uint8Array(message)
+                    const f32Array = new Float32Array(uint8Array.buffer)
 
-                // Dual channel
-                if (this.inputUrl === this.outputUrl) {
-                    console.log(`input = ${this.inputUrl}`)
-                    this.play_incoming_audio_chunks(this.output_ws)
-                }
+                    // Always analyze sound levels and log them
+                    this.analyzeSoundLevel(f32Array)
 
-                // Event 'message' on client extension WebSocket
-                client.on('message', (message) => {
-                    if (this.isPaused) {
-                        // Si en pause, stocker les chunks pour traitement ultérieur
-                        this.pausedChunks.push(message)
-                        return
-                    }
-
-                    if (message instanceof Buffer) {
-                        const uint8Array = new Uint8Array(message)
-                        const f32Array = new Float32Array(uint8Array.buffer)
-
+                    // In local-only mode, we don't forward audio to any output
+                    if (!this.localOnlyMode && this.output_ws && this.output_ws.readyState === WebSocket.OPEN) {
                         // Convert f32Array to s16Array
                         const s16Array = new Int16Array(f32Array.length)
                         for (let i = 0; i < f32Array.length; i++) {
@@ -132,34 +149,18 @@ export class Streaming {
                             )
                         }
                         // Send audio chunk to output webSocket
-                        if (this.output_ws.readyState === WebSocket.OPEN) {
-                            this.output_ws.send(s16Array.buffer)
-                        }
+                        this.output_ws.send(s16Array.buffer)
                     }
-                })
-                // Event 'close' on client extension WebSocket
-                client.on('close', () => {
-                    console.log(`Client has left`)
-
-                    this.output_ws.close()
-                })
-                // Event 'error' on client extension WebSocket
-                client.on('error', (err: Error) => {
-                    console.error(`WebSocket error : ${err}`)
-                })
-                // Event 'close' on output WebSocket
-                this.output_ws.on('close', () => {
-                    console.log(`Output WebSocket closed`)
-                })
-                // Event 'error' on output WebSocket
-                this.output_ws.on('error', (err: Error) => {
-                    console.error(`Output WebSocket error : ${err}`)
-                })
+                }
             })
-        }
+            
+            // Event 'error' on client extension WebSocket
+            client.on('error', (err: Error) => {
+                console.error(`WebSocket error : ${err}`)
+            })
+        })
 
-        if (this.inputUrl && this.outputUrl !== this.inputUrl) {
-            console.log(`input = ${this.inputUrl}`)
+        if (!this.localOnlyMode && this.inputUrl && this.outputUrl !== this.inputUrl) {
             try {
                 this.input_ws = new WebSocket(this.inputUrl)
             } catch (error) {
@@ -167,10 +168,6 @@ export class Streaming {
                 return
             }
 
-            // Event 'open' on input WebSocket
-            this.input_ws.on('open', () => {
-                console.log(`Input WebSocket opened`)
-            })
             // Event 'error' on input WebSocket
             this.input_ws.on('error', (err: Error) => {
                 console.error(`Input WebSocket error : ${err}`)
@@ -196,7 +193,6 @@ export class Streaming {
             return
         }
 
-        console.log('Pausing streaming service')
         this.isPaused = true
     }
 
@@ -214,7 +210,6 @@ export class Streaming {
             return
         }
 
-        console.log('Resuming streaming service')
         this.isPaused = false
 
         // Traiter les chunks mis en pause
@@ -230,8 +225,6 @@ export class Streaming {
             return
         }
 
-        console.log('Stopping streaming service')
-
         // Fermer le flux stdin s'il existe
         if (this.output_ws) {
             this.output_ws.close()
@@ -241,6 +234,11 @@ export class Streaming {
         if (this.input_ws) {
             this.input_ws.close()
             this.input_ws = null
+        }
+        
+        if (this.extension_ws) {
+            this.extension_ws.close()
+            this.extension_ws = null
         }
 
         // Réinitialiser l'état
@@ -254,7 +252,7 @@ export class Streaming {
 
     // Send Speaker Data to Output WebSocket
     public send_speaker_state(speakers: SpeakerData[]) {
-        if (!this.isInitialized) {
+        if (!this.isInitialized || this.localOnlyMode) {
             return
         }
 
@@ -269,6 +267,56 @@ export class Streaming {
     }
 
     /**
+     * Analyze sound level from audio data and log it
+     */
+    private analyzeSoundLevel(audioData: Float32Array): void {
+        // Calculate RMS (Root Mean Square) of the audio buffer to get sound level
+        let sum = 0;
+        let max = 0;
+        
+        // Vérifier d'abord si le buffer contient des données non nulles
+        for (let i = 0; i < audioData.length; i++) {
+            const absValue = Math.abs(audioData[i]);
+            max = Math.max(max, absValue);
+            sum += audioData[i] * audioData[i];
+        }
+        
+        const rms = Math.sqrt(sum / audioData.length);
+        
+        // Méthode standard pour le calcul de niveau sonore
+        // Utiliser une échelle logarithmique standard pour les niveaux sonores
+        let normalizedLevel = 0;
+        
+        if (rms > 0) {
+            // Calcul standard des dB audio avec une valeur minimale plus élevée
+            // Ce qui rendra le système moins sensible aux sons très faibles
+            const db = 20 * Math.log10(Math.max(0.0001, rms));
+            
+            // Normalisation standard sur l'échelle 0-100
+            // Un son à -60dB sera proche de 0, un son à 0dB sera 100
+            normalizedLevel = Math.max(0, Math.min(100, (db + 60)));
+        }
+        
+        // Mise à jour du niveau sonore actuel (au lieu du maximum historique)
+        this.currentSoundLevel = normalizedLevel;
+
+        // Écrire directement dans le fichier à chaque analyse
+        const now = Date.now();
+        const timestamp = new Date(now).toISOString();
+        const logEntry = `${timestamp},${normalizedLevel.toFixed(2)}\n`;
+        
+        try {
+            // Obtenir le chemin du fichier
+            const soundLogPath = PathManager.getInstance(this.botId).getSoundLogPath();
+            // Écrire directement dans le fichier
+            fs.appendFileSync(soundLogPath, logEntry);
+        } catch (error) {
+            console.error(`Error writing to sound log: ${error}`);
+        }
+    }
+    
+
+    /**
      * Traite les chunks audio mis en pause
      */
     private processPausedChunks(): void {
@@ -276,14 +324,15 @@ export class Streaming {
             return
         }
 
-        console.log(`Processing ${this.pausedChunks.length} paused chunks`)
-
         // Traiter les chunks stockés pendant la pause
         for (const message of this.pausedChunks) {
             // Réutiliser la logique de traitement des messages
-            if (this.output_ws && message instanceof Buffer) {
+            if (!this.localOnlyMode && this.output_ws && message instanceof Buffer) {
                 const uint8Array = new Uint8Array(message)
                 const f32Array = new Float32Array(uint8Array.buffer)
+
+                // Also analyze paused chunks to keep sound level log consistent
+                this.analyzeSoundLevel(f32Array)
 
                 // Convert f32Array to s16Array
                 const s16Array = new Int16Array(f32Array.length)
@@ -296,6 +345,11 @@ export class Streaming {
                 if (this.output_ws.readyState === WebSocket.OPEN) {
                     this.output_ws.send(s16Array.buffer)
                 }
+            } else if (message instanceof Buffer) {
+                // In local-only mode, just analyze the audio
+                const uint8Array = new Uint8Array(message)
+                const f32Array = new Float32Array(uint8Array.buffer)
+                this.analyzeSoundLevel(f32Array)
             }
         }
 
@@ -324,7 +378,13 @@ export class Streaming {
             read() {},
         })
         let hasLoggedError = false
+        let packetsReceived = 0;
+        let lastStatsTime = Date.now();
+        
         input_ws.on('message', (message: RawData) => {
+            // Compter les paquets pour les stats
+            packetsReceived++;
+            
             // I think that here, in order to prevent the sound from being choppy,
             // it would be necessary to wait a bit (like 4 or 5 chunks) before writing to the stdin.
             if (this.isPaused) {
@@ -340,6 +400,10 @@ export class Streaming {
                     for (let i = 0; i < s16Array.length; i++) {
                         f32Array[i] = s16Array[i] / 32768
                     }
+                    
+                    // Also analyze incoming audio and log sound levels
+                    this.analyzeSoundLevel(f32Array)
+                    
                     // Push data into the steam
                     const buffer = Buffer.from(f32Array.buffer)
                     stream.push(buffer)
@@ -354,13 +418,22 @@ export class Streaming {
             }
         })
 
-        // Event 'close' on input WebSocket
-        input_ws.on('close', () => {
-            console.log(`Input WebSocket closed`)
-
-            // Indicates End Of Stream
-            stream.push(null)
-        })
         return stream
+    }
+    
+    /**
+     * Get the current sound level
+     * @returns Current sound level (0-100)
+     */
+    public getCurrentSoundLevel(): number {
+        return this.currentSoundLevel;
+    }
+    
+    /**
+     * Check if streaming is in local-only mode (no input/output URLs)
+     * @returns True if in local-only mode
+     */
+    public isLocalOnlyMode(): boolean {
+        return this.localOnlyMode;
     }
 }

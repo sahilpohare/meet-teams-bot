@@ -111,6 +111,10 @@ export class PathManager {
         return path.join(this.getBasePath(), 'SeparationSpeakerLog.txt')
     }
 
+    public getSoundLogPath(): string {
+        return path.join(this.getBasePath(), 'sound_levels.log')
+    }
+
     public getTempPath(): string {
         return path.join(this.getBasePath(), 'temp')
     }

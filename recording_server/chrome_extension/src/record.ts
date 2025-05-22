@@ -42,17 +42,12 @@ export async function initMediaRecorder(
                     return
                 }
 
-                if (streaming_output) {
-                    new SoundStreamer()
-                    SoundStreamer.instance.start(
-                        stream,
-                        streaming_audio_frequency,
-                    )
-                } else {
-                    CONTEXT = new AudioContext()
-                    THIS_STREAM = CONTEXT!.createMediaStreamSource(stream)
-                    THIS_STREAM!.connect(CONTEXT!.destination)
-                }
+                new SoundStreamer()
+                SoundStreamer.instance.start(stream, streaming_audio_frequency)
+
+                CONTEXT = new AudioContext()
+                THIS_STREAM = CONTEXT!.createMediaStreamSource(stream)
+                THIS_STREAM!.connect(CONTEXT!.destination)
 
                 try {
                     MEDIA_RECORDER = new MediaRecorder(stream, {

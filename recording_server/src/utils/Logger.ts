@@ -173,7 +173,9 @@ export async function uploadLogsToS3(options: {
 }): Promise<void> {
     try {
         let logPath: string;
+        let soundLogPath: string;
         let s3LogPath: string;
+        let s3SoundLogPath: string;
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
 
         switch (options.type) {
@@ -182,25 +184,40 @@ export async function uploadLogsToS3(options: {
                 if (!options.bot_uuid || !options.secret) {
                     throw new Error('bot_uuid and secret are required for normal log upload');
                 }
-                logPath = currentBotLogFile || PathManager.getInstance(options.bot_uuid, options.secret).getLogPath();
-                console.log('Looking for log file at:', logPath);
-                s3LogPath = `${options.secret}-${options.bot_uuid}/logs.log`
+                const pathManager = PathManager.getInstance(options.bot_uuid, options.secret);
+                logPath = currentBotLogFile || pathManager.getLogPath();
+                soundLogPath = pathManager.getSoundLogPath();
+                console.log('Looking for log files at:', { logPath, soundLogPath });
+                s3LogPath = `${options.secret}-${options.bot_uuid}/logs.log`;
+                s3SoundLogPath = `${options.secret}-${options.bot_uuid}/sound.log`;
                 break;
             case 'crash':
-                logPath = currentBotLogFile || PathManager.getInstance().getLogPath();
-                console.log('Looking for crash log file at:', logPath);
+                const crashPathManager = PathManager.getInstance();
+                logPath = currentBotLogFile || crashPathManager.getLogPath();
+                soundLogPath = crashPathManager.getSoundLogPath();
+                console.log('Looking for crash log files at:', { logPath, soundLogPath });
                 s3LogPath = `crash-logs/${timestamp}-${options.error?.name || 'unknown'}.log`;
+                s3SoundLogPath = `crash-logs/${timestamp}-${options.error?.name || 'unknown'}-sound.log`;
                 break;
         }
         
-        if (!fs.existsSync(logPath)) {
+        // Upload main log file
+        if (fs.existsSync(logPath)) {
+            logger.info(`Uploading ${options.type} logs to S3...`);
+            await s3cp(logPath, s3LogPath);
+            logger.info(`${options.type} logs uploaded to S3`);
+        } else {
             console.error('No log file found at path:', logPath);
-            return;
         }
-
-        logger.info(`Uploading ${options.type} logs to S3...`);
-        await s3cp(logPath, s3LogPath);
-        logger.info(`${options.type} logs uploaded to S3`);
+        
+        // Upload sound log file
+        if (fs.existsSync(soundLogPath)) {
+            logger.info(`Uploading ${options.type} sound logs to S3...`);
+            await s3cp(soundLogPath, s3SoundLogPath);
+            logger.info(`${options.type} sound logs uploaded to S3`);
+        } else {
+            console.log('No sound log file found at path:', soundLogPath);
+        }
     } catch (error) {
         logger.error(`Failed to upload ${options.type} logs to S3:`, error);
         throw error;

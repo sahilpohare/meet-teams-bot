@@ -1,4 +1,5 @@
 import { Events } from '../../events'
+import { Streaming } from '../../streaming'
 import { MEETING_CONSTANTS } from '../constants'
 
 import {
@@ -11,6 +12,9 @@ import { BaseState } from './base-state'
 import { TRANSCODER } from '../../recording/Transcoder'
 import { PathManager } from '../../utils/PathManager'
 
+// Sound level threshold for considering activity (0-100)
+const SOUND_LEVEL_ACTIVITY_THRESHOLD = 5;
+
 export class RecordingState extends BaseState {
     private isProcessing: boolean = true
     private pathManager: PathManager
@@ -20,24 +24,24 @@ export class RecordingState extends BaseState {
         try {
             console.info('Starting recording state')
 
-            // Démarrer l'observateur de dialogue dès l'entrée dans l'état
+            // Start the dialog observer when entering this state
             this.startDialogObserver()
 
-            // Initialiser PathManager
+            // Initialize PathManager
             this.pathManager = PathManager.getInstance(
                 this.context.params.bot_uuid,
             )
             await this.pathManager.initializePaths()
 
-            // Initialiser l'enregistrement
+            // Initialize recording
             await this.initializeRecording()
 
-            // Définir un timeout global pour l'état d'enregistrement
+            // Set a global timeout for the recording state
             const startTime = Date.now()
 
-            // Boucle principale
+            // Main loop
             while (this.isProcessing) {
-                // Vérifier le timeout global
+                // Check global timeout
                 if (
                     Date.now() - startTime >
                     MEETING_CONSTANTS.RECORDING_TIMEOUT
@@ -51,7 +55,7 @@ export class RecordingState extends BaseState {
                     break
                 }
 
-                // Vérifier si on doit s'arrêter
+                // Check if we should stop
                 const { shouldEnd, reason } = await this.checkEndConditions()
 
                 if (shouldEnd) {
@@ -60,7 +64,7 @@ export class RecordingState extends BaseState {
                     break
                 }
 
-                // Si pause demandée, transitionner vers l'état Paused
+                // If pause requested, transition to Paused state
                 if (this.context.isPaused) {
                     return this.transition(MeetingStateType.Paused)
                 }
@@ -68,11 +72,11 @@ export class RecordingState extends BaseState {
                 await this.sleep(this.CHECK_INTERVAL)
             }
 
-            // Arrêter l'observateur avant de passer à l'état Cleanup
+            // Stop the observer before transitioning to Cleanup state
             this.stopDialogObserver()
             return this.transition(MeetingStateType.Cleanup)
         } catch (error) {
-            // Arrêter l'observateur en cas d'erreur
+            // Stop the observer in case of error
             this.stopDialogObserver()
             
             console.error('Error in recording state:', error)
@@ -83,20 +87,30 @@ export class RecordingState extends BaseState {
     private async initializeRecording(): Promise<void> {
         console.info('Initializing recording...')
 
-        // Démarrer le streaming si disponible
+        // Start streaming if available
         if (this.context.streamingService) {
+            console.info('Starting streaming service from recording state')
             this.context.streamingService.start()
+            
+            // Check that the instance is properly created
+            if (!Streaming.instance) {
+                console.warn('Streaming service not properly initialized, trying fallback initialization')
+                // If the instance is not available after starting, we might have a problem
+                Streaming.instance = this.context.streamingService;
+            }
+        } else {
+            console.warn('No streaming service available in context')
         }
 
-        // Log l'état du contexte
+        // Log the context state
         console.info('Context state:', {
-           
             hasPathManager: !!this.context.pathManager,
             hasStreamingService: !!this.context.streamingService,
+            isStreamingInstanceAvailable: !!Streaming.instance,
             isTranscoderConfigured: TRANSCODER.getStatus().isConfigured,
         })
 
-        // Configurer les listeners
+        // Configure listeners
         await this.setupEventListeners()
         console.info('Recording initialized successfully')
     }
@@ -135,12 +149,12 @@ export class RecordingState extends BaseState {
             const now = Date.now()
 
             try {
-                // On vérifie si un arrêt a été demandé via la machine d'état
+                // Check if stop was requested via state machine
                 if (this.context.endReason) {
                     return { shouldEnd: true, reason: this.context.endReason }
                 }
 
-                // Vérifier si le bot a été retiré
+                // Check if bot was removed
                 if (await this.checkBotRemoved()) {
                     return {
                         shouldEnd: true,
@@ -148,7 +162,7 @@ export class RecordingState extends BaseState {
                     }
                 }
 
-                // Vérifier les participants
+                // Check participants
                 if (await this.checkNoAttendees(now)) {
                     return {
                         shouldEnd: true,
@@ -156,7 +170,7 @@ export class RecordingState extends BaseState {
                     }
                 }
 
-                // Vérifier l'activité audio
+                // Check audio activity
                 if (await this.checkNoSpeaker(now)) {
                     return {
                         shouldEnd: true,
@@ -197,10 +211,10 @@ export class RecordingState extends BaseState {
         this.context.endReason = reason
         
         try {
-            // Arrêter l'observateur de dialogue
+            // Stop the dialog observer
             this.stopDialogObserver()
             
-            // Essayer de fermer la réunion mais ne pas laisser une erreur ici affecter le reste
+            // Try to close the meeting but don't let an error here affect the rest
             try {
                 // If the reason is bot_removed, we know the meeting is already effectively closed
                 if (reason === RecordingEndReason.BotRemoved) {
@@ -253,7 +267,7 @@ export class RecordingState extends BaseState {
         }
 
         try {
-            // Vérifier si la fonction existe d'abord
+            // Check if the function exists first
             const functionExists = await this.context.backgroundPage.evaluate(() => {
                 const w = window as any;
                 return {
@@ -266,7 +280,7 @@ export class RecordingState extends BaseState {
             console.log('Stop functions status:', functionExists);
             
             if (functionExists.stopMediaRecorderExists) {
-                // 1. Arrêter l'enregistrement média avec diagnostic détaillé
+                // 1. Stop media recording with detailed diagnostics
                 await this.context.backgroundPage.evaluate(() => {
                     const w = window as any;
                     try {
@@ -276,7 +290,7 @@ export class RecordingState extends BaseState {
                         return result;
                     } catch (error) {
                         console.error('Error in stopMediaRecorder:', error);
-                        // Essayer d'afficher plus de détails sur l'erreur
+                        // Try to display more details about the error
                         console.error('Error details:', 
                             JSON.stringify(error, Object.getOwnPropertyNames(error)));
                         throw error;
@@ -285,7 +299,7 @@ export class RecordingState extends BaseState {
             } else {
                 console.warn('stopMediaRecorder function not found in window object');
                 
-                // Tentative de workaround direct avec MediaRecorder si disponible
+                // Direct workaround attempt with MediaRecorder if available
                 try {
                     await this.context.backgroundPage.evaluate(() => {
                         const w = window as any;
@@ -342,47 +356,74 @@ export class RecordingState extends BaseState {
     }
 
     /**
-     * Vérifie si le meeting doit se terminer à cause d'un manque de participants
-     * @param now Timestamp actuel
-     * @returns true si le meeting doit se terminer par manque de participants
+     * Checks if the meeting should end due to lack of participants
+     * @param now Current timestamp
+     * @returns true if the meeting should end due to lack of participants
      */
     private checkNoAttendees(now: number): boolean {
         const attendeesCount = this.context.attendeesCount || 0
         const startTime = this.context.startTime || 0
         const firstUserJoined = this.context.firstUserJoined || false
 
-        // Si des participants sont présents, pas besoin de terminer
+        // If participants are present, no need to end
         if (attendeesCount > 0) {
             return false
         }
 
-        // Vrai si on a dépassé les 7 minutes initiales sans aucun participant
+        // True if we've exceeded the initial 7 minutes without any participants
         const noAttendeesTimeout =
             startTime + MEETING_CONSTANTS.INITIAL_WAIT_TIME < now
 
-        // Vrai si au moins un utilisateur a rejoint puis est parti
+        // True if at least one user joined and then left
         const noAttendeesAfterJoin = firstUserJoined
 
-        // On termine si personne n'est présent ET
-        // soit on a dépassé le timeout initial, soit quelqu'un était là mais est parti
+        // End if no one is present AND
+        // either we've exceeded the initial timeout, or someone was there but left
         return noAttendeesTimeout || noAttendeesAfterJoin
     }
 
     /**
-     * Vérifie si le meeting doit se terminer à cause d'une absence de son
-     * @param now Timestamp actuel
-     * @returns true si le meeting doit se terminer par absence de son
+     * Checks if the meeting should end due to absence of sound
+     * @param now Current timestamp
+     * @returns true if the meeting should end due to absence of sound
      */
     private checkNoSpeaker(now: number): boolean {
         const noSpeakerDetectedTime = this.context.noSpeakerDetectedTime || 0
 
-        // Si aucune période de silence n'a été détectée, pas besoin de terminer
+        // If no silence period has been detected, no need to end
         if (noSpeakerDetectedTime <= 0) {
             return false
         }
 
-        // Vérifier si la période de silence a dépassé le timeout
-        return noSpeakerDetectedTime + MEETING_CONSTANTS.SILENCE_TIMEOUT < now
+        // Check current sound level if streaming is available
+        if (Streaming.instance) {
+            const currentSoundLevel = Streaming.instance.getCurrentSoundLevel();
+            
+            // More detailed sound level logging
+            console.log(`[checkNoSpeaker] Current sound level: ${currentSoundLevel.toFixed(2)}, threshold: ${SOUND_LEVEL_ACTIVITY_THRESHOLD}`);
+            
+            // If sound is detected above threshold, reset the silence counter
+            if (currentSoundLevel > SOUND_LEVEL_ACTIVITY_THRESHOLD) {
+                console.log(`[checkNoSpeaker] Sound activity detected (${currentSoundLevel.toFixed(2)}), resetting silence timer`);
+                this.context.noSpeakerDetectedTime = 0;
+                return false;
+            }
+        } else {
+            console.warn('[checkNoSpeaker] Streaming instance not available, cannot check sound levels');
+        }
+
+        // Check if the silence period has exceeded the timeout
+        const silenceDuration = Math.floor((now - noSpeakerDetectedTime)/1000);
+        const silenceTimeout = Math.floor(MEETING_CONSTANTS.SILENCE_TIMEOUT/1000);
+        const shouldEnd = noSpeakerDetectedTime + MEETING_CONSTANTS.SILENCE_TIMEOUT < now;
+        
+        console.log(`[checkNoSpeaker] Silence duration: ${silenceDuration}s / ${silenceTimeout}s timeout`);
+        
+        if (shouldEnd) {
+            console.log(`[checkNoSpeaker] No sound activity detected for ${silenceDuration} seconds, ending meeting`);
+        }
+        
+        return shouldEnd;
     }
 
     private sleep(ms: number): Promise<void> {
