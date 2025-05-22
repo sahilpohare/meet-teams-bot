@@ -1,6 +1,7 @@
 import { generateBranding, playBranding } from '../../branding'
 import { openBrowser } from '../../browser'
 import { MeetingHandle } from '../../meeting'
+import { Streaming } from '../../streaming'
 import { JoinError, JoinErrorCode } from '../../types'
 import { PathManager } from '../../utils/PathManager'
 import { MeetingStateType, StateExecuteResult } from '../types'
@@ -41,6 +42,20 @@ export class InitializationState extends BaseState {
                 enhancedError.stack = error instanceof Error ? error.stack : undefined;
                 throw enhancedError;
             }
+
+             // Initialiser le streaming si nécessaire
+        if (
+            this.context.params.streaming_input ||
+            this.context.params.streaming_output
+        ) {
+            this.context.streamingService = new Streaming(
+                this.context.params.streaming_input,
+                this.context.params.streaming_output,
+                this.context.params.streaming_audio_frequency,
+                this.context.params.bot_uuid,
+            )
+            // Ne pas démarrer tout de suite, attendre l'état Recording
+        }
 
             // All initialization successful
             return this.transition(MeetingStateType.WaitingRoom)

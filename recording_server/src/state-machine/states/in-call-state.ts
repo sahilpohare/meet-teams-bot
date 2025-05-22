@@ -1,7 +1,6 @@
 import { Events } from '../../events'
 import { TRANSCODER } from '../../recording/Transcoder'
 import { SpeakerManager } from '../../speaker-manager'
-import { Streaming } from '../../streaming'
 import { MEETING_CONSTANTS } from '../constants'
 import { MeetingStateType, StateExecuteResult } from '../types'
 import { BaseState } from './base-state'
@@ -63,19 +62,7 @@ export class InCallState extends BaseState {
             throw new Error('PathManager not initialized')
         }
 
-        // Initialiser le streaming si nécessaire
-        if (
-            this.context.params.streaming_input ||
-            this.context.params.streaming_output
-        ) {
-            this.context.streamingService = new Streaming(
-                this.context.params.streaming_input,
-                this.context.params.streaming_output,
-                this.context.params.streaming_audio_frequency,
-                this.context.params.bot_uuid,
-            )
-            // Ne pas démarrer tout de suite, attendre l'état Recording
-        }
+       
 
 
 
