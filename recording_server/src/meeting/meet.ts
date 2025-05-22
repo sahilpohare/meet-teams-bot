@@ -261,8 +261,10 @@ export class MeetProvider implements MeetingProviderInterface {
                     'No one else',
                 ]
 
-                if (endMessages.some((msg) => content.includes(msg))) {
-                    console.log('End meeting detected through page content')
+                const foundMessage = endMessages.find((msg) => content.includes(msg))
+                
+                if (foundMessage) {
+                    console.log('End meeting detected through page content:', foundMessage)
                     return true
                 }
             }

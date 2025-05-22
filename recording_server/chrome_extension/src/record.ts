@@ -45,10 +45,6 @@ export async function initMediaRecorder(
                 new SoundStreamer()
                 SoundStreamer.instance.start(stream, streaming_audio_frequency)
 
-                CONTEXT = new AudioContext()
-                THIS_STREAM = CONTEXT!.createMediaStreamSource(stream)
-                THIS_STREAM!.connect(CONTEXT!.destination)
-
                 try {
                     MEDIA_RECORDER = new MediaRecorder(stream, {
                         mimeType: 'video/webm; codecs=h264,pcm',

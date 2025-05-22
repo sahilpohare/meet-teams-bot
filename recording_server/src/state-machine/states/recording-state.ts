@@ -19,6 +19,8 @@ export class RecordingState extends BaseState {
     private isProcessing: boolean = true
     private pathManager: PathManager
     private readonly CHECK_INTERVAL = 250
+    private noAttendeesWithSilenceStartTime: number = 0
+    private readonly SILENCE_CONFIRMATION_MS = 15000 // 15 seconds of silence before confirming no attendees
 
     async execute(): StateExecuteResult {
         try {
@@ -365,8 +367,9 @@ export class RecordingState extends BaseState {
         const startTime = this.context.startTime || 0
         const firstUserJoined = this.context.firstUserJoined || false
 
-        // If participants are present, no need to end
+        // If participants are present, no need to end and reset silence timer
         if (attendeesCount > 0) {
+            this.noAttendeesWithSilenceStartTime = 0
             return false
         }
 
@@ -377,9 +380,32 @@ export class RecordingState extends BaseState {
         // True if at least one user joined and then left
         const noAttendeesAfterJoin = firstUserJoined
 
-        // End if no one is present AND
-        // either we've exceeded the initial timeout, or someone was there but left
-        return noAttendeesTimeout || noAttendeesAfterJoin
+        // Check if we should consider ending due to no attendees
+        const shouldConsiderEnding = noAttendeesTimeout || noAttendeesAfterJoin
+
+        // If we should consider ending, check for silence confirmation
+        if (shouldConsiderEnding) {
+            // If this is the first time we're detecting no attendees, start the silence timer
+            if (this.noAttendeesWithSilenceStartTime === 0) {
+                this.noAttendeesWithSilenceStartTime = now
+                return false
+            }
+
+            // Check if we've had silence for long enough
+            const silenceDuration = now - this.noAttendeesWithSilenceStartTime
+            const hasEnoughSilence = silenceDuration >= this.SILENCE_CONFIRMATION_MS
+
+            // If we're tracking silence but haven't reached the threshold, log the progress
+            if (!hasEnoughSilence && silenceDuration % 5000 < this.CHECK_INTERVAL) {
+                console.log(`[checkNoAttendees] Waiting for silence confirmation: ${Math.floor(silenceDuration/1000)}s / ${this.SILENCE_CONFIRMATION_MS/1000}s`)
+            }
+
+            return hasEnoughSilence
+        }
+
+        // Reset silence timer if we're not considering ending
+        this.noAttendeesWithSilenceStartTime = 0
+        return false
     }
 
     /**
@@ -400,7 +426,7 @@ export class RecordingState extends BaseState {
             const currentSoundLevel = Streaming.instance.getCurrentSoundLevel();
             
             // More detailed sound level logging
-            console.log(`[checkNoSpeaker] Current sound level: ${currentSoundLevel.toFixed(2)}, threshold: ${SOUND_LEVEL_ACTIVITY_THRESHOLD}`);
+            // console.log(`[checkNoSpeaker] Current sound level: ${currentSoundLevel.toFixed(2)}, threshold: ${SOUND_LEVEL_ACTIVITY_THRESHOLD}`);
             
             // If sound is detected above threshold, reset the silence counter
             if (currentSoundLevel > SOUND_LEVEL_ACTIVITY_THRESHOLD) {
@@ -414,10 +440,7 @@ export class RecordingState extends BaseState {
 
         // Check if the silence period has exceeded the timeout
         const silenceDuration = Math.floor((now - noSpeakerDetectedTime)/1000);
-        const silenceTimeout = Math.floor(MEETING_CONSTANTS.SILENCE_TIMEOUT/1000);
         const shouldEnd = noSpeakerDetectedTime + MEETING_CONSTANTS.SILENCE_TIMEOUT < now;
-        
-        console.log(`[checkNoSpeaker] Silence duration: ${silenceDuration}s / ${silenceTimeout}s timeout`);
         
         if (shouldEnd) {
             console.log(`[checkNoSpeaker] No sound activity detected for ${silenceDuration} seconds, ending meeting`);

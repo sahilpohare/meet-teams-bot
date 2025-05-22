@@ -49,31 +49,13 @@ export class InitializationState extends BaseState {
                 throw enhancedError
             }
 
-            // Always initialize the streaming service
-            // If streaming_input or streaming_output is provided, use them
-            // Otherwise, create a local-only streaming instance to collect audio data for analysis
-            if (
-                this.context.params.streaming_input ||
-                this.context.params.streaming_output
-            ) {
-                console.info('Initializing full streaming service with input/output URLs')
-                this.context.streamingService = new Streaming(
-                    this.context.params.streaming_input,
-                    this.context.params.streaming_output,
-                    this.context.params.streaming_audio_frequency,
-                    this.context.params.bot_uuid,
-                )
-            } else {
-                console.info('Initializing local-only streaming service for audio analysis')
-                // Create a streaming service with no URLs but still able to receive audio from extension
-                this.context.streamingService = new Streaming(
-                    undefined, // No input URL
-                    undefined, // No output URL
-                    this.context.params.streaming_audio_frequency,
-                    this.context.params.bot_uuid,
-                )
-            }
-
+            this.context.streamingService = new Streaming(
+                this.context.params.streaming_input,
+                this.context.params.streaming_output,
+                this.context.params.streaming_audio_frequency,
+                this.context.params.bot_uuid,
+            )
+            
             // All initialization successful
             return this.transition(MeetingStateType.WaitingRoom)
         } catch (error) {
