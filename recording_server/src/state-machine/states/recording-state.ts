@@ -20,7 +20,7 @@ export class RecordingState extends BaseState {
     private pathManager: PathManager
     private readonly CHECK_INTERVAL = 250
     private noAttendeesWithSilenceStartTime: number = 0
-    private readonly SILENCE_CONFIRMATION_MS = 15000 // 15 seconds of silence before confirming no attendees
+    private readonly SILENCE_CONFIRMATION_MS = 45000 // 45 seconds of silence before confirming no attendees
 
     async execute(): StateExecuteResult {
         try {
