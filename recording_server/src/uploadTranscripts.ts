@@ -27,6 +27,10 @@ export async function uploadTranscriptTask(
     speaker: SpeakerData,
     end: boolean,
 ): Promise<void> {
+    if (process.env.SERVERLESS === 'true') {
+        console.log('Skipping transcript upload - serverless mode')
+        return
+    }
     if (speaker.timestamp === null || speaker.timestamp === undefined) {
         console.log('Skipping transcript upload - timestamps not yet available')
         return

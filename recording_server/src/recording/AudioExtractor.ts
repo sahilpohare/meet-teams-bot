@@ -80,12 +80,12 @@ export class AudioExtractor extends EventEmitter {
             await this.validateAudioFile(outputPath)
 
             // Upload vers S3 avec le bon chemin
-            const s3Url = await this.s3Uploader.uploadFile(
+            const s3Url = process.env.SERVERLESS !== 'true' ? await this.s3Uploader.uploadFile(
                 outputPath,
                 bucketName,
                 `${s3Path}/${path.basename(outputPath)}`,
                 true,
-            )
+            ) : null
 
             this.emit('extractionComplete', {
                 startTime,

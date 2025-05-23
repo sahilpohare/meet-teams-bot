@@ -1,9 +1,9 @@
 import { Page } from '@playwright/test'
+import { promises as fs } from 'fs'
 import * as path from 'path'
+import sharp from 'sharp'
 import { PathManager } from '../utils/PathManager'
 import { s3cp } from './S3Uploader'
-import sharp from 'sharp'
-import { promises as fs } from 'fs'
 
 export async function takeScreenshot(page: Page, name: string) {
     try {
@@ -52,14 +52,16 @@ export async function takeScreenshot(page: Page, name: string) {
         // Supprimer le fichier temporaire
         await fs.unlink(tempScreenshotPath).catch(() => {})
 
+        if (process.env.SERVERLESS !== 'true') {
         // Obtenir les chemins S3 depuis PathManager
         const { bucketName, s3Path } = pathManager.getS3Paths()
         const s3FilePath = `${s3Path}/${timestamp}_${name.replaceAll('/', '')}.png`
 
         // Upload vers S3
         await s3cp(finalScreenshotPath, s3FilePath).catch((e) => {
-            console.error(`Failed to upload screenshot to s3: ${e}`)
-        })
+                console.error(`Failed to upload screenshot to s3: ${e}`)
+            })
+        }
     } catch (e) {
         console.error(`Failed to take screenshot: ${e}`)
     }

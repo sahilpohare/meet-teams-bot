@@ -8,9 +8,11 @@ export class PathManager {
     private environment: string
     private botUuid: string | null
     private secret: string | null
+    private isServerless: boolean
 
     private constructor() {
         this.environment = process.env.ENVIRON || 'dev'
+        this.isServerless = process.env.SERVERLESS === 'true' || false
         this.botUuid = null
         this.secret = null
         console.log('ENVIRON:', this.environment)
@@ -72,6 +74,9 @@ export class PathManager {
     }
 
     public getBasePath(): string {
+        if (this.isServerless) {
+            return path.join('./data', this.botUuid)
+        }
         const identifier = this.botUuid
         switch (this.environment) {
             case 'prod':
@@ -108,7 +113,7 @@ export class PathManager {
     }
 
     public getSpeakerLogPath(): string {
-        return path.join(this.getBasePath(), 'SeparationSpeakerLog.txt')
+        return path.join(this.getBasePath(), 'SeparationSpeaker.log')
     }
 
     public getSoundLogPath(): string {

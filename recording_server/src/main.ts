@@ -13,13 +13,14 @@ import { exit } from 'process'
 // import { generateBranding } from './branding'
 import { Api } from './api/methods'
 import { Consumer } from './rabbitmq'
-import { JoinError, JoinErrorCode, MeetingParams } from './types'
+import { JoinError, JoinErrorCode, MeetingParams, MeetingProvider } from './types'
 
 import { spawn } from 'child_process'
 import { Events } from './events'
 import { RecordingEndReason } from './state-machine/types'
 import {
     logger,
+    redirectLogsToBot,
     setupConsoleLogger,
     setupExitHandler,
     uploadLogsToS3
@@ -41,6 +42,42 @@ const MAX_INSTANCE_DURATION_AFTER_RABBIT_MESSAGE_RECIEVED_MS =
     5 * 60 * 60 * 1000 // 5 hours
 let forceTerminationTimeout: NodeJS.Timeout | null = null
 
+// Helper function to detect meeting provider
+function detectMeetingProvider(url: string): MeetingProvider {
+    if (url.includes('https://teams')) {
+        return 'Teams'
+    } else if (url.includes('https://meet')) {
+        return 'Meet'
+    } else {
+        return 'Zoom'
+    }
+}
+
+// Helper function to read data from stdin (for serverless mode)
+async function readFromStdin(): Promise<MeetingParams> {
+    return new Promise((resolve) => {
+        let data = '';
+        process.stdin.on('data', (chunk) => {
+            data += chunk;
+        });
+        
+        process.stdin.on('end', () => {
+            try {
+                const params = JSON.parse(data) as MeetingParams;
+                // Détecter le provider de meeting
+                params.meetingProvider = detectMeetingProvider(params.meeting_url);
+                resolve(params);
+            } catch (error) {
+                console.error('Failed to parse JSON from stdin:', error);
+                process.exit(1);
+            }
+        });
+    });
+}
+
+// Check if running in serverless mode
+const isServerless = process.env.SERVERLESS === 'true';
+
 // ENTRY POINT
 // syntax convention
 // minus => Library
@@ -58,31 +95,72 @@ let forceTerminationTimeout: NodeJS.Timeout | null = null
     // Enregistrer le répertoire original
     const originalDirectory = process.cwd()
 
-    console.log('Before REDIS.connect()')
-    await clientRedis.connect().catch((e) => {
-        console.error(`Fail to connect to redis: ${e}`)
-        throw e
-    })
-
-    console.log('Before RABBIT.connect()')
-    const consumer = await Consumer.init().catch((e) => {
-        console.error(`Fail to init consumer: ${e}`)
-        throw e
-    })
-
-    console.log('start consuming rabbitmq messages')
     let consumeResult: {
         params: MeetingParams
         error: Error
     }
-    try {
-        consumeResult = await consumer.consume(Consumer.handleStartRecord)
-    } catch (e) {
-        if (LOCK_INSTANCE_AT_STARTUP) {
-            await consumer.deleteQueue().catch((e) => {
-                console.error('fail to delete queue', e)
-            })
+
+    if (isServerless) {
+        // SERVERLESS MODE: Read parameters from stdin
+        console.log('Running in serverless mode - reading parameters from stdin');
+        try {
+            const meetingParams = await readFromStdin();
+            console.log('Received meeting parameters:', JSON.stringify({
+                meeting_url: meetingParams.meeting_url,
+                bot_uuid: meetingParams.bot_uuid,
+                bot_name: meetingParams.bot_name
+            }));
+                    // Redirect logs to bot-specific file
+            console.log('About to redirect logs to bot:', meetingParams.bot_uuid);
+            await redirectLogsToBot(meetingParams.bot_uuid);
+            console.log('Logs redirected successfully');
+            // Setup force termination timer for safety
+            setupForceTermination({
+                secret: meetingParams.secret,
+                bot_uuid: meetingParams.bot_uuid,
+            });
+
+            // Create a fake consumeResult structure to match the original logic
+            consumeResult = {
+                params: meetingParams,
+                error: null
+            };
+        } catch (e) {
+            console.error('Error reading from stdin:', e);
+            process.exit(1);
+        }
+    } else {
+        // NORMAL MODE: Use Redis and RabbitMQ (original logic)
+        console.log('Before REDIS.connect()')
+        await clientRedis.connect().catch((e) => {
+            console.error(`Fail to connect to redis: ${e}`)
             throw e
+        })
+
+        console.log('Before RABBIT.connect()')
+        const consumer = await Consumer.init().catch((e) => {
+            console.error(`Fail to init consumer: ${e}`)
+            throw e
+        })
+
+        console.log('start consuming rabbitmq messages')
+        try {
+            consumeResult = await consumer.consume(Consumer.handleStartRecord)
+        } catch (e) {
+            if (LOCK_INSTANCE_AT_STARTUP) {
+                await consumer.deleteQueue().catch((e) => {
+                    console.error('fail to delete queue', e)
+                })
+                throw e
+            }
+        }
+
+        // Setup force termination timer for safety (only after getting params)
+        if (consumeResult?.params) {
+            setupForceTermination({
+                secret: consumeResult.params.secret,
+                bot_uuid: consumeResult.params.bot_uuid,
+            });
         }
     }
 
@@ -108,6 +186,30 @@ let forceTerminationTimeout: NodeJS.Timeout | null = null
     } else if (consumeResult.params.meetingProvider !== 'Zoom') {
         // Assuming that recording is active at this point
         try {
+            // Dans le mode serverless, on doit initialiser MeetingHandle nous-mêmes
+            if (isServerless) {
+                // Créer l'instance API
+                new Api(consumeResult.params)
+                
+                // Importer les modules nécessaires
+                const { server } = await import('./server');
+                const { Events } = await import('./events');
+                
+                // Démarrer le serveur
+                await server().catch((e) => {
+                    console.error(`Fail to start server: ${e}`)
+                    throw e
+                })
+                console.log('Server started successfully')
+
+                // Initialiser MeetingHandle avec les paramètres
+                MeetingHandle.init(consumeResult.params)
+
+                // Initialiser les événements
+                Events.init(consumeResult.params)
+                Events.joiningCall()
+            }
+
             // Démarrer le meeting avec la machine à états
             await MeetingHandle.instance.startRecordMeeting()
 
@@ -133,7 +235,11 @@ let forceTerminationTimeout: NodeJS.Timeout | null = null
                 while (Date.now() - apiStartTime < maxApiWaitTime) {
                     try {
                         // Try to call the API
-                        await Api.instance.endMeetingTrampoline()
+                        if (isServerless) {
+                            console.log('Skipping endMeetingTrampoline - serverless mode')
+                        } else {
+                            await Api.instance.endMeetingTrampoline()
+                        }
                         console.log(
                             'API call to endMeetingTrampoline succeeded',
                         )
@@ -312,18 +418,23 @@ let forceTerminationTimeout: NodeJS.Timeout | null = null
         }
     }
 
-    await delSessionInRedis(consumeResult.params.session_id).catch((e) => {
-        console.error('fail delete session in redis: ', e)
-    })
+    // Only do Redis cleanup in normal mode
+    if (!isServerless) {
+        await delSessionInRedis(consumeResult.params.session_id).catch((e) => {
+            console.error('fail delete session in redis: ', e)
+        })
 
-    if (LOCK_INSTANCE_AT_STARTUP) {
-        await consumer.deleteQueue().catch((e) => {
-            console.error('fail to delete queue', e)
-        })
-        await terminateInstance().catch((e) => {
-            console.error('fail to terminate instance', e)
-        })
-    }
+        if (LOCK_INSTANCE_AT_STARTUP) {
+            await Consumer.init().then(consumer => {
+                return consumer.deleteQueue();
+            }).catch((e) => {
+                console.error('fail to delete queue', e)
+            })
+            await terminateInstance().catch((e) => {
+                console.error('fail to terminate instance', e)
+            })
+        }
+  
 
     // Upload logs to S3 before exiting
     try {
@@ -341,7 +452,7 @@ let forceTerminationTimeout: NodeJS.Timeout | null = null
     } catch (error) {
         console.error('Failed to upload logs to S3:', error)
     }
-
+}
     console.log('exiting instance')
     exit(0)
 })()
@@ -438,6 +549,16 @@ export function meetingBotStartRecordFailed(
     bot_uuid: string,
     message: string,
 ): Promise<void> {
+
+    if (isServerless) {
+
+        console.log('Notifying failed recording attempt:', {
+            meetingLink,
+            bot_uuid,
+            message,
+        })
+        return Promise.resolve()
+    }
     console.log('Notifying failed recording attempt:', {
         meetingLink,
         bot_uuid,
@@ -483,6 +604,7 @@ export function setupForceTermination(params: {
                 'CRITICAL: Forcing immediate process termination after timeout',
             )
 
+            if (process.env.SERVERLESS !== 'true') {
             // Try to upload logs before termination
             try {
                 await uploadLogsToS3({
@@ -494,6 +616,7 @@ export function setupForceTermination(params: {
                 logger.error('Failed to upload logs before termination:', uploadError)
             }
             process.kill(process.pid, 'SIGKILL')
+            }
         } catch (e) {
             logger.error(
                 'Failed to terminate gracefully, using immediate exit',

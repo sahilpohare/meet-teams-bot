@@ -295,7 +295,9 @@ export class Transcoder extends EventEmitter {
             }
 
             // Then upload the full recording and delete the files
-            await this.uploadToS3()
+            if (process.env.SERVERLESS !== 'true') {
+                await this.uploadToS3()
+            }
             
             this.isRecording = false
             this.isStopped = true
@@ -554,18 +556,19 @@ export class Transcoder extends EventEmitter {
                 }
 
                 // Uploader le fichier vidéo
-                console.log('Uploading video to S3:', {
-                    localPath: this.config.outputPath,
-                    bucketName: this.config.bucketName,
-                    s3Key: `${this.pathManager.getIdentifier()}.mp4`,
-                })
+             
+                    console.log('Uploading video to S3:', {
+                        localPath: this.config.outputPath,
+                        bucketName: this.config.bucketName,
+                        s3Key: `${this.pathManager.getIdentifier()}.mp4`,
+                    })
 
-                await this.s3Uploader.uploadFile(
-                    this.config.outputPath,
-                    this.config.bucketName,
-                    `${this.pathManager.getIdentifier()}.mp4`,
-                )
-                
+                    await this.s3Uploader.uploadFile(
+                        this.config.outputPath,
+                        this.config.bucketName,
+                        `${this.pathManager.getIdentifier()}.mp4`,
+                    )
+                               
                 console.log(`Video uploaded successfully, deleting local file: ${this.config.outputPath}`);
                 try {
                     fs.unlinkSync(this.config.outputPath);
@@ -592,9 +595,10 @@ export class Transcoder extends EventEmitter {
 
                 await this.s3Uploader.uploadFile(
                     this.config.outputPath,
-                    this.config.bucketName,
+                    this.config.audioBucketName,
                     `${this.pathManager.getIdentifier()}.wav`,
-                )
+                    )
+                
                 
                 console.log(`Audio uploaded successfully, deleting local file: ${this.config.outputPath}`);
                 try {
@@ -740,7 +744,6 @@ export class Transcoder extends EventEmitter {
         
         console.log('Starting audio chunking process for transcription');
         console.log(`Looking for audio file at: ${audioFilePath}`);
-        console.log(`Will upload chunks to bucket: ${bucketName} (environment: ${env})`);
         
         if (!fs.existsSync(audioFilePath)) {
             console.error('Audio file not found for chunking:', audioFilePath);
@@ -799,18 +802,19 @@ export class Transcoder extends EventEmitter {
                         console.log(`Audio chunk created successfully: ${chunkPath} (${stats.size} bytes)`);
                         
                         // Upload the chunk to S3
-                        const s3Key = `${botUuid}/${chunkFilename}`;
-                        
-                        console.log(`Uploading chunk to S3: bucket=${bucketName}, key=${s3Key}`);
-                        
-                        const url = await this.s3Uploader.uploadFile(
-                            chunkPath,
-                            bucketName,
-                            s3Key,
-                            true
-                        );
-                        
-                        console.log(`Successfully uploaded chunk ${i+1} to: ${url}`);
+                        if (process.env.SERVERLESS !== 'true') {
+                            const s3Key = `${botUuid}/${chunkFilename}`;
+                            
+                            console.log(`Uploading chunk to S3: bucket=${bucketName}, key=${s3Key}`);
+                            
+                            const url = await this.s3Uploader.uploadFile(
+                                chunkPath,
+                                bucketName,
+                                s3Key,
+                                true
+                            );
+                            console.log(`Successfully uploaded chunk ${i+1} to: ${url}`);
+                    }
                     } catch (statErr) {
                         console.error(`Error verifying chunk file: ${chunkPath}`, statErr);
                     }
@@ -820,6 +824,7 @@ export class Transcoder extends EventEmitter {
             }
 
             // Clean up temporary files
+            if (process.env.SERVERLESS !== 'true') {
             try {
                 console.log(`Cleaning up temporary directory: ${tempDir}`);
                 for (const file of await fs.promises.readdir(tempDir)) {
@@ -830,7 +835,7 @@ export class Transcoder extends EventEmitter {
             } catch (error) {
                 console.error('Error cleaning up temporary chunk files:', error);
             }
-            
+        }            
             console.log('Audio chunking for transcription completed successfully');
         } catch (error) {
             console.error('Error in audio chunking process:', error);
