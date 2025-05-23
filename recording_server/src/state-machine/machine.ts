@@ -24,7 +24,7 @@ export class MeetingStateMachine {
         } as MeetingContext
 
         // Setup global dialog observer functions
-        this.setupGlobalDialogObserver();
+        this.setupGlobalDialogObserver()
     }
 
     private setupGlobalDialogObserver(): void {
@@ -32,106 +32,139 @@ export class MeetingStateMachine {
         this.context.startGlobalDialogObserver = () => {
             // Ne démarrer l'observateur que pour Google Meet
             if (this.context.params.meetingProvider !== 'Meet') {
-                console.info(`Global dialog observer not started: provider is not Google Meet (${this.context.params.meetingProvider})`);
-                return;
+                console.info(
+                    `Global dialog observer not started: provider is not Google Meet (${this.context.params.meetingProvider})`,
+                )
+                return
             }
 
             if (!this.context.playwrightPage) {
-                console.warn('Cannot start global dialog observer: page not available');
-                return;
+                console.warn(
+                    'Cannot start global dialog observer: page not available',
+                )
+                return
             }
 
             // Nettoyer tout observateur existant
             if (this.context.dialogObserverInterval) {
-                clearInterval(this.context.dialogObserverInterval);
+                clearInterval(this.context.dialogObserverInterval)
             }
 
             // Créer un nouvel observateur avec un intervalle de vérification
-            console.info(`Starting global dialog observer in state machine`);
-            
+            console.info(`Starting global dialog observer in state machine`)
+
             // Fonction pour vérifier et redémarrer l'observateur si nécessaire
             const checkAndRestartObserver = () => {
                 if (!this.context.dialogObserverInterval) {
-                    console.warn('Global dialog observer was stopped, restarting...');
-                    this.context.startGlobalDialogObserver?.();
-                    return;
+                    console.warn(
+                        'Global dialog observer was stopped, restarting...',
+                    )
+                    this.context.startGlobalDialogObserver?.()
+                    return
                 }
-            };
+            }
 
             // Heartbeat pour vérifier l'état de l'observateur toutes les 2 secondes
-            const heartbeatInterval = setInterval(checkAndRestartObserver, 2000);
+            const heartbeatInterval = setInterval(checkAndRestartObserver, 2000)
 
             // Stocker l'intervalle de heartbeat pour pouvoir le nettoyer plus tard
-            this.context.dialogObserverHeartbeat = heartbeatInterval;
+            this.context.dialogObserverHeartbeat = heartbeatInterval
 
             this.context.dialogObserverInterval = setInterval(async () => {
                 try {
                     if (this.context.playwrightPage?.isClosed()) {
-                        this.context.stopGlobalDialogObserver?.();
-                        return;
+                        this.context.stopGlobalDialogObserver?.()
+                        return
                     }
 
                     // Chercher le dialogue "Got it"
-                    const gotItDialog = this.context.playwrightPage.locator([
-                        '[role="dialog"][aria-modal="true"][aria-label="Others may see your video differently"]',
-                        '[role="dialog"]:has(button:has-text("Got it"))',
-                        '[aria-modal="true"]:has(button:has-text("Got it"))'
-                    ].join(','));
+                    const gotItDialog = this.context.playwrightPage.locator(
+                        [
+                            '[role="dialog"][aria-modal="true"][aria-label="Others may see your video differently"]',
+                            '[role="dialog"]:has(button:has-text("Got it"))',
+                            '[aria-modal="true"]:has(button:has-text("Got it"))',
+                        ].join(','),
+                    )
 
-                    const isVisible = await gotItDialog.isVisible({ timeout: 300 }).catch(() => false);
-                    
+                    const isVisible = await gotItDialog
+                        .isVisible({ timeout: 300 })
+                        .catch(() => false)
+
                     if (isVisible) {
-                        console.info(`[GlobalDialogObserver] Found "Got it" dialog in state ${this.currentState}`);
-                        
+                        console.info(
+                            `[GlobalDialogObserver] Found "Got it" dialog in state ${this.currentState}`,
+                        )
+
                         // Trouver le bouton Got it
-                        const gotItButton = gotItDialog.locator('button:has-text("Got it")');
-                        await gotItButton.click({ force: true, timeout: 1000 }).catch(async (err) => {
-                            console.warn(`[GlobalDialogObserver] Failed to click with regular method: ${err.message}`);
-                            
-                            // Fallback: essayer de cliquer avec JavaScript directement
-                            await this.context.playwrightPage?.evaluate(() => {
-                                const buttons = document.querySelectorAll('button');
-                                for (const button of buttons) {
-                                    if (button.textContent?.includes('Got it')) {
-                                        (button as HTMLElement).click();
-                                        return true;
-                                    }
-                                }
-                                return false;
-                            }).catch(e => console.error(`[GlobalDialogObserver] JavaScript click failed: ${e.message}`));
-                        });
-                        
-                        console.info(`[GlobalDialogObserver] Clicked "Got it" button`);
+                        const gotItButton = gotItDialog.locator(
+                            'button:has-text("Got it")',
+                        )
+                        await gotItButton
+                            .click({ force: true, timeout: 1000 })
+                            .catch(async (err) => {
+                                console.warn(
+                                    `[GlobalDialogObserver] Failed to click with regular method: ${err.message}`,
+                                )
+
+                                // Fallback: essayer de cliquer avec JavaScript directement
+                                await this.context.playwrightPage
+                                    ?.evaluate(() => {
+                                        const buttons =
+                                            document.querySelectorAll('button')
+                                        for (const button of buttons) {
+                                            if (
+                                                button.textContent?.includes(
+                                                    'Got it',
+                                                )
+                                            ) {
+                                                ;(button as HTMLElement).click()
+                                                return true
+                                            }
+                                        }
+                                        return false
+                                    })
+                                    .catch((e) =>
+                                        console.error(
+                                            `[GlobalDialogObserver] JavaScript click failed: ${e.message}`,
+                                        ),
+                                    )
+                            })
+
+                        console.info(
+                            `[GlobalDialogObserver] Clicked "Got it" button`,
+                        )
                     }
                 } catch (error) {
-                    console.error(`[GlobalDialogObserver] Error checking for dialogs: ${error}`);
+                    console.error(
+                        `[GlobalDialogObserver] Error checking for dialogs: ${error}`,
+                    )
                     // En cas d'erreur, on redémarre l'observateur
-                    this.context.stopGlobalDialogObserver?.();
-                    this.context.startGlobalDialogObserver?.();
+                    this.context.stopGlobalDialogObserver?.()
+                    this.context.startGlobalDialogObserver?.()
                 }
-            }, 2000); // Vérifier toutes les 2 secondes
-        };
+            }, 2000) // Vérifier toutes les 2 secondes
+        }
 
         // Fonction pour arrêter l'observateur
         this.context.stopGlobalDialogObserver = () => {
             if (this.context.dialogObserverInterval) {
-                clearInterval(this.context.dialogObserverInterval);
-                this.context.dialogObserverInterval = undefined;
-                console.info(`Stopped global dialog observer`);
+                clearInterval(this.context.dialogObserverInterval)
+                this.context.dialogObserverInterval = undefined
+                console.info(`Stopped global dialog observer`)
             }
             if (this.context.dialogObserverHeartbeat) {
-                clearInterval(this.context.dialogObserverHeartbeat);
-                this.context.dialogObserverHeartbeat = undefined;
-                console.info(`Stopped global dialog observer heartbeat`);
+                clearInterval(this.context.dialogObserverHeartbeat)
+                this.context.dialogObserverHeartbeat = undefined
+                console.info(`Stopped global dialog observer heartbeat`)
             }
-        };
+        }
     }
 
     public async start(): Promise<void> {
         try {
             // Démarrer l'observateur global dès le début
-            this.context.startGlobalDialogObserver?.();
-            
+            this.context.startGlobalDialogObserver?.()
+
             while (
                 this.currentState !== MeetingStateType.Cleanup &&
                 this.currentState !== MeetingStateType.Terminated &&
@@ -140,7 +173,7 @@ export class MeetingStateMachine {
                 console.info(`Current state: ${this.currentState}`)
 
                 if (this.currentState === MeetingStateType.Recording) {
-                    this.wasInRecordingState = true;
+                    this.wasInRecordingState = true
                 }
 
                 if (this.forceStop) {
@@ -156,10 +189,10 @@ export class MeetingStateMachine {
                 this.currentState = transition.nextState
                 this.context = transition.context
             }
-            
+
             // Arrêter l'observateur global à la fin
-            this.context.stopGlobalDialogObserver?.();
-            
+            this.context.stopGlobalDialogObserver?.()
+
             if (this.wasInRecordingState && this.context.endReason) {
                 const normalReasons = [
                     RecordingEndReason.ApiRequest,
@@ -167,14 +200,16 @@ export class MeetingStateMachine {
                     RecordingEndReason.ManualStop,
                     RecordingEndReason.NoAttendees,
                     RecordingEndReason.NoSpeaker,
-                    RecordingEndReason.RecordingTimeout
-                ];
-                this.normalTermination = normalReasons.includes(this.context.endReason);
+                    RecordingEndReason.RecordingTimeout,
+                ]
+                this.normalTermination = normalReasons.includes(
+                    this.context.endReason,
+                )
             }
         } catch (error) {
             // Arrêter l'observateur global en cas d'erreur
-            this.context.stopGlobalDialogObserver?.();
-            
+            this.context.stopGlobalDialogObserver?.()
+
             this.error = error as Error
             await this.handleError(error as Error)
         }
@@ -279,14 +314,14 @@ export class MeetingStateMachine {
     }
 
     public wasRecordingSuccessful(): boolean {
-        return this.wasInRecordingState && this.normalTermination && !this.error;
+        return this.wasInRecordingState && this.normalTermination && !this.error
     }
-    
+
     public getWasInRecordingState(): boolean {
-        return this.wasInRecordingState;
+        return this.wasInRecordingState
     }
-    
+
     public getNormalTermination(): boolean {
-        return this.normalTermination;
+        return this.normalTermination
     }
 }

@@ -59,10 +59,7 @@ export class CleanupState extends BaseState {
 
     private async stopTranscoderAndTranscription(): Promise<void> {
         try {
-            await Promise.all([
-                TRANSCODER.stop(),
-                
-            ])
+            await Promise.all([TRANSCODER.stop()])
         } catch (error) {
             console.error('Error stopping processes:', error)
             throw error
@@ -104,7 +101,9 @@ export class CleanupState extends BaseState {
                 console.log('Uploading video to S3')
                 await TRANSCODER.uploadToS3()
             } else {
-                console.log('Files already uploaded to S3 in stop() method, skipping')
+                console.log(
+                    'Files already uploaded to S3 in stop() method, skipping',
+                )
             }
         } catch (error) {
             console.error('Failed to upload video to S3:', error)

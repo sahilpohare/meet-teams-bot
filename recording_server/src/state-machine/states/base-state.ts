@@ -51,16 +51,20 @@ export abstract class BaseState {
     }
 
     /**
-     * Démarre un observateur qui surveille l'apparition des dialogues comme "Got it" 
+     * Démarre un observateur qui surveille l'apparition des dialogues comme "Got it"
      * et les gère automatiquement en arrière-plan
      */
     protected startDialogObserver() {
         // Utiliser l'observateur global au lieu de créer une instance locale
         if (this.context.startGlobalDialogObserver) {
-            this.context.startGlobalDialogObserver();
-            console.info(`Requested global dialog observer from state ${this.constructor.name}`);
+            this.context.startGlobalDialogObserver()
+            console.info(
+                `Requested global dialog observer from state ${this.constructor.name}`,
+            )
         } else {
-            console.warn(`Global dialog observer not available in state ${this.constructor.name}`);
+            console.warn(
+                `Global dialog observer not available in state ${this.constructor.name}`,
+            )
         }
     }
 
@@ -70,6 +74,8 @@ export abstract class BaseState {
     protected stopDialogObserver() {
         // Cette méthode est gardée pour compatibilité, mais ne fait plus rien
         // L'observateur global sera arrêté au niveau de la machine à états
-        console.info(`Dialog observer stop requested from state ${this.constructor.name} (ignored - using global observer)`);
+        console.info(
+            `Dialog observer stop requested from state ${this.constructor.name} (ignored - using global observer)`,
+        )
     }
 }

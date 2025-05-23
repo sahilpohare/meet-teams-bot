@@ -65,8 +65,11 @@ export class ErrorState extends BaseState {
                 isJoinError: error instanceof JoinError,
                 name: error.name,
                 message: error.message,
-                code: error instanceof JoinError ? error.message : 'not a JoinError',
-                stack: error.stack?.substring(0, 200) // Limite la taille du stack
+                code:
+                    error instanceof JoinError
+                        ? error.message
+                        : 'not a JoinError',
+                stack: error.stack?.substring(0, 200), // Limite la taille du stack
             })
 
             try {
@@ -74,7 +77,7 @@ export class ErrorState extends BaseState {
                     // Vérification supplémentaire du code d'erreur
                     const errorCode = error.message
                     console.log('JoinError code:', errorCode)
-                    
+
                     switch (errorCode) {
                         case JoinErrorCode.BotNotAccepted:
                             await Events.botRejected()
@@ -93,7 +96,9 @@ export class ErrorState extends BaseState {
                             await Events.apiRequestStop()
                             break
                         default:
-                            console.log(`Unhandled JoinError code: ${errorCode}`)
+                            console.log(
+                                `Unhandled JoinError code: ${errorCode}`,
+                            )
                             await Events.meetingError(error)
                     }
                 } else {
@@ -105,8 +110,12 @@ export class ErrorState extends BaseState {
         }
 
         // Augmenter le timeout pour la notification d'erreur
-        const timeoutPromise = new Promise<void>((_, reject) =>
-            setTimeout(() => reject(new Error('Notify error timeout')), 15000), // 15 secondes au lieu de 5
+        const timeoutPromise = new Promise<void>(
+            (_, reject) =>
+                setTimeout(
+                    () => reject(new Error('Notify error timeout')),
+                    15000,
+                ), // 15 secondes au lieu de 5
         )
 
         try {

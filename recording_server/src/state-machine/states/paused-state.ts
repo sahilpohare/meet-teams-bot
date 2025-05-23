@@ -6,8 +6,6 @@ import { MeetingStateType, StateExecuteResult } from '../types'
 import { BaseState } from './base-state'
 
 export class PausedState extends BaseState {
-    
-
     async execute(): StateExecuteResult {
         try {
             // Marquer le début de la pause

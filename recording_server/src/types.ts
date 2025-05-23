@@ -1,6 +1,5 @@
 import { Browser, BrowserContext, Page } from '@playwright/test'
 
-
 export type Meeting = {
     page: Page
     backgroundPage: Page

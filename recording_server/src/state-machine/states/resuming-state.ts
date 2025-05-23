@@ -5,9 +5,9 @@ import { MeetingStateType, StateExecuteResult } from '../types'
 import { BaseState } from './base-state'
 
 export class ResumingState extends BaseState {
-        async execute(): StateExecuteResult {
+    async execute(): StateExecuteResult {
         try {
-                       // Reprendre l'enregistrement
+            // Reprendre l'enregistrement
             await this.resumeRecording()
 
             // Notifier de la reprise

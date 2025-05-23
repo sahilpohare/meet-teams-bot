@@ -55,7 +55,7 @@ export class InitializationState extends BaseState {
                 this.context.params.streaming_audio_frequency,
                 this.context.params.bot_uuid,
             )
-            
+
             // All initialization successful
             return this.transition(MeetingStateType.WaitingRoom)
         } catch (error) {

@@ -13,7 +13,7 @@ import { TRANSCODER } from '../../recording/Transcoder'
 import { PathManager } from '../../utils/PathManager'
 
 // Sound level threshold for considering activity (0-100)
-const SOUND_LEVEL_ACTIVITY_THRESHOLD = 5;
+const SOUND_LEVEL_ACTIVITY_THRESHOLD = 5
 
 export class RecordingState extends BaseState {
     private isProcessing: boolean = true
@@ -80,7 +80,7 @@ export class RecordingState extends BaseState {
         } catch (error) {
             // Stop the observer in case of error
             this.stopDialogObserver()
-            
+
             console.error('Error in recording state:', error)
             return this.handleError(error as Error)
         }
@@ -93,12 +93,14 @@ export class RecordingState extends BaseState {
         if (this.context.streamingService) {
             console.info('Starting streaming service from recording state')
             this.context.streamingService.start()
-            
+
             // Check that the instance is properly created
             if (!Streaming.instance) {
-                console.warn('Streaming service not properly initialized, trying fallback initialization')
+                console.warn(
+                    'Streaming service not properly initialized, trying fallback initialization',
+                )
                 // If the instance is not available after starting, we might have a problem
-                Streaming.instance = this.context.streamingService;
+                Streaming.instance = this.context.streamingService
             }
         } else {
             console.warn('No streaming service available in context')
@@ -127,8 +129,6 @@ export class RecordingState extends BaseState {
                     endTime: chunkInfo.endTime,
                     hasAudioUrl: !!chunkInfo.audioUrl,
                 })
-
-        
             } catch (error) {
                 console.error('Error during transcription:', error)
             }
@@ -211,42 +211,58 @@ export class RecordingState extends BaseState {
     private async handleMeetingEnd(reason: RecordingEndReason): Promise<void> {
         console.info(`Handling meeting end with reason: ${reason}`)
         this.context.endReason = reason
-        
+
         try {
             // Stop the dialog observer
             this.stopDialogObserver()
-            
+
             // Try to close the meeting but don't let an error here affect the rest
             try {
                 // If the reason is bot_removed, we know the meeting is already effectively closed
                 if (reason === RecordingEndReason.BotRemoved) {
-                    console.info('Bot was removed from meeting, skipping active closure step')
+                    console.info(
+                        'Bot was removed from meeting, skipping active closure step',
+                    )
                 } else {
-                    await this.context.provider.closeMeeting(this.context.playwrightPage)
+                    await this.context.provider.closeMeeting(
+                        this.context.playwrightPage,
+                    )
                 }
             } catch (closeError) {
-                console.error('Error closing meeting, but continuing process:', closeError)
+                console.error(
+                    'Error closing meeting, but continuing process:',
+                    closeError,
+                )
             }
-            
+
             // These critical steps must execute regardless of previous steps
             console.info('Triggering call ended event')
             await Events.callEnded()
-            
+
             console.info('Stopping video recording')
-            await this.stopVideoRecording().catch(err => {
-                console.error('Error stopping video recording, continuing:', err)
+            await this.stopVideoRecording().catch((err) => {
+                console.error(
+                    'Error stopping video recording, continuing:',
+                    err,
+                )
             })
-            
+
             console.info('Stopping audio streaming')
-            await this.stopAudioStreaming().catch(err => {
-                console.error('Error stopping audio streaming, continuing:', err) 
+            await this.stopAudioStreaming().catch((err) => {
+                console.error(
+                    'Error stopping audio streaming, continuing:',
+                    err,
+                )
             })
 
             console.info('Stopping transcoder')
             try {
                 await TRANSCODER.stop()
             } catch (error) {
-                console.error('Error stopping transcoder, continuing cleanup:', error)
+                console.error(
+                    'Error stopping transcoder, continuing cleanup:',
+                    error,
+                )
             }
 
             console.info('Setting isProcessing to false to end recording loop')
@@ -270,55 +286,77 @@ export class RecordingState extends BaseState {
 
         try {
             // Check if the function exists first
-            const functionExists = await this.context.backgroundPage.evaluate(() => {
-                const w = window as any;
-                return {
-                    stopMediaRecorderExists: typeof w.stopMediaRecorder === 'function',
-                    recordExists: typeof w.record !== 'undefined',
-                    recordStopExists: w.record && typeof w.record.stop === 'function'
-                };
-            });
-            
-            console.log('Stop functions status:', functionExists);
-            
+            const functionExists = await this.context.backgroundPage.evaluate(
+                () => {
+                    const w = window as any
+                    return {
+                        stopMediaRecorderExists:
+                            typeof w.stopMediaRecorder === 'function',
+                        recordExists: typeof w.record !== 'undefined',
+                        recordStopExists:
+                            w.record && typeof w.record.stop === 'function',
+                    }
+                },
+            )
+
+            console.log('Stop functions status:', functionExists)
+
             if (functionExists.stopMediaRecorderExists) {
                 // 1. Stop media recording with detailed diagnostics
                 await this.context.backgroundPage.evaluate(() => {
-                    const w = window as any;
+                    const w = window as any
                     try {
-                        console.log('Calling stopMediaRecorder...');
-                        const result = w.stopMediaRecorder();
-                        console.log('stopMediaRecorder called successfully, result:', result);
-                        return result;
+                        console.log('Calling stopMediaRecorder...')
+                        const result = w.stopMediaRecorder()
+                        console.log(
+                            'stopMediaRecorder called successfully, result:',
+                            result,
+                        )
+                        return result
                     } catch (error) {
-                        console.error('Error in stopMediaRecorder:', error);
+                        console.error('Error in stopMediaRecorder:', error)
                         // Try to display more details about the error
-                        console.error('Error details:', 
-                            JSON.stringify(error, Object.getOwnPropertyNames(error)));
-                        throw error;
+                        console.error(
+                            'Error details:',
+                            JSON.stringify(
+                                error,
+                                Object.getOwnPropertyNames(error),
+                            ),
+                        )
+                        throw error
                     }
-                });
+                })
             } else {
-                console.warn('stopMediaRecorder function not found in window object');
-                
+                console.warn(
+                    'stopMediaRecorder function not found in window object',
+                )
+
                 // Direct workaround attempt with MediaRecorder if available
                 try {
                     await this.context.backgroundPage.evaluate(() => {
-                        const w = window as any;
-                        if (w.MEDIA_RECORDER && w.MEDIA_RECORDER.state !== 'inactive') {
-                            console.log('Attempting direct stop of MEDIA_RECORDER');
-                            w.MEDIA_RECORDER.stop();
-                            return true;
+                        const w = window as any
+                        if (
+                            w.MEDIA_RECORDER &&
+                            w.MEDIA_RECORDER.state !== 'inactive'
+                        ) {
+                            console.log(
+                                'Attempting direct stop of MEDIA_RECORDER',
+                            )
+                            w.MEDIA_RECORDER.stop()
+                            return true
                         }
-                        return false;
-                    });
+                        return false
+                    })
                 } catch (directStopError) {
-                    console.error('Failed direct stop attempt:', directStopError);
+                    console.error(
+                        'Failed direct stop attempt:',
+                        directStopError,
+                    )
                 }
             }
         } catch (error) {
-            console.error('Failed to stop video recording:', error);
-            throw error;
+            console.error('Failed to stop video recording:', error)
+            throw error
         }
     }
 
@@ -393,11 +431,17 @@ export class RecordingState extends BaseState {
 
             // Check if we've had silence for long enough
             const silenceDuration = now - this.noAttendeesWithSilenceStartTime
-            const hasEnoughSilence = silenceDuration >= this.SILENCE_CONFIRMATION_MS
+            const hasEnoughSilence =
+                silenceDuration >= this.SILENCE_CONFIRMATION_MS
 
             // If we're tracking silence but haven't reached the threshold, log the progress
-            if (!hasEnoughSilence && silenceDuration % 5000 < this.CHECK_INTERVAL) {
-                console.log(`[checkNoAttendees] Waiting for silence confirmation: ${Math.floor(silenceDuration/1000)}s / ${this.SILENCE_CONFIRMATION_MS/1000}s`)
+            if (
+                !hasEnoughSilence &&
+                silenceDuration % 5000 < this.CHECK_INTERVAL
+            ) {
+                console.log(
+                    `[checkNoAttendees] Waiting for silence confirmation: ${Math.floor(silenceDuration / 1000)}s / ${this.SILENCE_CONFIRMATION_MS / 1000}s`,
+                )
             }
 
             return hasEnoughSilence
@@ -423,30 +467,37 @@ export class RecordingState extends BaseState {
 
         // Check current sound level if streaming is available
         if (Streaming.instance) {
-            const currentSoundLevel = Streaming.instance.getCurrentSoundLevel();
-            
+            const currentSoundLevel = Streaming.instance.getCurrentSoundLevel()
+
             // More detailed sound level logging
             // console.log(`[checkNoSpeaker] Current sound level: ${currentSoundLevel.toFixed(2)}, threshold: ${SOUND_LEVEL_ACTIVITY_THRESHOLD}`);
-            
+
             // If sound is detected above threshold, reset the silence counter
             if (currentSoundLevel > SOUND_LEVEL_ACTIVITY_THRESHOLD) {
-                console.log(`[checkNoSpeaker] Sound activity detected (${currentSoundLevel.toFixed(2)}), resetting silence timer`);
-                this.context.noSpeakerDetectedTime = 0;
-                return false;
+                console.log(
+                    `[checkNoSpeaker] Sound activity detected (${currentSoundLevel.toFixed(2)}), resetting silence timer`,
+                )
+                this.context.noSpeakerDetectedTime = 0
+                return false
             }
         } else {
-            console.warn('[checkNoSpeaker] Streaming instance not available, cannot check sound levels');
+            console.warn(
+                '[checkNoSpeaker] Streaming instance not available, cannot check sound levels',
+            )
         }
 
         // Check if the silence period has exceeded the timeout
-        const silenceDuration = Math.floor((now - noSpeakerDetectedTime)/1000);
-        const shouldEnd = noSpeakerDetectedTime + MEETING_CONSTANTS.SILENCE_TIMEOUT < now;
-        
+        const silenceDuration = Math.floor((now - noSpeakerDetectedTime) / 1000)
+        const shouldEnd =
+            noSpeakerDetectedTime + MEETING_CONSTANTS.SILENCE_TIMEOUT < now
+
         if (shouldEnd) {
-            console.log(`[checkNoSpeaker] No sound activity detected for ${silenceDuration} seconds, ending meeting`);
+            console.log(
+                `[checkNoSpeaker] No sound activity detected for ${silenceDuration} seconds, ending meeting`,
+            )
         }
-        
-        return shouldEnd;
+
+        return shouldEnd
     }
 
     private sleep(ms: number): Promise<void> {

@@ -80,15 +80,15 @@ export class Consumer {
         handler: (data: MeetingParams) => Promise<void>,
     ): Promise<StartRecordingResult> {
         return new Promise((resolve, reject) => {
-            let isProcessing = false;
+            let isProcessing = false
             this.channel
                 .consume(Consumer.QUEUE_NAME, async (message) => {
                     if (isProcessing) {
-                        console.log('Already processing a message, skipping...');
-                        return;
+                        console.log('Already processing a message, skipping...')
+                        return
                     }
-                    
-                    isProcessing = true;
+
+                    isProcessing = true
                     console.log(`consume message : ${message}`)
                     if (message !== null) {
                         try {
@@ -153,22 +153,22 @@ export class Consumer {
     // throw error if start recoridng fail
     static async handleStartRecord(data: MeetingParams) {
         console.log('handleStartRecord')
-        
+
         const grafanaService = GrafanaService.getInstance()
-        
+
         // Mettre à jour la configuration de Grafana Agent
         grafanaService.setBotUuid(data.bot_uuid)
         await grafanaService.updateGrafanaAgentWithBotUuid()
-        
+
         // Redirect logs to bot-specific file
-        console.log('About to redirect logs to bot:', data.bot_uuid);
-        await redirectLogsToBot(data.bot_uuid);
-        console.log('Logs redirected successfully');
+        console.log('About to redirect logs to bot:', data.bot_uuid)
+        await redirectLogsToBot(data.bot_uuid)
+        console.log('Logs redirected successfully')
 
         // Set up force termination timer once we've received a message
         setupForceTermination({
             secret: data.secret,
-            bot_uuid: data.bot_uuid
+            bot_uuid: data.bot_uuid,
         })
 
         console.log('####### DATA #######', data)

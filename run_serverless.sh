@@ -2,6 +2,9 @@
 # Script to run the serverless bot with predefined parameters
 # Just modify the JSON below to change the meeting parameters
 
+# Generate a random UUID for the bot
+BOT_UUID=$(uuidgen)
+
 # Meeting parameters - modify these as needed
 STDIN='{
   "meeting_url": "https://meet.google.com/cva-xscy-fkb?authuser=0",
@@ -10,7 +13,7 @@ STDIN='{
   "bot_name": "La Vache!",
   "speech_to_text_provider": "Default",
   "bots_webhook_url": "https://webhook-test.com/942a23a5e6cea9a7a2a3be242cede1f7",
-  "bot_uuid": "dd5cd63e-cdc7-42fa-b1eb-57ce6d649eed",
+  "bot_uuid": "'$BOT_UUID'",
   "recording_mode": "SpeakerView",
   "mp4_s3_path": "187e3f81-3349-4131-a325-10c93922a4fb.mp4",
   "custom_branding_bot_path": "https://i.ibb.co/N9YtnDZ/ducobu.jpg",
