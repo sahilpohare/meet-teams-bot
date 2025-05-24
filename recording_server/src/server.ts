@@ -248,7 +248,7 @@ export async function server() {
                         return
                     }
                     try {
-                        const command = `ffmpeg -y -loop 1 -i resized_${filename} -c:v libx264 -r 30 -t 1 -pix_fmt yuv420p ${filename}.mp4`
+                        const command = `ffmpeg -y -loop 1 -i resized_${filename} -c:v libvpx-vp9 -r 30 -t 1 -pix_fmt yuv420p ${filename}.mp4`
                         const output = execSync(command)
                         console.log(output.toString())
                     } catch (e) {

@@ -154,18 +154,18 @@ export class Streaming {
             client.on('close', () => {
                 console.log(`Client has left`)
 
-                this.output_ws.close()
+                this.output_ws?.close()
             })
             // Event 'error' on client extension WebSocket
             client.on('error', (err: Error) => {
                 console.error(`WebSocket error : ${err}`)
             })
             // Event 'close' on output WebSocket
-            this.output_ws.on('close', () => {
+            this.output_ws?.on('close', () => {
                 console.log(`Output WebSocket closed`)
             })
             // Event 'error' on output WebSocket
-            this.output_ws.on('error', (err: Error) => {
+            this.output_ws?.on('error', (err: Error) => {
                 console.error(`Output WebSocket error : ${err}`)
             })
         })

@@ -2,11 +2,6 @@ import { BrowserContext, chromium, Page } from '@playwright/test'
 import { join } from 'path'
 
 // const EXTENSION_NAME = 'spoke'
-const GOOGLE_CHROME_EXECUTABLE_PATH =
-    process.env.GOOGLE_CHROME_EXECUTABLE_PATH ||
-    (process.platform === 'darwin'
-        ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
-        : '/usr/bin/google-chrome')
 const EXTENSION_ID = 'eahilodcoaonodbfiijhpmfnddkfhmbl'
 const USER_DATA_DIR = '/tmp/test-user-data-dir'
 
@@ -60,7 +55,6 @@ export async function openBrowser(
 
         const context = await chromium.launchPersistentContext('', {
             headless: false,
-            executablePath: GOOGLE_CHROME_EXECUTABLE_PATH,
             viewport: { width, height },
             args: [
                 '--no-sandbox',
