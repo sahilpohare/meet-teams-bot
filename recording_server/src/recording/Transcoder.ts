@@ -218,40 +218,38 @@ export class Transcoder extends EventEmitter {
                 // En mode audio, on écrit directement en WAV
                 await this.startFFmpeg()
             } else {
-                // En mode vidéo, on écrit dans un fichier MP4 temporaire
-                const tempVideoPath = this.config.outputPath + '.temp'
-                this.config.tempVideoPath = tempVideoPath
-
-                // Arguments FFmpeg pour écrire directement en MP4 et WAV simultanément
+                // En mode vidéo, écrire simultanément MP4 ET WAV depuis le même processus
                 const ffmpegArgs = [
                     '-i',
                     'pipe:0',
-                    // Sortie MP4
-                    '-map',
-                    '0',
-                    '-c:v',
-                    'libvpx-vp9',
-                    '-c:a',
-                    'aac',
-                    '-b:a',
-                    '128k',
-                    '-f',
-                    'mp4',
-                    '-movflags',
-                    '+frag_keyframe+empty_moov+separate_moof+omit_tfhd_offset+default_base_moof',
-                    tempVideoPath,
-                    // Sortie WAV simultanée
-                    '-map',
-                    '0:a',
-                    '-c:a',
-                    'pcm_s16le',
-                    '-ac',
-                    '1',
-                    '-ar',
-                    '16000',
-                    '-f',
-                    'wav',
-                    this.config.audioOutputPath,
+                    // Optimisations générales
+                    '-threads', '0', // Utiliser tous les CPU disponibles
+                    '-preset', 'ultrafast', // Préset le plus rapide
+                    '-tune', 'zerolatency', // Optimisé pour le temps réel
+                    
+                    // SORTIE 1: MP4 (vidéo + audio stéréo)
+                    '-map', '0:v', '-map', '0:a',
+                    '-c:v', 'libx264',
+                    '-profile:v', 'baseline',
+                    '-level', '3.0',
+                    '-pix_fmt', 'yuv420p',
+                    '-crf', '23',
+                    '-c:a', 'aac',
+                    '-b:a', '128k',
+                    '-ac', '2', // Stéréo pour MP4
+                    '-ar', '44100',
+                    '-f', 'mp4',
+                    '-movflags', '+frag_keyframe+empty_moov+faststart',
+                    '-y', this.config.outputPath,
+                    
+                    // SORTIE 2: WAV (audio mono 16kHz pour transcription)
+                    '-map', '0:a',
+                    '-vn', // Pas de vidéo pour le WAV
+                    '-acodec', 'pcm_s16le',
+                    '-ac', '1', // Mono pour transcription
+                    '-ar', '16000', // 16kHz pour transcription
+                    '-f', 'wav',
+                    '-y', this.config.audioOutputPath!,
                 ]
 
                 this.ffmpegProcess = spawn('ffmpeg', ffmpegArgs, {
@@ -259,6 +257,12 @@ export class Transcoder extends EventEmitter {
                 })
 
                 this.setupFFmpegListeners()
+                
+                console.log('Started dual-output FFmpeg process:', {
+                    mp4Output: this.config.outputPath,
+                    wavOutput: this.config.audioOutputPath,
+                    note: 'Single process writes both MP4 and WAV simultaneously'
+                })
             }
 
             this.isRecording = true
@@ -303,8 +307,8 @@ export class Transcoder extends EventEmitter {
             // Fermer les flux
             await this.stopAllStreams()
 
-            if (!this.isAudioOnly) {
-                // Optimiser la vidéo en copiant le fichier temporaire vers le fichier final
+            // Optimiser la vidéo seulement si on a utilisé un fichier temporaire
+            if (!this.isAudioOnly && this.config.tempVideoPath) {
                 await this.finalizeVideo()
             }
 
@@ -403,16 +407,31 @@ export class Transcoder extends EventEmitter {
                 this.config.outputPath,
             ]
         } else {
-            // Configuration MP4 standard (inchangée)
+            // Configuration MP4 optimisée pour Docker/temps réel
+            // IMPORTANT: FFmpeg peut décoder WebM/VP9/Opus (chunks Chromium) 
+            // et encoder en H264/AAC (25x plus rapide que VP9)
+            // Le transcodage WebM→MP4 est transparent et compatible
             ffmpegArgs = [
                 '-i',
                 'pipe:0',
+                // Optimisations générales
+                '-threads', '0', // Utiliser tous les CPU disponibles
+                '-preset', 'ultrafast', // Préset le plus rapide
+                '-tune', 'zerolatency', // Optimisé pour le temps réel
+                // Configuration vidéo (H264 au lieu de VP9 pour la vitesse)
                 '-c:v',
-                'libvpx-vp9',
+                'libx264',
+                '-profile:v', 'baseline', // Profil rapide
+                '-level', '3.0',
+                '-pix_fmt', 'yuv420p',
+                '-crf', '23', // Qualité excellente (23 au lieu de 28)
+                // Configuration audio
                 '-c:a',
                 'aac',
                 '-b:a',
                 '128k',
+                '-ac', '2', // Stéréo
+                '-ar', '44100',
                 '-strict',
                 'experimental',
                 '-f',
@@ -422,9 +441,6 @@ export class Transcoder extends EventEmitter {
                 '-y',
                 this.config.outputPath,
             ]
-
-            // Démarrer un second processus FFmpeg pour l'extraction audio
-            this.startAudioExtraction()
         }
 
         this.ffmpegProcess = spawn('ffmpeg', ffmpegArgs, {
@@ -436,6 +452,8 @@ export class Transcoder extends EventEmitter {
         console.log('Started FFmpeg process:', {
             isAudioOnly: this.isAudioOnly,
             outputPath: this.config.outputPath,
+            codec: this.isAudioOnly ? 'WAV' : 'H264-fast',
+            note: 'Can decode WebM/VP9 input and encode H264 output'
         })
     }
 
