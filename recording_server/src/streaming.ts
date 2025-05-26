@@ -85,26 +85,34 @@ export class Streaming {
                 try {
                     this.output_ws = new WebSocket(this.outputUrl)
 
-                    // Send initial message to output webSocket
+                    // Setup output WebSocket event listeners IMMEDIATELY after creation
+                    // to avoid race conditions
                     this.output_ws.on('open', () => {
-                        this.output_ws.send(
-                            JSON.stringify({
-                                protocol_version: 1,
-                                bot_id: this.botId,
-                                offset: 0.0,
-                            }),
-                        )
+                        if (this.output_ws) {
+                            this.output_ws.send(
+                                JSON.stringify({
+                                    protocol_version: 1,
+                                    bot_id: this.botId,
+                                    offset: 0.0,
+                                }),
+                            )
+                        }
+                    })
+
+                    // Event 'error' on output WebSocket - MOVED HERE to avoid race condition
+                    this.output_ws.on('error', (err: Error) => {
+                        console.error(`Output WebSocket error : ${err}`)
+                    })
+
+                    // Event 'close' on output WebSocket - MOVED HERE to avoid race condition
+                    this.output_ws.on('close', () => {
+                        console.log(`Output WebSocket closed`)
                     })
 
                     // Dual channel
                     if (this.inputUrl === this.outputUrl) {
                         this.play_incoming_audio_chunks(this.output_ws)
                     }
-
-                    // Event 'error' on output WebSocket
-                    this.output_ws.on('error', (err: Error) => {
-                        console.error(`Output WebSocket error : ${err}`)
-                    })
                 } catch (error) {
                     console.error(
                         `Failed to connect to output WebSocket: ${error}`,
@@ -118,7 +126,7 @@ export class Streaming {
                 this.audioPacketsReceived++
 
                 if (this.isPaused) {
-                    // Si en pause, stocker les chunks pour traitement ultérieur
+                    // If paused, store chunks for later processing
                     this.pausedChunks.push(message)
                     return
                 }
@@ -150,23 +158,19 @@ export class Streaming {
                     }
                 }
             })
+
             // Event 'close' on client extension WebSocket
             client.on('close', () => {
                 console.log(`Client has left`)
-
-                this.output_ws?.close()
+                // Safely close output WebSocket if it exists
+                if (this.output_ws && this.output_ws.readyState === WebSocket.OPEN) {
+                    this.output_ws.close()
+                }
             })
+
             // Event 'error' on client extension WebSocket
             client.on('error', (err: Error) => {
                 console.error(`WebSocket error : ${err}`)
-            })
-            // Event 'close' on output WebSocket
-            this.output_ws?.on('close', () => {
-                console.log(`Output WebSocket closed`)
-            })
-            // Event 'error' on output WebSocket
-            this.output_ws?.on('error', (err: Error) => {
-                console.error(`Output WebSocket error : ${err}`)
             })
         })
 
@@ -225,7 +229,7 @@ export class Streaming {
 
         this.isPaused = false
 
-        // Traiter les chunks mis en pause
+        // Process paused chunks
         this.processPausedChunks()
     }
 
@@ -238,29 +242,54 @@ export class Streaming {
             return
         }
 
-        // Fermer le flux stdin s'il existe
-        if (this.output_ws) {
-            this.output_ws.close()
+        console.log('Stopping streaming service...')
+
+        // Safely close WebSocket connections with proper error handling
+        try {
+            if (this.output_ws) {
+                if (this.output_ws.readyState === WebSocket.OPEN || 
+                    this.output_ws.readyState === WebSocket.CONNECTING) {
+                    this.output_ws.close()
+                }
+                this.output_ws = null
+            }
+        } catch (error) {
+            console.error('Error closing output WebSocket:', error)
             this.output_ws = null
         }
 
-        if (this.input_ws) {
-            this.input_ws.close()
+        try {
+            if (this.input_ws) {
+                if (this.input_ws.readyState === WebSocket.OPEN || 
+                    this.input_ws.readyState === WebSocket.CONNECTING) {
+                    this.input_ws.close()
+                }
+                this.input_ws = null
+            }
+        } catch (error) {
+            console.error('Error closing input WebSocket:', error)
             this.input_ws = null
         }
 
-        if (this.extension_ws) {
-            this.extension_ws.close()
+        try {
+            if (this.extension_ws) {
+                this.extension_ws.close()
+                this.extension_ws = null
+            }
+        } catch (error) {
+            console.error('Error closing extension WebSocket server:', error)
             this.extension_ws = null
         }
 
-        // Réinitialiser l'état
+        // Reset the state
         this.isInitialized = false
         this.isPaused = false
         this.pausedChunks = []
 
-        // Réinitialiser l'instance statique
+        // Reset the static instance
         Streaming.instance = null
+        
+        console.log('Streaming service stopped successfully')
     }
 
     // Send Speaker Data to Output WebSocket
@@ -270,7 +299,7 @@ export class Streaming {
         }
 
         if (this.isPaused) {
-            // On pourrait stocker les états des speakers pendant la pause
+            // We could store speaker states during pause
             return
         }
 
@@ -287,7 +316,7 @@ export class Streaming {
         let sum = 0
         let max = 0
 
-        // Vérifier d'abord si le buffer contient des données non nulles
+        // First check if the buffer contains non-null data
         for (let i = 0; i < audioData.length; i++) {
             const absValue = Math.abs(audioData[i])
             max = Math.max(max, absValue)
@@ -313,7 +342,7 @@ export class Streaming {
         // Mise à jour du niveau sonore actuel (au lieu du maximum historique)
         this.currentSoundLevel = normalizedLevel
 
-        // Écrire directement dans le fichier à chaque analyse
+        // Write directly to file on each analysis
         const now = Date.now()
         const timestamp = new Date(now).toISOString()
         const logEntry = `${timestamp},${normalizedLevel.toFixed(2)}\n`
@@ -323,7 +352,7 @@ export class Streaming {
             const soundLogPath = PathManager.getInstance(
                 this.botId,
             ).getSoundLogPath()
-            // Écrire directement dans le fichier
+            // Write directly to file
             fs.appendFileSync(soundLogPath, logEntry)
         } catch (error) {
             console.error(`Error writing to sound log: ${error}`)
