@@ -6,20 +6,20 @@ import { BaseState } from './base-state'
 export class ErrorState extends BaseState {
     async execute(): StateExecuteResult {
         try {
-            // Log l'erreur
+            // Log the error
             await this.logError()
 
-            // Notification des événements d'erreur
+            // Notify error events
             await this.notifyError()
 
-            // Mise à jour des métriques
+            // Update metrics
             this.updateMetrics()
 
-            // Passage au nettoyage
+            // Move to cleanup
             return this.transition(MeetingStateType.Cleanup)
         } catch (error) {
             console.error('Error in ErrorState:', error)
-            // Même en cas d'erreur dans la gestion d'erreur, on passe au nettoyage
+            // Even if error handling fails, transition to cleanup
             return this.transition(MeetingStateType.Cleanup)
         }
     }
@@ -32,7 +32,7 @@ export class ErrorState extends BaseState {
             return
         }
 
-        // Création d'un objet d'erreur détaillé
+        // Create a detailed error object
         const errorDetails = {
             message: error.message,
             stack: error.stack,
@@ -47,7 +47,7 @@ export class ErrorState extends BaseState {
             timestamp: Date.now(),
         }
 
-        // Log de l'erreur avec tous les détails
+        // Log the error with all details
         console.error('Meeting error occurred:', errorDetails)
     }
 
@@ -60,7 +60,7 @@ export class ErrorState extends BaseState {
                 return
             }
 
-            // Log complet pour le débogage
+            // Full log for debugging
             console.log('Error in notifyError:', {
                 isJoinError: error instanceof JoinError,
                 name: error.name,
@@ -74,7 +74,7 @@ export class ErrorState extends BaseState {
 
             try {
                 if (error instanceof JoinError) {
-                    // Vérification supplémentaire du code d'erreur
+                    // Additional check on the error code
                     const errorCode = error.message
                     console.log('JoinError code:', errorCode)
 
@@ -109,13 +109,13 @@ export class ErrorState extends BaseState {
             }
         }
 
-        // Augmenter le timeout pour la notification d'erreur
+        // Increase timeout for error notification
         const timeoutPromise = new Promise<void>(
             (_, reject) =>
                 setTimeout(
                     () => reject(new Error('Notify error timeout')),
                     15000,
-                ), // 15 secondes au lieu de 5
+                ), // 15 seconds instead of 5
         )
 
         try {
@@ -138,13 +138,13 @@ export class ErrorState extends BaseState {
                 ? Date.now() - this.context.startTime
                 : 0,
             state: this.stateType,
-            // Autres métriques pertinentes du contexte
+            // Other relevant context metrics
             attendeesCount: this.context.attendeesCount,
             firstUserJoined: this.context.firstUserJoined,
             sessionId: this.context.params?.session_id,
         }
 
-        // Log des métriques
+        // Log metrics
         console.info('Error metrics:', metrics)
     }
 }

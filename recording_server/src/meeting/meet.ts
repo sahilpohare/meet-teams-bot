@@ -191,7 +191,7 @@ export class MeetProvider implements MeetingProviderInterface {
                 throw new JoinError(JoinErrorCode.CannotJoinMeeting)
             }
 
-            // Attendre d'être dans le meeting avec vérification régulière du cancelCheck
+            // Wait to be in the meeting with regular cancelCheck verification
             console.log('Waiting to confirm meeting join...')
             while (true) {
                 if (cancelCheck()) {
@@ -211,8 +211,8 @@ export class MeetProvider implements MeetingProviderInterface {
                 await sleep(1000)
             }
 
-            // Une fois dans le meeting, on exécute toutes les actions post-join
-            // SANS vérifier le cancelCheck puisqu'on est déjà dans le meeting
+            // Once in the meeting, execute all post-join actions
+            // WITHOUT checking cancelCheck since we are already in the meeting
 
             if (meetingParams.enter_message) {
                 console.log('Sending entry message...')
@@ -318,7 +318,7 @@ async function findShowEveryOne(
 
     while (!showEveryOneFound) {
         try {
-            // Vérifier si on est effectivement dans le meeting
+            // Check if we are actually in the meeting
             inMeetingConfirmed = await isInMeeting(page)
             if (inMeetingConfirmed) {
                 console.log('Successfully confirmed we are in the meeting')
@@ -346,7 +346,7 @@ async function findShowEveryOne(
                 }
             }
 
-            // Si on n'a pas trouvé le bouton mais qu'on est dans le meeting,
+            // If we did not find the button but we are in the meeting,
             // on considère que c'est un succès (certaines réunions n'ont pas ce bouton)
             if (!showEveryOneFound && inMeetingConfirmed) {
                 console.log(
@@ -380,16 +380,16 @@ async function findShowEveryOne(
     }
 }
 
-// Nouvelle fonction pour vérifier si on est effectivement dans le meeting
+// New function to check if we are actually in the meeting
 async function isInMeeting(page: Page): Promise<boolean> {
     try {
-        // Vérifier d'abord si on a été retiré de la réunion
+        // First check if we have been removed from the meeting
         if (await notAcceptedInMeeting(page)) {
             console.log('Bot has been removed from the meeting')
             return false
         }
 
-        // Vérifier des éléments qui indiquent qu'on est dans la réunion
+        // Check elements that indicate we are in the meeting
         const indicators = [
             // La présence des contrôles de réunion
             await page
@@ -412,7 +412,7 @@ async function isInMeeting(page: Page): Promise<boolean> {
         const confirmedIndicators = indicators.filter(Boolean).length
         console.log(`Meeting presence indicators: ${confirmedIndicators}/3`)
 
-        // On considère qu'on est dans la réunion si au moins 2 indicateurs sont présents
+        // We consider we are in the meeting if at least 2 indicators are present
         return confirmedIndicators >= 2
     } catch (error) {
         console.error('Error checking if in meeting:', error)
@@ -425,7 +425,7 @@ async function sendEntryMessage(
     enterMessage: string,
 ): Promise<boolean> {
     console.log('Attempting to send entry message...')
-    // Vérifier d'abord si on est toujours dans la réunion
+    // First check if we are still in the meeting
     if (!(await isInMeeting(page))) {
         console.log(
             'Bot is no longer in the meeting, cannot send entry message',
@@ -442,7 +442,7 @@ async function sendEntryMessage(
             { state: 'visible' },
         )
 
-        // Vérifier à nouveau si on est toujours dans la réunion
+        // Check again if we are still in the meeting
         if (!(await isInMeeting(page))) {
             console.log('Bot is no longer in the meeting after opening chat')
             return false
@@ -636,7 +636,7 @@ async function changeLayout(
     )
 
     try {
-        // Vérifier d'abord si on est toujours dans la réunion
+        // First check if we are still in the meeting
         if (!(await isInMeeting(page))) {
             console.log(
                 'Bot is no longer in the meeting, stopping layout change',
@@ -660,7 +660,7 @@ async function changeLayout(
         await moreOptionsButton.click()
         await page.waitForTimeout(500)
 
-        // Vérifier à nouveau si on est toujours dans la réunion
+        // Check again if we are still in the meeting
         if (!(await isInMeeting(page))) {
             console.log(
                 'Bot is no longer in the meeting after clicking More options',
@@ -677,7 +677,7 @@ async function changeLayout(
         await changeLayoutItem.click()
         await page.waitForTimeout(500)
 
-        // Vérifier à nouveau si on est toujours dans la réunion
+        // Check again if we are still in the meeting
         if (!(await isInMeeting(page))) {
             console.log(
                 'Bot is no longer in the meeting after clicking Change layout',
@@ -703,7 +703,7 @@ async function changeLayout(
         await spotlightOption.click()
         await page.waitForTimeout(500)
 
-        // Vérifier une dernière fois si on est toujours dans la réunion
+        // Check one last time if we are still in the meeting
         if (!(await isInMeeting(page))) {
             console.log(
                 'Bot is no longer in the meeting after clicking Spotlight',
@@ -754,7 +754,7 @@ async function typeBotName(page: Page, botName: string): Promise<boolean> {
         // Taper le nouveau nom
         await page.fill(INPUT, BotNameTyped)
 
-        // Vérifier que le texte a bien été saisi
+        // Check that the text has been properly entered
         const inputValue = await page.inputValue(INPUT)
         return inputValue.includes(BotNameTyped)
     } catch (e) {

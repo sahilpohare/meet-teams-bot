@@ -34,12 +34,12 @@ export class PausedState extends BaseState {
             while (this.context.isPaused) {
                 await new Promise((resolve) => setTimeout(resolve, 100))
 
-                // Vérifier si on doit arrêter complètement
+                // Check if we should stop completely
                 if (this.context.endReason) {
                     return this.transition(MeetingStateType.Cleanup)
                 }
 
-                // Vérifier si la pause a duré trop longtemps
+                // Check if the pause has lasted too long
                 if (
                     Date.now() - pauseStartTime >
                     MEETING_CONSTANTS.RESUMING_TIMEOUT
@@ -68,7 +68,7 @@ export class PausedState extends BaseState {
 
     private async pauseRecording(): Promise<void> {
         const pausePromise = async () => {
-            // Pause du MediaRecorder dans le navigateur
+            // Pause the MediaRecorder in the browser
             await this.context.backgroundPage?.evaluate(() => {
                 const w = window as any
                 return w.pauseMediaRecorder?.()

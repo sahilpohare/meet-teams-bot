@@ -33,7 +33,7 @@ import {
 
 const ZOOM_SDK_DEBUG_EXECUTABLE_PATHNAME = './target/debug/client'
 const ZOOM_SDK_RELEASE_EXECUTABLE_PATHNAME = './target/release/client'
-const ZOOM_SDK_LIBRARY_PATH = './zoom-sdk-linux-rs/zoom-meeting-sdk-linux'
+const ZOOM_SDK_LIBRARY_PATH = './zoom-meeting-sdk-linux-rs/zoom-meeting-sdk-linux'
 const ZOOM_SDK_RELATIVE_DIRECTORY = '../zoom'
 
 // Setup initial console logging
@@ -69,7 +69,7 @@ async function readFromStdin(): Promise<MeetingParams> {
         process.stdin.on('end', () => {
             try {
                 const params = JSON.parse(data) as MeetingParams
-                // Détecter le provider de meeting
+                // Detect the meeting provider
                 params.meetingProvider = detectMeetingProvider(
                     params.meeting_url,
                 )
@@ -99,7 +99,7 @@ const isServerless = process.env.SERVERLESS === 'true'
 
     let environ: string = process.env.ENVIRON
 
-    // Enregistrer le répertoire original
+    // Save the original directory
     const originalDirectory = process.cwd()
 
     let consumeResult: {
@@ -201,40 +201,40 @@ const isServerless = process.env.SERVERLESS === 'true'
     } else if (consumeResult.params.meetingProvider !== 'Zoom') {
         // Assuming that recording is active at this point
         try {
-            // Dans le mode serverless, on doit initialiser MeetingHandle nous-mêmes
+            // In serverless mode, we need to initialize MeetingHandle ourselves
             if (isServerless) {
-                // Créer l'instance API
+                // Create the API instance
                 new Api(consumeResult.params)
 
-                // Importer les modules nécessaires
+                // Import necessary modules
                 const { server } = await import('./server')
                 const { Events } = await import('./events')
 
-                // Démarrer le serveur
+                // Start the server
                 await server().catch((e) => {
                     console.error(`Fail to start server: ${e}`)
                     throw e
                 })
                 console.log('Server started successfully')
 
-                // Initialiser MeetingHandle avec les paramètres
+                // Initialize MeetingHandle with parameters
                 MeetingHandle.init(consumeResult.params)
 
-                // Initialiser les événements
+                // Initialize events
                 Events.init(consumeResult.params)
                 Events.joiningCall()
             }
 
-            // Démarrer le meeting avec la machine à états
+            // Start the meeting with state machine
             await MeetingHandle.instance.startRecordMeeting()
 
-            // Vérifier si l'enregistrement a réussi et s'est terminé normalement
+            // Check if recording was successful and ended normally
             if (MeetingHandle.instance.wasRecordingSuccessful()) {
                 console.log(
                     `${Date.now()} Finalize project && Sending WebHook complete`,
                 )
 
-                // Enregistrer la raison de fin pour le logging
+                // Log the end reason for debugging
                 const endReason = MeetingHandle.instance.getEndReason()
                 console.log(
                     `Recording ended normally with reason: ${endReason}`,
@@ -327,24 +327,24 @@ const isServerless = process.env.SERVERLESS === 'true'
                     }
                 }
             } else {
-                // L'enregistrement n'a pas atteint l'état Recording ou a échoué
+                // Recording did not reach Recording state or failed
                 console.error('Recording did not complete successfully')
 
-                // Récupérer la raison spécifique de l'échec
+                // Get the specific reason for the failure
                 const endReason = MeetingHandle.instance.getEndReason()
                 let errorMessage
 
-                // Vérifier si nous avons une erreur de type JoinError dans le contexte
+                // Check if we have a JoinError type error in the context
                 const joinError =
                     MeetingHandle.instance?.stateMachine?.context?.error
                 if (joinError && joinError instanceof JoinError) {
-                    // Utiliser le message de JoinError directement
+                    // Use the JoinError message directly
                     errorMessage = joinError.message
                     console.log(
                         `Found JoinError in context with code: ${errorMessage}`,
                     )
                 } else if (endReason) {
-                    // Utiliser endReason comme fallback
+                    // Use endReason as fallback
                     errorMessage = String(endReason)
                 }
 
@@ -352,7 +352,7 @@ const isServerless = process.env.SERVERLESS === 'true'
                     `Recording failed with reason: ${errorMessage || 'Unknown'}`,
                 )
 
-                // On n'appelle pas endMeetingTrampoline ici
+                // Don't call endMeetingTrampoline here
                 await sendWebhookOnce({
                     meetingUrl: consumeResult.params.meeting_url,
                     botUuid: consumeResult.params.bot_uuid,
@@ -363,7 +363,7 @@ const isServerless = process.env.SERVERLESS === 'true'
                 })
             }
         } catch (error) {
-            // Erreur explicite propagée depuis la machine à états (erreur durant l'enregistrement)
+            // Explicit error propagated from state machine (error during recording)
             console.error('Meeting failed:', error)
 
             await sendWebhookOnce({
@@ -491,7 +491,7 @@ async function sendWebhookOnce(params: {
     }
 
     try {
-        // Tentatives multiples pour l'envoi du webhook
+        // Multiple attempts for webhook sending
         const maxRetries = 3
         let attempt = 0
 
@@ -533,7 +533,7 @@ async function sendWebhookOnce(params: {
             }
         }
     } finally {
-        webhookSent = true // Marquer comme envoyé même en cas d'échec
+        webhookSent = true // Mark as sent even in case of failure
     }
 }
 

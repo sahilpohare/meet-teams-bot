@@ -90,7 +90,7 @@ export class InitializationState extends BaseState {
                 // Augmenter le timeout pour les environnements plus lents
                 const timeoutMs = 60000 // 60 secondes au lieu de 30
 
-                // Créer une promesse qui se rejette après un délai
+                // Create a promise that rejects after a delay
                 const timeoutPromise = new Promise<BrowserResult>(
                     (_, reject) => {
                         const id = setTimeout(() => {
@@ -150,7 +150,7 @@ export class InitializationState extends BaseState {
             }
         } catch (error) {
             console.error('Path manager setup failed:', error)
-            // Créer les répertoires de base si possible
+            // Create base directories if possible
             try {
                 const fs = require('fs')
                 const path = require('path')

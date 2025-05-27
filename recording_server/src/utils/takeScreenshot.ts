@@ -10,7 +10,7 @@ export async function takeScreenshot(page: Page, name: string) {
         const pathManager = PathManager.getInstance()
         const timestamp = Date.now()
 
-        // Désactiver les animations CSS avant la capture
+        // Disable CSS animations before capturing
         await page.addStyleTag({
             content: `
                 *, *::before, *::after {

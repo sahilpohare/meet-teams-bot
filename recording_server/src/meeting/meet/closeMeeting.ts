@@ -29,7 +29,7 @@ export async function closeMeeting(page: Page): Promise<void> {
                         break
                     }
                 } catch (e) {
-                    // Ignorer les erreurs et continuer
+                    // Ignore errors and continue
                     continue
                 }
             }
@@ -44,7 +44,7 @@ export async function closeMeeting(page: Page): Promise<void> {
                     await iconButton.click({ force: true, timeout: 300 })
                 }
             } catch (e) {
-                // Ignorer, continuer
+                // Ignore, continue
             }
 
             // Confirmation finale rapide
@@ -59,7 +59,7 @@ export async function closeMeeting(page: Page): Promise<void> {
                     await leaveButton.click({ timeout: 300, force: true })
                 }
             } catch (e) {
-                // Ignorer
+                // Ignore
             }
 
             // Dernier recours ultra-rapide : naviguer ailleurs sans attente

@@ -14,14 +14,14 @@ export class WaitingRoomState extends BaseState {
             console.info('Entering waiting room state')
             Events.inWaitingRoom()
 
-            // Obtenir les informations de la réunion
+            // Get meeting information
             const { meetingId, password } = await this.getMeetingInfo()
             console.info('Meeting info retrieved', {
                 meetingId,
                 hasPassword: !!password,
             })
 
-            // Générer le lien de réunion
+            // Generate the meeting link
             const meetingLink = this.context.provider.getMeetingLink(
                 meetingId,
                 password,
@@ -30,17 +30,17 @@ export class WaitingRoomState extends BaseState {
                 this.context.params.enter_message,
             )
 
-            // Ouvrir la page de réunion
+            // Open the meeting page
             await this.openMeetingPage(meetingLink)
 
-            // Démarrer l'observateur de dialogue dès que la page est ouverte
+            // Start the dialog observer once the page is open
             this.startDialogObserver()
 
-            // Attendre l'acceptation dans la réunion
+            // Wait for acceptance into the meeting
             await this.waitForAcceptance()
             console.info('Successfully joined meeting')
 
-            // Si tout est OK, passer à l'état InCall
+            // If everything is fine, move to the InCall state
             return this.transition(MeetingStateType.InCall)
         } catch (error) {
             // Arrêter l'observateur en cas d'erreur
@@ -132,12 +132,12 @@ export class WaitingRoomState extends BaseState {
             this.context.params.automatic_leave.waiting_room_timeout * 1000
         console.info(`Setting waiting room timeout to ${timeoutMs}ms`)
 
-        let joinSuccessful = false // Flag pour indiquer si on est dans le meeting
+        let joinSuccessful = false // Flag indicating we joined the meeting
 
         return new Promise((resolve, reject) => {
             const timeout = setTimeout(() => {
                 if (!joinSuccessful) {
-                    // Ne déclencher le timeout que si on n'est pas dans le meeting
+                    // Trigger the timeout only if we are not in the meeting
                     const timeoutError = new JoinError(
                         JoinErrorCode.TimeoutWaitingToStart,
                     )
@@ -161,7 +161,7 @@ export class WaitingRoomState extends BaseState {
                         this.context.endReason ===
                         RecordingEndReason.ApiRequest,
                     this.context.params,
-                    // Ajouter un callback pour notifier le succès du join
+                    // Add a callback to notify that the join succeeded
                     () => {
                         joinSuccessful = true
                         console.log('Join successful notification received')

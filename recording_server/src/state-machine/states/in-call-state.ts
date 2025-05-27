@@ -8,10 +8,10 @@ import { BaseState } from './base-state'
 export class InCallState extends BaseState {
     async execute(): StateExecuteResult {
         try {
-            // Démarrer l'observateur de dialogue dès l'entrée dans l'état
+            // Start dialog observer upon entering the state
             this.startDialogObserver()
 
-            // Démarrer avec un timeout global pour le setup
+            // Start with global timeout for setup
             await Promise.race([this.setupRecording(), this.createTimeout()])
             return this.transition(MeetingStateType.Recording)
         } catch (error) {
@@ -42,10 +42,10 @@ export class InCallState extends BaseState {
             // Notifier qu'on est en appel mais pas encore en enregistrement
             Events.inCallNotRecording()
 
-            // Initialiser les services
+            // Initialize services
             await this.initializeServices()
 
-            // Nettoyer le HTML et démarrer l'observation
+            // Clean HTML and start observation
             await this.setupBrowserComponents()
 
             console.info('Recording setup completed successfully')
@@ -121,7 +121,7 @@ export class InCallState extends BaseState {
             SpeakerManager.start()
 
             if (functionsExist.speakersObserverExists) {
-                // Démarrer l'observation des speakers
+                // Start speaker observation
                 await this.context.backgroundPage.evaluate(
                     async (params) => {
                         const w = window as any
@@ -158,7 +158,7 @@ export class InCallState extends BaseState {
             throw new Error(`Browser component setup failed: ${error as Error}`)
         }
 
-        // Vérifier si startRecording existe
+        // Check if startRecording exists
         const recordingFunctionsExist =
             await this.context.backgroundPage.evaluate(() => {
                 const w = window as any
@@ -173,7 +173,7 @@ export class InCallState extends BaseState {
 
         console.log('Recording functions status:', recordingFunctionsExist)
 
-        // Démarrer l'enregistrement avec gestion d'erreur améliorée
+        // Start recording with improved error handling
         let startTime: number
         try {
             if (recordingFunctionsExist.startRecordingExists) {
@@ -229,7 +229,7 @@ export class InCallState extends BaseState {
             startTime = Date.now() // Fallback
         }
 
-        // Définir le temps de début dans le contexte
+        // Set start time in context
         this.context.startTime = startTime || Date.now()
         console.log(`Recording started at timestamp: ${this.context.startTime}`)
 

@@ -24,30 +24,26 @@ export interface TranscoderConfig {
 
 export class Transcoder extends EventEmitter {
     private static readonly FFMPEG_CLOSE_TIMEOUT: number = 60_000
-    private static readonly FASTSTART_TIMEOUT: number = 30_000
 
     // Configuration
     private config: TranscoderConfig
 
-    // Composants essentiels
+    // Essential components
     private pathManager: PathManager | null = null
     private videoProcessor: VideoChunkProcessor
     private s3Uploader: S3Uploader
 
     private processedChunks: number = 0
 
-    // Streams de sortie
+    // Output streams
     private ffmpegProcess: ChildProcess | null = null
 
-    // États
+    // States
     private isRecording: boolean = false
     private isPaused: boolean = false
     private isStopped: boolean = false
     private isConfigured: boolean = false
     private isAudioOnly: boolean = false
-
-    // Nouveau processus pour l'extraction audio en parallèle
-    private audioFfmpegProcess: ChildProcess | null = null
 
     // Track if files have been uploaded
     private filesUploaded = false
@@ -98,7 +94,7 @@ export class Transcoder extends EventEmitter {
                 transcriptionAudioBucket,
         }
 
-        // Vérifier si on est en mode audio-only
+        // Check if we are in audio-only mode
         this.isAudioOnly = this.config.recordingMode === 'audio_only'
 
         this.s3Uploader = S3Uploader.getInstance()
@@ -122,7 +118,7 @@ export class Transcoder extends EventEmitter {
 
         this.pathManager = pathManager
 
-        // Mettre à jour le mode d'enregistrement si fourni
+        // Update recording mode if provided
         if (recordingMode) {
             this.config.recordingMode = recordingMode
             this.isAudioOnly = recordingMode === 'audio_only'
@@ -149,14 +145,11 @@ export class Transcoder extends EventEmitter {
             })
         }
 
-        // Ajuster l'extension du fichier de sortie selon le mode
+        // Set output file paths based on mode
         if (this.isAudioOnly) {
-            // Utiliser WAV au lieu de MP3 pour l'audio
             this.config.outputPath = pathManager.getOutputPath() + '.wav'
         } else {
-            // Mode vidéo normal
             this.config.outputPath = pathManager.getOutputPath() + '.mp4'
-            // Ajouter un chemin pour le fichier audio WAV
             this.config.audioOutputPath = pathManager.getOutputPath() + '.wav'
         }
 
@@ -190,7 +183,7 @@ export class Transcoder extends EventEmitter {
             throw new Error('Transcoder is already running')
         }
 
-        // Valider l'extension du fichier en fonction du mode
+        // Validate file extension based on mode
         if (this.isAudioOnly) {
             if (!this.config.outputPath.endsWith('.wav')) {
                 throw new Error(
@@ -213,57 +206,7 @@ export class Transcoder extends EventEmitter {
         this.validateStartConditions()
         try {
             await this.pathManager!.ensureDirectories()
-
-            if (this.isAudioOnly) {
-                // En mode audio, on écrit directement en WAV
-                await this.startFFmpeg()
-            } else {
-                // En mode vidéo, écrire simultanément MP4 ET WAV depuis le même processus
-                const ffmpegArgs = [
-                    '-i',
-                    'pipe:0',
-                    // Optimisations générales
-                    '-threads', '0', // Utiliser tous les CPU disponibles
-                    '-preset', 'ultrafast', // Préset le plus rapide
-                    '-tune', 'zerolatency', // Optimisé pour le temps réel
-                    
-                    // SORTIE 1: MP4 (vidéo + audio stéréo)
-                    '-map', '0:v', '-map', '0:a',
-                    '-c:v', 'libx264',
-                    '-profile:v', 'baseline',
-                    '-level', '3.0',
-                    '-pix_fmt', 'yuv420p',
-                    '-crf', '23',
-                    '-c:a', 'aac',
-                    '-b:a', '128k',
-                    '-ac', '2', // Stéréo pour MP4
-                    '-ar', '44100',
-                    '-f', 'mp4',
-                    '-movflags', '+frag_keyframe+empty_moov+faststart',
-                    '-y', this.config.outputPath,
-                    
-                    // SORTIE 2: WAV (audio mono 16kHz pour transcription)
-                    '-map', '0:a',
-                    '-vn', // Pas de vidéo pour le WAV
-                    '-acodec', 'pcm_s16le',
-                    '-ac', '1', // Mono pour transcription
-                    '-ar', '16000', // 16kHz pour transcription
-                    '-f', 'wav',
-                    '-y', this.config.audioOutputPath!,
-                ]
-
-                this.ffmpegProcess = spawn('ffmpeg', ffmpegArgs, {
-                    stdio: ['pipe', 'inherit', 'inherit'],
-                })
-
-                this.setupFFmpegListeners()
-                
-                console.log('Started dual-output FFmpeg process:', {
-                    mp4Output: this.config.outputPath,
-                    wavOutput: this.config.audioOutputPath,
-                    note: 'Single process writes both MP4 and WAV simultaneously'
-                })
-            }
+            await this.startFFmpeg()
 
             this.isRecording = true
             this.emit('started', {
@@ -276,7 +219,7 @@ export class Transcoder extends EventEmitter {
         }
     }
 
-    // Gestion des chunks - identique pour audio et vidéo
+    // Simplified chunk processing
     public async uploadChunk(
         chunk: Buffer,
         isFinal: boolean = false,
@@ -284,7 +227,7 @@ export class Transcoder extends EventEmitter {
         if (!this.isReadyForChunks()) return
 
         try {
-            // On n'écrit plus dans le WebM, seulement dans FFmpeg
+            // Write directly to FFmpeg stdin
             await this.writeToFFmpeg(chunk)
 
             await this.videoProcessor.processChunk(chunk, isFinal)
@@ -301,24 +244,25 @@ export class Transcoder extends EventEmitter {
         if (this.isStopped) return
 
         try {
-            // Finaliser le traitement des chunks
+            // Finalize chunk processing
             await this.videoProcessor.finalize()
 
-            // Fermer les flux
-            await this.stopAllStreams()
+            // Close streams
+            await this.stopFFmpeg()
 
-            // Optimiser la vidéo seulement si on a utilisé un fichier temporaire
-            if (!this.isAudioOnly && this.config.tempVideoPath) {
-                await this.finalizeVideo()
+            // Create audio file for transcription if in video mode and transcription is enabled
+            if (!this.isAudioOnly && this.config.enableTranscriptionChunking && this.pathManager) {
+                console.log('Creating audio file for transcription before chunking...')
+                await this.createAudioFileForTranscription()
             }
 
-            // First, create and upload audio chunks for transcription before we delete any files
+            // Create and upload audio chunks for transcription
             if (this.pathManager && this.config.enableTranscriptionChunking) {
                 console.log('Starting audio chunking process for transcription')
                 await this.createAndUploadTranscriptionChunks()
             }
 
-            // Then upload the full recording and delete the files
+            // Upload the full recording and delete the files
             if (process.env.SERVERLESS !== 'true') {
                 await this.uploadToS3()
             }
@@ -332,34 +276,20 @@ export class Transcoder extends EventEmitter {
         }
     }
 
-    // Gestion des événements - identique pour audio et vidéo
+    // Event listeners setup
     private setupEventListeners(): void {
         this.videoProcessor.on('error', (error) => {
             this.emit('error', { type: 'processorError', error })
         })
     }
 
-    // Helpers d'état - identique pour audio et vidéo
+    // State helpers
     private isReadyForChunks(): boolean {
         if (this.isStopped || !this.isRecording) {
             console.log('Cannot process chunk: transcoder not ready')
             return false
         }
         return true
-    }
-
-    private async stopAllStreams(): Promise<void> {
-        const closePromises = []
-
-        if (this.ffmpegProcess) {
-            closePromises.push(this.stopFFmpeg())
-        }
-
-        if (this.audioFfmpegProcess) {
-            closePromises.push(this.stopAudioFFmpeg())
-        }
-
-        await Promise.all(closePromises)
     }
 
     public async pause(): Promise<void> {
@@ -390,75 +320,72 @@ export class Transcoder extends EventEmitter {
         let ffmpegArgs: string[] = []
 
         if (this.isAudioOnly) {
-            // Configuration pour l'extraction audio WAV
+            // SIMPLIFIED Audio-only configuration
             ffmpegArgs = [
-                '-i',
-                'pipe:0', // Entrée depuis stdin
-                '-vn', // Pas de vidéo
-                '-acodec',
-                'pcm_s16le', // Codec WAV
-                '-ac',
-                '1', // Mono
-                '-ar',
-                '16000', // 16kHz
-                '-f',
-                'wav', // Format WAV
-                '-y', // Écraser le fichier existant
+                '-f', 'webm',           // Input format (WebM from chunks)
+                '-i', 'pipe:0',         // Read from stdin
+                '-vn',                  // No video
+                '-acodec', 'pcm_s16le', // WAV codec
+                '-ac', '1',             // Mono
+                '-ar', '16000',         // 16kHz sample rate
+                '-f', 'wav',            // Output format
+                '-y',                   // Overwrite output
                 this.config.outputPath,
             ]
         } else {
-            // Configuration MP4 optimisée pour Docker/temps réel
-            // IMPORTANT: FFmpeg peut décoder WebM/VP9/Opus (chunks Chromium) 
-            // et encoder en H264/AAC (25x plus rapide que VP9)
-            // Le transcodage WebM→MP4 est transparent et compatible
+            // SIMPLIFIED Video + Audio configuration (single output MP4)
             ffmpegArgs = [
-                '-i',
-                'pipe:0',
-                // Optimisations générales
-                '-threads', '0', // Utiliser tous les CPU disponibles
-                '-preset', 'ultrafast', // Préset le plus rapide
-                '-tune', 'zerolatency', // Optimisé pour le temps réel
-                // Configuration vidéo (H264 au lieu de VP9 pour la vitesse)
-                '-c:v',
-                'libx264',
-                '-profile:v', 'baseline', // Profil rapide
-                '-level', '3.0',
-                '-pix_fmt', 'yuv420p',
-                '-crf', '23', // Qualité excellente (23 au lieu de 28)
-                // Configuration audio
-                '-c:a',
-                'aac',
-                '-b:a',
-                '128k',
-                '-ac', '2', // Stéréo
-                '-ar', '44100',
-                '-strict',
-                'experimental',
-                '-f',
-                'mp4',
-                '-movflags',
-                '+frag_keyframe+empty_moov+faststart',
-                '-y',
+                '-f', 'webm',           // Input format (WebM from browser chunks)
+                '-i', 'pipe:0',         // Read from stdin
+                // Video settings - simple and fast
+                '-c:v', 'libx264',      // H264 codec
+                '-preset', 'faster',    // Balanced speed/quality
+                '-crf', '23',           // Good quality
+                '-pix_fmt', 'yuv420p',  // Compatibility
+                // Audio settings
+                '-c:a', 'aac',          // AAC codec
+                '-b:a', '128k',         // Audio bitrate
+                '-ac', '2',             // Stereo
+                '-ar', '44100',         // Standard sample rate
+                // Output settings
+                '-f', 'mp4',            // MP4 format
+                '-movflags', '+faststart', // Optimize for streaming
+                '-y',                   // Overwrite output
                 this.config.outputPath,
             ]
         }
 
+        console.log('Starting FFmpeg with args:', ffmpegArgs)
+
         this.ffmpegProcess = spawn('ffmpeg', ffmpegArgs, {
-            stdio: ['pipe', 'inherit', 'inherit'],
+            stdio: ['pipe', 'pipe', 'pipe'],
         })
 
         this.setupFFmpegListeners()
 
-        console.log('Started FFmpeg process:', {
+        console.log('Started simplified FFmpeg process:', {
             isAudioOnly: this.isAudioOnly,
             outputPath: this.config.outputPath,
-            codec: this.isAudioOnly ? 'WAV' : 'H264-fast',
-            note: 'Can decode WebM/VP9 input and encode H264 output'
+            inputFormat: 'WebM chunks from browser',
+            outputFormat: this.isAudioOnly ? 'WAV' : 'MP4'
         })
     }
 
     private setupFFmpegListeners(): void {
         if (!this.ffmpegProcess) return
+
+        this.ffmpegProcess.stdout?.on('data', (data) => {
+            // Log FFmpeg output for debugging
+            console.log('FFmpeg stdout:', data.toString())
+        })
+
+        this.ffmpegProcess.stderr?.on('data', (data) => {
+            const output = data.toString()
+            // Only log important FFmpeg messages, not all debug info
+            if (output.includes('error') || output.includes('Error') || output.includes('failed')) {
+                console.error('FFmpeg stderr:', output)
+            }
+        })
 
         this.ffmpegProcess.on('error', (error) => {
             console.error('FFmpeg process error:', error)
@@ -466,7 +393,8 @@ export class Transcoder extends EventEmitter {
         })
 
         this.ffmpegProcess.on('close', (code) => {
-            if (code !== 0) {
+            console.log(`FFmpeg process closed with code: ${code}`)
+            if (code !== 0 && !this.isStopped) {
                 this.emit('error', {
                     type: 'ffmpegClose',
                     error: new Error(`FFmpeg exited with code ${code}`),
@@ -512,68 +440,29 @@ export class Transcoder extends EventEmitter {
     private async stopFFmpeg(): Promise<void> {
         if (!this.ffmpegProcess) return
 
+        console.log('Stopping FFmpeg process...')
+
         return new Promise<void>((resolve, reject) => {
             const timeout = setTimeout(() => {
                 if (this.ffmpegProcess) {
-                    this.ffmpegProcess.kill('SIGTERM')
+                    console.log('FFmpeg timeout, forcing kill...')
+                    this.ffmpegProcess.kill('SIGKILL')
                     reject(new Error('FFmpeg stop timeout'))
                 }
             }, Transcoder.FFMPEG_CLOSE_TIMEOUT)
 
-            this.ffmpegProcess.on('close', () => {
+            this.ffmpegProcess.on('close', (code) => {
                 clearTimeout(timeout)
+                console.log(`FFmpeg stopped with code: ${code}`)
                 this.ffmpegProcess = null
                 resolve()
             })
 
-            if (this.ffmpegProcess.stdin) {
+            // Gracefully close stdin to signal end of input
+            if (this.ffmpegProcess.stdin && !this.ffmpegProcess.stdin.destroyed) {
+                console.log('Closing FFmpeg stdin...')
                 this.ffmpegProcess.stdin.end()
             }
-        })
-    }
-
-    private async finalizeVideo(): Promise<void> {
-        if (!this.config.tempVideoPath) return
-
-        return new Promise<void>((resolve, reject) => {
-            const fastStartProcess = spawn('ffmpeg', [
-                '-i',
-                this.config.tempVideoPath,
-                '-c',
-                'copy',
-                '-movflags',
-                '+faststart',
-                this.config.outputPath,
-            ])
-
-            const timeout = setTimeout(() => {
-                fastStartProcess.kill('SIGTERM')
-                reject(new Error('Faststart optimization timeout'))
-            }, Transcoder.FASTSTART_TIMEOUT)
-
-            fastStartProcess.on('close', async (code) => {
-                clearTimeout(timeout)
-                if (code === 0) {
-                    try {
-                        // Supprimer le fichier temporaire
-                        await fs.promises.unlink(this.config.tempVideoPath)
-                        resolve()
-                    } catch (error) {
-                        reject(error)
-                    }
-                } else {
-                    // En cas d'erreur lors de l'optimisation, on garde le fichier temporaire comme backup
-                    try {
-                        await fs.promises.rename(
-                            this.config.tempVideoPath,
-                            this.config.outputPath,
-                        )
-                        resolve()
-                    } catch (error) {
-                        reject(error)
-                    }
-                }
-            })
         })
     }
 
@@ -594,105 +483,39 @@ export class Transcoder extends EventEmitter {
         }
 
         try {
-            // Upload video file if not in audio-only mode
-            if (!this.isAudioOnly) {
-                // Vérifier que le fichier existe
-                if (!fs.existsSync(this.config.outputPath)) {
-                    throw new Error(
-                        `Video file does not exist for upload: ${this.config.outputPath}`,
-                    )
-                }
-
-                // Uploader le fichier vidéo
-
-                console.log('Uploading video to S3:', {
-                    localPath: this.config.outputPath,
-                    bucketName: this.config.bucketName,
-                    s3Key: `${this.pathManager.getIdentifier()}.mp4`,
-                })
-
-                await this.s3Uploader.uploadFile(
-                    this.config.outputPath,
-                    this.config.bucketName,
-                    `${this.pathManager.getIdentifier()}.mp4`,
+            // Upload main output file
+            if (!fs.existsSync(this.config.outputPath)) {
+                throw new Error(
+                    `Output file does not exist for upload: ${this.config.outputPath}`,
                 )
-
-                console.log(
-                    `Video uploaded successfully, deleting local file: ${this.config.outputPath}`,
-                )
-                try {
-                    fs.unlinkSync(this.config.outputPath)
-                    console.log('Local video file deleted successfully')
-                } catch (deleteError) {
-                    console.error(
-                        'Failed to delete local video file:',
-                        deleteError,
-                    )
-                }
             }
 
-            // Upload audio file (WAV format)
-            if (this.isAudioOnly) {
-                // En mode audio-only, le fichier principal est déjà au format WAV
-                if (!fs.existsSync(this.config.outputPath)) {
-                    throw new Error(
-                        `Audio file does not exist for upload: ${this.config.outputPath}`,
-                    )
-                }
+            const fileExtension = this.isAudioOnly ? '.wav' : '.mp4'
+            const s3Key = `${this.pathManager.getIdentifier()}${fileExtension}`
 
-                console.log('Uploading audio to S3:', {
-                    localPath: this.config.outputPath,
-                    bucketName: this.config.bucketName,
-                    s3Key: `${this.pathManager.getIdentifier()}.wav`,
-                })
+            console.log('Uploading file to S3:', {
+                localPath: this.config.outputPath,
+                bucketName: this.config.bucketName,
+                s3Key: s3Key,
+            })
 
-                await this.s3Uploader.uploadFile(
-                    this.config.outputPath,
-                    this.config.audioBucketName,
-                    `${this.pathManager.getIdentifier()}.wav`,
+            await this.s3Uploader.uploadFile(
+                this.config.outputPath,
+                this.config.bucketName,
+                s3Key,
+            )
+
+            console.log(
+                `File uploaded successfully, deleting local file: ${this.config.outputPath}`,
+            )
+            try {
+                fs.unlinkSync(this.config.outputPath)
+                console.log('Local file deleted successfully')
+            } catch (deleteError) {
+                console.error(
+                    'Failed to delete local file:',
+                    deleteError,
                 )
-
-                console.log(
-                    `Audio uploaded successfully, deleting local file: ${this.config.outputPath}`,
-                )
-                try {
-                    fs.unlinkSync(this.config.outputPath)
-                    console.log('Local audio file deleted successfully')
-                } catch (deleteError) {
-                    console.error(
-                        'Failed to delete local audio file:',
-                        deleteError,
-                    )
-                }
-            } else if (
-                this.config.audioOutputPath &&
-                fs.existsSync(this.config.audioOutputPath)
-            ) {
-                // En mode vidéo, uploader aussi le fichier audio séparé
-                console.log('Uploading audio to S3:', {
-                    localPath: this.config.audioOutputPath,
-                    bucketName: this.config.bucketName,
-                    s3Key: `${this.pathManager.getIdentifier()}.wav`,
-                })
-
-                await this.s3Uploader.uploadFile(
-                    this.config.audioOutputPath,
-                    this.config.bucketName,
-                    `${this.pathManager.getIdentifier()}.wav`,
-                )
-
-                console.log(
-                    `Audio uploaded successfully, deleting local file: ${this.config.audioOutputPath}`,
-                )
-                try {
-                    fs.unlinkSync(this.config.audioOutputPath)
-                    console.log('Local audio file deleted successfully')
-                } catch (deleteError) {
-                    console.error(
-                        'Failed to delete local audio file:',
-                        deleteError,
-                    )
-                }
             }
 
             // Mark files as uploaded to prevent duplicate uploads
@@ -704,74 +527,63 @@ export class Transcoder extends EventEmitter {
         }
     }
 
-    // Nouveau processus pour l'extraction audio en parallèle
-    private async startAudioExtraction(): Promise<void> {
-        if (this.isAudioOnly || !this.config.audioOutputPath) return
+    private async createAudioFileForTranscription(): Promise<void> {
+        if (!this.pathManager || this.isAudioOnly) return
 
-        const webmPath = this.pathManager!.getWebmPath()
+        const audioPath = this.config.outputPath.replace('.mp4', '.wav')
+        
+        console.log('Creating audio file for transcription from video...')
+        console.log(`Input MP4 file: ${this.config.outputPath}`)
+        console.log(`Output WAV file: ${audioPath}`)
 
-        const audioArgs = [
-            '-i',
-            webmPath,
-            '-vn',
-            '-acodec',
-            'pcm_s16le',
-            '-ac',
-            '1',
-            '-ar',
-            '16000',
-            '-f',
-            'wav',
-            '-y',
-            this.config.audioOutputPath,
-        ]
+        // Verify the input MP4 file exists
+        if (!fs.existsSync(this.config.outputPath)) {
+            throw new Error(`Input MP4 file does not exist: ${this.config.outputPath}`)
+        }
 
-        this.audioFfmpegProcess = spawn('ffmpeg', audioArgs, {
-            stdio: ['ignore', 'inherit', 'inherit'],
-        })
-
-        this.audioFfmpegProcess.on('error', (error) => {
-            console.error('Audio extraction FFmpeg process error:', error)
-            this.emit('error', { type: 'audioFfmpegError', error })
-        })
-
-        this.audioFfmpegProcess.on('close', (code) => {
-            if (code !== 0 && !this.isStopped) {
-                // On ignore l'erreur si on a arrêté volontairement
-                this.emit('error', {
-                    type: 'audioFfmpegClose',
-                    error: new Error(
-                        `Audio extraction FFmpeg exited with code ${code}`,
-                    ),
-                })
-            } else {
-                console.log('Audio extraction completed successfully')
-            }
-        })
-
-        console.log('Started audio extraction process:', {
-            outputPath: this.config.audioOutputPath,
-        })
-    }
-
-    private async stopAudioFFmpeg(): Promise<void> {
-        if (!this.audioFfmpegProcess) return
+        const inputStats = fs.statSync(this.config.outputPath)
+        console.log(`Input MP4 file size: ${inputStats.size} bytes`)
 
         return new Promise<void>((resolve, reject) => {
-            const timeout = setTimeout(() => {
-                if (this.audioFfmpegProcess) {
-                    this.audioFfmpegProcess.kill('SIGTERM')
-                    reject(new Error('Audio FFmpeg stop timeout'))
-                }
-            }, Transcoder.FFMPEG_CLOSE_TIMEOUT)
+            const ffmpeg = spawn('ffmpeg', [
+                '-i', this.config.outputPath,  // Input MP4 file
+                '-vn',                          // No video
+                '-acodec', 'pcm_s16le',        // WAV codec
+                '-ac', '1',                     // Mono
+                '-ar', '16000',                 // 16kHz for transcription
+                '-y',                           // Overwrite
+                audioPath,                      // Output WAV file
+            ])
 
-            this.audioFfmpegProcess.on('close', () => {
-                clearTimeout(timeout)
-                this.audioFfmpegProcess = null
-                resolve()
+            ffmpeg.stderr?.on('data', (data) => {
+                const output = data.toString()
+                // Log important FFmpeg messages
+                if (output.includes('error') || output.includes('Error') || output.includes('failed')) {
+                    console.error('FFmpeg audio extraction stderr:', output)
+                }
             })
 
-            this.audioFfmpegProcess.kill('SIGINT')
+            ffmpeg.on('close', (code) => {
+                if (code === 0) {
+                    // Verify the output file was created
+                    if (fs.existsSync(audioPath)) {
+                        const outputStats = fs.statSync(audioPath)
+                        console.log(`Audio file for transcription created successfully: ${audioPath} (${outputStats.size} bytes)`)
+                        this.config.audioOutputPath = audioPath
+                        resolve()
+                    } else {
+                        reject(new Error('Audio file was not created despite FFmpeg success'))
+                    }
+                } else {
+                    console.error(`Audio extraction failed with FFmpeg exit code: ${code}`)
+                    reject(new Error(`Audio extraction failed with code ${code}`))
+                }
+            })
+
+            ffmpeg.on('error', (error) => {
+                console.error('FFmpeg audio extraction process error:', error)
+                reject(error)
+            })
         })
     }
 
@@ -820,9 +632,18 @@ export class Transcoder extends EventEmitter {
 
         console.log('Starting audio chunking process for transcription')
         console.log(`Looking for audio file at: ${audioFilePath}`)
+        console.log(`Audio mode: ${this.isAudioOnly ? 'audio-only' : 'video with separate audio file'}`)
 
         if (!fs.existsSync(audioFilePath)) {
             console.error('Audio file not found for chunking:', audioFilePath)
+            console.error('Available files in directory:')
+            try {
+                const dirPath = require('path').dirname(audioFilePath)
+                const files = fs.readdirSync(dirPath)
+                files.forEach(file => console.error(`  - ${file}`))
+            } catch (dirError) {
+                console.error('Could not list directory contents:', dirError)
+            }
             return
         }
 

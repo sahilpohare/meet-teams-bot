@@ -46,7 +46,7 @@ export async function openBrowser(
     try {
         console.log('Launching persistent context...')
 
-        // Vérifier que le chemin d'extension existe
+        // Check that extension path exists
         const fs = require('fs')
         if (!fs.existsSync(pathToExtension)) {
             console.error(`Extension path does not exist: ${pathToExtension}`)
@@ -87,13 +87,13 @@ export async function openBrowser(
         console.log('Waiting for background page...')
         let backgroundPage = null
 
-        // Vérifier si une page d'arrière-plan existe déjà
+        // Check if a background page already exists
         const existingBackgroundPages = context.backgroundPages()
         if (existingBackgroundPages.length > 0) {
             backgroundPage = existingBackgroundPages[0]
             console.log('Found existing background page')
         } else {
-            // Attendre avec un timeout explicite
+            // Wait with explicit timeout
             console.log('No background page found, waiting for event...')
             try {
                 backgroundPage = await Promise.race([

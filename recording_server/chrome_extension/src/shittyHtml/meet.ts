@@ -1,14 +1,4 @@
 import { RecordingMode } from '../api';
-// export async function removeInitialShityHtml(mode: RecordingMode) {
-//     // Fonction désactivée temporairement pour tests
-//     console.log('removeInitialShityHtml désactivé');
-//     return;
-// }
-// export function removeShityHtml(mode: RecordingMode) {
-//     // Fonction désactivée temporairement pour tests
-//     console.log('removeShityHtml désactivé');
-//     return;
-// }
 
 
 export async function removeInitialShityHtml(mode: RecordingMode) {
@@ -261,17 +251,17 @@ export function removeShityHtml(mode: RecordingMode) {
 }
 
 function removeBlackBox(): void {
-    // Sélectionner tous les éléments avec l'attribut data-layout='roi-crop'
+    // Select all elements with the data-layout='roi-crop' attribute
     const elements: NodeListOf<HTMLElement> = document.querySelectorAll(
         '[data-layout="roi-crop"]',
     )
 
     if (elements.length === 0) {
-        // console.log("Aucun élément trouvé avec data-layout='roi-crop'")
+        // console.log("No element found with data-layout='roi-crop'")
         return
     }
 
-    // Trouver l'élément avec la plus grande largeur
+    // Find the element with the greatest width
     let maxWidth: number = 0
     let maxElement: HTMLElement | null = null
 
@@ -283,7 +273,7 @@ function removeBlackBox(): void {
         }
     })
 
-    // Appliquer les styles aux autres éléments et leurs parents
+    // Apply styles to the other elements and their parents
     elements.forEach((el: HTMLElement) => {
         if (el == maxElement) {
             el.style.opacity = '1'

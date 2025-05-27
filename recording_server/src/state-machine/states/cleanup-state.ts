@@ -11,7 +11,7 @@ export class CleanupState extends BaseState {
         try {
             console.info('Starting cleanup sequence')
 
-            // Utiliser Promise.race pour implémenter le timeout
+            // Use Promise.race to implement the timeout
             const cleanupPromise = this.performCleanup()
             const timeoutPromise = new Promise((_, reject) => {
                 setTimeout(
@@ -28,7 +28,7 @@ export class CleanupState extends BaseState {
             return this.transition(MeetingStateType.Terminated) // État final
         } catch (error) {
             console.error('Error during cleanup:', error)
-            // Même en cas d'erreur, on reste dans l'état Cleanup
+            // Even in case of error, we stay in Cleanup state
             return this.transition(MeetingStateType.Cleanup)
         }
     }
@@ -43,17 +43,17 @@ export class CleanupState extends BaseState {
                 this.context.streamingService.stop()
             }
 
-            // 3. Nettoyage des ressources de l'extension et du navigateur
+            // 3. Clean up extension resources and browser
             await this.cleanupBrowserResources()
 
-            // 4. Upload de la vidéo à S3 avant de nettoyer les fichiers locaux
+            // 4. Upload the video to S3 before removing local files
             await this.uploadVideoToS3()
 
-            // 5. Nettoyage final Redis
+            // 5. Final Redis cleanup
             await this.cleanupRedisSession()
         } catch (error) {
             console.error('Cleanup error:', error)
-            // On continue même en cas d'erreur
+            // Continue even if an error occurs
         }
     }
 
@@ -67,23 +67,23 @@ export class CleanupState extends BaseState {
     }
     private async cleanupBrowserResources(): Promise<void> {
         try {
-            // 1. Arrêter le branding
+            // 1. Stop branding
             if (this.context.brandingProcess) {
                 this.context.brandingProcess.kill()
             }
 
-            // 2. Arrêter les contextes média
+            // 2. Stop media contexts
             VideoContext.instance?.stop()
             SoundContext.instance?.stop()
 
-            // 3. Fermer les pages et nettoyage du navigateur
+            // 3. Close pages and clean the browser
             await Promise.all([
                 this.context.playwrightPage?.close().catch(() => {}),
                 this.context.backgroundPage?.close().catch(() => {}),
                 this.context.browserContext?.close().catch(() => {}),
             ])
 
-            // 4. Nettoyage des timeouts
+            // 4. Clear timeouts
             if (this.context.meetingTimeoutInterval) {
                 clearTimeout(this.context.meetingTimeoutInterval)
             }

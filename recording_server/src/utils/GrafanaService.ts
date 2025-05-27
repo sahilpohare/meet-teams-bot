@@ -23,10 +23,10 @@ export class GrafanaService {
     }
 
     /**
-     * Met à jour la configuration de Grafana Agent pour utiliser le botUuid comme identifiant
+     * Update Grafana Agent configuration to use the botUuid as identifier
      */
     public async updateGrafanaAgentWithBotUuid(): Promise<void> {
-        // Si déjà mis à jour ou en environnement local, ne rien faire
+        // Skip if already updated or running locally
         if (this.isUpdated || process.env.ENVIRON === 'local') {
             return
         }
@@ -38,7 +38,7 @@ export class GrafanaService {
         try {
             console.log('Starting Grafana Agent config update...')
 
-            // Mise à jour du fichier de configuration
+            // Update the configuration file
             const sedResult = await execPromise(
                 `sudo -n sed -i 's/${NODE_NAME}/${this.botUuid}/g' /etc/grafana-agent.yaml`,
             )
@@ -51,7 +51,7 @@ export class GrafanaService {
 
             console.log('Grafana configuration file updated successfully')
 
-            // Redémarrage de l'agent Grafana
+            // Restart Grafana agent
             const reloadResult = await execPromise(
                 'sudo -n systemctl restart grafana-agent.service',
             )
@@ -64,7 +64,7 @@ export class GrafanaService {
 
             console.log('Grafana agent restarted successfully')
 
-            // Marquer comme mis à jour pour éviter des appels multiples
+            // Mark as updated to avoid multiple calls
             this.isUpdated = true
         } catch (error) {
             console.error(`Error updating Grafana Agent: ${error}`)

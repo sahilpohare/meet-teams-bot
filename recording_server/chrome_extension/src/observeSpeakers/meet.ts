@@ -4,7 +4,7 @@ export const SPEAKER_LATENCY = 0 // ms
 
 let lastValidSpeakers: SpeakerData[] = []
 let lastValidSpeakerCheck = Date.now()
-const FREEZE_TIMEOUT = 30000 // 30 secondes
+const FREEZE_TIMEOUT = 30000 // 30 seconds
 
 export async function getSpeakerRootToObserve(
     recordingMode: RecordingMode,
@@ -41,12 +41,12 @@ export async function getSpeakerRootToObserve(
                 )
             })
             
-            // Nous ne supprimons plus ces divs pour ne pas perturber l'interface
+            // We no longer remove these divs to avoid disrupting the interface
             // filteredDivs.forEach((div) => {
             //     div.remove()
             // })
 
-            // Observer le document entier au lieu du panneau participants
+            // Observe the entire document instead of the participants panel
             return [
                 document,
                 {
@@ -80,14 +80,14 @@ export function observeIframes(callback: (iframe: HTMLIFrameElement) => void) {
         callback(iframe);
     });
 
-    // Observer pour détecter les nouvelles iframes
+    // Observe for new iframes
     const observer = new MutationObserver((mutations) => {
         mutations.forEach(mutation => {
             mutation.addedNodes.forEach(node => {
                 if (node.nodeName === 'IFRAME') {
                     callback(node as HTMLIFrameElement);
                 }
-                // Rechercher les iframes dans les sous-éléments ajoutés
+                // Look for iframes inside added nodes
                 if (node.nodeType === Node.ELEMENT_NODE) {
                     (node as Element).querySelectorAll('iframe').forEach(iframe => {
                         callback(iframe);
@@ -105,13 +105,13 @@ export function observeIframes(callback: (iframe: HTMLIFrameElement) => void) {
     return observer;
 }
 
-// Fonction pour obtenir un document à partir d'une iframe
+// Helper to get a document from an iframe
 export function getIframeDocument(iframe: HTMLIFrameElement): Document | null {
     try {
-        // Vérifier si l'iframe est accessible (même origine)
+        // Check if the iframe is accessible (same origin)
         return iframe.contentDocument || iframe.contentWindow?.document || null;
     } catch (error) {
-        // Si l'iframe est cross-origin, on ne peut pas y accéder
+        // If the iframe is cross-origin we cannot access it
         console.log('Cannot access iframe content (likely cross-origin):', error);
         return null;
     }
@@ -122,7 +122,7 @@ export function getSpeakerFromDocument(
     timestamp: number,
 ): SpeakerData[] {
     try {
-        // Vérifier si la page est gelée
+        // Check if the page is frozen
         const currentTime = Date.now()
         if (currentTime - lastValidSpeakerCheck > FREEZE_TIMEOUT) {
             return []
@@ -133,14 +133,14 @@ export function getSpeakerFromDocument(
         )
         if (!participantsList) {
             lastValidSpeakers = []
-            return [] // Vrai cas de 0 participants
+            return [] // Real case of 0 participants
         }
 
         const participantItems =
             participantsList.querySelectorAll('[role="listitem"]')
 
         if (!participantItems || participantItems.length === 0) {
-            lastValidSpeakers = [] // Mettre à jour l'état
+            lastValidSpeakers = [] // Update the current state
             return []
         }
 
@@ -156,7 +156,7 @@ export function getSpeakerFromDocument(
             }
         >()
 
-        // Structure pour les groupes fusionnés
+        // Data structure for merged groups
         const mergedGroups = new Map<
             string,
             {
@@ -165,26 +165,26 @@ export function getSpeakerFromDocument(
             }
         >()
 
-        // Première passe: identifier tous les participants
+        // First pass: identify all participants
         for (let i = 0; i < participantItems.length; i++) {
             const item = participantItems[i]
             const ariaLabel = item.getAttribute('aria-label')?.trim()
 
             if (!ariaLabel) continue
 
-            // Vérifier si cet élément est "Merged audio"
+            // Check if this element is "Merged audio"
             const isMergedAudio = ariaLabel === 'Merged audio'
 
-            // Obtenir le cohort-id pour les groupes fusionnés
+            // Get the cohort id for merged groups
             let cohortId: string | null = null
             if (isMergedAudio) {
-                // Chercher le cohort-id dans l'élément parent
+                // Look for the cohort id in the parent element
                 const cohortElement = item.closest('[data-cohort-id]')
                 if (cohortElement) {
                     cohortId = cohortElement.getAttribute('data-cohort-id')
                 }
 
-                // Vérifier si l'audio fusionné parle
+                // Check if the merged audio is speaking
                 const speakingIndicators = Array.from(
                     item.querySelectorAll('*'),
                 ).filter((elem) => {
@@ -195,7 +195,7 @@ export function getSpeakerFromDocument(
                     )
                 })
 
-                // Vérifier aussi l'icône de micro non muet
+                // Also check for the unmuted microphone icon
                 const unmutedMicImg = item.querySelector(
                     'img[src*="mic_unmuted"]',
                 )
@@ -203,7 +203,7 @@ export function getSpeakerFromDocument(
                 const isSpeaking =
                     speakingIndicators.length > 0 || !!unmutedMicImg
 
-                // Initialiser le groupe fusionné
+                // Initialize the merged group
                 if (cohortId) {
                     mergedGroups.set(cohortId, {
                         isSpeaking: isSpeaking,
@@ -212,21 +212,21 @@ export function getSpeakerFromDocument(
                 }
             }
 
-            // Vérifier si ce participant fait partie d'un groupe audio fusionné
+            // Check if this participant is part of a merged audio group
             const isInMergedAudio = !!item.querySelector(
                 '[aria-label="Adaptive audio group"]',
             )
             let participantCohortId: string | null = null
 
             if (isInMergedAudio) {
-                // Chercher le cohort-id dans l'élément parent
+                // Look for the cohort id in the parent element
                 const cohortElement = item.closest('[data-cohort-id]')
                 if (cohortElement) {
                     participantCohortId =
                         cohortElement.getAttribute('data-cohort-id')
                 }
 
-                // Ajouter ce participant au groupe fusionné correspondant
+                // Add this participant to the matching merged group
                 if (
                     participantCohortId &&
                     mergedGroups.has(participantCohortId)
@@ -237,8 +237,8 @@ export function getSpeakerFromDocument(
                 }
             }
 
-            // Ajouter le participant à notre map seulement s'il n'est pas dans un groupe fusionné
-            // ou s'il est l'entrée "Merged audio" elle-même
+            // Add the participant to our map only if not in a merged group
+            // or if it is the "Merged audio" entry itself
             if (isMergedAudio || !isInMergedAudio) {
                 const uniqueKey =
                     isMergedAudio && cohortId
@@ -257,7 +257,7 @@ export function getSpeakerFromDocument(
 
                 const participant = uniqueParticipants.get(uniqueKey)!
 
-                // Vérifier si le participant présente
+                // Check if the participant is presenting
                 const allDivs = Array.from(item.querySelectorAll('div'))
                 const isPresenting = allDivs.some((div) => {
                     const text = div.textContent?.trim()
@@ -268,7 +268,7 @@ export function getSpeakerFromDocument(
                     participant.isPresenting = true
                 }
 
-                // Vérifier les indicateurs de parole
+                // Check speaking indicators
                 const speakingIndicators = Array.from(
                     item.querySelectorAll('*'),
                 ).filter((elem) => {
@@ -292,12 +292,12 @@ export function getSpeakerFromDocument(
                     }
                 })
 
-                // Mettre à jour la map avec les données potentiellement modifiées
+                // Update the map with the potentially modified data
                 uniqueParticipants.set(uniqueKey, participant)
             }
         }
 
-        // Remplacer les noms des groupes fusionnés par les noms des membres
+        // Replace merged group names with member names
         for (const [key, participant] of uniqueParticipants.entries()) {
             if (
                 participant.name === 'Merged audio' &&
@@ -312,7 +312,7 @@ export function getSpeakerFromDocument(
             }
         }
 
-        // Créer la liste finale des participants
+        // Build the final participant list
         const speakers = Array.from(uniqueParticipants.values()).map(
             (participant) => ({
                 name: participant.name,
@@ -357,17 +357,17 @@ export function getSpeakerFromDocument(
 //     return names
 // }
 
-// Dans votre fonction qui initialise l'observation des haut-parleurs
+// In the function that initializes speaker observation
 const iframeObserver = observeIframes((iframe) => {
     const iframeDoc = getIframeDocument(iframe);
     if (iframeDoc) {
-        // Créer un nouvel observateur pour le contenu de l'iframe
+        // Create a new observer for the iframe content
         const observer = new MutationObserver((mutations) => {
-            // Même logique que votre observateur principal
-            // Traiter les mutations pour détecter les changements de haut-parleurs
+            // Same logic as the main observer
+            // Process mutations to detect speaker changes
         });
         
-        // Observer le document de l'iframe avec les mêmes paramètres
+        // Observe the iframe document with the same parameters
         observer.observe(iframeDoc, {
             attributes: true,
             characterData: false,
@@ -378,4 +378,4 @@ const iframeObserver = observeIframes((iframe) => {
     }
 });
 
-// Stockez cet iframeObserver pour pouvoir le déconnecter plus tard si nécessaire
+// Store this iframeObserver so it can be disconnected later if needed

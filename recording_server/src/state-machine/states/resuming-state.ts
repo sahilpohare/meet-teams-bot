@@ -13,7 +13,7 @@ export class ResumingState extends BaseState {
             // Notifier de la reprise
             Events.recordingResumed()
 
-            // Réinitialiser les variables de pause
+            // Reset pause variables
             this.context.pauseStartTime = null
             this.context.isPaused = false
 
@@ -41,7 +41,7 @@ export class ResumingState extends BaseState {
 
     private async resumeRecording(): Promise<void> {
         const resumePromise = async () => {
-            // Reprendre le MediaRecorder dans le navigateur
+            // Resume the MediaRecorder in the browser
             await this.context.backgroundPage?.evaluate(() => {
                 const w = window as any
                 return w.resumeMediaRecorder?.()

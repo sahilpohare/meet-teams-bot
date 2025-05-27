@@ -80,7 +80,7 @@ export class MeetingHandle {
         try {
             await this.stateMachine.start()
 
-            // Vérifier si une erreur s'est produite pendant l'exécution
+            // Check if an error occurred during execution
             if (
                 this.stateMachine.getError() ||
                 this.stateMachine.getCurrentState() === MeetingStateType.Error

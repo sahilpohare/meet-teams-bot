@@ -125,7 +125,7 @@ export async function server() {
         // console.log('logs from zoom', req.body)
         const { level, message, timestamp } = req.body
 
-        // Fonction pour colorer les logs dans le terminal
+        // Function to colorize logs in terminal
         function colorLog(level, message, timestamp) {
             switch (level) {
                 case 'warn':
@@ -327,7 +327,7 @@ export async function server() {
         process.exit(0)
     })
 
-    // Dans server.ts, on reçoit les chunks mais il n'y a pas de logging
+    // In server.ts, we receive chunks but there is no logging
     app.post('/transcoder/upload_chunk', async (req, res) => {
         return await uploadChunk(req, res, false)
     })

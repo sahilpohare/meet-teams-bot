@@ -30,7 +30,7 @@ export class MeetingStateMachine {
     private setupGlobalDialogObserver(): void {
         // Fonction pour gérer l'observateur de dialogues globalement
         this.context.startGlobalDialogObserver = () => {
-            // Ne démarrer l'observateur que pour Google Meet
+            // Only start observer for Google Meet
             if (this.context.params.meetingProvider !== 'Meet') {
                 console.info(
                     `Global dialog observer not started: provider is not Google Meet (${this.context.params.meetingProvider})`,
@@ -50,10 +50,10 @@ export class MeetingStateMachine {
                 clearInterval(this.context.dialogObserverInterval)
             }
 
-            // Créer un nouvel observateur avec un intervalle de vérification
+            // Create a new observer with verification interval
             console.info(`Starting global dialog observer in state machine`)
 
-            // Fonction pour vérifier et redémarrer l'observateur si nécessaire
+            // Function to check and restart observer if necessary
             const checkAndRestartObserver = () => {
                 if (!this.context.dialogObserverInterval) {
                     console.warn(
@@ -64,7 +64,7 @@ export class MeetingStateMachine {
                 }
             }
 
-            // Heartbeat pour vérifier l'état de l'observateur toutes les 2 secondes
+            // Heartbeat to check observer state every 2 seconds
             const heartbeatInterval = setInterval(checkAndRestartObserver, 2000)
 
             // Stocker l'intervalle de heartbeat pour pouvoir le nettoyer plus tard
@@ -142,7 +142,7 @@ export class MeetingStateMachine {
                     this.context.stopGlobalDialogObserver?.()
                     this.context.startGlobalDialogObserver?.()
                 }
-            }, 2000) // Vérifier toutes les 2 secondes
+            }, 2000) // Check every 2 seconds
         }
 
         // Fonction pour arrêter l'observateur

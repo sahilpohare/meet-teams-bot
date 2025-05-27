@@ -94,7 +94,8 @@ async function checkSpeakers() {
 }
 
 let checkSpeakersTimeout: number | null = null
-const MUTATION_DEBOUNCE = 10 // 10ms est suffisant pour regrouper les mutations simultanées
+// 10ms is enough to group simultaneous mutations
+const MUTATION_DEBOUNCE = 10
 
 // Add a variable to track when we last detected a mutation
 let lastMutationTime = Date.now()

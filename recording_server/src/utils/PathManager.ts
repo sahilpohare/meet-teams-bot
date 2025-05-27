@@ -140,20 +140,20 @@ export class PathManager {
 
     public async moveFile(sourcePath: string, destPath: string): Promise<void> {
         try {
-            // Vérifier que le fichier source existe
+            // Ensure the source file exists
             await fs.access(sourcePath)
 
-            // Créer le dossier de destination si nécessaire
+            // Create the destination folder if needed
             await fs.mkdir(path.dirname(destPath), { recursive: true })
 
-            // Si le fichier de destination existe déjà, le supprimer
+            // Remove destination file if it already exists
             try {
                 await fs.unlink(destPath)
             } catch (e) {
-                // Ignore si le fichier n'existe pas
+                // Ignore if the file does not exist
             }
 
-            // Déplacer le fichier
+            // Move the file
             await fs.rename(sourcePath, destPath)
 
             console.log(

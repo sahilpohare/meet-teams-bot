@@ -239,23 +239,23 @@ export class TeamsProvider implements MeetingProviderInterface {
 
         await takeScreenshot(page, 'afterjoinnow')
 
-        // Attendre d'être dans le meeting
+        // Wait to be in the meeting
         console.log('Waiting to confirm meeting join...')
         let inMeeting = false
 
         while (!inMeeting) {
-            // Vérifier si on a été refusé
+            // Check if we have been refused
             const botNotAccepted = await isBotNotAccepted(page)
             if (botNotAccepted) {
                 throw new JoinError(JoinErrorCode.BotNotAccepted)
             }
 
-            // Vérifier si on doit annuler
+            // Check if we should cancel
             if (cancelCheck()) {
                 throw new JoinError(JoinErrorCode.ApiRequest)
             }
 
-            // Vérifier si on est dans le meeting (plusieurs indicateurs)
+            // Check if we are in the meeting (multiple indicators)
             inMeeting = await isInTeamsMeeting(page)
 
             if (!inMeeting) {
@@ -265,7 +265,7 @@ export class TeamsProvider implements MeetingProviderInterface {
 
         console.log('Successfully confirmed we are in the meeting')
 
-        // Une fois dans le meeting, configurer la vue
+        // Once in the meeting, configure the view
         try {
             if (await clickWithInnerText(page, 'button', 'View', 10, false)) {
                 if (meetingParams.recording_mode !== 'gallery_view') {
@@ -613,11 +613,11 @@ async function ensurePageLoaded(page: Page, timeout = 20000): Promise<boolean> {
     }
 }
 
-// Nouvelle fonction pour vérifier si on est dans le meeting Teams
+// New function to check if we are in the Teams meeting
 async function isInTeamsMeeting(page: Page): Promise<boolean> {
     try {
         const indicators = [
-            // Le bouton React est un bon indicateur qu'on est dans le meeting
+            // The React button is a good indicator that we are in the meeting
             await clickWithInnerText(page, 'button', 'React', 1, false),
 
             // Le bouton Raise hand aussi
@@ -633,7 +633,7 @@ async function isInTeamsMeeting(page: Page): Promise<boolean> {
             // L'absence des textes de waiting room
             !(await isBotNotAccepted(page)),
 
-            // L'absence du bouton Join now (qui n'existe que dans la waiting room)
+            // The absence of the Join now button (which only exists in the waiting room)
             !(await clickWithInnerText(page, 'button', 'Join now', 1, false)),
         ]
 
