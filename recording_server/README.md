@@ -246,4 +246,4 @@ npm run watch-dev
 
 ## License
 
-Licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+Licensed under the Elastic License 2.0 (ELv2) - see the [LICENSE](../LICENSE.md) file for details.
