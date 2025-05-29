@@ -92,6 +92,7 @@ process_config() {
 # Run bot with configuration file
 run_with_config() {
     local config_file=$1
+    local override_meeting_url=$2
     
     if [ ! -f "$config_file" ]; then
         print_error "Configuration file '$config_file' not found"
@@ -101,9 +102,25 @@ run_with_config() {
     
     local output_dir=$(create_output_dir)
     local config_json=$(cat "$config_file")
+    
+    # Override meeting URL if provided as argument
+    if [ -n "$override_meeting_url" ]; then
+        print_info "Overriding meeting URL with: $override_meeting_url"
+        # Use jq if available, otherwise use sed
+        if command -v jq &> /dev/null; then
+            config_json=$(echo "$config_json" | jq --arg url "$override_meeting_url" '.meeting_url = $url')
+        else
+            # Fallback to sed for simple replacement
+            config_json=$(echo "$config_json" | sed "s|\"meeting_url\"[[:space:]]*:[[:space:]]*\"[^\"]*\"|\"meeting_url\": \"$override_meeting_url\"|g")
+        fi
+    fi
+    
     local processed_config=$(process_config "$config_json")
     
     print_info "Running Meet Teams Bot with configuration: $config_file"
+    if [ -n "$override_meeting_url" ]; then
+        print_info "Meeting URL: $override_meeting_url"
+    fi
     print_info "Output directory: $output_dir"
     
     # Debug: Show what we're sending to Docker (first 200 chars)
@@ -195,7 +212,7 @@ show_help() {
     echo
     echo "Usage:"
     echo "  $0 build                     - Build the Docker image"
-    echo "  $0 run <config_file>         - Run bot with configuration file"
+    echo "  $0 run <config_file> [url]   - Run bot with configuration file (optional meeting URL override)"
     echo "  $0 run-json '<json>'         - Run bot with JSON configuration"
     echo "  $0 clean                     - Clean recordings directory"
     echo "  $0 help                      - Show this help message"
@@ -203,11 +220,13 @@ show_help() {
     echo "Examples:"
     echo "  $0 build"
     echo "  $0 run params.json"
+    echo "  $0 run params.json 'https://meet.google.com/new-meeting-url'"
     echo "  $0 run-json '{\"meeting_url\":\"https://meet.google.com/abc-def-ghi\", \"bot_name\":\"RecordingBot\"}'"
     echo "  $0 clean"
     echo
     echo "Features:"
     echo "  • Automatically generates bot_uuid if not provided"
+    echo "  • Override meeting URL by passing it as last argument"
     echo "  • Saves recordings to ./recordings directory"
     echo "  • Lists generated files after completion"
     echo
@@ -225,11 +244,11 @@ main() {
         "run")
             if [ -z "${2:-}" ]; then
                 print_error "Please specify a configuration file"
-                print_info "Usage: $0 run <config_file>"
+                print_info "Usage: $0 run <config_file> [meeting_url]"
                 exit 1
             fi
             check_docker
-            run_with_config "$2"
+            run_with_config "$2" "$3"
             ;;
         "run-json")
             if [ -z "${2:-}" ]; then

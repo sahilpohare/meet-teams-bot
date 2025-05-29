@@ -111,6 +111,9 @@ Create analytics and insights on customer conversations or team meetings. Self-h
 # Run with config file
 ./run_bot.sh run params.json
 
+# Or override the meeting URL from config
+./run_bot.sh run params.json "https://meet.google.com/your-new-meeting"
+
 # Or run with inline JSON
 ./run_bot.sh run-json '{
   "meeting_url": "https://meet.google.com/abc-def-ghi",
@@ -138,6 +141,9 @@ docker build -t my-meeting-bot .
 cat params.json | docker run -i \
   -v "$(pwd)/recordings:/app/recording_server/data" \
   my-meeting-bot
+
+# Quick meeting URL override (no Docker rebuild needed)
+./run_bot.sh run params.json "https://meet.google.com/different-meeting"
 ```
 
 ## 🏗️ Architecture & Features
@@ -146,6 +152,7 @@ cat params.json | docker run -i \
 - **Containerized & Stateless**: Perfect for AWS Lambda, Google Cloud Run, Azure Functions
 - **No External Dependencies**: No Redis/RabbitMQ required in serverless mode
 - **Resource Optimized**: Runs efficiently in constrained environments
+- **Quick Meeting Override**: Change meeting URLs without rebuilding or editing config files
 
 ### 🎥 **Advanced Recording Capabilities**
 - **Smart Recording**: Automatic speaker detection and view switching
