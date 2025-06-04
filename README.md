@@ -1,292 +1,174 @@
-<p align="center"><a href="https://discord.com/invite/dsvFgDTr6c"><img height="60px" src="https://user-images.githubusercontent.com/31022056/158916278-4504b838-7ecb-4ab9-a900-7dc002aade78.png" alt="Join our Discord!"></a>
+<a id="readme-top"></a>
+
+<!-- PROJECT LOGO -->
+<br />
+<div align="center">
+  <a href="https://github.com/Meeting-Baas">
+    <img src="https://avatars.githubusercontent.com/u/141436269?s=200&v=4" alt="MeetingBaaS Logo" width="80" height="80">
+  </a>
+
+  <h3 align="center" style="margin-bottom: 0;">Meet Team Bot</h3>
+  <p align="center" style="color: #999999; font-size: 14px;">by Meeting BaaS</p>
+   <p align="center" style="color: #999999; font-size: 12px;">Meeting Bot as a Service</p>
+
+  <p align="center">
+    The most powerful <strong>open source meeting bot</strong> to join video calls, and record them.
+    <br />
+    100% free, self-hosted, and privacy-first.
+    <br /><br />
+    <a href="https://www.meetingbaas.com">🌐 Landing Page</a>
+    &nbsp;•&nbsp;
+    <a href="https://www.meetingbaas.com/demo">⚡ Live Demo</a>
+    &nbsp;•&nbsp;
+    <a href="https://discord.com/invite/dsvFgDTr6c">💬 Join Our Discord</a>
+    &nbsp;•&nbsp;
+    <a href="https://github.com/Meeting-Baas/meet-teams-bot/issues/new?labels=bug&template=bug_report.md">🐛 Report a Bug</a>
+  </p>
+
+  [![Contributors][contributors-shield]][contributors-url]
+  [![Forks][forks-shield]][forks-url]
+  [![Stargazers][stars-shield]][stars-url]
+  [![Issues][issues-shield]][issues-url]
+
+</div>
 
 <p align="center">
-  <b>🚀🐟 Help us reach 50 stars! 🐟🚀</b><br>
-  <b>Current: <img src="https://img.shields.io/github/stars/Meeting-BaaS/meet-teams-bot?style=social" /> → Goal: 50 ⭐️</b><br>
-  <a href="https://github.com/Meeting-BaaS/meet-teams-bot/stargazers">⭐ Star this repo to support the project!</a>
+  <b>🔥 Be among the first to support and star 🔥</b><br>
+  <a href="https://github.com/Meeting-Baas/meet-teams-bot/stargazers">
+    <b>Current: <img src="https://img.shields.io/github/stars/Meeting-Baas/meet-teams-bot?style=social" /> → Goal: 50 ⭐️</b>
+  </a>
 </p>
 
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker&logoColor=white)](./run_bot.sh) [![Serverless](https://img.shields.io/badge/Serverless-Native-2EA44F?style=flat-square&logo=serverless&logoColor=white)](./run_serverless.sh)
+## What is Meet Team Bot?
 
-# Meet Teams Bot: Self-Hostable Meeting Recording Engine
-[![Project Logo](RecordingBotTeamsGmeet@2x.png)](https://meetingBaaS.com)
+**Meet Team Bot** is the open-source engine behind **Meeting BaaS**.
+It lets you **send bots into video meetings** (Google Meet, Teams, Zoom) to **record**, **transcribe**, and **summarize** conversations — all while keeping your data **private** and **under your control**.
 
-The **open-source core bot engine** that powers [**Meeting BaaS** (Meeting **B**ots **a**s **a** **S**ervice)](https://meetingBaaS.com) - a production-ready, self-hostable TypeScript bot for automated meeting recording and transcription on **Google Meet** and **Microsoft Teams**.
+Supports:
 
-**🎯 Privacy-first, open-source alternative to Recall.ai's bot functionality**
+- ✅ Google Meet
+- ✅ Microsoft Teams
 
-## 🚀 Build Meeting Intelligence. In Hours, Not Months.
+Use it as a free and self-hostable alternative to services like `recall.ai`.
 
-Deploy your own meeting bots and start capturing meeting data **immediately**. This is the same battle-tested engine that powers thousands of meeting recordings in production.
 
-### ⚡ **Get Started in 3 Commands**
+## Try It Live
+
+* 🌐 [Online Demo](https://your-demo-url.com)
+* ⚡ [Test a Live Meeting Bot Now](https://your-demo-url.com/live)
+
+
+## Get Started in Seconds
+
+* 🎥 [Watch a Video Walkthrough](https://your-video-url.com)
+
+### Clone the repo and build the Docker image
+
 ```bash
-# 1. Build the bot
+# Clone the repo
+git clone https://github.com/Meeting-Baas/meet-teams-bot.git
+cd meet-teams-bot
+
 ./run_bot.sh build
-
-# 2. Run with your meeting (using actual Meeting BaaS API format)
-./run_bot.sh run-json '{
-  "meeting_url": "https://meet.google.com/abc-def-ghi",
-  "bot_name": "My Recording Bot",
-  "user_token": "your-jwt-token",
-  "bots_api_key": "your-api-key",
-  "recording_mode": "SpeakerView",
-  "bots_webhook_url": "https://your-webhook.com/webhook"
-}'
-
-# 3. Access your recordings
-ls ./recordings/
 ```
 
-**Perfect for developers building:** AI Meeting Assistants • Vertical SaaS • Developer Tools • Meeting Intelligence Platforms
-
-## 🎯 Who This Is For
-
-This open-source meeting bot engine is designed for **technical teams** who need:
-
-### 🤖 **AI Meeting Assistant Builders**
-Deploy bots to capture raw video, audio, and transcript data from Google Meet and Teams meetings. Build intelligent assistants with complete meeting context and participant metadata.
-
-### 🏢 **Vertical SaaS Developers**
-Embed meeting recording capabilities directly into your industry-specific solution. Get complete control over the bot behavior, data pipeline, and user experience.
-
-### 🛠️ **Developer Tool Creators**
-Build IDE plugins, workflow automations, or productivity tools that need meeting data. Access speaker detection, timing information, and real-time webhooks.
-
-### 📊 **Meeting Intelligence Platforms**
-Create analytics and insights on customer conversations or team meetings. Self-host for complete data sovereignty and custom processing pipelines.
-
-## ✨ The Open Source Advantage
-
-### 🚀 **Start Fast, Scale Your Way**
-- **Hosted API First**: Begin with [MeetingBaaS API](https://meetingBaaS.com) for instant integration (1 API call to deploy bots)
-- **Self-Host When Ready**: Deploy this engine on your infrastructure with full control
-- **No Vendor Lock-In**: Your data, your code, your choice
-
-### 🔒 **Enterprise-Grade Control**
-- **GDPR Compliant**: Full data sovereignty when self-hosted
-- **Custom Processing**: Modify transcription, recording, and webhook logic
-- **Source Transparency**: Audit, extend, and customize the entire bot pipeline
-
-### 💪 **Production Battle-Tested**
-- **Thousands of recordings** processed in production
-- **Sophisticated error recovery** for real-world meeting scenarios
-- **Optimized performance** for resource-constrained environments
-
-## 🚀 Quick Start with Docker
-
-### Prerequisites
-- Docker installed on your system
-- Meeting URL (Google Meet or Microsoft Teams)
-
-### Simple Example
-
-**1. Create your bot configuration:**
-```json
-{
-    "meeting_url": "https://meet.google.com/your-meeting-url",
-    "user_token": "your-jwt-token-here",
-    "bots_api_key": "your-api-key-here",
-    "bot_name": "My Recording Bot",
-    "speech_to_text_provider": "Default",
-    "bots_webhook_url": "https://your-webhook-url.com/webhook",
-    "bot_uuid": "unique-bot-identifier",
-    "recording_mode": "SpeakerView",
-    "mp4_s3_path": "recordings/output.mp4",
-    "custom_branding_bot_path": "https://your-domain.com/path/to/branding-image.jpg",
-    "automatic_leave": {
-        "waiting_room_timeout": 60,
-        "noone_joined_timeout": 60
-    },
-    "enter_message": "Recording bot has joined the meeting",
-    "secret": "your-secret-key"
-}
-```
-
-**2. Deploy the bot:**
-```bash
-# Build once
-./run_bot.sh build
-
-# Run with config file
-./run_bot.sh run params.json
-
-# Or override the meeting URL from config
-./run_bot.sh run params.json "https://meet.google.com/your-new-meeting"
-
-# Or run with inline JSON
-./run_bot.sh run-json '{
-  "meeting_url": "https://meet.google.com/abc-def-ghi",
-  "bot_name": "My Bot",
-  "user_token": "your-jwt-token",
-  "bots_api_key": "your-api-key"
-}'
-```
-
-**3. Access your data:**
-```bash
-ls ./recordings/
-# output.mp4 - Full meeting recording
-# transcript.json - Complete transcript with timestamps
-# metadata.json - Participant data and meeting info
-```
-
-### Advanced Docker Usage
+### Send a bot to record your meeting
 
 ```bash
-# Build custom image
-docker build -t my-meeting-bot .
-
-# Run with volume mounting
-cat params.json | docker run -i \
-  -v "$(pwd)/recordings:/app/recording_server/data" \
-  my-meeting-bot
-
-# Quick meeting URL override (no Docker rebuild needed)
-./run_bot.sh run params.json "https://meet.google.com/different-meeting"
+./run_bot.sh run params.json [your-meeting-url]
 ```
 
-## 🏗️ Architecture & Features
+### Retrieve the Recording
 
-### 🎯 **Serverless-First Design**
-- **Containerized & Stateless**: Perfect for AWS Lambda, Google Cloud Run, Azure Functions
-- **No External Dependencies**: No Redis/RabbitMQ required in serverless mode
-- **Resource Optimized**: Runs efficiently in constrained environments
-- **Quick Meeting Override**: Change meeting URLs without rebuilding or editing config files
-
-### 🎥 **Advanced Recording Capabilities**
-- **Smart Recording**: Automatic speaker detection and view switching
-- **Multi-Provider Transcription**: Whisper, Google Speech-to-Text, and custom providers
-- **Real-time Webhooks**: Live status updates and event streaming
-- **Custom Branding**: Bot names, avatars, and join messages
-
-### 🤖 **Sophisticated Browser Automation**
-- **Playwright-powered**: Chrome extension with advanced meeting detection
-- **State Machine**: Robust lifecycle management (Join → Record → Process → Upload)
-- **Error Recovery**: Handles waiting rooms, authentication, network issues
-- **Platform Adaptability**: Automatic detection of meeting types and formats
-
-### ☁️ **Data Pipeline Integration**
-- **Flexible Outputs**: MP4 video, WAV audio, JSON transcripts, CSV metadata
-- **S3 Integration**: Automatic upload with configurable paths
-- **Webhook Events**: Real-time notifications for meeting lifecycle
-- **Participant Tracking**: Speaker identification with accurate timestamps
-
-## 🌐 Supported Platforms
-
-### Google Meet ✅
-- **URL Support**: `https://meet.google.com/xxx-xxxx-xxx`
-- **Account Types**: G Suite, Workspace, personal Gmail accounts
-- **Features**: Waiting room handling, automatic speaker switching, chat capture
-- **Authentication**: Supports both authenticated and guest access
-
-### Microsoft Teams ✅
-- **URL Support**: `https://teams.microsoft.com/l/meetup-join/...`
-- **Meeting Types**: Classic Teams, Teams Live, scheduled meetings
-- **URL Formats**: Automatic conversion of light-meeting URLs
-- **Tenant Support**: Multi-tenant deployments with custom authentication
-
-## 📋 Complete Configuration Reference
-
-| Parameter | Description | Required | Default | Example |
-|-----------|-------------|----------|---------|---------|
-| `meeting_url` | Full meeting URL (Meet or Teams) | ✅ | - | `"https://meet.google.com/abc-def-ghi"` |
-| `bot_name` | Display name in meeting | ✅ | - | `"Recording Assistant"` |
-| `user_token` | JWT authentication token | ✅ | - | `"eyJhbGciOiJIUzI1NiIs..."` |
-| `bots_api_key` | API key for bot service | ✅ | - | `"your-api-key-here"` |
-| `recording_mode` | Recording format | ❌ | `"SpeakerView"` | `"SpeakerView"`, `"GalleryView"` |
-| `bots_webhook_url` | Status notification endpoint | ❌ | - | `"https://api.example.com/webhook"` |
-| `speech_to_text_provider` | Transcription service | ❌ | `"Default"` | `"Default"`, `"Whisper"` |
-| `automatic_leave` | Auto-leave conditions | ❌ | - | `{"waiting_room_timeout": 60}` |
-| `enter_message` | Bot join announcement | ❌ | - | `"Recording bot has joined"` |
-| `mp4_s3_path` | S3 upload path | ❌ | - | `"recordings/meeting-{date}.mp4"` |
-| `custom_branding_bot_path` | Bot avatar URL | ❌ | - | `"https://cdn.example.com/bot.jpg"` |
-| `bot_uuid` | Unique bot identifier | ❌ | auto-generated | `"unique-bot-identifier"` |
-| `secret` | Secret key for authentication | ❌ | - | `"your-secret-key"` |
-
-## 🔗 Integration with MeetingBaaS Ecosystem
-
-This bot engine is the **core component** that powers [MeetingBaaS](https://meetingBaaS.com). Use it alongside other open-source tools:
-
-### 🎬 **[Transcript Seeker](https://github.com/Meeting-BaaS/transcript-seeker)** (MIT)
-Complete React interface for viewing and managing meeting transcripts
-
-### 🗣️ **[Speaking Bots](https://github.com/Meeting-BaaS/speaking-meeting-bot)** (MIT)
-AI-powered conversational agents that can participate in meetings
-
-### 🔄 **[Real-time Transcription](https://github.com/Meeting-BaaS/realtime-meeting-transcription)** (MIT)
-Live transcription service for ongoing meetings
-
-### 🤖 **[Meeting MCP](https://github.com/Meeting-BaaS/meeting-mcp)** (MIT)
-Model Context Protocol server for AI assistant integration
-
-### 📊 **[API Integration Examples](https://github.com/Meeting-BaaS/meeting-bot-as-a-service)** (MIT)
-Sample apps, automation workflows, and integration patterns
-
-## 🛡️ Security & Compliance
-
-- **Data Sovereignty**: Complete control when self-hosted
-- **Secure Token Handling**: Environment variables and secret manager support
-- **HTTPS Enforcement**: All webhook URLs must use HTTPS
-- **Access Control**: Meeting URL authorization validation
-- **Audit Trail**: Complete logging of bot actions and data access
-- **GDPR Ready**: Data processing controls and deletion capabilities
-
-> **Enterprise Security**: For detailed guidelines, see our [Security Policy](SECURITY.md)
-
-## 🚀 Development & Deployment
-
-### Local Development
 ```bash
-# Run in serverless mode locally
-echo '{"meeting_url": "...", ...}' | SERVERLESS=true npm run start-serverless
+cd ./recordings
 ```
 
-### Production Deployment Options
-- **🐳 Docker**: Ready-to-deploy container with `./run_bot.sh`
-- **☁️ Serverless**: AWS Lambda, Google Cloud Run, Azure Functions
-- **🔧 Kubernetes**: Scalable orchestrated deployments
-- **🖥️ Self-Hosted**: Traditional server deployment
+* 📘 [Full Developer Guide →](https://docs.meetingbaas.com/)
 
-### Performance Optimization
-- **Resource Limits**: Runs efficiently with 2GB RAM
-- **CPU Optimization**: Multi-threaded FFmpeg processing
-- **Network Resilience**: Automatic retry and recovery mechanisms
 
-## 📚 Resources & Community
+## Dive Deeper
 
-### 📖 **Technical Documentation**
-- [Detailed Server Setup](recording_server/README.md)
-- [Docker Configuration](Dockerfile)
-- [Deployment Guide](DEPLOYMENT.md)
-- [API Documentation](https://doc.meetingBaaS.com)
+### The Meeting BaaS Ecosystem
 
-### 🤝 **Community & Support**
-- 💬 [Discord Community](https://discord.com/invite/dsvFgDTr6c) - Get help from developers and maintainers
-- 🐛 [GitHub Issues](https://github.com/Meeting-BaaS/meet-teams-bot/issues) - Report bugs and request features
-- 💡 [GitHub Discussions](https://github.com/Meeting-BaaS/meet-teams-bot/discussions) - Share use cases and ideas
-- 📚 [Contributing Guidelines](CONTRIBUTING.md) - Join our development community
+Meeting BaaS is a powerful and **easy-to-integrate ecosystem** that provides you with **everything you need** to **capture, transcribe, and summarize meetings** — simply, privately, and at scale.
 
-### 🏢 **Commercial Support**
-- **Hosted Service**: [MeetingBaaS API](https://meetingBaaS.com) - Start with 1-line integration
-- **Enterprise Support**: Priority support and custom features
-- **Professional Services**: Custom development and deployment assistance
+#### 🧩 Core Components
 
-## 📄 License
+* **[`meet-teams-bot`](https://github.com/Meeting-Baas/meet-teams-bot)** – Bot to join Microsoft Teams meetings and stream audio.
+* **[`realtime-meeting-transcription`](https://github.com/Meeting-Baas/realtime-meeting-transcription)** – Real-time transcription engine built for performance and privacy.
+* **[`meeting-mcp`](https://github.com/Meeting-Baas/meeting-mcp)** – Protocol server for managing bots, transcripts, and recordings.
 
-Licensed under the **Elastic License 2.0 (ELv2)** - see the [LICENSE](LICENSE.md) file for details.
+#### 🛠 Developer Tools
 
-**Key Points:**
-- ✅ **Free for internal use** and most commercial use cases
-- ✅ **Source available** - audit, modify, and contribute
-- ✅ **Can distribute and modify** the software
-- ❌ **Cannot provide as hosted/managed service** to third parties
-- ❌ **Cannot circumvent license key functionality** (if applicable)
+* **[`sdk-generator`](https://github.com/Meeting-Baas/sdk-generator)** – TypeScript SDK and MPC client generator to interact with the API effortlessly.
 
-**Ecosystem Projects**: All other MeetingBaaS projects (Transcript Seeker, Speaking Bots, etc.) are **MIT licensed**.
+#### 📂 Apps & Interfaces
 
----
+* **[`transcript-seeker`](https://github.com/Meeting-Baas/transcript-seeker)** – Browser-based transcript manager with note-taking, bot integration, and AI-powered chat.
+* **[`speaking-meeting-bot`](https://github.com/Meeting-Baas/speaking-meeting-bot)** – Autonomous bots that can listen, speak, and interact in meetings.
 
-**🎯 Built by developers, for developers.** Deploy bots in minutes, capture meeting intelligence, build the future of work.
+📘 [Full Developer Guide →](https://docs.meetingbaas.com/)
 
-[Get API Key](https://meetingBaaS.com) • [View Docs](https://doc.meetingBaaS.com) • [Join Discord](https://discord.com/invite/dsvFgDTr6c) • [⭐ Star this repo](https://github.com/Meeting-BaaS/meet-teams-bot/stargazers)
+
+## Community
+
+Get updates on Meeting BaaS development and chat with the project maintainers and community members.
+
+- Follow [@MeetingBaas on X (Twitter)](https://twitter.com/MeetingBaas)
+- Follow [Lazare Rossillon on X (Twitter)](https://twitter.com/LaRossillon)
+- Join our [community Discord](https://discord.com/invite/dsvFgDTr6c)
+- Explore our [GitHub Discussions](https://github.com/Meeting-Baas/meet-teams-bot/discussions)
+
+For questions, feedback, or to connect with the team, use the links above!
+
+
+## Creators
+
+**Lazare Rossillon**
+
+- <https://www.linkedin.com/in/lazare-rossillon/>
+- <https://github.com/Lazare-42>
+
+**Philippe Drion**
+
+- <https://www.linkedin.com/in/philippe-drion-3905a3a5/>
+
+**Mickael Billod**
+
+- <https://www.linkedin.com/in/mickael-billod-121217199/>
+
+
+## Thanks
+
+Thanks to [Playwright](https://github.com/microsoft/playwright) for providing the open-source browser automation framework that helps us test and automate meeting bots across browsers!
+
+## First Stargazers
+
+Huge thanks to our **founding stargazers** — the first developers who believed in the project and showed their support early. You helped make this real ❤️
+
+[![Stargazers repo roster for @Meeting-Baas/meet-teams-bot](https://reporoster.com/stars/Meeting-Baas/meet-teams-bot)](https://github.com/Meeting-Baas/meet-teams-bot/stargazers)
+
+## License
+
+This project is licensed under the **Elastic License 2.0 (ELv2)**. See the [LICENSE.md](LICENSE.md) file for the full terms and conditions.
+
+**Ecosystem Projects:** All other MeetingBaaS projects (Transcript Seeker, Speaking Bots, etc.) are MIT licensed.
+
+<!-- MARKDOWN LINKS & IMAGES -->
+<!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
+
+[contributors-shield]: https://img.shields.io/github/contributors/Meeting-Baas/meet-teams-bot.svg?style=for-the-badge
+[contributors-url]: https://github.com/Meeting-Baas/meet-teams-bot/graphs/contributors
+
+[forks-shield]: https://img.shields.io/github/forks/Meeting-Baas/meet-teams-bot.svg?style=for-the-badge
+[forks-url]: https://github.com/Meeting-Baas/meet-teams-bot/network/members
+
+[stars-shield]: https://img.shields.io/github/stars/Meeting-Baas/meet-teams-bot.svg?style=for-the-badge
+[stars-url]: https://github.com/Meeting-Baas/meet-teams-bot/stargazers
+
+[issues-shield]: https://img.shields.io/github/issues/Meeting-Baas/meet-teams-bot.svg?style=for-the-badge
+[issues-url]: https://github.com/Meeting-Baas/meet-teams-bot/issues
+
+[license-shield]: https://img.shields.io/github/license/Meeting-Baas/meet-teams-bot.svg?style=for-the-badge
+[license-url]: https://github.com/Meeting-Baas/meet-teams-bot/blob/master/LICENSE
