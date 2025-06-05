@@ -8,7 +8,7 @@ import {
 } from '../types'
 
 import { parseMeetingUrlFromJoinInfos } from '../urlParser/teamsUrlParser'
-import { sleep } from '../utils'
+import { sleep } from '../utils/sleep'
 import { takeScreenshot } from '../utils/takeScreenshot'
 
 export class TeamsProvider implements MeetingProviderInterface {

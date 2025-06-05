@@ -1,4 +1,5 @@
-import { RecordingMode, sleep } from '../api'
+import { RecordingMode } from '../api'
+import { sleep } from '../utils'
 
 export async function removeInitialShityHtml(mode: RecordingMode) {
     // console.log('[Teams] Starting removeInitialShityHtml', { mode })

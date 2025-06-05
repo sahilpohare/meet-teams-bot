@@ -19,6 +19,11 @@ export class S3Uploader extends EventEmitter {
     }
 
     public static getInstance(): S3Uploader {
+        if (process.env.SERVERLESS === 'true') {
+            console.log('Skipping S3 uploader - serverless mode')
+            return null
+        }
+
         if (!instance) {
             instance = new S3Uploader()
         }
@@ -39,6 +44,11 @@ export class S3Uploader extends EventEmitter {
         s3Path: string,
         isAudio: boolean = false,
     ): Promise<string> {
+        if (process.env.SERVERLESS === 'true') {
+            console.log('Skipping S3 upload - serverless mode')
+            return Promise.resolve('')
+        }
+
         try {
             await this.checkFileExists(filePath)
 
@@ -106,6 +116,11 @@ export class S3Uploader extends EventEmitter {
         filePath: string,
         s3Path: string,
     ): Promise<string> {
+        if (process.env.SERVERLESS === 'true') {
+            console.log('Skipping S3 upload - serverless mode')
+            return Promise.resolve('')
+        }
+
         try {
             return await this.uploadFile(
                 filePath,

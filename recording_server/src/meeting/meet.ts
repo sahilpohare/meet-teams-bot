@@ -8,7 +8,7 @@ import {
 } from '../types'
 
 import { parseMeetingUrlFromJoinInfos } from '../urlParser/meetUrlParser'
-import { sleep } from '../utils'
+import { sleep } from '../utils/sleep'
 import { takeScreenshot } from '../utils/takeScreenshot'
 import { closeMeeting } from './meet/closeMeeting'
 
