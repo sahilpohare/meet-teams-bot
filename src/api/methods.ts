@@ -19,7 +19,10 @@ export class Api {
         }
         axios.defaults.baseURL = process.env.API_SERVER_BASEURL
         axios.defaults.withCredentials = true
-
+        const isServerless = process.env.SERVERLESS === 'true'
+        if (!isServerless && params.user_token) {
+            axios.defaults.headers.common['Authorization'] = params.user_token
+        }
         axios.defaults.raxConfig = {
             instance: axios,
             retry: 2, // Number of retry attempts
