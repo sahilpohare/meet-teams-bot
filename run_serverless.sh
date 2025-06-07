@@ -40,6 +40,6 @@ echo "- Bot UUID: $BOT_UUID"
 echo ""
 
 # Build first, then run
-npm --prefix recording_server/chrome_extension run build-dev
-npm --prefix recording_server run build
-echo "$STDIN" | SERVERLESS=true npm --prefix recording_server run start-serverless 
+npm --prefix chrome_extension run build-dev
+npm run build
+echo "$STDIN" | SERVERLESS=true npm run start-serverless 

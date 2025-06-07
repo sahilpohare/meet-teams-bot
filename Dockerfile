@@ -43,26 +43,26 @@ RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2
 WORKDIR /app
 
 # Copy dependency descriptors first for caching
-COPY recording_server/package.json recording_server/package-lock.json ./recording_server/
-COPY recording_server/chrome_extension/package.json recording_server/chrome_extension/package-lock.json ./recording_server/chrome_extension/
+COPY package.json package-lock.json ./
+COPY chrome_extension/package.json chrome_extension/package-lock.json ./chrome_extension/
 
 # Install dependencies for the server and the extension
-RUN npm ci --prefix recording_server \
-    && npm ci --prefix recording_server/chrome_extension
+RUN npm ci  \
+    && npm ci --prefix chrome_extension
 
 # Install Playwright browsers using the local version
-RUN npx --prefix recording_server playwright install --with-deps chromium
+RUN npx  playwright install --with-deps chromium
 
 # Copy the rest of the application code
-COPY recording_server ./recording_server
+COPY . .
 
 # Build the server and the Chrome extension
-RUN npm run build --prefix recording_server \
-    && npm run build --prefix recording_server/chrome_extension
+RUN npm run build  \
+    && npm run build --prefix chrome_extension
 
 # Verify extension build
-RUN ls -la /app/recording_server/chrome_extension/dist/ \
-    && ls -la /app/recording_server/chrome_extension/dist/js/
+RUN ls -la /app/chrome_extension/dist/ \
+    && ls -la /app/chrome_extension/dist/js/
 
 # Create startup script
 RUN echo '#!/bin/bash\n\
@@ -76,14 +76,14 @@ echo "✅ Virtual display started (PID: $XVFB_PID)"\n\
 sleep 2\n\
 \n\
 echo "🚀 Starting application..."\n\
-cd /app/recording_server\n\
+cd /app/\n\
 node build/src/main.js\n\
 \n\
 # Cleanup\n\
 kill $XVFB_PID 2>/dev/null || true\n\
 ' > /start.sh && chmod +x /start.sh
 
-WORKDIR /app/recording_server
+WORKDIR /app/
 
 ENV SERVERLESS=true
 ENV NODE_ENV=production

@@ -135,7 +135,7 @@ run_with_config() {
     fi
     
     echo "$processed_config" | docker run -i \
-        -v "$(pwd)/$output_dir:/app/recording_server/data" \
+        -v "$(pwd)/$output_dir:/app/data" \
         meet-teams-bot
     
     print_success "Bot execution completed"
@@ -172,7 +172,7 @@ run_with_json() {
     fi
     
     echo "$processed_config" | docker run -i \
-        -v "$(pwd)/$output_dir:/app/recording_server/data" \
+        -v "$(pwd)/$output_dir:/app/data" \
         meet-teams-bot
     
     print_success "Bot execution completed"

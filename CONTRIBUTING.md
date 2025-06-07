@@ -45,7 +45,6 @@ git clone https://github.com/yourusername/meet-teams-bot.git
 cd meet-teams-bot
 
 # Install dependencies
-cd recording_server
 npm install
 
 # Generate browser extension key
@@ -186,7 +185,6 @@ When working with the state machine:
 ## Project Structure
 
 ```
-recording_server/
 ├── src/
 │   ├── api/               # API endpoints and methods
 │   ├── browser/           # Browser automation
