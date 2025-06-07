@@ -31,9 +31,9 @@ import {
     uploadLogsToS3,
 } from './utils/Logger'
 
-const ZOOM_SDK_DEBUG_EXECUTABLE_PATHNAME = './target/debug/client'
-const ZOOM_SDK_RELEASE_EXECUTABLE_PATHNAME = './target/release/client'
-const ZOOM_SDK_LIBRARY_PATH = './zoom-meeting-sdk-linux-rs/zoom-meeting-sdk-linux'
+const ZOOM_SDK_DEBUG_EXECUTABLE_PATHNAME = './target/debug/client-zoom'
+const ZOOM_SDK_RELEASE_EXECUTABLE_PATHNAME = './target/release/client-zoom'
+const ZOOM_SDK_LIBRARY_PATH = './dependencies/zoom-sdk-linux-rs/zoom-meeting-sdk-linux'
 const ZOOM_SDK_RELATIVE_DIRECTORY = '../zoom'
 
 // Setup initial console logging
