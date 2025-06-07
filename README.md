@@ -125,16 +125,16 @@ For questions, feedback, or to connect with the team, use the links above!
 
 ## Creators
 
-**Lazare Rossillon**
+**Lazare Rossillon 🐰**
 
 - <https://www.linkedin.com/in/lazare-rossillon/>
 - <https://github.com/Lazare-42>
 
-**Philippe Drion**
+**Philippe Drion 🦙**
 
 - <https://www.linkedin.com/in/philippe-drion-3905a3a5/>
 
-**Mickael Billod**
+**Mickael Billod 🐮**
 
 - <https://www.linkedin.com/in/mickael-billod-121217199/>
 
