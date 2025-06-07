@@ -9,6 +9,7 @@ let CONTEXT: AudioContext | null = null // No streaming_output audio mode
 let THIS_STREAM: MediaStreamAudioSourceNode | null = null // No streaming_output audio mode
 
 let SESSION: SpokeSession | null = null
+let CURRENT_MIME_TYPE: string = 'video/webm; codecs=vp8,opus'
 
 type SpokeSession = {
     upload_queue: asyncLib.AsyncQueue<() => Promise<void>>
@@ -46,8 +47,15 @@ export async function initMediaRecorder(
                 SoundStreamer.instance.start(stream, streaming_audio_frequency)
 
                 try {
+                    const mimeType = 'video/webm; codecs=vp8,opus'
+                    
+                    if (!MediaRecorder.isTypeSupported(mimeType)) {
+                        throw new Error('VP8 codec is not supported by this browser')
+                    }
+                    
+                    CURRENT_MIME_TYPE = mimeType
                     MEDIA_RECORDER = new MediaRecorder(stream, {
-                        mimeType: 'video/webm; codecs=vp9,opus',
+                        mimeType: mimeType,
                     })
                 } catch (e) {
                     console.error('error creating media recorder', e)
@@ -169,7 +177,7 @@ async function handleChunk(isFinal: boolean) {
 
     const recordedDataChunk = recordedChunks.map((c) => c.data)
     const blob = new Blob(recordedDataChunk, {
-        type: 'video/webm; codecs=opus',
+        type: CURRENT_MIME_TYPE,
     })
     const file = new File([blob], 'record.webm', {
         type: 'video/webm',
