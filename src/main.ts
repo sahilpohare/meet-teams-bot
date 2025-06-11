@@ -67,6 +67,7 @@ async function readFromStdin(): Promise<MeetingParams> {
         })
 
         process.stdin.on('end', () => {
+            console.log('Raw data received from stdin:', JSON.stringify(data));
             try {
                 const params = JSON.parse(data) as MeetingParams
                 // Detect the meeting provider
@@ -76,6 +77,7 @@ async function readFromStdin(): Promise<MeetingParams> {
                 resolve(params)
             } catch (error) {
                 console.error('Failed to parse JSON from stdin:', error)
+                console.error('Raw data was:', JSON.stringify(data))
                 process.exit(1)
             }
         })

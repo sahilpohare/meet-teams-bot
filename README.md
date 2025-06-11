@@ -75,8 +75,19 @@ cd meet-teams-bot
 ### Send a bot to record your meeting
 
 ```bash
-./run_bot.sh run params.json [your-meeting-url]
+# Basic usage (uses bot.config.json by default)
+./run_bot.sh run
+
+# Override any config param from the CLI
+./run_bot.sh run meeting_url=https://meet.google.com/abc-defg-hij bot_name="My Bot"
+
+# Use a custom config file
+./run_bot.sh run my_custom_config.json meeting_url=https://meet.google.com/abc-defg-hij
 ```
+
+- The config file is now `bot.config.json` (see it for example format).
+- All logs print to stderr, so only clean JSON is sent to the bot.
+- At the end, you'll see a message with your bot UUID for easy lookup of recordings.
 
 ### Retrieve the Recording
 
