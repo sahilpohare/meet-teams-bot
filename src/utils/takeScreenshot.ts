@@ -58,7 +58,7 @@ export async function takeScreenshot(page: Page, name: string) {
             const s3FilePath = `${s3Path}/${timestamp}_${name.replaceAll('/', '')}.png`
 
             // Upload vers S3
-            await s3cp(finalScreenshotPath, s3FilePath).catch((e) => {
+            await s3cp(finalScreenshotPath, s3FilePath, []).catch((e) => {  // TODO : s3_args !
                 console.error(`Failed to upload screenshot to s3: ${e}`)
             })
         }

@@ -84,6 +84,16 @@ export type MeetingParams = {
         // recording_permission_denied_timeout?: number
     }
     mp4_s3_path: string
+    // ----------------- TODO -------------------- SECTION RAJOUTEE
+    environ: string, // local, prod or preprod
+    aws_s3_temporary_audio_bucket: string,
+    remote : {
+        s3_args: string[],
+        api_server_baseurl: string,
+        aws_s3_video_bucket: string,
+        aws_s3_log_bucket: string,
+    }
+    // -----------------------------------------------------------
     secret: string
     extra?: any
     zoom_sdk_id?: string

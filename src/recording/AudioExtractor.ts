@@ -86,6 +86,7 @@ export class AudioExtractor extends EventEmitter {
                           outputPath,
                           bucketName,
                           `${s3Path}/${path.basename(outputPath)}`,
+                          [], // TODO : Seems to be shitty code : Be carefull about s3_args here
                           true,
                       )
                     : null

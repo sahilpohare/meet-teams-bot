@@ -221,7 +221,7 @@ export async function uploadLogsToS3(options: {
         // Upload main log file
         if (fs.existsSync(logPath)) {
             logger.info(`Uploading ${options.type} logs to S3...`)
-            await s3cp(logPath, s3LogPath)
+            await s3cp(logPath, s3LogPath, []) // TODO : s3_args !
             logger.info(`${options.type} logs uploaded to S3`)
         } else {
             console.error('No log file found at path:', logPath)
@@ -230,7 +230,7 @@ export async function uploadLogsToS3(options: {
         // Upload sound log file
         if (fs.existsSync(soundLogPath)) {
             logger.info(`Uploading ${options.type} sound logs to S3...`)
-            await s3cp(soundLogPath, s3SoundLogPath)
+            await s3cp(soundLogPath, s3SoundLogPath, []) // TODO : s3_args !
             logger.info(`${options.type} sound logs uploaded to S3`)
         } else {
             console.log('No sound log file found at path:', soundLogPath)

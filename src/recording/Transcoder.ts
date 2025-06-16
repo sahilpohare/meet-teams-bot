@@ -549,6 +549,7 @@ export class Transcoder extends EventEmitter {
                 this.config.outputPath,
                 this.config.bucketName,
                 s3Key,
+                [] // TODO : Remove this shitty code if we need s3_args here !!!
             )
 
             console.log(
@@ -771,6 +772,7 @@ export class Transcoder extends EventEmitter {
                                 chunkPath,
                                 bucketName,
                                 s3Key,
+                                [], // TODO : It seams correct but be carefull here.
                                 true,
                             )
                             console.log(
