@@ -2,9 +2,12 @@ import { ChildProcess, spawn } from 'child_process'
 import { EventEmitter } from 'events'
 import * as fs from 'fs'
 import * as path from 'path'
+import { Streaming } from '../streaming'
+
+import { RecordingMode } from '../types'
 import { PathManager } from '../utils/PathManager'
-import { SyncCalibrator, SyncResult } from './SyncCalibrator'
-import { SystemDiagnostic } from '../utils/SystemDiagnostic'
+import { S3Uploader } from '../utils/S3Uploader'
+import { SyncCalibrator } from './SyncCalibrator'
 
 export interface ScreenRecordingConfig {
     display: string
@@ -15,390 +18,495 @@ export interface ScreenRecordingConfig {
     width: number
     height: number
     framerate: number
-    chunkDuration: number // en millisecondes
     audioBitrate: string
     videoBitrate: string
+    recordingMode?: RecordingMode
+    enableTranscriptionChunking?: boolean
+    transcriptionChunkDuration?: number
+    transcriptionAudioBucket?: string
+    bucketName?: string
+    s3Path?: string
 }
 
+/**
+ * Native ScreenRecorder - Simplified architecture without Transcoder legacy
+ * 
+ * DESIGN PRINCIPLES:
+ * - No legacy Transcoder patterns
+ * - Simple direct configuration
+ * - Native file path handling
+ * - Clean S3 upload logic
+ * - Same external API (compatibility)
+ */
 export class ScreenRecorder extends EventEmitter {
     private ffmpegProcess: ChildProcess | null = null
+    private streamingProcess: ChildProcess | null = null
     private isRecording: boolean = false
     private config: ScreenRecordingConfig
+    
+    // Simplified state (no legacy bloat)
     private outputPath: string = ''
-    private chunkIndex: number = 0
-    private lastChunkTime: number = 0
+    private audioOutputPath: string = ''
+    private isConfigured: boolean = false
+    private filesUploaded: boolean = false
+    private page: any = null
+    
+    // Core components
     private syncCalibrator: SyncCalibrator
-    private page: any = null // Page Playwright for sync signal generation
-    private calibratedOffset: number = 0 // NOUVEAU: Offset measured once
-    private pathManager: PathManager
-    private systemDiagnostic: SystemDiagnostic
+    private s3Uploader: S3Uploader | null = null
+    private chunkWatcher: any = null
 
     constructor(config: Partial<ScreenRecordingConfig> = {}) {
         super()
         
+        // Native bucket logic (no legacy complexity)
+        const env = process.env.ENVIRON || 'local'
+        const transcriptionAudioBucket = this.determineBucket(env)
+
+        console.log(`Native ScreenRecorder: Using audio bucket for ${env}: ${transcriptionAudioBucket}`)
+        
+        // Clean configuration (no legacy defaults)
         this.config = {
             display: process.env.DISPLAY || ':99',
             audioDevice: 'pulse',
-            outputFormat: 'webm',
-            videoCodec: 'libvpx',
-            audioCodec: 'opus',
+            outputFormat: 'mp4',
+            videoCodec: 'libx264',
+            audioCodec: 'aac',
             width: 1280,
             height: 720,
             framerate: 30,
-            chunkDuration: 3000, // 3 seconds per chunk
             audioBitrate: '128k',
             videoBitrate: '1000k',
+            recordingMode: 'speaker_view',
+            enableTranscriptionChunking: false,
+            transcriptionChunkDuration: 3600,
+            transcriptionAudioBucket: transcriptionAudioBucket,
+            bucketName: process.env.AWS_S3_VIDEO_BUCKET || '',
+            s3Path: '',
             ...config
         }
         
         this.syncCalibrator = new SyncCalibrator()
-        this.pathManager = PathManager.getInstance()
-        this.systemDiagnostic = new SystemDiagnostic()
+        
+        if (process.env.SERVERLESS !== 'true') {
+            this.s3Uploader = S3Uploader.getInstance()
+        }
+        
+        console.log('Native ScreenRecorder initialized:', {
+            recordingMode: this.config.recordingMode,
+            enableTranscriptionChunking: this.config.enableTranscriptionChunking,
+        })
     }
 
-    public setPage(page: any): void {
-        this.page = page
-        console.log('Page set for sync signal generation')
+    private determineBucket(env: string): string {
+        switch (env) {
+            case 'prod': return 'meeting-baas-audio'
+            case 'preprod': return 'preprod-meeting-baas-audio'
+            default: return process.env.AWS_S3_TEMPORARY_AUDIO_BUCKET || 'local-meeting-baas-audio'
+        }
     }
 
     /**
-     * NOUVELLE MÉTHODE : Calibration once at startup
+     * External API: configure() - Maintain compatibility
+     * Internal: Convert to simple native paths
      */
-    public async calibrateSync(): Promise<void> {
-        if (!this.page) {
-            console.warn('⚠️ No page set for sync calibration, skipping...')
-            return
+    public configure(
+        pathManager: PathManager,
+        recordingMode?: RecordingMode,
+        meetingParams?: any,
+    ): void {
+        if (!pathManager) {
+            throw new Error('PathManager is required for configuration')
         }
 
-        console.log('🎯 === ONE-TIME SYNC CALIBRATION ===')
-        try {
-            this.calibratedOffset = await this.syncCalibrator.calibrateOnce(this.page)
-            console.log(`✅ Calibration complete! Will use offset: ${this.calibratedOffset}s`)
-        } catch (error) {
-            console.error('❌ Calibration failed, using offset 0:', error)
-            this.calibratedOffset = 0
+        if (recordingMode) {
+            this.config.recordingMode = recordingMode
+        }
+
+        // Simple transcription detection
+        if (meetingParams) {
+            const hasTranscription = this.detectTranscription(meetingParams)
+            this.config.enableTranscriptionChunking = hasTranscription
+        }
+
+        // Native path generation (no legacy patterns)
+        this.generateOutputPaths(pathManager)
+
+        // Simple S3 configuration
+        const { bucketName, s3Path } = pathManager.getS3Paths()
+        this.config.bucketName = bucketName
+        this.config.s3Path = s3Path
+
+        this.isConfigured = true
+
+        console.log('Native ScreenRecorder configured:', {
+            outputPath: this.outputPath,
+            audioOutputPath: this.audioOutputPath,
+            recordingMode: this.config.recordingMode,
+        })
+    }
+
+    private detectTranscription(meetingParams: any): boolean {
+        return (meetingParams.speech_to_text_provider && 
+                meetingParams.speech_to_text_provider !== 'None') ||
+               (meetingParams.speech_to_text?.provider && 
+                meetingParams.speech_to_text.provider !== 'None')
+    }
+
+    private generateOutputPaths(pathManager: PathManager): void {
+        const isAudioOnly = this.config.recordingMode === 'audio_only'
+        
+        if (isAudioOnly) {
+            this.outputPath = pathManager.getOutputPath() + '.wav'
+            this.audioOutputPath = this.outputPath
+        } else {
+            this.outputPath = pathManager.getOutputPath() + '.mp4'
+            this.audioOutputPath = pathManager.getOutputPath() + '.wav'
         }
     }
 
-    public async startRecording(onChunk: (chunk: Buffer, isFinal: boolean) => Promise<void>): Promise<void> {
+    /**
+     * External API: setPage() - Maintain compatibility
+     */
+    public setPage(page: any): void {
+        this.page = page
+    }
+
+    /**
+     * External API: startRecording() - Maintain compatibility
+     */
+    public async startRecording(): Promise<void> {
+        this.validateConfiguration()
+        
         if (this.isRecording) {
             throw new Error('Recording is already in progress')
         }
 
-        console.log('🎬 Starting screen recording with config:', this.config)
-
-        // Create output directories
-        await this.pathManager.ensureDirectories()
-
-        // Get output path
-        const outputPath = path.join(this.pathManager.getTempPath(), 'output.mp4')
-        this.outputPath = outputPath
-        console.log('📁 Using output path:', this.outputPath)
-
-        // Auto-calibration system for precise audio/video synchronization
-        console.log('=== SYNC CALIBRATION SYSTEM ===')
-        console.log('Hybrid approach: Quick estimation + precise flash+bip calibration')
-        
-        // Step 1: Quick load-based estimation (500ms)
-        const quickLoad = await this.getSystemLoad()
-        const roughEstimate = this.estimateOffsetFromLoad(quickLoad)
-        console.log(`Step 1 - Quick estimate: ${roughEstimate.toFixed(3)}s (system load: ${quickLoad.toFixed(2)})`)
-        
-        // Step 2: Precise flash+bip calibration (1.5s)
-        console.log('Step 2 - Precise calibration with flash+bip detection')
-        const preciseOffset = await this.syncCalibrator.quickCalibrateOnceOptimized(this.page)
-        
-        // Step 3: Choose best result with fine-tuning
-        let finalOffset: number
-        if (Math.abs(preciseOffset) > 0.001) {
-            // Calibration successful: use precise result
-            let correctedOffset = -preciseOffset  // Invert detected offset
-            
-            // Fine-tuning: Additional empirical adjustment for optimal sync
-            const fineTuning = 0.020  // 20ms additional compensation
-            correctedOffset += fineTuning
-            
-            finalOffset = correctedOffset
-            console.log(`Using PRECISE calibration: ${(-preciseOffset).toFixed(3)}s + fine-tuning: ${fineTuning.toFixed(3)}s`)
-            console.log(`Final precise offset: ${finalOffset.toFixed(3)}s (flash+bip detected + fine-tuned)`)
-        } else {
-            // Calibration failed: fallback to estimation
-            finalOffset = roughEstimate
-            console.log(`Calibration failed, using system load estimate: ${finalOffset.toFixed(3)}s`)
-        }
-        
-        console.log(`Final sync offset: ${finalOffset.toFixed(3)}s (${finalOffset > 0 ? 'delay audio' : 'advance audio'})`)
-        console.log('Sync calibration completed - best of both worlds: speed + precision')
-
-        // Diagnostic information for troubleshooting
-        console.log('=== DIAGNOSTIC INFO ===')
-        console.log('If sync is still off after this correction:')
-        console.log('  1. Check FFmpeg buffer delays (usually ~20-50ms)')
-        console.log('  2. Verify PulseAudio latency (check with `pactl info`)')
-        console.log('  3. Measure actual end-to-end delay in your setup')
-        console.log('  4. Consider hardware-specific audio driver delays')
-        console.log('Note: DO NOT add random empirical adjustments!')
-        console.log('Best practice: MEASURE and IDENTIFY the root cause instead')
-
-        // Build FFmpeg arguments with calibrated offset
-        const ffmpegArgs = await this.buildFFmpegArgs(finalOffset)
-
-        // Test if display and audio are available
-        console.log('Testing X11 display...')
-        try {
-            const { spawn: testSpawn } = require('child_process')
-            const testDisplay = testSpawn('xdpyinfo', ['-display', this.config.display])
-            testDisplay.on('exit', (code) => {
-                console.log('xdpyinfo exit code:', code)
-            })
-            testDisplay.stderr.on('data', (data) => {
-                console.log('xdpyinfo stderr:', data.toString().trim())
-            })
-        } catch (err) {
-            console.log('xdpyinfo test failed:', err)
-        }
+        console.log('🎬 Starting native recording...')
 
         try {
+            await this.ensureOutputDirectory()
+            const syncOffset = await this.calculateSyncOffset()
+            const ffmpegArgs = this.buildNativeFFmpegArgs(syncOffset)
+
             this.ffmpegProcess = spawn('ffmpeg', ffmpegArgs, {
                 stdio: ['pipe', 'pipe', 'pipe']
             })
 
             this.isRecording = true
-            this.lastChunkTime = Date.now()
+            this.setupProcessMonitoring()
+            this.startNativeAudioStreaming()
 
-            // Detailed FFmpeg stderr logging
-            this.ffmpegProcess.stderr?.on('data', (data) => {
-                const output = data.toString()
-                console.log('FFmpeg stderr:', output.trim())
-                
-                // Analyze specific errors
-                if (output.includes('No such file or directory')) {
-                    console.error('ERROR: File/device not found!')
-                }
-                if (output.includes('Permission denied')) {
-                    console.error('ERROR: Permission denied!')
-                }
-                if (output.includes('Cannot open display')) {
-                    console.error('ERROR: Display :99 inaccessible!')
-                }
-                if (output.includes('Connection refused')) {
-                    console.error('ERROR: PulseAudio connection refused!')
-                }
-                if (output.includes('Invalid argument')) {
-                    console.error('ERROR: Invalid FFmpeg argument!')
-                }
-                if (output.includes('fps=') || output.includes('time=')) {
-                    console.log('FFmpeg progress:', output.trim())
-                }
+            console.log('Native recording started successfully')
+            this.emit('started', {
+                outputPath: this.outputPath,
+                isAudioOnly: this.config.recordingMode === 'audio_only',
             })
-
-            // Test if the file is created
-            let fileCreated = false
-            const checkFile = setInterval(() => {
-                if (fs.existsSync(this.outputPath)) {
-                    if (!fileCreated) {
-                        console.log('Screen recording file created:', this.outputPath)
-                        fileCreated = true
-                    }
-                    const stats = fs.statSync(this.outputPath)
-                    if (stats.size > 0) {
-                        console.log(`File size: ${stats.size} bytes`)
-                    }
-                }
-            }, 1000)
-
-            // Handle errors
-            this.ffmpegProcess.on('error', (error) => {
-                console.error('FFmpeg process error:', error)
-                console.error('Error details:', {
-                    code: (error as any).code,
-                    errno: (error as any).errno,
-                    syscall: (error as any).syscall,
-                    path: (error as any).path
-                })
-                this.emit('error', error)
-            })
-
-            this.ffmpegProcess.on('exit', (code, signal) => {
-                console.log(`FFmpeg process exited with code ${code} and signal ${signal}`)
-                clearInterval(checkFile)
-                
-                // Analyze error code
-                if (code === 1) {
-                    console.error('FFmpeg failed with code 1 - checking common causes:')
-                    console.error('  - Input source (x11grab/pulse) not available?')
-                    console.error('  - Invalid parameters?')
-                    console.error('  - Permission issues?')
-                }
-                if (code === 0) {
-                    console.log('FFmpeg completed successfully!')
-                    if (fs.existsSync(this.outputPath)) {
-                        const stats = fs.statSync(this.outputPath)
-                        console.log(`Final video file: ${stats.size} bytes`)
-                    }
-                }
-                
-                this.isRecording = false
-                this.emit('stopped')
-            })
-
-            // Timeout to detect if FFmpeg produces nothing
-            setTimeout(() => {
-                clearInterval(checkFile)
-                if (!fileCreated && this.isRecording) {
-                    console.error('WARNING: No file created after 10 seconds!')
-                }
-            }, 10000)
-
-            console.log('Screen recording started successfully')
-            console.log(`Using pre-calibrated sync offset: ${this.calibratedOffset}s`)
-            this.emit('started')
 
         } catch (error) {
-            console.error('💥 Failed to start screen recording:', error)
+            console.error('Failed to start native recording:', error)
             this.isRecording = false
+            this.emit('error', { type: 'startError', error })
             throw error
         }
     }
 
-    private async buildFFmpegArgs(fixedAudioOffset: number): Promise<string[]> {
-        const args: string[] = []
+    private validateConfiguration(): void {
+        if (!this.isConfigured) {
+            throw new Error('ScreenRecorder must be configured before starting')
+        }
+    }
 
-        console.log('🛠️ Building FFmpeg args for Docker-optimized synchronization...')
-        console.log(`🎯 Applying audio offset: ${fixedAudioOffset.toFixed(3)}s`)
+    private async ensureOutputDirectory(): Promise<void> {
+        const outputDir = path.dirname(this.outputPath)
+        if (!fs.existsSync(outputDir)) {
+            fs.mkdirSync(outputDir, { recursive: true })
+        }
+    }
 
-        // ===== SOLUTION 1: CAPTURE SYNCHRONIZED UNIQUE =====
-        // Instead of 2 separate inputs, use a single multi-stream input
+    private async calculateSyncOffset(): Promise<number> {
+        // Native sync calculation (simplified)
+        const systemLoad = await this.getSystemLoad()
+        const roughEstimate = this.estimateOffsetFromLoad(systemLoad)
         
-        // Input video with integrated audio for ensuring sync
-        args.push(
-            '-f', 'x11grab',
-            '-video_size', '1280x880',         // AUGMENTED: 720+160 for the new crop
-            '-framerate', '30',
-            '-probesize', '50M',
-            '-analyzeduration', '10000000',
-            
-            // ===== DOCKER SYNC FIXES =====
-            '-thread_queue_size', '512',       // Larger buffer to avoid drops
-            '-rtbufsize', '100M',              // Real-time buffer for stability
-            '-fflags', '+genpts',              // Force timestamp generation
-            '-use_wallclock_as_timestamps', '1', // Use system clock as reference
-            
-            '-i', this.config.display
-        )
+        if (this.page) {
+            try {
+                const preciseOffset = await this.syncCalibrator.quickCalibrateOnceOptimized(this.page)
+                if (Math.abs(preciseOffset) > 0.001) {
+                    return -preciseOffset + 0.020
+                }
+            } catch (error) {
+                console.warn('Precise calibration failed, using system estimate')
+            }
+        }
+        
+        return roughEstimate
+    }
 
-        // Separate audio but with forced synchronization + OFFSET CALIBRATED
-        if (this.config.audioDevice) {
+    private buildNativeFFmpegArgs(syncOffset: number): string[] {
+        const args: string[] = []
+        const isAudioOnly = this.config.recordingMode === 'audio_only'
+
+        console.log('🛠️ Building FFmpeg args for native synchronization...')
+        console.log(`🎯 Applying audio offset: ${syncOffset.toFixed(3)}s`)
+
+        if (isAudioOnly) {
             args.push(
                 '-f', 'pulse',
                 '-thread_queue_size', '512',
                 '-probesize', '50M',
                 '-analyzeduration', '10000000',
-                
-                // ===== AUDIO SYNC IN DOCKER =====
-                '-fflags', '+genpts',              // Consistent timestamps
-                '-use_wallclock_as_timestamps', '1', // Same clock as video
-                
-                // ===== OFFSET INTELLIGENT CALIBRATED =====
-                '-itsoffset', fixedAudioOffset.toString(), // Apply CORRECTED offset !
-                
+                '-i', 'virtual_speaker.monitor',
+                '-itsoffset', syncOffset.toString(),
+                '-acodec', 'pcm_s16le',
+                '-ac', '1', '-ar', '16000',
+                '-f', 'wav', '-y',
+                this.outputPath
+            )
+        } else {
+            // **FIXED: Proper separate inputs + sync params like working version**
+            args.push(
+                // Video input with Docker sync fixes
+                '-f', 'x11grab',
+                '-video_size', '1280x880',
+                '-framerate', '30',
+                '-probesize', '50M',
+                '-analyzeduration', '10000000',
+                '-thread_queue_size', '512',
+                '-rtbufsize', '100M',
+                '-fflags', '+genpts',
+                '-use_wallclock_as_timestamps', '1',
+                '-i', this.config.display
+            )
+
+            // Audio input with calibrated offset + sync
+            args.push(
+                '-f', 'pulse',
+                '-thread_queue_size', '512',
+                '-probesize', '50M',
+                '-analyzeduration', '10000000',
+                '-fflags', '+genpts',
+                '-use_wallclock_as_timestamps', '1',
+                '-itsoffset', syncOffset.toString(),
                 '-i', 'virtual_speaker.monitor'
             )
-            
-            console.log(`✅ FFmpeg itsoffset parameter: ${fixedAudioOffset.toFixed(3)}s`)
+
+            // **FIXED: Restore simultaneous MP4 + WAV multi-output (like working version)**
+            args.push(
+                // === OUTPUT 1: MP4 (video + audio) ===
+                '-map', '0:v:0', '-map', '1:a:0',
+                '-c:v', 'libx264', '-preset', 'medium', '-crf', '20',
+                '-vf', 'crop=1280:720:0:160',
+                '-c:a', 'aac', '-b:a', '160k',
+                '-avoid_negative_ts', 'make_zero',
+                '-max_muxing_queue_size', '1024',
+                '-async', '1',
+                '-f', 'mp4', '-movflags', '+faststart',
+                this.outputPath,
+                
+                // === OUTPUT 2: WAV (simultaneous audio for transcription) ===
+                '-map', '1:a:0', '-vn',
+                '-acodec', 'pcm_s16le', '-ac', '1', '-ar', '16000',
+                '-async', '1',
+                '-avoid_negative_ts', 'make_zero',
+                '-f', 'wav',
+                this.audioOutputPath
+            )
+
+            // === OUTPUT 3: Real-time chunks (if enabled) ===
+            if (this.config.enableTranscriptionChunking) {
+                const chunksDir = path.join(path.dirname(this.outputPath), 'chunks')
+                if (!fs.existsSync(chunksDir)) {
+                    fs.mkdirSync(chunksDir, { recursive: true })
+                }
+                
+                args.push(
+                    '-map', '1:a:0', '-vn',
+                    '-acodec', 'pcm_s16le', '-ac', '1', '-ar', '16000',
+                    '-f', 'segment',
+                    '-segment_time', (this.config.transcriptionChunkDuration || 3600).toString(),
+                    '-segment_format', 'wav',
+                    path.join(chunksDir, 'chunk-%03d.wav')
+                )
+                
+                this.startChunkMonitoring(chunksDir)
+                console.log(`🎯 Real-time chunks: ${this.config.transcriptionChunkDuration}s chunks enabled`)
+            }
+
+            console.log(`✅ FFmpeg itsoffset parameter: ${syncOffset.toFixed(3)}s`)
+            console.log(`🎯 Simultaneous generation: MP4 + WAV during recording`)
         }
 
-        // ===== SOLUTION 2: ENCODING WITH NATIVE SYNC =====
-        args.push(
-            // Video
-            '-c:v', 'libx264',
-            '-preset', 'medium',
-            '-crf', '20',
-            '-profile:v', 'high',
-            '-level', '4.0',
-            '-pix_fmt', 'yuv420p',
-            
-            // Crop for browser header
-            '-vf', 'crop=1280:720:0:160',      // AUGMENTED: remove 160px from top instead of 120px
-            
-            // Audio (without fixed correction, we'll use automatic detection)
-            '-c:a', 'aac',
-            '-b:a', '160k',
-            '-ac', '2',
-            '-ar', '48000',
-            
-            // ===== SOLUTION 3: SYNCHRONIZATION FOR DETECTION =====
-            '-map', '0:v:0',                   // Explicit video map from stream 0
-            '-map', '1:a:0',                   // Explicit audio map from stream 1
-            '-shortest',                       // Stop when shortest stream finishes
-            '-avoid_negative_ts', 'make_zero', // Normalize negative timestamps
-            '-max_muxing_queue_size', '1024',  // Larger queue for sync
-            
-            // ===== SOLUTION 4: TIMING PRECISE =====
-            '-vsync', 'cfr',                   // Constant frame rate (not vfr)
-            '-copyts',                         // Preserve original timestamps
-            '-start_at_zero',                  // Start timestamps at 0
-            
-            // Output
-            '-f', 'mp4',
-            '-movflags', '+faststart',         // Optimization for streaming
-            this.outputPath
-        )
-
-        console.log('✅ Docker-optimized sync args built:', args.length, 'parameters')
         return args
     }
 
-    public async stopRecording(): Promise<void> {
-        if (!this.isRecording || !this.ffmpegProcess) {
-            console.warn('No recording in progress to stop')
+
+
+    private setupProcessMonitoring(): void {
+        if (!this.ffmpegProcess) return
+
+        this.ffmpegProcess.on('error', (error) => {
+            console.error('FFmpeg error:', error)
+            this.emit('error', error)
+        })
+
+        this.ffmpegProcess.on('exit', (code) => {
+            console.log(`FFmpeg exited with code ${code}`)
+            
+            if (code === 0) {
+                this.handleSuccessfulRecording()
+            }
+            
+            this.isRecording = false
+            this.emit('stopped')
+        })
+
+        this.ffmpegProcess.stderr?.on('data', (data) => {
+            const output = data.toString()
+            if (output.includes('error')) {
+                console.error('FFmpeg stderr:', output.trim())
+            }
+        })
+    }
+
+    private async handleSuccessfulRecording(): Promise<void> {
+        console.log('Native recording completed')
+        
+        // Auto-upload if not serverless
+        if (process.env.SERVERLESS !== 'true') {
+            setTimeout(() => this.uploadToS3().catch(console.error), 200)
+        }
+        
+        this.cleanupChunkMonitoring()
+    }
+
+    private startNativeAudioStreaming(): void {
+        if (!Streaming.instance) return
+
+        try {
+            const STREAMING_SAMPLE_RATE = 24_000
+
+            this.streamingProcess = spawn('ffmpeg', [
+                '-f', 'pulse',
+                '-thread_queue_size', '256',
+                '-i', 'virtual_speaker.monitor',
+                '-acodec', 'pcm_f32le',
+                '-ac', '1',
+                '-ar', STREAMING_SAMPLE_RATE.toString(),
+                '-f', 'f32le',
+                'pipe:1'
+            ], { stdio: ['pipe', 'pipe', 'pipe'] })
+
+            this.streamingProcess.stdout?.on('data', (data: Buffer) => {
+                if (Streaming.instance) {
+                    const float32Array = new Float32Array(
+                        data.buffer, data.byteOffset, data.length / 4
+                    )
+                    Streaming.instance.processAudioChunk(float32Array)
+                }
+            })
+
+            this.ffmpegProcess?.once('exit', () => {
+                if (this.streamingProcess && !this.streamingProcess.killed) {
+                    this.streamingProcess.kill('SIGINT')
+                }
+            })
+
+        } catch (error) {
+            console.error('Failed to start native audio streaming:', error)
+        }
+    }
+
+    private startChunkMonitoring(chunksDir: string): void {
+        this.chunkWatcher = fs.watch(chunksDir, async (eventType, filename) => {
+            if (eventType === 'rename' && filename?.endsWith('.wav')) {
+                const chunkPath = path.join(chunksDir, filename)
+                setTimeout(() => this.uploadChunk(chunkPath, filename), 2000)
+            }
+        })
+    }
+
+    private async uploadChunk(chunkPath: string, filename: string): Promise<void> {
+        if (!this.s3Uploader || !fs.existsSync(chunkPath)) return
+
+        try {
+            await this.s3Uploader.uploadFile(
+                chunkPath, 
+                this.config.transcriptionAudioBucket!, 
+                `chunks/${filename}`, 
+                true
+            )
+        } catch (error) {
+            console.error(`Failed to upload chunk ${filename}:`, error)
+        }
+    }
+
+
+
+
+
+    private cleanupChunkMonitoring(): void {
+        if (this.chunkWatcher) {
+            this.chunkWatcher.close()
+            this.chunkWatcher = null
+        }
+    }
+
+    /**
+     * External API: uploadToS3() - Maintain compatibility
+     */
+    public async uploadToS3(): Promise<void> {
+        if (this.filesUploaded || !this.s3Uploader || !fs.existsSync(this.outputPath)) {
             return
         }
 
-        console.log('🛑 Stopping screen recording gracefully...')
+        try {
+            const isAudioOnly = this.config.recordingMode === 'audio_only'
+            const fileExtension = isAudioOnly ? '.wav' : '.mp4'
+            const s3Key = `${this.config.s3Path}${fileExtension}`
+
+            await this.s3Uploader.uploadFile(
+                this.outputPath,
+                this.config.bucketName!,
+                s3Key,
+            )
+
+            fs.unlinkSync(this.outputPath)
+            this.filesUploaded = true
+            
+            console.log(`Native S3 upload completed`)
+        } catch (error) {
+            console.error('Native S3 upload error:', error)
+            throw error
+        }
+    }
+
+    /**
+     * External API: stopRecording() - Maintain compatibility
+     */
+    public async stopRecording(): Promise<void> {
+        if (!this.isRecording || !this.ffmpegProcess) {
+            return
+        }
 
         return new Promise((resolve) => {
-            if (!this.ffmpegProcess) {
-                resolve()
-                return
-            }
-
-            // Listen for exit once
-            this.ffmpegProcess.once('exit', async (code, signal) => {
-                console.log(`FFmpeg stopped gracefully with code ${code}, signal ${signal}`)
-                
-                if (code === 0) {
-                    console.log(`Perfectly synced video created: ${this.outputPath}`)
-                    console.log(`Applied calibrated offset: ${this.calibratedOffset}s during recording`)
-                    console.log(`No re-encoding needed! Maximum performance achieved!`)
-                    
-                    if (fs.existsSync(this.outputPath)) {
-                        const stats = fs.statSync(this.outputPath)
-                        console.log(`Final video file: ${stats.size} bytes`)
-                    }
-                } else {
-                    console.error(`FFmpeg failed with code ${code}`)
-                }
-                
+            this.ffmpegProcess!.once('exit', () => {
                 this.isRecording = false
                 this.ffmpegProcess = null
                 resolve()
             })
 
-            // Send SIGINT (Ctrl+C) for graceful shutdown instead of SIGTERM
-            console.log('Sending SIGINT to FFmpeg for graceful shutdown...')
-            this.ffmpegProcess.kill('SIGINT')
+            this.ffmpegProcess!.kill('SIGINT')
 
-            // Safety timeout if FFmpeg doesn't respond
             setTimeout(() => {
                 if (this.ffmpegProcess && !this.ffmpegProcess.killed) {
-                    console.warn('FFmpeg did not respond to SIGINT, forcing SIGKILL...')
                     this.ffmpegProcess.kill('SIGKILL')
                 }
-            }, 5000) // 5 seconds max for graceful shutdown
+            }, 5000)
         })
     }
 
+    // External API methods (maintain compatibility)
     public isCurrentlyRecording(): boolean {
         return this.isRecording
     }
@@ -414,44 +522,23 @@ export class ScreenRecorder extends EventEmitter {
         this.config = { ...this.config, ...newConfig }
     }
 
-    private analyzeVarianceSource(stdDev: number, diagnosticSummary: string): void {
-        console.log('🎯 === VARIANCE ANALYSIS ===')
-        console.log('🎯 Diagnostic summary:')
-        console.log(diagnosticSummary)
-        
-        if (stdDev > 0.05) {
-            console.warn(`⚠️ High variance detected (${(stdDev * 1000).toFixed(0)}ms) - system might be unstable`)
-        } else {
-            console.log(`✅ Excellent precision! Variance only ±${(stdDev * 1000).toFixed(0)}ms`)
+    public getStatus(): {
+        isRecording: boolean
+        isConfigured: boolean
+        filesUploaded: boolean
+    } {
+        return {
+            isRecording: this.isRecording,
+            isConfigured: this.isConfigured,
+            filesUploaded: this.filesUploaded,
         }
     }
 
-    private async waitForSystemStability(): Promise<void> {
-        console.log('⏳ Checking system stability before calibration...')
-        
-        let attempts = 0
-        const maxAttempts = 10 // Max 10 attempts (50 seconds)
-        
-        while (attempts < maxAttempts) {
-            const diagnostic = await this.systemDiagnostic.quickDiagnostic()
-            const load = await this.getSystemLoad()
-            
-            console.log(`📊 System check ${attempts + 1}/${maxAttempts}: Load ${load.toFixed(2)}`)
-            
-            if (load < 2.0) {
-                console.log(`✅ System stable! Load ${load.toFixed(2)} < 2.0 - proceeding with calibration`)
-                return
-            }
-            
-            console.log(`⏳ System load too high (${load.toFixed(2)} >= 2.0), waiting 5s...`)
-            await new Promise(resolve => setTimeout(resolve, 5000))
-            attempts++
-        }
-        
-        console.warn(`⚠️ System still unstable after ${maxAttempts} attempts, proceeding anyway...`)
-        console.warn(`⚠️ Expect higher variance in calibration results`)
+    public getFilesUploaded(): boolean {
+        return this.filesUploaded
     }
-    
+
+    // Helper methods
     private async getSystemLoad(): Promise<number> {
         try {
             const { exec } = require('child_process')
@@ -467,28 +554,15 @@ export class ScreenRecorder extends EventEmitter {
     }
 
     private estimateOffsetFromLoad(load: number): number {
-        // Correction based on real observed results:
-        // High load = audio ahead = need NEGATIVE offset or close to 0
-        
-        if (load < 1.5) {
-            // Stable system: audio often ahead by ~65ms
-            console.log('Stable system detected, applying negative offset for early audio')
-            return -0.065  // Advance audio by 65ms (audio typically ahead)
-        } else if (load < 2.5) {
-            // Moderately loaded system: offset close to 0
-            console.log('Moderate load detected, using minimal offset')
-            return 0.000  // No offset
-        } else {
-            // Very loaded system: audio ahead, need to advance it more!
-            console.log('High load detected, audio ahead - applying negative offset')
-            return -0.050  // Advance audio by 50ms as it's ahead
-        }
-    }
-
-    // Background calibration system (optional for future improvements)
-    private async startBackgroundCalibration(): Promise<void> {
-        // This function could run in the background during recording
-        // to adjust parameters if necessary
-        console.log('Background calibration could be implemented here for future improvements')
+        if (load < 1.5) return -0.065
+        else if (load < 2.5) return 0.000
+        else return -0.050
     }
 }
+
+// External API: Global instance (maintain compatibility)
+export const SCREEN_RECORDER = new ScreenRecorder({
+    recordingMode: 'speaker_view',
+    enableTranscriptionChunking: process.env.ENABLE_TRANSCRIPTION_CHUNKING === 'true',
+    transcriptionAudioBucket: process.env.TRANSCRIPTION_AUDIO_BUCKET,
+}) 
