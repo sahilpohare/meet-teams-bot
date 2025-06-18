@@ -17,20 +17,6 @@ const P720: Resolution = {
 
 var RESOLUTION: Resolution = P720
 
-/**
- * Opens a Chromium browser instance with performance optimizations for meeting recording
- * 
- * Performance optimizations applied:
- * - Memory management: Increased heap size and enabled memory pressure relief
- * - Process limitations: Limited renderer processes to prevent resource exhaustion  
- * - Background network reduction: Disabled unnecessary background operations
- * - Feature optimization: Disabled unused Chrome features to reduce overhead
- * - Cache management: Enabled aggressive cache discarding for memory efficiency
- * 
- * @param lowResolution Whether to use lower resolution (480p vs 720p) for better performance
- * @param slowMo Whether to enable slow motion mode for debugging (adds 100ms delay)
- * @returns Promise resolving to browser context and main page for meeting interaction
- */
 export async function openBrowser(
     lowResolution: boolean,
     slowMo: boolean = false,
@@ -43,39 +29,21 @@ export async function openBrowser(
     const height = RESOLUTION.height
 
     try {
-        console.log('Launching persistent context without extension...')
+        console.log('Launching persistent context with exact extension args...')
 
         const context = await chromium.launchPersistentContext('', {
             headless: false,
             viewport: { width, height },
             args: [
-                // Security configurations
                 '--no-sandbox',
-                '--disable-setuid-sandbox',
-                
-                // WebRTC optimizations (required for meeting audio/video capture)
                 '--disable-rtc-smoothness-algorithm',
                 '--disable-webrtc-hw-decoding',
                 '--disable-webrtc-hw-encoding',
-                '--autoplay-policy=no-user-gesture-required',
-                
-                // Performance and resource management optimizations
                 '--disable-blink-features=AutomationControlled',
+                '--disable-setuid-sandbox',
+                '--autoplay-policy=no-user-gesture-required',
                 '--disable-background-timer-throttling',
                 '--enable-features=SharedArrayBuffer',
-                '--memory-pressure-off',              // Disable memory pressure handling for consistent performance
-                '--max_old_space_size=4096',          // Increase V8 heap size to 4GB for large meetings
-                '--disable-background-networking',    // Reduce background network activity
-                '--disable-features=TranslateUI',     // Disable translation features to save resources
-                '--disable-features=AutofillServerCommunication', // Disable autofill to reduce network usage
-                '--disable-component-extensions-with-background-pages', // Reduce background extension overhead
-                '--disable-default-apps',             // Disable default Chrome apps
-                '--renderer-process-limit=4',         // Limit renderer processes to prevent resource exhaustion
-                '--disable-ipc-flooding-protection',  // Improve IPC performance for high-frequency operations
-                '--aggressive-cache-discard',         // Enable aggressive cache management for memory efficiency
-                '--disable-features=MediaRouter',     // Disable media router for reduced overhead
-                
-                // Certificate and security optimizations for meeting platforms
                 '--ignore-certificate-errors',
                 '--allow-insecure-localhost',
                 '--disable-blink-features=TrustedDOMTypes',
@@ -95,9 +63,8 @@ export async function openBrowser(
         // Create a main page for meeting interaction
         const mainPage = await context.newPage()
         
-        console.log('Browser launched successfully without extension')
+        console.log('Browser launched successfully')
         
-        // Return the page as backgroundPage for compatibility with existing code
         return { browser: context, backgroundPage: mainPage }
         
     } catch (error) {

@@ -95,6 +95,8 @@ run_with_config() {
     local config_file=$1
     local override_meeting_url=$2
     local recording_mode=${RECORDING:-true}  # Par défaut true
+    local debug_mode=${DEBUG:-false}  # Debug mode avec VNC
+    local debug_logs=${DEBUG_LOGS:-false}  # Debug logs mode
     
     if [ ! -f "$config_file" ]; then
         print_error "Configuration file '$config_file' not found"
@@ -140,6 +142,7 @@ run_with_config_and_overrides() {
         print_info "Meeting URL: $override_meeting_url"
     fi
     print_info "Output directory: $output_dir"
+<<<<<<< HEAD
     # Show masked config preview (only non-sensitive fields)
     local preview
     preview=$(echo "$processed_config" | jq 'del(.bots_api_key, .bots_webhook, .speech_to_text_api_key) | tostring' 2>&1 | head -c 100)
@@ -150,18 +153,48 @@ run_with_config_and_overrides() {
         print_info "Configuration loaded successfully"
     fi
     # Validate JSON
+=======
+    
+    # Debug mode avec VNC
+    local docker_args="-p 3000:3000"
+    if [ "$debug_mode" = "true" ]; then
+        docker_args="-p 5900:5900 -p 3000:3000"
+        print_info "🔍 DEBUG MODE: VNC enabled on port 5900"
+        print_info "💻 Connect with VNC viewer to: localhost:5900"
+        print_info "📱 On Mac, you can use: open vnc://localhost:5900"
+    fi
+    
+    # Debug: Show what we're sending to Docker (first 200 chars)
+    local preview=$(echo "$processed_config" | head -c 200)
+    print_info "Config preview: ${preview}..."
+    
+    # Validate JSON is not empty
+>>>>>>> f287737 (teams and meet observer)
     if [ -z "$processed_config" ] || [ "$processed_config" = "{}" ]; then
         print_error "Invalid configuration format after processing."
         print_error "Original config_json: $config_json"
         print_error "Processed config: $processed_config"
         exit 1
     fi
+<<<<<<< HEAD
     # Extract bot_uuid for summary message
     local bot_uuid
     bot_uuid=$(echo "$processed_config" | jq -r '.bot_uuid // empty')
     # Run the bot
+=======
+    
+    # Add debug logs environment variable if enabled
+    local debug_env=""
+    if [ "$debug_logs" = "true" ]; then
+        debug_env="-e DEBUG_LOGS=true"
+        print_info "🐛 DEBUG logs enabled - verbose speakers logging activated"
+    fi
+    
+>>>>>>> f287737 (teams and meet observer)
     echo "$processed_config" | docker run -i \
+        $docker_args \
         -e RECORDING="$recording_mode" \
+        $debug_env \
         -v "$(pwd)/$output_dir:/app/data" \
         meet-teams-bot 2>&1 | while IFS= read -r line; do
             if [[ $line == *"Starting virtual display"* ]]; then
@@ -197,10 +230,27 @@ run_with_config_and_overrides() {
     fi
 }
 
+# Run bot in debug mode (enables debug logs + VNC)
+run_debug() {
+    local config_file=$1
+    local override_meeting_url=$2
+    
+    print_info "🐛 Starting DEBUG mode - speakers debug logs + VNC enabled"
+    
+    # Force enable debug modes
+    export DEBUG_LOGS=true
+    export DEBUG=true
+    
+    # Call the regular run function with debug enabled
+    run_with_config "$config_file" "$override_meeting_url"
+}
+
 # Run bot with JSON input
 run_with_json() {
     local json_input=$1
     local recording_mode=${RECORDING:-true}  # Par défaut true
+    local debug_mode=${DEBUG:-false}  # Debug mode avec VNC
+    local debug_logs=${DEBUG_LOGS:-false}  # Debug logs mode
     local output_dir=$(create_output_dir)
     local processed_config=$(process_config "$json_input")
     
@@ -208,6 +258,15 @@ run_with_json() {
     print_info "Recording enabled: $recording_mode"
     print_info "Recording mode: screen (direct capture)"
     print_info "Output directory: $output_dir"
+    
+    # Debug mode avec VNC
+    local docker_args="-p 3000:3000"
+    if [ "$debug_mode" = "true" ]; then
+        docker_args="-p 5900:5900 -p 3000:3000"
+        print_info "🔍 DEBUG MODE: VNC enabled on port 5900"
+        print_info "💻 Connect with VNC viewer to: localhost:5900"
+        print_info "📱 On Mac, you can use: open vnc://localhost:5900"
+    fi
     
     # Debug: Show what we're sending to Docker (first 200 chars)
     local preview=$(echo "$processed_config" | head -c 200)
@@ -220,8 +279,17 @@ run_with_json() {
         exit 1
     fi
     
+    # Add debug logs environment variable if enabled
+    local debug_env=""
+    if [ "$debug_logs" = "true" ]; then
+        debug_env="-e DEBUG_LOGS=true"
+        print_info "🐛 DEBUG logs enabled - verbose speakers logging activated"
+    fi
+    
     echo "$processed_config" | docker run -i \
+        $docker_args \
         -e RECORDING="$recording_mode" \
+        $debug_env \
         -v "$(pwd)/$output_dir:/app/data" \
         meet-teams-bot
     
@@ -259,10 +327,15 @@ clean_recordings() {
 # Test recording system
 test_recording() {
     local duration=${1:-30}  # Par défaut 30 secondes
+    local debug_mode=${DEBUG:-false}  # Debug mode avec VNC
     
     print_info "🧪 Testing screen recording system"
     print_info "📅 Test duration: ${duration}s"
     print_info "📄 Using normal run command with params.json"
+    if [ "$debug_mode" = "true" ]; then
+        print_info "🔍 DEBUG MODE: VNC will be available on port 5900"
+        print_info "💻 Connect with: open vnc://localhost:5900"
+    fi
     
     # Vérifier que Docker est disponible
     check_docker
@@ -313,8 +386,13 @@ test_recording() {
     }
     
     # Lancer la commande run normale avec timeout
+    local env_vars=""
+    if [ "$debug_mode" = "true" ]; then
+        env_vars="DEBUG=true"
+    fi
+    
     if run_with_timeout $((duration + 10)) \
-        ./run_bot.sh run params.json > "$log_file" 2>&1; then
+        env $env_vars ./run_bot.sh run params.json > "$log_file" 2>&1; then
         print_success "✅ Test completed successfully"
     else
         print_info "ℹ️ Test stopped after timeout (this is expected)"
@@ -421,6 +499,7 @@ show_help() {
     echo "Usage:"
     echo "  $0 build                     - Build the Docker image"
     echo "  $0 run <config_file> [url]   - Run bot with configuration file (optional meeting URL override)"
+    echo "  $0 debug <config_file> [url] - Run bot in DEBUG mode (speakers logs + VNC enabled)"
     echo "  $0 run-json '<json>'         - Run bot with JSON configuration"
     echo "  $0 test [duration]           - Test screen recording system (duration in seconds)"
     echo "  $0 clean                     - Clean recordings directory"
@@ -428,15 +507,24 @@ show_help() {
     echo
     echo "Environment Variables:"
     echo "  RECORDING=true|false         - Enable/disable video recording (default: true)"
+    echo "  DEBUG=true|false            - Enable/disable debug mode with VNC (default: false)"
+    echo "  DEBUG_LOGS=true|false       - Enable/disable speakers debug logs (default: false)"
     echo
     echo "Examples:"
     echo "  $0 build"
     echo "  $0 run params.json"
+    echo "  $0 debug params.json                            # Debug mode: speakers logs + VNC"
     echo "  $0 run params.json 'https://meet.google.com/new-meeting-url'"
+    echo "  $0 debug params.json 'https://meet.google.com/new-url'  # Debug with URL override"
     echo "  RECORDING=false $0 run params.json  # Run without video recording"
+    echo "  RECORDING=false $0 debug params.json  # Debug without video recording"
+    echo "  DEBUG=true $0 run params.json       # Run with VNC debug access only"
+    echo "  DEBUG_LOGS=true $0 run params.json  # Run with speakers debug logs only"
     echo "  $0 run-json '{\"meeting_url\":\"https://meet.google.com/abc-def-ghi\", \"bot_name\":\"RecordingBot\"}'"
     echo "  RECORDING=false $0 run-json '{...}'  # Run JSON config without recording"
+    echo "  DEBUG=true $0 run-json '{...}'      # Run JSON config with VNC debug"
     echo "  $0 test 60  # Test screen recording for 60 seconds"
+    echo "  DEBUG=true $0 test 60              # Test with VNC debug access"
     echo "  $0 clean"
     echo
     echo "Recording Modes:"
@@ -446,6 +534,9 @@ show_help() {
     echo "  • Automatically generates bot_uuid if not provided"
     echo "  • Override meeting URL by passing it as last argument"
     echo "  • Control video recording with RECORDING environment variable"
+    echo "  • DEBUG mode: One command to enable speakers debug logs + VNC access"
+    echo "  • Debug logs: Show detailed speakers detection (DEBUG_LOGS=true)"
+    echo "  • VNC access: View bot screen remotely (DEBUG=true) - localhost:5900"
     echo "  • Test recording system with different modes"
     echo "  • Saves recordings to ./recordings directory (when recording enabled)"
     echo "  • Lists generated files after completion"
@@ -482,6 +573,15 @@ main() {
             fi
             print_info "Using config file: $config_file"
             run_with_config_and_overrides "$config_file" "${overrides[@]}"
+            ;;
+        "debug")
+            if [ -z "${2:-}" ]; then
+                print_error "Please specify a configuration file"
+                print_info "Usage: $0 debug <config_file> [meeting_url]"
+                exit 1
+            fi
+            check_docker
+            run_debug "$2" "$3"
             ;;
         "run-json")
             if [ -z "${2:-}" ]; then

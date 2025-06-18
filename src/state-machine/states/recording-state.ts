@@ -259,7 +259,10 @@ export class RecordingState extends BaseState {
 
             console.info('Stopping screen recorder')
             try {
-                if (RECORDING && SCREEN_RECORDER.isCurrentlyRecording()) {
+                // 🍎 MAC TESTING: Skip screen recording stop for Mac local testing
+                if (process.env.DISABLE_RECORDING === 'true' || process.platform === 'darwin') {
+                    console.log('🍎 Screen recording disabled for Mac - nothing to stop')
+                } else if (RECORDING && SCREEN_RECORDER.isCurrentlyRecording()) {
                     await SCREEN_RECORDER.stopRecording()
                     console.info('ScreenRecorder stopped successfully')
                 } else {

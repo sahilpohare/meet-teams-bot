@@ -1,15 +1,17 @@
 import { Page } from '@playwright/test'
 import { RecordingMode, SpeakerData } from '../../types'
 
-export const SPEAKER_LATENCY = 1500 // ms - same as extension
-
 export class MeetSpeakersObserver {
     private page: Page
-    private isObserving: boolean = false
-    private lastSpeakers: Map<string, boolean> = new Map()
     private recordingMode: RecordingMode
     private botName: string
     private onSpeakersChange: (speakers: SpeakerData[]) => void
+    private isObserving: boolean = false
+
+    private readonly SPEAKER_LATENCY = 0 // ms
+    private readonly MUTATION_DEBOUNCE = 50 // ms
+    private readonly CHECK_INTERVAL = 10000 // 10s  
+    private readonly FREEZE_TIMEOUT = 8000 // 8s
 
     constructor(
         page: Page,
@@ -25,299 +27,435 @@ export class MeetSpeakersObserver {
 
     public async startObserving(): Promise<void> {
         if (this.isObserving) {
-            console.warn('[Meet] Speakers observer already running')
+            console.warn('[Meet] Already observing')
             return
         }
 
-        console.log('[Meet] Starting speakers observation...')
-        this.isObserving = true
+        console.log('[Meet] Starting speaker observation...')
+
+        // Browser console logs are handled by centralized page-logger in base-state.ts
+
+        // EXACT SAME AS EXTENSION: Ensure People panel is open
+        await this.ensurePeoplePanelOpen()
 
         // Expose callback function to the page
         await this.page.exposeFunction('meetSpeakersChanged', async (speakers: SpeakerData[]) => {
             try {
-                console.log(`[Meet] Browser callback: ${speakers.length} speakers`)
-                // Filter out bot - same as extension
-                const filteredSpeakers = speakers.filter(
-                    (speaker) => speaker.name !== this.botName,
-                )
-
-                // Check if speakers have changed - exactly same logic as extension
-                const newSpeakers = new Map(
-                    filteredSpeakers.map((elem) => [elem.name, elem.isSpeaking]),
-                )
-
-                if (!this.areMapsEqual(this.lastSpeakers, newSpeakers)) {
-                    console.log(`[Meet] 🎤 SPEAKERS CHANGED: ${filteredSpeakers.length} participants`)
-                    this.onSpeakersChange(filteredSpeakers)
-                    this.lastSpeakers = newSpeakers
-                }
+                console.log(`[Meet] 📞 CALLBACK RECEIVED: ${speakers.length} speakers from browser`)
+                this.onSpeakersChange(speakers)
+                console.log(`[Meet] ✅ onSpeakersChange callback completed`)
             } catch (error) {
-                console.error('[Meet] Error in speakers callback:', error)
+                console.error('[Meet] ❌ Error in speakers callback:', error)
             }
         })
 
-        // Initialize the observer in the browser context - EXACT SAME AS EXTENSION
-        console.log('[Meet] Setting up browser-side observer...')
-        await this.setupBrowserObserver()
+        // Inject EXACT SAME LOGIC as extension but via Playwright
+        await this.page.evaluate(
+            ({ recordingMode, botName, speakerLatency, mutationDebounce, checkInterval, freezeTimeout }) => {
+                console.log('[Meet-Browser] Setting up observation - EXACT EXTENSION LOGIC')
 
-        console.log('[Meet] Speakers observer started successfully')
-    }
+                // EXACT SAME VARIABLES AS EXTENSION
+                let CUR_SPEAKERS = new Map<string, boolean>()
+                let checkSpeakersTimeout: any = null
+                let lastMutationTime = Date.now()
+                let MUTATION_OBSERVER: MutationObserver | null = null
+                let periodicCheck: any = null
 
-    public stopObserving(): void {
-        if (!this.isObserving) {
-            return
-        }
+                // EXACT SAME freeze detection variables as extension
+                let lastValidSpeakers: SpeakerData[] = []
+                let lastValidSpeakerCheck = Date.now()
+                const FREEZE_TIMEOUT_MS = 30000 // 30 seconds
 
-        console.log('[Meet] Stopping speakers observer...')
-        this.isObserving = false
+                // EXACT SAME getSpeakerRootToObserve as extension
+                async function getSpeakerRootToObserve(recordingMode: string): Promise<[Node, MutationObserverInit] | undefined> {
+                    if (recordingMode === 'gallery_view') {
+                        return [
+                            document,
+                            {
+                                attributes: true,
+                                characterData: false,
+                                childList: true,
+                                subtree: true,
+                                attributeFilter: ['class'],
+                            },
+                        ]
+                    } else {
+                        try {
+                            // Find all div elements
+                            const allDivs = document.querySelectorAll('div')
 
-        // Stop browser-side observer
-        this.page.evaluate(() => {
-            if ((window as any).meetObserverCleanup) {
-                (window as any).meetObserverCleanup()
-            }
-        }).catch(e => console.error('[Meet] Error cleaning up browser observer:', e))
+                            // Filter divs to include padding in their size (assuming border-box sizing)
+                            const filteredDivs = Array.from(allDivs).filter((div) => {
+                                // Use offsetWidth and offsetHeight to include padding (and border)
+                                const width = div.offsetWidth
+                                const height = div.offsetHeight
 
-        console.log('[Meet] Speakers observer stopped')
-    }
-
-    private async setupBrowserObserver(): Promise<void> {
-        try {
-            console.log('[Meet] Setting up browser-side observer - EXACT EXTENSION LOGIC...')
-            
-            await this.page.evaluate(
-                ({ recordingMode, botName, speakerLatency }) => {
-                    // Cleanup existing observer
-                    if ((window as any).meetObserverCleanup) {
-                        (window as any).meetObserverCleanup()
-                    }
-
-                    console.log('[Meet-Browser] Setting up observation - EXACT EXTENSION LOGIC')
-
-                    // EXACT SAME VARIABLES AS EXTENSION (global scope like extension)
-                    let CUR_SPEAKERS = new Map<string, boolean>()
-                    let checkSpeakersTimeout: number | null = null
-                    const MUTATION_DEBOUNCE = 150 // EXACT SAME AS EXTENSION - 150ms NOT 1000ms!
-                    let lastMutationTime = Date.now()
-                    let MUTATION_OBSERVER: MutationObserver | null = null
-
-                    // EXACT SAME helper functions as extension
-                    function getSpeakerRootToObserve(recordingMode: string): Promise<[Node, MutationObserverInit] | undefined> {
-                        return new Promise((resolve) => {
-                            // EXACT SAME logic as extension
-                            const waitForElement = (selector: string, maxAttempts: number = 50): Promise<Element | null> => {
-                                return new Promise((resolve) => {
-                                    let attempts = 0
-                                    const checkElement = () => {
-                                        const element = document.querySelector(selector)
-                                        if (element || attempts >= maxAttempts) {
-                                            resolve(element)
-                                        } else {
-                                            attempts++
-                                            setTimeout(checkElement, 100)
-                                        }
-                                    }
-                                    checkElement()
-                                })
-                            }
-
-                            // Wait for the specific element based on recording mode - EXACT SAME AS EXTENSION
-                            let selector: string
-                            if (recordingMode === 'gallery_view') {
-                                selector = '[role="main"] [data-self-name]'
-                            } else {
-                                selector = '[role="main"] [data-self-name], [role="main"] [data-participant-id]'
-                            }
-
-                            waitForElement(selector).then((element) => {
-                                if (element) {
-                                    // Find the appropriate container - EXACT SAME AS EXTENSION
-                                    let container = element.closest('[role="main"]')
-                                    if (!container) {
-                                        container = document.querySelector('[role="main"]')
-                                    }
-                                    if (!container) {
-                                        container = document.documentElement
-                                    }
-
-                                    resolve([
-                                        container,
-                                        {
-                                            attributes: true,
-                                            childList: true,
-                                            subtree: true,
-                                            attributeFilter: ['data-self-name', 'data-participant-id', 'style', 'class']
-                                        }
-                                    ])
-                                } else {
-                                    // Fallback to document - EXACT SAME AS EXTENSION
-                                    resolve([
-                                        document.documentElement,
-                                        {
-                                            attributes: true,
-                                            childList: true,
-                                            subtree: true,
-                                            attributeFilter: ['data-self-name', 'data-participant-id', 'style', 'class']
-                                        }
-                                    ])
-                                }
+                                return (
+                                    width === 360 &&
+                                    (height === 64 ||
+                                        height === 63 ||
+                                        height === 50.99 ||
+                                        height === 51 ||
+                                        height === 66.63)
+                                )
                             })
-                        })
-                    }
-
-                    function extractName(element: Element): string {
-                        try {
-                            // EXACT SAME logic as extension
-                            const ariaLabel = element.getAttribute('aria-label') || ''
                             
-                            // Split on common separators and take the first part
-                            const separators = [',', '(', ' is ', ' joined', ' left', 'presenting']
-                            let name = ariaLabel
-                            
-                            for (const separator of separators) {
-                                if (name.includes(separator)) {
-                                    name = name.split(separator)[0].trim()
-                                    break
-                                }
-                            }
-                            
-                            return name || ''
-                        } catch (e) {
-                            return ''
-                        }
-                    }
+                            // We no longer remove these divs to avoid disrupting the interface
 
-                    function isSpeaking(element: Element): boolean {
-                        try {
-                            // EXACT SAME logic as extension - Check for speaking indicators
-                            
-                            // Method 1: Check for speaking ring animation
-                            const speakingRing = element.querySelector('[data-is-speaking="true"], [data-speaking="true"]')
-                            if (speakingRing) {
-                                return true
-                            }
-
-                            // Method 2: Check for animated elements that indicate speaking
-                            const animatedElements = element.querySelectorAll('[style*="animation"], [class*="speaking"], [class*="active"]')
-                            for (const animEl of animatedElements) {
-                                const style = window.getComputedStyle(animEl)
-                                if (style.animationName && style.animationName !== 'none') {
-                                    return true
-                                }
-                            }
-
-                            // Method 3: Check for specific Google Meet speaking indicators
-                            const voiceIndicator = element.querySelector('[data-self-name] + div[style*="background"], [data-participant-id] + div[style*="background"]')
-                            if (voiceIndicator) {
-                                const style = window.getComputedStyle(voiceIndicator)
-                                // Check for blue-ish colors typically used for speaking indicators
-                                const bgColor = style.backgroundColor
-                                if (bgColor.includes('rgb') && bgColor.includes('54, 179, 126')) { // Green speaking indicator
-                                    return true
-                                }
-                            }
-
-                            return false
-                        } catch (e) {
-                            return false
-                        }
-                    }
-
-                    // EXACT SAME getSpeakerFromDocument as extension
-                    function getSpeakerFromDocument(recordingMode: string, timestamp: number): any[] {
-                        try {
-                            const speakers: any[] = []
-
-                            // Find all participant elements - EXACT SAME AS EXTENSION
-                            const participantSelectors = [
-                                '[data-self-name]',
-                                '[data-participant-id]',
-                                '[role="main"] [aria-label*="microphone"], [role="main"] [aria-label*="camera"]'
+                            // Observe the entire document instead of the participants panel
+                            return [
+                                document,
+                                {
+                                    attributes: true,
+                                    characterData: false,
+                                    childList: true,
+                                    subtree: true,
+                                    attributeFilter: ['class', 'aria-label'],
+                                },
                             ]
+                        } catch (error) {
+                            console.error('Error in getSpeakerRootToObserve:', error)
+                            return [
+                                document,
+                                {
+                                    attributes: true,
+                                    characterData: false,
+                                    childList: true,
+                                    subtree: true,
+                                    attributeFilter: ['class', 'aria-label'],
+                                },
+                            ]
+                        }
+                    }
+                }
 
-                            for (const selector of participantSelectors) {
-                                const elements = document.querySelectorAll(selector)
-                                
-                                for (const element of elements) {
-                                    const name = extractName(element)
-                                    if (name && name.length > 0) {
-                                        const speaking = isSpeaking(element)
-                                        
-                                        // Avoid duplicates
-                                        if (!speakers.find(s => s.name === name)) {
-                                            speakers.push({
-                                                name,
-                                                id: 0,
-                                                timestamp,
-                                                isSpeaking: speaking
-                                            })
-                                        }
-                                    }
+                // EXACT SAME observeIframes as extension
+                function observeIframes(callback: (iframe: HTMLIFrameElement) => void) {
+                    // Observer les iframes existantes
+                    document.querySelectorAll('iframe').forEach(iframe => {
+                        callback(iframe);
+                    });
+
+                    // Observe for new iframes
+                    const observer = new MutationObserver((mutations) => {
+                        mutations.forEach(mutation => {
+                            mutation.addedNodes.forEach(node => {
+                                if (node.nodeName === 'IFRAME') {
+                                    callback(node as HTMLIFrameElement);
                                 }
-                            }
+                                // Look for iframes inside added nodes
+                                if (node.nodeType === Node.ELEMENT_NODE) {
+                                    (node as Element).querySelectorAll('iframe').forEach(iframe => {
+                                        callback(iframe);
+                                    });
+                                }
+                            });
+                        });
+                    });
 
-                            return speakers
-                        } catch (e) {
-                            console.error('[Meet-Browser] Error in getSpeakerFromDocument:', e)
+                    observer.observe(document.body, {
+                        childList: true,
+                        subtree: true
+                    });
+
+                    return observer;
+                }
+
+                // EXACT SAME getIframeDocument as extension
+                function getIframeDocument(iframe: HTMLIFrameElement): Document | null {
+                    try {
+                        // Check if the iframe is accessible (same origin)
+                        return iframe.contentDocument || iframe.contentWindow?.document || null;
+                    } catch (error) {
+                        // If the iframe is cross-origin we cannot access it
+                        console.log('Cannot access iframe content (likely cross-origin):', error);
+                        return null;
+                    }
+                }
+
+                // EXACT SAME getSpeakerFromDocument as extension
+                function getSpeakerFromDocument(recordingMode: string, timestamp: number): SpeakerData[] {
+                    try {
+                        // Check if the page is frozen
+                        const currentTime = Date.now()
+                        if (currentTime - lastValidSpeakerCheck > FREEZE_TIMEOUT_MS) {
                             return []
                         }
-                    }
 
-                    // EXACT SAME checkSpeakers logic as extension
-                    async function checkSpeakers() {
-                        try {
-                            const timestamp = Date.now() - speakerLatency
-                            let currentSpeakersList = getSpeakerFromDocument(recordingMode, timestamp)
+                        const participantsList = document.querySelector(
+                            "[aria-label='Participants']",
+                        )
+                        if (!participantsList) {
+                            lastValidSpeakers = []
+                            return [] // Real case of 0 participants
+                        }
 
-                            // Filter out bot - EXACT SAME AS EXTENSION
-                            currentSpeakersList = currentSpeakersList.filter(
-                                (speaker: any) => speaker.name !== botName,
-                            )
+                        const participantItems =
+                            participantsList.querySelectorAll('[role="listitem"]')
 
-                            let new_speakers = new Map(
-                                currentSpeakersList.map((elem: any) => [elem.name, elem.isSpeaking]),
-                            )
+                        if (!participantItems || participantItems.length === 0) {
+                            lastValidSpeakers = [] // Update the current state
+                            return []
+                        }
 
-                            function areMapsEqual(map1: Map<string, boolean>, map2: Map<string, boolean>): boolean {
-                                if (map1.size !== map2.size) {
-                                    return false
+                        // Map to store unique participants with their speaking status
+                        const uniqueParticipants = new Map<
+                            string,
+                            {
+                                name: string
+                                isSpeaking: boolean
+                                isPresenting: boolean
+                                isInMergedAudio: boolean
+                                cohortId: string | null
+                            }
+                        >()
+
+                        // Data structure for merged groups
+                        const mergedGroups = new Map<
+                            string,
+                            {
+                                isSpeaking: boolean
+                                members: string[]
+                            }
+                        >()
+
+                        // First pass: identify all participants
+                        for (let i = 0; i < participantItems.length; i++) {
+                            const item = participantItems[i]
+                            const ariaLabel = item.getAttribute('aria-label')?.trim()
+
+                            if (!ariaLabel) continue
+
+                            // Check if this element is "Merged audio"
+                            const isMergedAudio = ariaLabel === 'Merged audio'
+
+                            // Get the cohort id for merged groups
+                            let cohortId: string | null = null
+                            if (isMergedAudio) {
+                                // Look for the cohort id in the parent element
+                                const cohortElement = item.closest('[data-cohort-id]')
+                                if (cohortElement) {
+                                    cohortId = cohortElement.getAttribute('data-cohort-id')
                                 }
-                                for (let [key, value] of map1) {
-                                    if (!map2.has(key) || map2.get(key) !== value) {
-                                        return false
+
+                                // Check if the merged audio is speaking + NEW COLOR
+                                const speakingIndicators = Array.from(
+                                    item.querySelectorAll('*'),
+                                ).filter((elem) => {
+                                    const color = getComputedStyle(elem).backgroundColor
+                                    return (
+                                        color === 'rgba(26, 115, 232, 0.9)' ||
+                                        color === 'rgb(26, 115, 232)' ||
+                                        color === 'rgb(11, 87, 208)' // NEW Meet speaking color!
+                                    )
+                                })
+
+                                // Also check for the unmuted microphone icon
+                                const unmutedMicImg = item.querySelector(
+                                    'img[src*="mic_unmuted"]',
+                                )
+
+                                const isSpeaking =
+                                    speakingIndicators.length > 0 || !!unmutedMicImg
+
+                                // Initialize the merged group
+                                if (cohortId) {
+                                    mergedGroups.set(cohortId, {
+                                        isSpeaking: isSpeaking,
+                                        members: [],
+                                    })
+                                }
+                            }
+
+                            // Check if this participant is part of a merged audio group
+                            const isInMergedAudio = !!item.querySelector(
+                                '[aria-label="Adaptive audio group"]',
+                            )
+                            let participantCohortId: string | null = null
+
+                            if (isInMergedAudio) {
+                                // Look for the cohort id in the parent element
+                                const cohortElement = item.closest('[data-cohort-id]')
+                                if (cohortElement) {
+                                    participantCohortId =
+                                        cohortElement.getAttribute('data-cohort-id')
+                                }
+
+                                // Add this participant to the matching merged group
+                                if (
+                                    participantCohortId &&
+                                    mergedGroups.has(participantCohortId)
+                                ) {
+                                    mergedGroups
+                                        .get(participantCohortId)!
+                                        .members.push(ariaLabel)
+                                }
+                            }
+
+                            // Add the participant to our map only if not in a merged group
+                            // or if it is the "Merged audio" entry itself
+                            if (isMergedAudio || !isInMergedAudio) {
+                                const uniqueKey =
+                                    isMergedAudio && cohortId
+                                        ? `Merged audio_${cohortId}`
+                                        : ariaLabel
+
+                                if (!uniqueParticipants.has(uniqueKey)) {
+                                    uniqueParticipants.set(uniqueKey, {
+                                        name: ariaLabel,
+                                        isSpeaking: false,
+                                        isPresenting: false,
+                                        isInMergedAudio: isMergedAudio,
+                                        cohortId: isMergedAudio ? cohortId : null,
+                                    })
+                                }
+
+                                const participant = uniqueParticipants.get(uniqueKey)!
+
+                                // Check if the participant is presenting
+                                const allDivs = Array.from(item.querySelectorAll('div'))
+                                const isPresenting = allDivs.some((div) => {
+                                    const text = div.textContent?.trim()
+                                    return text === 'Presentation'
+                                })
+
+                                if (isPresenting) {
+                                    participant.isPresenting = true
+                                }
+
+                                // Check speaking indicators + NEW COLOR FIX
+                                const speakingIndicators = Array.from(
+                                    item.querySelectorAll('*'),
+                                ).filter((elem) => {
+                                    const color = getComputedStyle(elem).backgroundColor
+                                    return (
+                                        color === 'rgba(26, 115, 232, 0.9)' ||
+                                        color === 'rgb(26, 115, 232)' ||
+                                        color === 'rgb(11, 87, 208)' // NEW Meet speaking color!
+                                    )
+                                })
+
+                                speakingIndicators.forEach((indicator) => {
+                                    const backgroundElement = indicator.children[1]
+                                    if (backgroundElement) {
+                                        const backgroundPosition =
+                                            getComputedStyle(
+                                                backgroundElement,
+                                            ).backgroundPositionX
+                                        if (backgroundPosition !== '0px') {
+                                            participant.isSpeaking = true
+                                        }
                                     }
-                                }
-                                return true
-                            }
+                                })
 
-                            // Send data only when a speakers change state is detected - EXACT SAME AS EXTENSION
-                            if (!areMapsEqual(CUR_SPEAKERS, new_speakers)) {
-                                console.log('[Meet-Browser] Speakers changed, calling callback')
-                                await (window as any).meetSpeakersChanged(currentSpeakersList)
-                                CUR_SPEAKERS = new_speakers
+                                // Update the map with the potentially modified data
+                                uniqueParticipants.set(uniqueKey, participant)
                             }
-                        } catch (e) {
-                            console.error('[Meet-Browser] Error in checkSpeakers:', e)
+                        }
+
+                        // Replace merged group names with member names
+                        for (const [key, participant] of uniqueParticipants.entries()) {
+                            if (
+                                participant.name === 'Merged audio' &&
+                                participant.cohortId &&
+                                mergedGroups.has(participant.cohortId)
+                            ) {
+                                const members = mergedGroups.get(participant.cohortId)!.members
+                                if (members.length > 0) {
+                                    participant.name = members.join(', ')
+                                    uniqueParticipants.set(key, participant)
+                                }
+                            }
+                        }
+
+                        // Build the final participant list
+                        const speakers = Array.from(uniqueParticipants.values()).map(
+                            (participant) => ({
+                                name: participant.name,
+                                id: 0,
+                                timestamp,
+                                isSpeaking: participant.isSpeaking,
+                            }),
+                        )
+
+                        console.log(`[MEET-DEBUG] Found ${speakers.length} participants:`, speakers.map(s => `${s.name} (speaking: ${s.isSpeaking})`))
+
+                        lastValidSpeakers = speakers
+                        lastValidSpeakerCheck = currentTime
+                        return speakers
+                    } catch (e) {
+                        return lastValidSpeakers
+                    }
+                }
+
+                // SHARED CRITICAL LOGIC from speakersUtils
+                function areMapsEqual<K, V>(map1: Map<K, V>, map2: Map<K, V>): boolean {
+                    if (map1.size !== map2.size) {
+                        return false
+                    }
+                    for (let [key, value] of map1) {
+                        if (!map2.has(key) || map2.get(key) !== value) {
+                            return false
                         }
                     }
+                    return true
+                }
 
-                    // EXACT SAME MutationObserver setup as extension (150ms debounce!)
-                    MUTATION_OBSERVER = new MutationObserver(function () {
-                        if (checkSpeakersTimeout !== null) {
-                            clearTimeout(checkSpeakersTimeout)
+                // SHARED CRITICAL checkSpeakers logic
+                async function checkSpeakers() {
+                    try {
+                        const timestamp = Date.now() - speakerLatency
+                        let currentSpeakersList = getSpeakerFromDocument(recordingMode, timestamp)
+
+                        // Filter out bot
+                        currentSpeakersList = currentSpeakersList.filter(
+                            (speaker) => speaker.name !== botName,
+                        )
+
+                        let new_speakers = new Map(
+                            currentSpeakersList.map((elem) => [elem.name, elem.isSpeaking]),
+                        )
+
+                        // Send data only when a speakers change state is detected
+                        if (!areMapsEqual(CUR_SPEAKERS, new_speakers)) {
+                            console.log(`[MEET-DEBUG-CHANGE] Speakers changed - ${currentSpeakersList.length} total`)
+                            
+                            // Simple speaker status logs
+                            currentSpeakersList.forEach((speaker) => {
+                                console.log(`[MEET-DEBUG-SPEAKER] ${speaker.name} : ${speaker.isSpeaking}`)
+                            })
+                            
+                            // CRITICAL: Call the callback 
+                            console.log('[MEET-DEBUG-CALLBACK] Calling meetSpeakersChanged')
+                            await (window as any).meetSpeakersChanged(currentSpeakersList)
+                            
+                            // CRITICAL: Update current speakers AFTER calling callback
+                            CUR_SPEAKERS.clear()
+                            new_speakers.forEach((value, key) => CUR_SPEAKERS.set(key, value))
+                            console.log('[MEET-DEBUG-UPDATE] Speakers state updated')
                         }
+                    } catch (e) {
+                        console.error('[Meet] Error in checkSpeakers:', e)
+                    }
+                }
 
-                        // Update the last mutation time whenever a mutation is detected - EXACT SAME AS EXTENSION
-                        lastMutationTime = Date.now()
+                // MutationObserver setup
+                MUTATION_OBSERVER = new MutationObserver(function () {
+                    if (checkSpeakersTimeout !== null) {
+                        clearTimeout(checkSpeakersTimeout)
+                    }
 
-                        checkSpeakersTimeout = window.setTimeout(() => {
-                            checkSpeakers()
-                            checkSpeakersTimeout = null
-                        }, MUTATION_DEBOUNCE) // 150ms NOT 1000ms!
-                    })
+                    lastMutationTime = Date.now()
 
-                    // EXACT SAME setupMutationObserver logic as extension
-                    async function setupMutationObserver() {
+                    checkSpeakersTimeout = window.setTimeout(() => {
+                        checkSpeakers()
+                        checkSpeakersTimeout = null
+                    }, mutationDebounce)
+                })
+
+                // setupMutationObserver
+                async function setupMutationObserver(): Promise<boolean> {
+                    try {
                         const observe_parameters = await getSpeakerRootToObserve(recordingMode)
 
                         if (!observe_parameters || !observe_parameters[0]) {
@@ -325,76 +463,213 @@ export class MeetSpeakersObserver {
                             return false
                         }
 
-                        // Disconnect any existing observer before creating a new one - EXACT SAME AS EXTENSION
-                        if (MUTATION_OBSERVER) {
-                            MUTATION_OBSERVER.disconnect()
-                            MUTATION_OBSERVER.observe(observe_parameters[0], observe_parameters[1])
-                            console.log('[Meet-Browser] Mutation observer successfully set up')
-                            // Reset the last mutation time when we set up a new observer - EXACT SAME AS EXTENSION
-                            lastMutationTime = Date.now()
-                            return true
-                        }
+                        MUTATION_OBSERVER!.disconnect()
+                        MUTATION_OBSERVER!.observe(observe_parameters[0], observe_parameters[1])
+                        console.log('[Meet-Browser] Mutation observer successfully set up')
+                        lastMutationTime = Date.now()
+                        return true
+                    } catch (e) {
+                        console.warn('[Meet-Browser] Failed to setup mutation observer:', e)
                         return false
                     }
-
-                    // Initial setup
-                    setupMutationObserver()
-
-                    // Initial check - same as extension
-                    checkSpeakers()
-
-                    // EXACT SAME periodic check as extension - Set up periodic check to verify and potentially reset the mutation observer
-                    const periodicCheck = setInterval(async () => {
-                        if (document.visibilityState !== 'hidden') {
-                            // Check if mutations have stopped being detected, indicating potential DOM changes
-                            // that require observer reset. Threshold set to 15s for balanced performance - EXACT SAME AS EXTENSION
-                            if (Date.now() - lastMutationTime > 15000) {
-                                console.warn('[Meet-Browser] No mutations detected for 15 seconds, resetting observer')
-                                await setupMutationObserver()
-                            }
-                            // Fallback speaker detection with balanced frequency - EXACT SAME AS EXTENSION
-                            // Interval set to 15s for good balance between accuracy and performance
-                            checkSpeakers()
-                        }
-                    }, 15000) // 15 seconds for balanced performance - EXACT SAME AS EXTENSION
-
-                    // Cleanup function
-                    ;(window as any).meetObserverCleanup = () => {
-                        console.log('[Meet-Browser] Cleaning up observer')
-                        if (MUTATION_OBSERVER) {
-                            MUTATION_OBSERVER.disconnect()
-                        }
-                        if (checkSpeakersTimeout) {
-                            clearTimeout(checkSpeakersTimeout)
-                        }
-                        clearInterval(periodicCheck)
-                    }
-
-                    console.log('[Meet-Browser] Observer setup complete - EXACT EXTENSION LOGIC')
-                },
-                { 
-                    recordingMode: this.recordingMode, 
-                    botName: this.botName,
-                    speakerLatency: SPEAKER_LATENCY
                 }
-            )
 
-            console.log('[Meet] Browser-side observer setup completed - EXACT EXTENSION LOGIC')
-            
-        } catch (error) {
-            console.error('[Meet] Error setting up browser observer:', error)
-        }
+                async function observeSpeakers() {
+                    try {
+                       
+                        // But only send if isSpeaking === true
+                        const currentSpeakersList = getSpeakerFromDocument(
+                            recordingMode,
+                            Date.now() - speakerLatency,
+                        ).filter(speaker => speaker.name !== botName && speaker.isSpeaking === true)
+
+                        if (currentSpeakersList.length > 0) {
+                            console.log(`[MEET-DEBUG-INIT] Found ${currentSpeakersList.length} speakers already talking`)
+                            await (window as any).meetSpeakersChanged(currentSpeakersList)
+                            // Initialize CUR_SPEAKERS with ALL speakers (speaking and not speaking)
+                            const allSpeakers = getSpeakerFromDocument(recordingMode, Date.now() - speakerLatency)
+                                .filter(speaker => speaker.name !== botName)
+                            CUR_SPEAKERS.clear()
+                            allSpeakers.forEach(elem => CUR_SPEAKERS.set(elem.name, elem.isSpeaking))
+                        }
+
+                        await setupMutationObserver()
+
+                        // periodic check + People panel check
+                        periodicCheck = setInterval(async () => {
+                            if (document.visibilityState !== 'hidden') {
+                                // Check if People panel is still open - CRITICAL FOR SPEAKER DETECTION
+                                const participantsList = document.querySelector("[aria-label='Participants']")
+                                if (!participantsList) {
+                                    console.warn('[Meet-Browser] People panel closed! Trying to reopen...')
+                                    // Try to reopen the panel
+                                    const possibleSelectors = [
+                                        "[aria-label='Show everyone']",
+                                        "[aria-label='People']", 
+                                        "[data-tooltip='Show everyone']",
+                                        "[data-tooltip='People']",
+                                        "button[aria-label*='people' i]",
+                                        "button[aria-label*='participants' i]"
+                                    ]
+                                    
+                                    for (const selector of possibleSelectors) {
+                                        const button = document.querySelector(selector) as HTMLElement
+                                        if (button && button.offsetParent !== null) {
+                                            console.log(`[Meet-Browser] Reopening People panel with: ${selector}`)
+                                            button.click()
+                                            break
+                                        }
+                                    }
+                                }
+                                
+                                if (Date.now() - lastMutationTime > freezeTimeout) {
+                                    console.warn(`[Meet-Browser] No mutations detected for ${freezeTimeout/1000}s, resetting observer`)
+                                    await setupMutationObserver()
+                                }
+                                checkSpeakers()
+                            }
+                        }, checkInterval)
+
+                        // Setup iframe observation
+                        const iframeObserver = observeIframes((iframe) => {
+                            const iframeDoc = getIframeDocument(iframe);
+                            if (iframeDoc) {
+                                // Create a new observer for the iframe content
+                                const observer = new MutationObserver((mutations) => {
+                                    // Same logic as the main observer
+                                    // Process mutations to detect speaker changes
+                                    if (checkSpeakersTimeout !== null) {
+                                        clearTimeout(checkSpeakersTimeout)
+                                    }
+
+                                    lastMutationTime = Date.now()
+
+                                    checkSpeakersTimeout = window.setTimeout(() => {
+                                        checkSpeakers()
+                                        checkSpeakersTimeout = null
+                                    }, mutationDebounce)
+                                });
+                                
+                                // Observe the iframe document with the same parameters
+                                observer.observe(iframeDoc, {
+                                    attributes: true,
+                                    characterData: false,
+                                    childList: true,
+                                    subtree: true,
+                                    attributeFilter: ['class', 'aria-label'],
+                                });
+                            }
+                        });
+
+                        // Cleanup function
+                        ;(window as any).meetObserverCleanup = () => {
+                            console.log('[Meet-Browser] Cleaning up observer')
+                            if (MUTATION_OBSERVER) {
+                                MUTATION_OBSERVER.disconnect()
+                            }
+                            if (checkSpeakersTimeout) {
+                                clearTimeout(checkSpeakersTimeout)
+                            }
+                            if (periodicCheck) {
+                                clearInterval(periodicCheck)
+                            }
+                            if (iframeObserver) {
+                                iframeObserver.disconnect()
+                            }
+                        }
+
+                        // CRITICAL: Initial check
+                        checkSpeakers()
+
+                        console.log('[Meet-Browser] Observer setup complete - EXACT EXTENSION LOGIC')
+                    } catch (e) {
+                        console.warn('[Meet-Browser] Failed to initialize observer:', e)
+                        setTimeout(observeSpeakers, 5000)
+                    }
+                }
+
+                // Initialize
+                observeSpeakers()
+            },
+            { 
+                recordingMode: this.recordingMode,
+                botName: this.botName,
+                speakerLatency: this.SPEAKER_LATENCY,
+                mutationDebounce: this.MUTATION_DEBOUNCE,
+                checkInterval: this.CHECK_INTERVAL,
+                freezeTimeout: this.FREEZE_TIMEOUT
+            }
+        )
+
+        this.isObserving = true
+        console.log('[Meet] ✅ Observer started successfully')
     }
 
-    private areMapsEqual<K, V>(map1: Map<K, V>, map2: Map<K, V>): boolean {
-        if (map1.size !== map2.size) {
-            return false
+    public stopObserving(): void {
+        if (!this.isObserving) {
+            return
         }
-        for (let [key, value] of map1) {
-            if (!map2.has(key) || map2.get(key) !== value) {
-                return false
+
+        console.log('[Meet] Stopping observation...')
+        
+        this.page?.evaluate(() => {
+            if ((window as any).meetObserverCleanup) {
+                (window as any).meetObserverCleanup()
             }
+        }).catch(e => console.error('[Meet] Error cleaning up:', e))
+
+        this.isObserving = false
+        console.log('[Meet] ✅ Observer stopped')
+    }
+
+    private async ensurePeoplePanelOpen(): Promise<void> {
+        try {
+            await this.page.evaluate(() => {
+                // Check if People panel is already open
+                const participantsList = document.querySelector("[aria-label='Participants']")
+                if (participantsList) {
+                    console.log('[Meet-Browser] People panel already open')
+                    return
+                }
+
+                console.log('[Meet-Browser] People panel not open, trying to open it...')
+
+                // Try multiple selectors for the people button
+                const possibleSelectors = [
+                    "[aria-label='Show everyone']",
+                    "[aria-label='People']", 
+                    "[data-tooltip='Show everyone']",
+                    "[data-tooltip='People']",
+                    "button[aria-label*='people' i]",
+                    "button[aria-label*='participants' i]",
+                    "button[title*='people' i]",
+                    "button[title*='participants' i]"
+                ]
+
+                for (const selector of possibleSelectors) {
+                    const button = document.querySelector(selector) as HTMLElement
+                    if (button && button.offsetParent !== null) { // Check if visible
+                        console.log(`[Meet-Browser] Found people button with selector: ${selector}`)
+                        button.click()
+                        
+                        // Wait a bit and check if panel opened
+                        setTimeout(() => {
+                            const checkPanel = document.querySelector("[aria-label='Participants']")
+                            if (checkPanel) {
+                                console.log('[Meet-Browser] ✅ People panel opened successfully')
+                            } else {
+                                console.warn('[Meet-Browser] People panel still not visible after click')
+                            }
+                        }, 1000)
+                        
+                        return
+                    }
+                }
+
+                console.warn('[Meet-Browser] Could not find people button to open panel')
+            })
+        } catch (error) {
+            console.warn('[Meet] Failed to ensure people panel is open:', error)
         }
-        return true
     }
 } 

@@ -44,18 +44,18 @@ export class CleanupState extends BaseState {
             // 3. Stop the ScreenRecorder
             await this.stopScreenRecorder()
 
-            // 3. Arrêter le streaming
+            // 4. Stop the streaming
             if (this.context.streamingService) {
                 this.context.streamingService.stop()
             }
 
-            // 4. Clean up browser resources
+            // 5. Clean up browser resources
             await this.cleanupBrowserResources()
 
-            // 5. Upload the video to S3 (handled automatically by ScreenRecorder now)
+            // 6. Upload the video to S3 (handled automatically by ScreenRecorder now)
             console.log('Video upload handled automatically by ScreenRecorder')
 
-            // 6. Final Redis cleanup
+            // 7. Final Redis cleanup
             await this.cleanupRedisSession()
         } catch (error) {
             console.error('Cleanup error:', error)
@@ -84,7 +84,7 @@ export class CleanupState extends BaseState {
             if (this.context.htmlCleaner) {
                 console.log('Stopping HTML cleaner from cleanup state...')
                 await this.context.htmlCleaner.stop()
-                this.context.htmlCleaner = null
+                this.context.htmlCleaner = undefined
                 console.log('HTML cleaner stopped successfully')
             } else {
                 console.log('HTML cleaner not active, nothing to stop')
@@ -97,6 +97,12 @@ export class CleanupState extends BaseState {
 
     private async stopScreenRecorder(): Promise<void> {
         try {
+            // 🍎 MAC TESTING: Skip screen recording stop for Mac local testing
+            if (process.env.DISABLE_RECORDING === 'true' || process.platform === 'darwin') {
+                console.log('🍎 Screen recording disabled for Mac - nothing to stop')
+                return
+            }
+
             if (SCREEN_RECORDER.isCurrentlyRecording()) {
                 console.log('Stopping ScreenRecorder from cleanup state...')
                 await SCREEN_RECORDER.stopRecording()

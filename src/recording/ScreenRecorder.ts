@@ -40,21 +40,18 @@ export interface ScreenRecordingConfig {
  */
 export class ScreenRecorder extends EventEmitter {
     private ffmpegProcess: ChildProcess | null = null
+    private chunkWatcher: fs.FSWatcher | null = null
     private streamingProcess: ChildProcess | null = null
-    private isRecording: boolean = false
-    private config: ScreenRecordingConfig
-    
-    // Simplified state (no legacy bloat)
     private outputPath: string = ''
     private audioOutputPath: string = ''
-    private isConfigured: boolean = false
-    private filesUploaded: boolean = false
-    private page: any = null
-    
-    // Core components
-    private syncCalibrator: SyncCalibrator
+    private config: ScreenRecordingConfig
     private s3Uploader: S3Uploader | null = null
-    private chunkWatcher: any = null
+    private isConfigured: boolean = false
+    private isRecording: boolean = false
+    private filesUploaded: boolean = false
+    private syncCalibrator: SyncCalibrator
+    private pathManager: PathManager | null = null
+    private page: any = null
 
     constructor(config: Partial<ScreenRecordingConfig> = {}) {
         super()
@@ -118,6 +115,8 @@ export class ScreenRecorder extends EventEmitter {
         if (!pathManager) {
             throw new Error('PathManager is required for configuration')
         }
+
+        this.pathManager = pathManager
 
         if (recordingMode) {
             this.config.recordingMode = recordingMode
@@ -315,10 +314,15 @@ export class ScreenRecorder extends EventEmitter {
 
             // === OUTPUT 3: Real-time chunks (if enabled) ===
             if (this.config.enableTranscriptionChunking) {
-                const chunksDir = path.join(path.dirname(this.outputPath), 'chunks')
+                // Use audio_tmp directory and UUID-based naming like production
+                const chunksDir = this.pathManager ? this.pathManager.getAudioTmpPath() : path.join(path.dirname(this.outputPath), 'audio_tmp')
                 if (!fs.existsSync(chunksDir)) {
                     fs.mkdirSync(chunksDir, { recursive: true })
                 }
+                
+                // Use botUuid for chunk naming format: ${botUuid}-%d.wav
+                const botUuid = this.pathManager ? this.pathManager.getBotUuid() : 'unknown'
+                const chunkPattern = path.join(chunksDir, `${botUuid}-%d.wav`)
                 
                 args.push(
                     '-map', '1:a:0', '-vn',
@@ -326,11 +330,12 @@ export class ScreenRecorder extends EventEmitter {
                     '-f', 'segment',
                     '-segment_time', (this.config.transcriptionChunkDuration || 3600).toString(),
                     '-segment_format', 'wav',
-                    path.join(chunksDir, 'chunk-%03d.wav')
+                    chunkPattern
                 )
                 
                 this.startChunkMonitoring(chunksDir)
                 console.log(`🎯 Real-time chunks: ${this.config.transcriptionChunkDuration}s chunks enabled`)
+                console.log(`🎯 Chunk naming format: ${botUuid}-[index].wav`)
             }
 
             console.log(`✅ FFmpeg itsoffset parameter: ${syncOffset.toFixed(3)}s`)
@@ -339,8 +344,6 @@ export class ScreenRecorder extends EventEmitter {
 
         return args
     }
-
-
 
     private setupProcessMonitoring(): void {
         if (!this.ffmpegProcess) return
@@ -430,20 +433,19 @@ export class ScreenRecorder extends EventEmitter {
         if (!this.s3Uploader || !fs.existsSync(chunkPath)) return
 
         try {
+            // Upload directly with the filename (UUID-index.wav format) without chunks/ prefix
+            // This matches production format where chunks are uploaded as: 009abdef-dd02-4a30-bac3-c514ebc69173-0.wav
             await this.s3Uploader.uploadFile(
                 chunkPath, 
                 this.config.transcriptionAudioBucket!, 
-                `chunks/${filename}`, 
+                filename, 
                 true
             )
+            console.log(`✅ Chunk uploaded: ${filename}`)
         } catch (error) {
             console.error(`Failed to upload chunk ${filename}:`, error)
         }
     }
-
-
-
-
 
     private cleanupChunkMonitoring(): void {
         if (this.chunkWatcher) {

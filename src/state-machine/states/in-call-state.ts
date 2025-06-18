@@ -121,26 +121,33 @@ export class InCallState extends BaseState {
         
         console.log('🎯 === STARTING SCREEN RECORDING ===')
         
-        try {
-            // Configure the meeting page for sync (if available)
-            if (this.context.playwrightPage) {
-                SCREEN_RECORDER.setPage(this.context.playwrightPage)
-                console.log('📄 Meeting page configured for SCREEN_RECORDER')
-            } else {
-                console.warn('⚠️ No playwright page available')
-            }
-
-            // Start screen recording
-            console.log('🚀 Starting screen recording...')
-            await SCREEN_RECORDER.startRecording()
-
+        // 🍎 MAC TESTING: Skip screen recording for Mac local testing
+        if (process.env.DISABLE_RECORDING === 'true' || process.platform === 'darwin') {
+            console.log('🍎 Screen recording disabled for Mac testing - focusing on speakers detection only')
             startTime = Date.now()
             recordingStartedSuccessfully = true
-            console.log('✅ Screen recording started successfully')
-        } catch (error) {
-            console.error('❌ Error starting screen recording:', error)
-            startTime = Date.now()
-            recordingStartedSuccessfully = false
+        } else {
+            try {
+                // Configure the meeting page for sync (if available)
+                if (this.context.playwrightPage) {
+                    SCREEN_RECORDER.setPage(this.context.playwrightPage)
+                    console.log('📄 Meeting page configured for SCREEN_RECORDER')
+                } else {
+                    console.warn('⚠️ No playwright page available')
+                }
+
+                // Start screen recording
+                console.log('🚀 Starting screen recording...')
+                await SCREEN_RECORDER.startRecording()
+
+                startTime = Date.now()
+                recordingStartedSuccessfully = true
+                console.log('✅ Screen recording started successfully')
+            } catch (error) {
+                console.error('❌ Error starting screen recording:', error)
+                startTime = Date.now()
+                recordingStartedSuccessfully = false
+            }
         }
 
         // Set start time in context
@@ -216,7 +223,7 @@ export class InCallState extends BaseState {
         console.log(`Starting HTML cleanup for ${this.context.params.meetingProvider}`)
 
         try {
-            // Create and start HTML cleaner
+            // EXACT SAME LOGIC AS EXTENSION: Use centralized HtmlCleaner
             const htmlCleaner = new HtmlCleaner(
                 this.context.playwrightPage,
                 this.context.params.meetingProvider,
@@ -225,7 +232,7 @@ export class InCallState extends BaseState {
 
             await htmlCleaner.start()
 
-            // Store the cleaner in context for cleanup later
+            // Store for cleanup later
             this.context.htmlCleaner = htmlCleaner
 
             console.log('HTML cleanup started successfully')
@@ -234,4 +241,6 @@ export class InCallState extends BaseState {
             // Continue even if HTML cleanup fails - it's not critical
         }
     }
+
+
 }
