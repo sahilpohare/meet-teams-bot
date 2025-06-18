@@ -53,11 +53,9 @@ WORKDIR /app
 
 # Copy dependency descriptors first for caching
 COPY package.json package-lock.json ./
-COPY chrome_extension/package.json chrome_extension/package-lock.json ./chrome_extension/
 
-# Install dependencies for the server and the extension
-RUN npm ci  \
-    && npm ci --prefix chrome_extension
+# Install dependencies for the server
+RUN npm ci
 
 # Install Playwright browsers using the local version
 RUN npx  playwright install --with-deps chromium
@@ -65,13 +63,8 @@ RUN npx  playwright install --with-deps chromium
 # Copy the rest of the application code
 COPY . .
 
-# Build the server and the Chrome extension
-RUN npm run build  \
-    && npm run build --prefix chrome_extension
-
-# Verify extension build
-RUN ls -la /app/chrome_extension/dist/ \
-    && ls -la /app/chrome_extension/dist/js/
+# Build the server
+RUN npm run build
 
 # Create startup script with audio support
 RUN echo '#!/bin/bash\n\

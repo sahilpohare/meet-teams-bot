@@ -1,9 +1,4 @@
 import { BrowserContext, chromium, Page } from '@playwright/test'
-import { join } from 'path'
-
-// const EXTENSION_NAME = 'spoke'
-const EXTENSION_ID = 'eahilodcoaonodbfiijhpmfnddkfhmbl'
-const USER_DATA_DIR = '/tmp/test-user-data-dir'
 
 type Resolution = {
     width: number
@@ -23,7 +18,7 @@ const P720: Resolution = {
 var RESOLUTION: Resolution = P720
 
 /**
- * Opens a Chromium browser instance with Chrome extension support and performance optimizations
+ * Opens a Chromium browser instance with performance optimizations for meeting recording
  * 
  * Performance optimizations applied:
  * - Memory management: Increased heap size and enabled memory pressure relief
@@ -34,10 +29,9 @@ var RESOLUTION: Resolution = P720
  * 
  * @param lowResolution Whether to use lower resolution (480p vs 720p) for better performance
  * @param slowMo Whether to enable slow motion mode for debugging (adds 100ms delay)
- * @returns Promise resolving to browser context and background page for extension interaction
+ * @returns Promise resolving to browser context and main page for meeting interaction
  */
 export async function openBrowser(
-    // useChromium: boolean,
     lowResolution: boolean,
     slowMo: boolean = false,
 ): Promise<{ browser: BrowserContext; backgroundPage: Page }> {
@@ -45,27 +39,11 @@ export async function openBrowser(
         RESOLUTION = P480
     }
 
-    const pathToExtension = join(
-        __dirname,
-        '..',
-        '..',
-        'chrome_extension',
-        'dist',
-    )
-    console.log('Path to Extension : ', pathToExtension)
-
     const width = RESOLUTION.width
     const height = RESOLUTION.height
 
     try {
-        console.log('Launching persistent context...')
-
-        // Check that extension path exists
-        const fs = require('fs')
-        if (!fs.existsSync(pathToExtension)) {
-            console.error(`Extension path does not exist: ${pathToExtension}`)
-            throw new Error('Extension path not found')
-        }
+        console.log('Launching persistent context without extension...')
 
         const context = await chromium.launchPersistentContext('', {
             headless: false,
@@ -74,11 +52,6 @@ export async function openBrowser(
                 // Security configurations
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
-                
-                // Chrome extension configuration (required for recording functionality)
-                `--disable-extensions-except=${pathToExtension}`,
-                `--load-extension=${pathToExtension}`,
-                `--allowlisted-extension-id=${EXTENSION_ID}`,
                 
                 // WebRTC optimizations (required for meeting audio/video capture)
                 '--disable-rtc-smoothness-algorithm',
@@ -117,49 +90,16 @@ export async function openBrowser(
             timeout: 120000, // 2 minutes
         })
 
-        console.log('Waiting for background page...')
-        let backgroundPage = null
-
-        // Check if a background page already exists
-        const existingBackgroundPages = context.backgroundPages()
-        if (existingBackgroundPages.length > 0) {
-            backgroundPage = existingBackgroundPages[0]
-            console.log('Found existing background page')
-        } else {
-            // Wait with explicit timeout
-            console.log('No background page found, waiting for event...')
-            try {
-                backgroundPage = await Promise.race([
-                    context.waitForEvent('backgroundpage'),
-                    new Promise((_, reject) =>
-                        setTimeout(
-                            () => reject(new Error('Background page timeout')),
-                            60000,
-                        ),
-                    ),
-                ])
-            } catch (timeoutError) {
-                console.error(
-                    'Timeout waiting for background page:',
-                    timeoutError,
-                )
-                // Essayer de forcer le chargement de l'extension
-                await context.newPage().then((page) => page.close())
-                // Réessayer de trouver la page d'arrière-plan
-                const retryBackgroundPages = context.backgroundPages()
-                if (retryBackgroundPages.length > 0) {
-                    backgroundPage = retryBackgroundPages[0]
-                    console.log('Found background page after retry')
-                }
-            }
-        }
-
-        if (!backgroundPage) {
-            throw new Error('Could not find extension background page')
-        }
-
-        console.log('Background page found')
-        return { browser: context, backgroundPage }
+        console.log('Creating main page for meeting interaction...')
+        
+        // Create a main page for meeting interaction
+        const mainPage = await context.newPage()
+        
+        console.log('Browser launched successfully without extension')
+        
+        // Return the page as backgroundPage for compatibility with existing code
+        return { browser: context, backgroundPage: mainPage }
+        
     } catch (error) {
         console.error('Failed to open browser:', error)
         throw error

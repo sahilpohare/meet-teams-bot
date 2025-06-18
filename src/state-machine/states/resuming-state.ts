@@ -1,5 +1,6 @@
 import { Events } from '../../events'
 import { SCREEN_RECORDER } from '../../recording/ScreenRecorder'
+import { SpeakerManager } from '../../speaker-manager'
 
 import { RECORDING } from '../../main'
 import { MeetingStateType, StateExecuteResult } from '../types'
@@ -42,16 +43,6 @@ export class ResumingState extends BaseState {
 
     private async resumeRecording(): Promise<void> {
         const resumePromise = async () => {
-            // Resume the MediaRecorder in the browser seulement si RECORDING est activé
-            if (RECORDING) {
-                await this.context.backgroundPage?.evaluate(() => {
-                    const w = window as any
-                    return w.resumeMediaRecorder?.()
-                })
-            } else {
-                console.log('RECORDING disabled - skipping video recording resume')
-            }
-
             // Note: ScreenRecorder ne supporte pas pause/resume - l'enregistrement a continué
             if (RECORDING) {
                 console.log('Note: ScreenRecorder recording continued during pause (no pause/resume support)')
@@ -65,6 +56,27 @@ export class ResumingState extends BaseState {
                 console.log('Streaming service resumed successfully')
             } else if (!RECORDING) {
                 console.log('RECORDING disabled - skipping streaming service resume')
+            }
+
+            // Resume speakers observation if it was paused
+            if (this.context.speakersObserver && this.context.playwrightPage) {
+                console.log('Resuming speakers observation...')
+                
+                const onSpeakersChange = async (speakers: any[]) => {
+                    try {
+                        await SpeakerManager.getInstance().handleSpeakerUpdate(speakers)
+                    } catch (error) {
+                        console.error('Error handling speaker update:', error)
+                    }
+                }
+
+                await this.context.speakersObserver.startObserving(
+                    this.context.playwrightPage,
+                    this.context.params.recording_mode,
+                    this.context.params.bot_name,
+                    onSpeakersChange
+                )
+                console.log('Speakers observation resumed')
             }
 
             console.log('Recording resumed successfully')

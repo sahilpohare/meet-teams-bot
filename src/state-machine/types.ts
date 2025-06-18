@@ -84,6 +84,12 @@ export interface MeetingContext {
     // Screen recording
     screenRecorder?: ScreenRecorder
 
+    // Speakers observation
+    speakersObserver?: import('../meeting/speakersObserver').SpeakersObserver
+
+    // HTML cleanup
+    htmlCleaner?: import('../meeting/htmlCleaner').HtmlCleaner
+
     errorTime?: number
     hasResumed?: boolean
     speakers?: string[]

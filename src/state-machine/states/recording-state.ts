@@ -315,21 +315,9 @@ export class RecordingState extends BaseState {
             return
         }
 
-        if (!this.context.backgroundPage) {
-            console.error('Background page not available for stopping audio')
-            return
-        }
-
-        try {
-            await this.context.backgroundPage.evaluate(() => {
-                const w = window as any
-                return w.stopAudioStreaming()
-            })
-            console.info('Audio streaming stopped successfully')
-        } catch (error) {
-            console.error('Failed to stop audio streaming:', error)
-            throw error
-        }
+        // Audio streaming is now handled directly by ScreenRecorder
+        // No need to stop via extension anymore
+        console.info('Audio streaming stop handled by ScreenRecorder - no extension call needed')
     }
 
     private async checkBotRemoved(): Promise<boolean> {

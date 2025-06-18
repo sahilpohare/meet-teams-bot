@@ -2,6 +2,8 @@ import { Events } from '../../events'
 import { RECORDING } from '../../main'
 import { SCREEN_RECORDER } from '../../recording/ScreenRecorder'
 import { SpeakerManager } from '../../speaker-manager'
+import { SpeakersObserver } from '../../meeting/speakersObserver'
+import { HtmlCleaner } from '../../meeting/htmlCleaner'
 import { MEETING_CONSTANTS } from '../constants'
 import { MeetingStateType, StateExecuteResult } from '../types'
 import { BaseState } from './base-state'
@@ -16,7 +18,7 @@ export class InCallState extends BaseState {
             await Promise.race([this.setupRecording(), this.createTimeout()])
             return this.transition(MeetingStateType.Recording)
         } catch (error) {
-            // Arrêter l'observateur en cas d'erreur
+            // Stop observer on error
             this.stopDialogObserver()
 
             console.error('Setup recording failed:', error)
@@ -83,49 +85,19 @@ export class InCallState extends BaseState {
     }
 
     private async setupBrowserComponents(): Promise<void> {
-        if (!this.context.backgroundPage) {
-            throw new Error('Background page not initialized')
+        if (!this.context.playwrightPage) {
+            throw new Error('Playwright page not initialized')
         }
 
         try {
-            // Check if the extension functions exist for HTML cleanup
-            const functionsExist = await this.context.backgroundPage.evaluate(
-                () => {
-                    const w = window as any
-                    return {
-                        removeHtmlExists:
-                            typeof w.remove_shitty_html === 'function',
-                        speakersObserverExists:
-                            typeof w.start_speakers_observer === 'function',
-                    }
-                },
-            )
+            console.log('Setting up browser components with integrated HTML cleanup...')
 
-            console.log('Extension functions status:', functionsExist)
+            // Start HTML cleanup first to clean the interface
+            await this.startHtmlCleaning()
 
-            // Clean up HTML if function exists
-            if (functionsExist.removeHtmlExists) {
-                await this.context.backgroundPage.evaluate(
-                    async (params) => {
-                        const w = window as any
-                        await w.remove_shitty_html(
-                            params.recording_mode,
-                            params.meetingProvider,
-                        )
-                    },
-                    {
-                        recording_mode: this.context.params.recording_mode,
-                        meetingProvider: this.context.params.meetingProvider,
-                    },
-                )
-                console.log('HTML cleanup completed successfully')
-            } else {
-                console.warn('HTML cleanup function not found in extension context')
-            }
-
-            // Si RECORDING=false, démarrer immédiatement l'observation des speakers
+            // If RECORDING=false, start speakers observation immediately
             if (!RECORDING) {
-                await this.startSpeakersObservation(functionsExist.speakersObserverExists)
+                await this.startSpeakersObservation()
                 console.log('RECORDING disabled - skipping video recording setup')
                 this.context.startTime = Date.now()
                 Events.inCallRecording({ start_time: this.context.startTime })
@@ -135,7 +107,7 @@ export class InCallState extends BaseState {
         } catch (error) {
             console.error('Error in setupBrowserComponents:', error)
             console.error('Context state:', {
-                hasBackgroundPage: !!this.context.backgroundPage,
+                hasPlaywrightPage: !!this.context.playwrightPage,
                 recordingMode: this.context.params.recording_mode,
                 meetingProvider: this.context.params.meetingProvider,
                 botName: this.context.params.bot_name,
@@ -143,7 +115,7 @@ export class InCallState extends BaseState {
             throw new Error(`Browser component setup failed: ${error as Error}`)
         }
 
-        // Mode RECORDING=true : Démarrer l'enregistrement d'écran
+        // RECORDING=true mode: Start screen recording
         let startTime: number
         let recordingStartedSuccessfully = false
         
@@ -175,56 +147,91 @@ export class InCallState extends BaseState {
         this.context.startTime = startTime || Date.now()
         console.log(`Recording started at timestamp: ${this.context.startTime}`)
 
-        // Démarrer l'observation des speakers seulement si l'enregistrement a réussi
-        if (recordingStartedSuccessfully) {
-            const functionsExist = await this.context.backgroundPage.evaluate(
-                () => {
-                    const w = window as any
-                    return {
-                        speakersObserverExists:
-                            typeof w.start_speakers_observer === 'function',
-                    }
-                },
-            )
-            
-            await this.startSpeakersObservation(functionsExist.speakersObserverExists)
-        } else {
-            console.error('Recording failed to start - skipping speakers observation to avoid inconsistent data')
+        // Start speakers observation in all cases
+        // Speakers observation is independent of video recording
+        try {
+            await this.startSpeakersObservation()
+        } catch (error) {
+            console.error('Failed to start speakers observation:', error)
+            // Continue even if speakers observation fails
         }
 
-        // Notifier que l'enregistrement est démarré
+        if (recordingStartedSuccessfully) {
+            console.log('✅ Screen recording and speakers observation setup complete')
+        } else {
+            console.warn('⚠️ Screen recording failed but speakers observation is running')
+        }
+
+        // Notify that recording has started
         Events.inCallRecording({ start_time: this.context.startTime })
     }
 
-    private async startSpeakersObservation(speakersObserverExists: boolean): Promise<void> {
-        // Démarrer SpeakerManager
+    private async startSpeakersObservation(): Promise<void> {
+        console.log(`Starting speakers observation for ${this.context.params.meetingProvider}`)
+        
+        // Start SpeakerManager
         SpeakerManager.start()
 
-        if (speakersObserverExists) {
-            // Start speaker observation
-            await this.context.backgroundPage.evaluate(
-                async (params) => {
-                    const w = window as any
-                    await w.start_speakers_observer(
-                        params.recording_mode,
-                        params.bot_name,
-                        params.meetingProvider,
-                        params.local_recording_server_location, // Passer l'URL pour initialiser ApiService
-                    )
-                },
-                {
-                    recording_mode: this.context.params.recording_mode,
-                    bot_name: this.context.params.bot_name,
-                    meetingProvider: this.context.params.meetingProvider,
-                    local_recording_server_location: this.context.params.local_recording_server_location,
-                },
+        if (!this.context.playwrightPage) {
+            console.error('Playwright page not available for speakers observation')
+            return
+        }
+
+        // Create and start integrated speakers observer
+        const speakersObserver = new SpeakersObserver(this.context.params.meetingProvider)
+        
+        // Callback to handle speakers changes
+        const onSpeakersChange = async (speakers: any[]) => {
+            try {
+                await SpeakerManager.getInstance().handleSpeakerUpdate(speakers)
+            } catch (error) {
+                console.error('Error handling speaker update:', error)
+            }
+        }
+
+        try {
+            await speakersObserver.startObserving(
+                this.context.playwrightPage,
+                this.context.params.recording_mode,
+                this.context.params.bot_name,
+                onSpeakersChange
             )
-            console.log('Speakers observer started successfully')
-        } else {
-            console.warn(
-                'start_speakers_observer function not found in extension context',
+            
+            // Store the observer in context for cleanup later
+            this.context.speakersObserver = speakersObserver
+            
+            console.log('Integrated speakers observer started successfully')
+        } catch (error) {
+            console.error('Failed to start integrated speakers observer:', error)
+            throw error
+        }
+    }
+
+    private async startHtmlCleaning(): Promise<void> {
+        if (!this.context.playwrightPage) {
+            console.error('Playwright page not available for HTML cleanup')
+            return
+        }
+
+        console.log(`Starting HTML cleanup for ${this.context.params.meetingProvider}`)
+
+        try {
+            // Create and start HTML cleaner
+            const htmlCleaner = new HtmlCleaner(
+                this.context.playwrightPage,
+                this.context.params.meetingProvider,
+                this.context.params.recording_mode
             )
-            // Continue without speakers observer - this is non-critical
+
+            await htmlCleaner.start()
+
+            // Store the cleaner in context for cleanup later
+            this.context.htmlCleaner = htmlCleaner
+
+            console.log('HTML cleanup started successfully')
+        } catch (error) {
+            console.error('Failed to start HTML cleanup:', error)
+            // Continue even if HTML cleanup fails - it's not critical
         }
     }
 }

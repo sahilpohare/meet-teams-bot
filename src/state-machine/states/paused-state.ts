@@ -69,16 +69,6 @@ export class PausedState extends BaseState {
 
     private async pauseRecording(): Promise<void> {
         const pausePromise = async () => {
-            // Pause the MediaRecorder in the browser seulement si RECORDING est activé
-            if (RECORDING) {
-                await this.context.backgroundPage?.evaluate(() => {
-                    const w = window as any
-                    return w.pauseMediaRecorder?.()
-                })
-            } else {
-                console.log('RECORDING disabled - skipping video recording pause')
-            }
-
             // Note: ScreenRecorder ne supporte pas pause/resume - l'enregistrement continue
             if (RECORDING) {
                 console.log('Note: ScreenRecorder recording continues during pause (no pause/resume support)')
@@ -92,6 +82,12 @@ export class PausedState extends BaseState {
                 console.log('Streaming service paused successfully')
             } else if (!RECORDING) {
                 console.log('RECORDING disabled - skipping streaming service pause')
+            }
+
+            // Pause speakers observation
+            if (this.context.speakersObserver) {
+                this.context.speakersObserver.stopObserving()
+                console.log('Speakers observation paused')
             }
 
             console.log('Recording paused successfully')

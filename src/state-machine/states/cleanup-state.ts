@@ -35,25 +35,63 @@ export class CleanupState extends BaseState {
 
     private async performCleanup(): Promise<void> {
         try {
-            // 1. Arrêter le ScreenRecorder
+            // 1. Stop speakers observer
+            await this.stopSpeakersObserver()
+
+            // 2. Stop HTML cleaner
+            await this.stopHtmlCleaner()
+
+            // 3. Stop the ScreenRecorder
             await this.stopScreenRecorder()
 
-            // 2.Arrêter le streaming
+            // 3. Arrêter le streaming
             if (this.context.streamingService) {
                 this.context.streamingService.stop()
             }
 
-            // 3. Clean up extension resources and browser
+            // 4. Clean up browser resources
             await this.cleanupBrowserResources()
 
-            // 4. Upload the video to S3 (handled automatically by ScreenRecorder now)
+            // 5. Upload the video to S3 (handled automatically by ScreenRecorder now)
             console.log('Video upload handled automatically by ScreenRecorder')
 
-            // 5. Final Redis cleanup
+            // 6. Final Redis cleanup
             await this.cleanupRedisSession()
         } catch (error) {
             console.error('Cleanup error:', error)
             // Continue even if an error occurs
+        }
+    }
+
+    private async stopSpeakersObserver(): Promise<void> {
+        try {
+            if (this.context.speakersObserver) {
+                console.log('Stopping speakers observer from cleanup state...')
+                this.context.speakersObserver.stopObserving()
+                this.context.speakersObserver = null
+                console.log('Speakers observer stopped successfully')
+            } else {
+                console.log('Speakers observer not active, nothing to stop')
+            }
+        } catch (error) {
+            console.error('Error stopping speakers observer:', error)
+            // Don't throw as this is non-critical
+        }
+    }
+
+    private async stopHtmlCleaner(): Promise<void> {
+        try {
+            if (this.context.htmlCleaner) {
+                console.log('Stopping HTML cleaner from cleanup state...')
+                await this.context.htmlCleaner.stop()
+                this.context.htmlCleaner = null
+                console.log('HTML cleaner stopped successfully')
+            } else {
+                console.log('HTML cleaner not active, nothing to stop')
+            }
+        } catch (error) {
+            console.error('Error stopping HTML cleaner:', error)
+            // Don't throw as this is non-critical
         }
     }
 
