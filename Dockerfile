@@ -1,5 +1,5 @@
-# Use Node.js 18 with Debian bullseye for better compatibility
-FROM node:18-bullseye
+# Use Node.js 20 with Debian bullseye for better compatibility
+FROM node:20-bullseye
 
 # Install system dependencies required for Playwright, Chrome extensions, Xvfb, FFmpeg and AWS CLI
 RUN apt-get update \

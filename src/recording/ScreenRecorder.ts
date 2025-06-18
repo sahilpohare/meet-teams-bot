@@ -28,16 +28,6 @@ export interface ScreenRecordingConfig {
     s3Path?: string
 }
 
-/**
- * Native ScreenRecorder - Simplified architecture without Transcoder legacy
- * 
- * DESIGN PRINCIPLES:
- * - No legacy Transcoder patterns
- * - Simple direct configuration
- * - Native file path handling
- * - Clean S3 upload logic
- * - Same external API (compatibility)
- */
 export class ScreenRecorder extends EventEmitter {
     private ffmpegProcess: ChildProcess | null = null
     private chunkWatcher: fs.FSWatcher | null = null
@@ -103,10 +93,6 @@ export class ScreenRecorder extends EventEmitter {
         }
     }
 
-    /**
-     * External API: configure() - Maintain compatibility
-     * Internal: Convert to simple native paths
-     */
     public configure(
         pathManager: PathManager,
         recordingMode?: RecordingMode,
@@ -164,16 +150,10 @@ export class ScreenRecorder extends EventEmitter {
         }
     }
 
-    /**
-     * External API: setPage() - Maintain compatibility
-     */
     public setPage(page: any): void {
         this.page = page
     }
 
-    /**
-     * External API: startRecording() - Maintain compatibility
-     */
     public async startRecording(): Promise<void> {
         this.validateConfiguration()
         
@@ -263,7 +243,6 @@ export class ScreenRecorder extends EventEmitter {
                 this.outputPath
             )
         } else {
-            // **FIXED: Proper separate inputs + sync params like working version**
             args.push(
                 // Video input with Docker sync fixes
                 '-f', 'x11grab',
