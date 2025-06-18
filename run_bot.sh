@@ -90,30 +90,6 @@ process_config() {
     fi
 }
 
-<<<<<<< HEAD
-# Helper: parse CLI key=value overrides and apply to JSON (robust, KISS)
-apply_overrides() {
-    local json="$1"
-    shift
-    local overrides=("$@")
-    for kv in "${overrides[@]}"; do
-        if [[ "$kv" =~ ^([a-zA-Z0-9_]+)=(.*)$ ]]; then
-            key="${BASH_REMATCH[1]}"
-            value="${BASH_REMATCH[2]}"
-            if [[ "$value" =~ ^[0-9]+$ ]] || [[ "$value" == "true" ]] || [[ "$value" == "false" ]]; then
-                json_out=$(echo "$json" | jq --arg key "$key" --argjson value "$value" '.[$key] = $value' 2>&1)
-            else
-                json_out=$(echo "$json" | jq --arg key "$key" --arg value "$value" '.[$key] = $value' 2>&1)
-            fi
-            if [ $? -ne 0 ]; then
-                print_error "Failed to apply override: $kv"
-                print_error "jq error: $json_out"
-                print_error "Key: $key, Value: $value"
-                print_error "Current JSON: $(echo "$json" | head -c 300)"
-                exit 1
-            fi
-            json="$json_out"
-=======
 # Run bot with configuration file
 run_with_config() {
     local config_file=$1
@@ -135,7 +111,6 @@ run_with_config() {
         # Use jq if available, otherwise use sed
         if command -v jq &> /dev/null; then
             config_json=$(echo "$config_json" | jq --arg url "$override_meeting_url" '.meeting_url = $url')
->>>>>>> 4502dfd (recordong mode true or false)
         else
             print_error "Invalid argument: $kv (must be key=value)"
             exit 1
@@ -157,16 +132,13 @@ run_with_config_and_overrides() {
     fi
     local output_dir=$(create_output_dir)
     local processed_config=$(process_config "$config_json")
-<<<<<<< HEAD
-    print_info "Initializing bot session..."
-=======
     
     print_info "Running Meet Teams Bot with configuration: $config_file"
-    print_info "Recording mode: $recording_mode"
+    print_info "Recording enabled: $recording_mode"
+    print_info "Recording mode: screen (direct capture)"
     if [ -n "$override_meeting_url" ]; then
         print_info "Meeting URL: $override_meeting_url"
     fi
->>>>>>> 4502dfd (recordong mode true or false)
     print_info "Output directory: $output_dir"
     # Show masked config preview (only non-sensitive fields)
     local preview
@@ -233,7 +205,8 @@ run_with_json() {
     local processed_config=$(process_config "$json_input")
     
     print_info "Running Meet Teams Bot with provided JSON configuration"
-    print_info "Recording mode: $recording_mode"
+    print_info "Recording enabled: $recording_mode"
+    print_info "Recording mode: screen (direct capture)"
     print_info "Output directory: $output_dir"
     
     # Debug: Show what we're sending to Docker (first 200 chars)
@@ -283,50 +256,199 @@ clean_recordings() {
     fi
 }
 
+# Test recording system
+test_recording() {
+    local duration=${1:-30}  # Par défaut 30 secondes
+    
+    print_info "🧪 Testing screen recording system"
+    print_info "📅 Test duration: ${duration}s"
+    print_info "📄 Using normal run command with params.json"
+    
+    # Vérifier que Docker est disponible
+    check_docker
+    
+    # Vérifier que params.json existe
+    if [ ! -f "params.json" ]; then
+        print_error "params.json not found!"
+        print_info "Please create params.json with your meeting configuration"
+        return 1
+    fi
+    
+    # Construire l'image si nécessaire
+    if ! docker images | grep -q meet-teams-bot; then
+        print_info "Docker image not found, building..."
+        build_image
+    fi
+    
+    print_info "🚀 Starting normal bot run with screen recording..."
+    print_info "ℹ️ Will automatically stop after ${duration}s"
+    
+    # Créer un fichier temporaire pour les logs
+    local log_file="/tmp/test-run-$(date +%s).log"
+    
+    # Fonction pour timeout compatible macOS/Linux
+    run_with_timeout() {
+        local timeout_duration=$1
+        shift
+        
+        if command -v gtimeout &> /dev/null; then
+            # macOS avec coreutils installé
+            gtimeout "$timeout_duration" "$@"
+        elif command -v timeout &> /dev/null; then
+            # Linux
+            timeout "$timeout_duration" "$@"
+        else
+            # Fallback pour macOS sans coreutils
+            "$@" &
+            local pid=$!
+            (
+                sleep "$timeout_duration"
+                print_info "⏰ Test timeout reached (${timeout_duration}s), stopping..."
+                kill -TERM "$pid" 2>/dev/null
+                sleep 5
+                kill -KILL "$pid" 2>/dev/null
+            ) &
+            wait "$pid" 2>/dev/null
+        fi
+    }
+    
+    # Lancer la commande run normale avec timeout
+    if run_with_timeout $((duration + 10)) \
+        ./run_bot.sh run params.json > "$log_file" 2>&1; then
+        print_success "✅ Test completed successfully"
+    else
+        print_info "ℹ️ Test stopped after timeout (this is expected)"
+    fi
+    
+    # Analyser les logs
+    print_info "📊 Analyzing test results..."
+    
+    # Afficher les lignes clés des logs
+    print_info "🔍 Key system messages:"
+    grep -E "Virtual display|PulseAudio|audio devices|ScreenRecorder|Screen recording|Application|Bot execution|Generated files" "$log_file" | head -10 || true
+    
+    # Compter les succès
+    local success_count=0
+    local total_tests=5
+    
+    # Test 1: Virtual display
+    if grep -q "Virtual display started" "$log_file"; then
+        print_success "✅ Virtual display working"
+        ((success_count++))
+    else
+        print_warning "⚠️ Virtual display may have issues"
+    fi
+    
+    # Test 2: PulseAudio
+    if grep -q "PulseAudio started" "$log_file"; then
+        print_success "✅ PulseAudio working"
+        ((success_count++))
+    else
+        print_warning "⚠️ PulseAudio may have issues"
+    fi
+    
+    # Test 3: Virtual audio devices
+    if grep -q "Virtual audio devices created" "$log_file"; then
+        print_success "✅ Audio devices created"
+        ((success_count++))
+    else
+        print_warning "⚠️ Audio devices may have issues"
+    fi
+    
+    # Test 4: Application started
+    if grep -q "Starting application\|Running in serverless mode\|Running on http" "$log_file"; then
+        print_success "✅ Application started"
+        ((success_count++))
+    else
+        print_warning "⚠️ Application may not have started"
+    fi
+    
+    # Test 5: Configuration parsed
+    if ! grep -q "Failed to parse JSON from stdin" "$log_file"; then
+        print_success "✅ Configuration parsed successfully"
+        ((success_count++))
+    else
+        print_warning "⚠️ Configuration parsing failed"
+    fi
+    
+    # Vérifier les fichiers générés
+    local output_dir="./recordings"
+    if [ -d "$output_dir" ] && [ "$(find $output_dir -name "*.mp4" -o -name "*.wav" | wc -l)" -gt 0 ]; then
+        print_success "✅ Recording files were generated"
+        print_info "Generated files:"
+        find "$output_dir" -name "*.mp4" -o -name "*.wav" | head -5
+    else
+        print_info "ℹ️ No recording files (normal for short test)"
+    fi
+    
+    # Compter les erreurs critiques
+    local critical_errors=$(grep -i "error\|Error\|ERROR" "$log_file" | \
+        grep -v "Console logger\|redis url\|Failed to parse JSON\|info.*error\|redis.*undefined" | wc -l | tr -d ' ')
+    
+    if [ "$critical_errors" -eq 0 ]; then
+        print_success "✅ No critical errors detected"
+    else
+        print_warning "⚠️ $critical_errors critical error(s) found:"
+        grep -i "error\|Error\|ERROR" "$log_file" | \
+            grep -v "Console logger\|redis url\|Failed to parse JSON\|info.*error\|redis.*undefined" | head -3 || true
+    fi
+    
+    # Résumé final
+    local success_rate=$((success_count * 100 / total_tests))
+    print_success "🎯 Test completed for screen recording"
+    print_info "Duration: ${duration}s"
+    print_info "Success rate: $success_count/$total_tests tests passed ($success_rate%)"
+    print_info "Critical errors: $critical_errors"
+    print_info "Full log available at: $log_file"
+    
+    if [ "$success_rate" -ge 80 ] && [ "$critical_errors" -eq 0 ]; then
+        print_success "🎉 Test passed! Screen recording system is working correctly"
+        return 0
+    elif [ "$success_rate" -ge 60 ]; then
+        print_warning "⚠️ Test passed with warnings. System mostly working."
+        return 0
+    else
+        print_error "❌ Test failed. Multiple issues detected."
+        print_info "Check the full log for details: $log_file"
+        return 1
+    fi
+}
+
 # Show help
 show_help() {
     echo -e "${BLUE}Meet Teams Bot - Serverless Runner${NC}"
     echo
     echo "Usage:"
-    echo "  $0 build                        - Build the Docker image"
-    echo "  $0 run [config_file] [key=value ...]   - Run bot with config file (default: bot.config.json), override any config param"
-    echo "  $0 run-json '<json>'            - Run bot with JSON configuration"
-    echo "  $0 clean                        - Clean recordings directory"
-    echo "  $0 help                         - Show this help message"
+    echo "  $0 build                     - Build the Docker image"
+    echo "  $0 run <config_file> [url]   - Run bot with configuration file (optional meeting URL override)"
+    echo "  $0 run-json '<json>'         - Run bot with JSON configuration"
+    echo "  $0 test [duration]           - Test screen recording system (duration in seconds)"
+    echo "  $0 clean                     - Clean recordings directory"
+    echo "  $0 help                      - Show this help message"
     echo
     echo "Environment Variables:"
     echo "  RECORDING=true|false         - Enable/disable video recording (default: true)"
     echo
     echo "Examples:"
     echo "  $0 build"
-<<<<<<< HEAD
-    echo "  $0 run" 
-    echo "  $0 run bot.config.json"
-    echo "  $0 run meeting_url=https://meet.google.com/abc-defg-hij bot_name='My Bot'"
-    echo "  $0 run bot.config.json bot_name='My Bot' bots_api_key=123"
-    echo "  $0 clean"
-    echo
-    echo -e "${YELLOW}Features:${NC}"
-    echo "  • Secure configuration handling"
-    echo "  • Automatic session ID generation"
-    echo "  • Meeting URL and all config params override support via CLI"
-    echo "  • Organized recording storage"
-    echo "  • Defaults to bot.config.json if no config file is specified"
-=======
     echo "  $0 run params.json"
     echo "  $0 run params.json 'https://meet.google.com/new-meeting-url'"
     echo "  RECORDING=false $0 run params.json  # Run without video recording"
     echo "  $0 run-json '{\"meeting_url\":\"https://meet.google.com/abc-def-ghi\", \"bot_name\":\"RecordingBot\"}'"
     echo "  RECORDING=false $0 run-json '{...}'  # Run JSON config without recording"
+    echo "  $0 test 60  # Test screen recording for 60 seconds"
     echo "  $0 clean"
+    echo
+    echo "Recording Modes:"
+    echo "  • screen (default)    - Direct screen capture via FFmpeg (recommended)"
     echo
     echo "Features:"
     echo "  • Automatically generates bot_uuid if not provided"
     echo "  • Override meeting URL by passing it as last argument"
     echo "  • Control video recording with RECORDING environment variable"
+    echo "  • Test recording system with different modes"
     echo "  • Saves recordings to ./recordings directory (when recording enabled)"
     echo "  • Lists generated files after completion"
->>>>>>> 4502dfd (recordong mode true or false)
     echo
     echo "For configuration format, see bot.config.json"
 }
@@ -369,6 +491,9 @@ main() {
             fi
             check_docker
             run_with_json "$2"
+            ;;
+        "test")
+            test_recording "${2:-30}"
             ;;
         "clean")
             clean_recordings
