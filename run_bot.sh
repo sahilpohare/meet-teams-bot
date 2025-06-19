@@ -71,6 +71,31 @@ mask_sensitive_json() {
     echo "$json" | sed -E 's/("(api_key|token|secret|password|webhook|key)"[[:space:]]*:[[:space:]]*")[^"]*/\1********/g'
 }
 
+# Apply CLI overrides to JSON configuration
+apply_overrides() {
+    local json="$1"
+    shift
+    local overrides=("$@")
+    
+    for override in "${overrides[@]}"; do
+        if [[ "$override" == *"="* ]]; then
+            local key="${override%%=*}"
+            local value="${override#*=}"
+            
+            # Use jq if available, otherwise skip overrides
+            if command -v jq &> /dev/null; then
+                json=$(echo "$json" | jq --arg key "$key" --arg value "$value" '.[$key] = $value')
+            else
+                print_warning "jq not available, skipping override: $override"
+            fi
+        else
+            print_warning "Invalid override format: $override (must be key=value)"
+        fi
+    done
+    
+    echo "$json"
+}
+
 # Process JSON configuration to add UUID if missing
 process_config() {
     local config_json="$1"
@@ -114,25 +139,11 @@ run_with_config() {
         if command -v jq &> /dev/null; then
             config_json=$(echo "$config_json" | jq --arg url "$override_meeting_url" '.meeting_url = $url')
         else
-            print_error "Invalid argument: $kv (must be key=value)"
+            print_error "jq not available, cannot override meeting URL"
             exit 1
         fi
-    done
-    echo "$json"
-}
-
-# Run bot with configuration file and CLI overrides
-run_with_config_and_overrides() {
-    local config_file=$1
-    shift
-    local overrides=("$@")
-    local config_json
-    config_json=$(cat "$config_file")
-    if [ ${#overrides[@]} -gt 0 ]; then
-        config_json=$(apply_overrides "$config_json" "${overrides[@]}")
-        print_info "Applied CLI overrides: ${overrides[*]}"
     fi
-    local output_dir=$(create_output_dir)
+    
     local processed_config=$(process_config "$config_json")
     
     print_info "Running Meet Teams Bot with configuration: $config_file"
@@ -142,18 +153,6 @@ run_with_config_and_overrides() {
         print_info "Meeting URL: $override_meeting_url"
     fi
     print_info "Output directory: $output_dir"
-<<<<<<< HEAD
-    # Show masked config preview (only non-sensitive fields)
-    local preview
-    preview=$(echo "$processed_config" | jq 'del(.bots_api_key, .bots_webhook, .speech_to_text_api_key) | tostring' 2>&1 | head -c 100)
-    if [ $? -ne 0 ]; then
-        print_error "jq error while generating config preview: $preview"
-        print_error "Processed config: $processed_config"
-    else
-        print_info "Configuration loaded successfully"
-    fi
-    # Validate JSON
-=======
     
     # Debug mode avec VNC
     local docker_args="-p 3000:3000"
@@ -169,19 +168,18 @@ run_with_config_and_overrides() {
     print_info "Config preview: ${preview}..."
     
     # Validate JSON is not empty
->>>>>>> f287737 (teams and meet observer)
     if [ -z "$processed_config" ] || [ "$processed_config" = "{}" ]; then
         print_error "Invalid configuration format after processing."
         print_error "Original config_json: $config_json"
         print_error "Processed config: $processed_config"
         exit 1
     fi
-<<<<<<< HEAD
+    
     # Extract bot_uuid for summary message
     local bot_uuid
-    bot_uuid=$(echo "$processed_config" | jq -r '.bot_uuid // empty')
-    # Run the bot
-=======
+    if command -v jq &> /dev/null; then
+        bot_uuid=$(echo "$processed_config" | jq -r '.bot_uuid // empty')
+    fi
     
     # Add debug logs environment variable if enabled
     local debug_env=""
@@ -190,7 +188,7 @@ run_with_config_and_overrides() {
         print_info "🐛 DEBUG logs enabled - verbose speakers logging activated"
     fi
     
->>>>>>> f287737 (teams and meet observer)
+    # Run the bot
     echo "$processed_config" | docker run -i \
         $docker_args \
         -e RECORDING="$recording_mode" \
@@ -205,6 +203,106 @@ run_with_config_and_overrides() {
                 echo "$line"
             fi
         done
+    
+    # Check if the last command was successful
+    if [ ${PIPESTATUS[0]} -eq 0 ]; then
+        print_success "Bot session completed successfully"
+        # List generated files with better formatting
+        if [ -d "$output_dir" ] && [ "$(ls -A $output_dir)" ]; then
+            echo
+            print_success "Generated recordings:"
+            find "$output_dir" -type f \( -name "*.mp4" -o -name "*.wav" \) -print0 | while IFS= read -r -d '' file; do
+                size=$(du -h "$file" | cut -f1)
+                filename=$(basename "$file")
+                echo -e "  ${GREEN}${ICON_FILE} $filename${NC} (${size})"
+            done
+        fi
+        if [ -n "$bot_uuid" ]; then
+            echo -e "\n${GREEN}done, check out your recording and metadata for bot UUID in $bot_uuid${NC}"
+            echo
+            echo "./recordings/$bot_uuid/output.mp4"
+            echo "./recordings/$bot_uuid/"  # folder for metadata and all files
+        fi
+    else
+        print_error "Bot session failed"
+        exit 1
+    fi
+}
+
+# Run bot with configuration file and CLI overrides
+run_with_config_and_overrides() {
+    local config_file=$1
+    shift
+    local overrides=("$@")
+    local config_json
+    config_json=$(cat "$config_file")
+    
+    if [ ${#overrides[@]} -gt 0 ]; then
+        config_json=$(apply_overrides "$config_json" "${overrides[@]}")
+        print_info "Applied CLI overrides: ${overrides[*]}"
+    fi
+    
+    local output_dir=$(create_output_dir)
+    local processed_config=$(process_config "$config_json")
+    local recording_mode=${RECORDING:-true}
+    local debug_mode=${DEBUG:-false}
+    local debug_logs=${DEBUG_LOGS:-false}
+    
+    print_info "Running Meet Teams Bot with configuration: $config_file"
+    print_info "Recording enabled: $recording_mode"
+    print_info "Recording mode: screen (direct capture)"
+    print_info "Output directory: $output_dir"
+    
+    # Debug mode avec VNC
+    local docker_args="-p 3000:3000"
+    if [ "$debug_mode" = "true" ]; then
+        docker_args="-p 5900:5900 -p 3000:3000"
+        print_info "🔍 DEBUG MODE: VNC enabled on port 5900"
+        print_info "💻 Connect with VNC viewer to: localhost:5900"
+        print_info "📱 On Mac, you can use: open vnc://localhost:5900"
+    fi
+    
+    # Debug: Show what we're sending to Docker (first 200 chars)
+    local preview=$(echo "$processed_config" | head -c 200)
+    print_info "Config preview: ${preview}..."
+    
+    # Validate JSON is not empty
+    if [ -z "$processed_config" ] || [ "$processed_config" = "{}" ]; then
+        print_error "Invalid configuration format after processing."
+        print_error "Original config_json: $config_json"
+        print_error "Processed config: $processed_config"
+        exit 1
+    fi
+    
+    # Extract bot_uuid for summary message
+    local bot_uuid
+    if command -v jq &> /dev/null; then
+        bot_uuid=$(echo "$processed_config" | jq -r '.bot_uuid // empty')
+    fi
+    
+    # Add debug logs environment variable if enabled
+    local debug_env=""
+    if [ "$debug_logs" = "true" ]; then
+        debug_env="-e DEBUG_LOGS=true"
+        print_info "🐛 DEBUG logs enabled - verbose speakers logging activated"
+    fi
+    
+    # Run the bot
+    echo "$processed_config" | docker run -i \
+        $docker_args \
+        -e RECORDING="$recording_mode" \
+        $debug_env \
+        -v "$(pwd)/$output_dir:/app/data" \
+        meet-teams-bot 2>&1 | while IFS= read -r line; do
+            if [[ $line == *"Starting virtual display"* ]]; then
+                print_info "${ICON_DISPLAY} $line"
+            elif [[ $line == *"Virtual display started"* ]]; then
+                print_success "$line"
+            else
+                echo "$line"
+            fi
+        done
+    
     # Check if the last command was successful
     if [ ${PIPESTATUS[0]} -eq 0 ]; then
         print_success "Bot session completed successfully"
