@@ -1,6 +1,7 @@
 import { spawn } from 'child_process'
 import { EventEmitter } from 'events'
 import * as fs from 'fs'
+import { GLOBAL } from '../singleton'
 
 // Singleton instance
 let instance: S3Uploader | null = null
@@ -11,7 +12,7 @@ export class S3Uploader extends EventEmitter {
 
     private constructor() {
         super()
-        this.environment = process.env.ENVIRON || 'local'
+        this.environment = GLOBAL.get().environ || 'local'
         this.defaultBucketName =
             this.environment === 'preprod'
                 ? 'preprod-meeting-baas-logs'
@@ -19,7 +20,7 @@ export class S3Uploader extends EventEmitter {
     }
 
     public static getInstance(): S3Uploader {
-        if (process.env.SERVERLESS === 'true') {
+        if (GLOBAL.isServerless()) {
             console.log('Skipping S3 uploader - serverless mode')
             return null
         }
@@ -45,7 +46,7 @@ export class S3Uploader extends EventEmitter {
         s3Args?:   string[],
         isAudio: boolean = false,
     ): Promise<string> {
-        if (process.env.SERVERLESS === 'true') {
+        if (GLOBAL.isServerless()) {
             console.log('Skipping S3 upload - serverless mode')
             return Promise.resolve('')
         }
@@ -117,7 +118,7 @@ export class S3Uploader extends EventEmitter {
         s3Path: string,
         s3_args: string[]
     ): Promise<string> {
-        if (process.env.SERVERLESS === 'true') {
+        if (GLOBAL.isServerless()) {
             console.log('Skipping S3 upload - serverless mode')
             return Promise.resolve('')
         }

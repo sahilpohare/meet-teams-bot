@@ -8,6 +8,7 @@ import { RecordingMode } from '../types'
 import { PathManager } from '../utils/PathManager'
 import { S3Uploader } from '../utils/S3Uploader'
 import { SyncCalibrator } from './SyncCalibrator'
+import { GLOBAL } from '../singleton'
 
 export interface ScreenRecordingConfig {
     display: string
@@ -300,7 +301,7 @@ export class ScreenRecorder extends EventEmitter {
                 }
                 
                 // Use botUuid for chunk naming format: ${botUuid}-%d.wav
-                const botUuid = this.pathManager ? this.pathManager.getBotUuid() : 'unknown'
+                const botUuid = GLOBAL.get().bot_uuid
                 const chunkPattern = path.join(chunksDir, `${botUuid}-%d.wav`)
                 
                 args.push(

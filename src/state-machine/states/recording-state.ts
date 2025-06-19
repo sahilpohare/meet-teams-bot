@@ -11,14 +11,12 @@ import { BaseState } from './base-state'
 
 import { RECORDING } from '../../main'
 import { SCREEN_RECORDER } from '../../recording/ScreenRecorder'
-import { PathManager } from '../../utils/PathManager'
 
 // Sound level threshold for considering activity (0-100)
 const SOUND_LEVEL_ACTIVITY_THRESHOLD = 5
 
 export class RecordingState extends BaseState {
     private isProcessing: boolean = true
-    private pathManager: PathManager
     private readonly CHECK_INTERVAL = 250
     private noAttendeesWithSilenceStartTime: number = 0
     private readonly SILENCE_CONFIRMATION_MS = 45000 // 45 seconds of silence before confirming no attendees
@@ -29,12 +27,6 @@ export class RecordingState extends BaseState {
 
             // Start the dialog observer when entering this state
             this.startDialogObserver()
-
-            // Initialize PathManager
-            this.pathManager = PathManager.getInstance(
-                this.context.params.bot_uuid,
-            )
-            await this.pathManager.initializePaths()
 
             // Initialize recording
             await this.initializeRecording()

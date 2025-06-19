@@ -1,6 +1,6 @@
 import express from 'express'
 import * as fs from 'fs/promises'
-import * as redis from 'redis'
+
 
 import { execSync } from 'child_process'
 import { SoundContext, VideoContext } from './media_context'
@@ -14,15 +14,6 @@ import { RecordingEndReason } from './state-machine/types'
 
 const HOST = '0.0.0.0'
 export const PORT = 8080
-
-console.log('redis url: ', process.env.REDIS_URL)
-export const clientRedis = redis.createClient({
-    url: process.env.REDIS_URL,
-})
-clientRedis.on('error', (err) => {
-    console.error('Redis error:', err)
-})
-
 
 async function getAllowedOrigins(): Promise<string[]> {
     return [

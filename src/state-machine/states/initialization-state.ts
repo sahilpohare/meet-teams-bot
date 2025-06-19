@@ -142,11 +142,7 @@ export class InitializationState extends BaseState {
     private async setupPathManager(): Promise<void> {
         try {
             if (!this.context.pathManager) {
-                this.context.pathManager = PathManager.getInstance(
-                    this.context.params.bot_uuid,
-                    this.context.params.secret,
-                )
-                await this.context.pathManager.ensureDirectories()
+                this.context.pathManager = PathManager.getInstance()
             }
         } catch (error) {
             console.error('Path manager setup failed:', error)

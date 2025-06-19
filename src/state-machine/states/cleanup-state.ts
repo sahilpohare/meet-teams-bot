@@ -1,4 +1,3 @@
-import { delSessionInRedis } from '../../instance'
 import { SoundContext, VideoContext } from '../../media_context'
 import { SCREEN_RECORDER } from '../../recording/ScreenRecorder'
 import { MEETING_CONSTANTS } from '../constants'
@@ -54,9 +53,6 @@ export class CleanupState extends BaseState {
 
             // 6. Upload the video to S3 (handled automatically by ScreenRecorder now)
             console.log('Video upload handled automatically by ScreenRecorder')
-
-            // 7. Final Redis cleanup
-            await this.cleanupRedisSession()
         } catch (error) {
             console.error('Cleanup error:', error)
             // Continue even if an error occurs
@@ -156,16 +152,6 @@ export class CleanupState extends BaseState {
             }
         } catch (error) {
             console.error('Failed to upload video to S3:', error)
-        }
-    }
-
-    private async cleanupRedisSession(): Promise<void> {
-        if (!this.context.params.session_id) return
-
-        try {
-            await delSessionInRedis(this.context.params.session_id)
-        } catch (error) {
-            console.error('Failed to cleanup Redis session:', error)
         }
     }
 }

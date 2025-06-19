@@ -1,4 +1,3 @@
-import { LOCAL_RECORDING_SERVER_LOCATION } from './instance'
 import { MeetingParams, MeetingProviderInterface } from './types'
 
 // import { Browser as PuppeteerBrowser, Page as PuppeteerPage } from 'puppeteer'
@@ -34,9 +33,6 @@ export class MeetingHandle {
                 ? new TeamsProvider()
                 : new MeetProvider()
 
-        // Configuration initiale
-        this.param.local_recording_server_location =
-            LOCAL_RECORDING_SERVER_LOCATION
         this.param.recording_mode =
             this.param.recording_mode === 'gallery_view'
                 ? 'speaker_view'

@@ -362,7 +362,7 @@ export class Streaming {
             const logEntry = `${timestamp},${normalizedLevel.toFixed(0)}\n`
 
             try {
-                const soundLogPath = PathManager.getInstance(this.botId).getSoundLogPath()
+                const soundLogPath = PathManager.getInstance().getSoundLogPath()
                 fs.promises.appendFile(soundLogPath, logEntry).catch(() => {})
                 this.lastSoundLogTime_ms = now
             } catch (error) {

@@ -1,6 +1,7 @@
 import { Api } from './api/methods'
 import { ApiTypes } from './api/types'
 import { MeetingHandle } from './meeting'
+import { GLOBAL } from './singleton'
 
 import { SpeakerData } from './types'
 
@@ -27,7 +28,7 @@ export async function uploadTranscriptTask(
     speaker: SpeakerData,
     end: boolean,
 ): Promise<void> {
-    if (process.env.SERVERLESS === 'true') {
+    if (GLOBAL.isServerless()) {
         console.log('Skipping transcript upload - serverless mode')
         return
     }
@@ -66,7 +67,6 @@ async function upload(speaker: SpeakerData, end: boolean) {
                                 MeetingHandle.instance.getStartTime()) /
                             1000,
                     } as ApiTypes.ChangeableTranscript,
-                    api.bot_uuid,
                 )
             } catch (e) {
                 console.error(
@@ -91,7 +91,6 @@ async function upload(speaker: SpeakerData, end: boolean) {
                                 MeetingHandle.instance.getStartTime()) /
                             1000,
                     } as ApiTypes.PostableTranscript,
-                    api.bot_uuid,
                 )
             } catch (e) {
                 console.error(
