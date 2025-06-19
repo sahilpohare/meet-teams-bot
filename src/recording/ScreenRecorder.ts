@@ -644,9 +644,19 @@ export class ScreenRecorder extends EventEmitter {
     }
 }
 
-// External API: Global instance (maintain compatibility)
-export const SCREEN_RECORDER = new ScreenRecorder({
-    recordingMode: 'speaker_view',
-    enableTranscriptionChunking: GLOBAL.get().speech_to_text_provider !== null,
-    transcriptionAudioBucket: GLOBAL.get().aws_s3_temporary_audio_bucket,
-})
+export class ScreenRecorderManager {
+    private static instance: ScreenRecorder
+
+    public static getInstance(): ScreenRecorder {
+        if (!ScreenRecorderManager.instance) {
+            ScreenRecorderManager.instance = new ScreenRecorder({
+                recordingMode: 'speaker_view',
+                enableTranscriptionChunking:
+                    GLOBAL.get().speech_to_text_provider !== null,
+                transcriptionAudioBucket:
+                    GLOBAL.get().aws_s3_temporary_audio_bucket,
+            })
+        }
+        return ScreenRecorderManager.instance
+    }
+}

@@ -6,34 +6,8 @@ import { s3cp } from './S3Uploader'
 // Reference to current bot log file
 let currentBotLogFile: string | null = null
 
-// Function to get caller file info
-function getCallerInfo(): string {
-    const stack = new Error().stack
-    if (!stack) return 'unknown:0'
-
-    const lines = stack.split('\n')
-    // Look for the first line that's not from this file or winston
-    for (let i = 1; i < lines.length; i++) {
-        const line = lines[i]
-        if (
-            line &&
-            !line.includes('node_modules') &&
-            !line.includes('Logger.ts') &&
-            !line.includes('winston')
-        ) {
-            const match =
-                line.match(/at.*\((.+):(\d+):\d+\)/) ||
-                line.match(/at (.+):(\d+):\d+/)
-            if (match) {
-                const filename =
-                    match[1].split('/').pop()?.split('.')[0] || 'unknown'
-                const lineNumber = match[2]
-                return `${filename}:${lineNumber}`
-            }
-        }
-    }
-    return 'unknown:0'
-}
+// Store current caller info globally
+let currentCaller = 'unknown:0'
 
 let format = winston.format.combine(
     winston.format.colorize({
@@ -49,8 +23,7 @@ let format = winston.format.combine(
         format: () => new Date().toISOString(),
     }),
     winston.format.printf(({ timestamp, level, message }) => {
-        const fileInfo = getCallerInfo()
-        return `${timestamp}  ${level} ${fileInfo}: ${message}`
+        return `${timestamp}  ${level} ${currentCaller}: ${message}`
     }),
 )
 
@@ -114,6 +87,35 @@ function formatArgs(msg: string, args: any[]) {
     )
 }
 
+// Function to capture caller info at the console override level
+function getCaller(): string {
+    const stack = new Error().stack
+    if (!stack) return 'unknown:0'
+
+    const lines = stack.split('\n')
+    // Look for the first non-internal frame (skip Error, getCaller, and console override)
+    for (let i = 3; i < lines.length; i++) {
+        const line = lines[i]
+        if (
+            line &&
+            !line.includes('node_modules') &&
+            !line.includes('Logger.ts')
+        ) {
+            const match =
+                line.match(/at.*\((.+):(\d+):\d+\)/) ||
+                line.match(/at (.+):(\d+):\d+/)
+            if (match) {
+                const fullPath = match[1]
+                const filename =
+                    fullPath.split('/').pop()?.split('.')[0] || 'unknown'
+                const lineNumber = match[2]
+                return `${filename}:${lineNumber}`
+            }
+        }
+    }
+    return 'unknown:0'
+}
+
 // Global winston logger
 export let logger = winston.createLogger({
     level: 'debug',
@@ -128,17 +130,30 @@ export let logger = winston.createLogger({
 export function setupConsoleLogger() {
     console.log('Setting up console logger')
 
-    console.log = (msg: string, ...args: any[]) =>
+    console.log = (msg: string, ...args: any[]) => {
+        currentCaller = getCaller()
         logger.info(formatArgs(msg, args))
-    console.info = (msg: string, ...args: any[]) =>
+    }
+    console.info = (msg: string, ...args: any[]) => {
+        currentCaller = getCaller()
         logger.info(formatArgs(msg, args))
-    console.warn = (msg: string, ...args: any[]) =>
+    }
+    console.warn = (msg: string, ...args: any[]) => {
+        currentCaller = getCaller()
         logger.warn(formatArgs(msg, args))
-    console.error = (msg: string, ...args: any[]) =>
+    }
+    console.error = (msg: string, ...args: any[]) => {
+        currentCaller = getCaller()
         logger.error(formatArgs(msg, args))
-    console.debug = (msg: string, ...args: any[]) =>
+    }
+    console.debug = (msg: string, ...args: any[]) => {
+        currentCaller = getCaller()
         logger.debug(formatArgs(msg, args))
-    console.table = (data: any) => logger.info(formatTable(data))
+    }
+    console.table = (data: any) => {
+        currentCaller = getCaller()
+        logger.info(formatTable(data))
+    }
 
     console.log('Console logger setup complete')
 }

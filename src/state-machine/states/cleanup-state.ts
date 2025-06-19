@@ -1,5 +1,5 @@
 import { SoundContext, VideoContext } from '../../media_context'
-import { SCREEN_RECORDER } from '../../recording/ScreenRecorder'
+import { ScreenRecorderManager } from '../../recording/ScreenRecorder'
 import { MEETING_CONSTANTS } from '../constants'
 
 import { MeetingStateType, StateExecuteResult } from '../types'
@@ -104,9 +104,9 @@ export class CleanupState extends BaseState {
                 return
             }
 
-            if (SCREEN_RECORDER.isCurrentlyRecording()) {
+            if (ScreenRecorderManager.getInstance().isCurrentlyRecording()) {
                 console.log('Stopping ScreenRecorder from cleanup state...')
-                await SCREEN_RECORDER.stopRecording()
+                await ScreenRecorderManager.getInstance().stopRecording()
                 console.log('ScreenRecorder stopped successfully')
             } else {
                 console.log('ScreenRecorder not recording, nothing to stop')
@@ -147,9 +147,9 @@ export class CleanupState extends BaseState {
         try {
             // ScreenRecorder handles S3 upload automatically during stopRecording()
             // Only upload manually if not already done
-            if (!SCREEN_RECORDER.getFilesUploaded()) {
+            if (!ScreenRecorderManager.getInstance().getFilesUploaded()) {
                 console.log('Uploading video to S3 via ScreenRecorder')
-                await SCREEN_RECORDER.uploadToS3()
+                await ScreenRecorderManager.getInstance().uploadToS3()
             } else {
                 console.log(
                     'Files already uploaded to S3 by ScreenRecorder, skipping',

@@ -27,9 +27,10 @@ export class MeetingHandle {
     }
 
     constructor() {
-        GLOBAL.get().meetingProvider === 'Teams'
-            ? new TeamsProvider()
-            : new MeetProvider()
+        this.provider =
+            GLOBAL.get().meetingProvider === 'Teams'
+                ? new TeamsProvider()
+                : new MeetProvider()
         // Initialisation de la machine à états
         this.stateMachine = new MeetingStateMachine({
             provider: this.provider,

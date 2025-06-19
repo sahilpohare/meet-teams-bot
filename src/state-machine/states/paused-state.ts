@@ -1,5 +1,4 @@
 import { Events } from '../../events'
-import { SCREEN_RECORDER } from '../../recording/ScreenRecorder'
 
 import { RECORDING } from '../../main'
 import { MEETING_CONSTANTS } from '../constants'

@@ -1,6 +1,6 @@
 import { Events } from '../../events'
 import { RECORDING } from '../../main'
-import { SCREEN_RECORDER } from '../../recording/ScreenRecorder'
+import { ScreenRecorderManager } from '../../recording/ScreenRecorder'
 import { SpeakerManager } from '../../speaker-manager'
 import { SpeakersObserver } from '../../meeting/speakersObserver'
 import { HtmlCleaner } from '../../meeting/htmlCleaner'
@@ -71,7 +71,7 @@ export class InCallState extends BaseState {
             console.info('Configuring SCREEN_RECORDER...')
 
             // Configure SCREEN_RECORDER with PathManager and recording params
-            SCREEN_RECORDER.configure(
+            ScreenRecorderManager.getInstance().configure(
                 this.context.pathManager,
                 GLOBAL.get().recording_mode,
             )
@@ -140,7 +140,9 @@ export class InCallState extends BaseState {
             try {
                 // Configure the meeting page for sync (if available)
                 if (this.context.playwrightPage) {
-                    SCREEN_RECORDER.setPage(this.context.playwrightPage)
+                    ScreenRecorderManager.getInstance().setPage(
+                        this.context.playwrightPage,
+                    )
                     console.log(
                         '📄 Meeting page configured for SCREEN_RECORDER',
                     )
@@ -150,7 +152,7 @@ export class InCallState extends BaseState {
 
                 // Start screen recording
                 console.log('🚀 Starting screen recording...')
-                await SCREEN_RECORDER.startRecording()
+                await ScreenRecorderManager.getInstance().startRecording()
 
                 startTime = Date.now()
                 recordingStartedSuccessfully = true

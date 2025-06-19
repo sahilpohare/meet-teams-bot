@@ -39,11 +39,13 @@ export class Events {
     }
 
     static async recordingPaused() {
-        return Events.EVENTS?.send('recording_paused')
+        // Send webhook in parallel - don't wait for completion
+        Events.EVENTS?.send('recording_paused')
     }
 
     static async recordingResumed() {
-        return Events.EVENTS?.send('recording_resumed')
+        // Send webhook in parallel - don't wait for completion
+        Events.EVENTS?.send('recording_resumed')
     }
 
     static async callEnded() {
@@ -105,7 +107,8 @@ export class Events {
         }
 
         this.sentEvents.add(code)
-        await this.send(code, additionalData)
+        // Send webhook in parallel - don't wait for completion
+        this.send(code, additionalData)
     }
 
     private async send(

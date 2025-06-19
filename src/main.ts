@@ -4,17 +4,23 @@ import { Events } from './events'
 import { GLOBAL } from './singleton'
 import { PathManager } from './utils/PathManager'
 import { detectMeetingProvider } from './utils/detectMeetingProvider' //TODO: RENAME
-import { uploadLogsToS3, setupExitHandler } from './utils/Logger'
+import {
+    uploadLogsToS3,
+    setupExitHandler,
+    setupConsoleLogger,
+} from './utils/Logger'
 import { server } from './server'
 
 import { JoinError, MeetingParams } from './types'
 
-import axios from 'axios'
 import { exit } from 'process'
 
 // ========================================
 // CONFIGURATION
 // ========================================
+
+// Setup console logger first to ensure proper formatting
+setupConsoleLogger()
 
 // Setup crash handlers to upload logs in case of unexpected exit
 setupExitHandler()

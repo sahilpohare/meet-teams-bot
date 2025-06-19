@@ -123,8 +123,11 @@ export class Api {
             })
             console.log('Successfully notified backend of recording failure')
         } catch (error) {
-            console.error('Failed to notify recording failure:', error)
-            throw error
+            console.warn(
+                'Unable to notify recording failure (continuing execution):',
+                error instanceof Error ? error.message : error,
+            )
+            // Don't throw - continue execution even if notification fails
         }
     }
 
@@ -139,9 +142,11 @@ export class Api {
             await this.endMeetingTrampoline()
             console.log('API call to endMeetingTrampoline succeeded')
         } catch (error) {
-            console.error('API call to endMeetingTrampoline failed:', error)
-            // The retry logic is already handled by the rax configuration in the constructor
-            throw error
+            console.warn(
+                'API call to endMeetingTrampoline failed (continuing execution):',
+                error instanceof Error ? error.message : error,
+            )
+            // Don't throw - continue execution even if API call fails
         }
     }
 }

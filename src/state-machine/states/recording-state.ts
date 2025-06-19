@@ -10,7 +10,7 @@ import {
 import { BaseState } from './base-state'
 
 import { RECORDING } from '../../main'
-import { SCREEN_RECORDER } from '../../recording/ScreenRecorder'
+import { ScreenRecorderManager } from '../../recording/ScreenRecorder'
 import { GLOBAL } from '../../singleton'
 
 // Sound level threshold for considering activity (0-100)
@@ -110,7 +110,7 @@ export class RecordingState extends BaseState {
             hasStreamingService: !!this.context.streamingService,
             isStreamingInstanceAvailable: !!Streaming.instance,
             isScreenRecorderConfigured: RECORDING
-                ? SCREEN_RECORDER.getStatus().isConfigured
+                ? ScreenRecorderManager.getInstance().getStatus().isConfigured
                 : 'N/A (RECORDING disabled)',
         })
 
@@ -124,13 +124,13 @@ export class RecordingState extends BaseState {
 
         // Seulement configurer les event listeners du screen recorder si RECORDING est activé
         if (RECORDING) {
-            SCREEN_RECORDER.on('error', async (error) => {
+            ScreenRecorderManager.getInstance().on('error', async (error) => {
                 console.error('ScreenRecorder error:', error)
                 this.context.error = error
                 this.isProcessing = false
             })
 
-            SCREEN_RECORDER.on('stopped', async () => {
+            ScreenRecorderManager.getInstance().on('stopped', async () => {
                 console.info('ScreenRecorder stopped - recording completed')
             })
 
@@ -268,9 +268,9 @@ export class RecordingState extends BaseState {
                     )
                 } else if (
                     RECORDING &&
-                    SCREEN_RECORDER.isCurrentlyRecording()
+                    ScreenRecorderManager.getInstance().isCurrentlyRecording()
                 ) {
-                    await SCREEN_RECORDER.stopRecording()
+                    await ScreenRecorderManager.getInstance().stopRecording()
                     console.info('ScreenRecorder stopped successfully')
                 } else {
                     console.info(

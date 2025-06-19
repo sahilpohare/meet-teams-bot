@@ -9,9 +9,12 @@ class Global {
         if (this.meetingParams !== null) {
             throw new Error('Meeting params are already set')
         }
-       
+
         // Validate critical parameters before setting them
-        if (!meetingParams.meeting_url || meetingParams.meeting_url.trim() === '') {
+        if (
+            !meetingParams.meeting_url ||
+            meetingParams.meeting_url.trim() === ''
+        ) {
             throw new Error('Missing required parameter: meeting_url')
         }
         if (!meetingParams.bot_uuid || meetingParams.bot_uuid.trim() === '') {
@@ -19,7 +22,9 @@ class Global {
         }
 
         this.meetingParams = meetingParams
-        console.log(`🤖 Bot ${meetingParams.bot_uuid} initialized with validated parameters`)
+        console.log(
+            `🤖 Bot ${meetingParams.bot_uuid} initialized with validated parameters`,
+        )
     }
 
     public get(): MeetingParams {
