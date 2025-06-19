@@ -55,9 +55,8 @@ export class ScreenRecorder extends EventEmitter {
             `Native ScreenRecorder: Using audio bucket for ${env}: ${transcriptionAudioBucket}`,
         )
 
-        // Clean configuration (no legacy defaults)
         this.config = {
-            display: GLOBAL.get().environ || ':99',
+            display: process.env.DISPLAY || ':99',
             audioDevice: 'pulse',
             outputFormat: 'mp4',
             videoCodec: 'libx264',
