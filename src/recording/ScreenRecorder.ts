@@ -418,6 +418,7 @@ export class ScreenRecorder extends EventEmitter {
                 chunkPath, 
                 this.config.transcriptionAudioBucket!, 
                 filename, 
+                [],
                 true
             )
             console.log(`✅ Chunk uploaded: ${filename}`)
@@ -450,6 +451,7 @@ export class ScreenRecorder extends EventEmitter {
                 this.outputPath,
                 this.config.bucketName!,
                 s3Key,
+                [],
             )
 
             fs.unlinkSync(this.outputPath)

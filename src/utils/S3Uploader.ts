@@ -42,7 +42,7 @@ export class S3Uploader extends EventEmitter {
         filePath: string,
         bucketName: string,
         s3Path: string,
-        s3Args: string[],
+        s3Args?:   string[],
         isAudio: boolean = false,
     ): Promise<string> {
         if (process.env.SERVERLESS === 'true') {
