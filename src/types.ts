@@ -47,7 +47,6 @@ export type MeetingParams = {
     meetingProvider: MeetingProvider
     event?: { id: number }
     agenda?: any
-    bot_branding: boolean
     custom_branding_bot_path?: string
     vocabulary: string[]
     force_lang: boolean

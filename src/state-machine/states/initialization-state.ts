@@ -25,7 +25,7 @@ export class InitializationState extends BaseState {
             await this.setupPathManager()
 
             // Setup branding if needed - non-bloquant
-            if (GLOBAL.get().bot_branding) {
+            if (GLOBAL.get().custom_branding_bot_path) {
                 this.setupBranding().catch((error) => {
                     console.warn(
                         'Branding setup failed, continuing anyway:',

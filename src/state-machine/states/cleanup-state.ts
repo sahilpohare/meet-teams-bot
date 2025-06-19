@@ -51,8 +51,8 @@ export class CleanupState extends BaseState {
             // 5. Clean up browser resources
             await this.cleanupBrowserResources()
 
-            // 6. Upload the video to S3 (handled automatically by ScreenRecorder now)
-            console.log('Video upload handled automatically by ScreenRecorder')
+            // 6. Upload the video to S3
+            await this.uploadVideoToS3()
         } catch (error) {
             console.error('Cleanup error:', error)
             // Continue even if an error occurs
