@@ -3,7 +3,6 @@ import * as fs from 'fs'
 import { MeetingHandle } from './meeting'
 import { Streaming } from './streaming'
 
-import { RECORDING } from './main'
 import { ParticipantState } from './state-machine/types'
 import { SpeakerData } from './types'
 import { uploadTranscriptTask } from './uploadTranscripts'
@@ -42,11 +41,8 @@ export class SpeakerManager {
             })
 
             // Envoyer l'état des speakers au streaming seulement si RECORDING est activé
-            if (RECORDING && Streaming.instance) {
+            if (Streaming.instance) {
                 Streaming.instance.send_speaker_state(speakers)
-            } else if (!RECORDING) {
-                // En mode test, on log juste qu'on skip le streaming
-                // console.log('RECORDING disabled - skipping speaker state streaming')
             }
 
             // console les speakers

@@ -1,18 +1,18 @@
 import express from 'express'
-import * as fs from 'fs/promises'
-
+import { writeFile, unlink } from 'fs/promises'
+import { unlinkSync } from 'fs'
 import { execSync } from 'child_process'
+import * as path from 'path'
+
 import { SoundContext, VideoContext } from './media_context'
 import { StopRecordParams } from './types'
-
-import axios from 'axios'
-import { unlinkSync } from 'fs'
 import { MeetingHandle } from './meeting'
-
 import { RecordingEndReason } from './state-machine/types'
 
+import axios from 'axios'
+
 const HOST = '0.0.0.0'
-export const PORT = 8080
+const PORT = 8080
 
 async function getAllowedOrigins(): Promise<string[]> {
     return [process.env.ALLOWED_ORIGIN]
@@ -132,15 +132,15 @@ export async function server() {
         Mp3 = '.mp3',
     }
 
-    const path = require('path')
-
     // Upload ressources into the server
     app.post('/upload', async (request, result) => {
         const params: Upload = request.body
         console.log(params)
 
         const extension = path.extname(params.url)
-        if (!Object.values(FileExtension).includes(extension)) {
+        if (
+            !Object.values(FileExtension).includes(extension as FileExtension)
+        ) {
             result.status(400).json({
                 error: 'This extension is not compatible',
             })
@@ -151,11 +151,14 @@ export async function server() {
             .then((file) => {
                 const filename = path.basename(params.url)
 
-                fs.writeFile(filename, file.data)
+                writeFile(filename, file.data)
                 console.log('Ressource downloaded @', filename)
 
                 // In case of image, create a video from it with FFMPEG and delete tmp files
-                if (extension == '.jpg' || extension == '.png') {
+                if (
+                    extension === FileExtension.Jpg ||
+                    extension === FileExtension.Png
+                ) {
                     try {
                         const command = `ffmpeg -y -i ${filename} -vf scale=${VideoContext.WIDTH}:${VideoContext.HEIGHT} -y resized_${filename}`
                         const output = execSync(command)
@@ -207,24 +210,26 @@ export async function server() {
         console.log(params)
 
         const extension = path.extname(params.url)
-        if (!Object.values(FileExtension).includes(extension)) {
+        if (
+            !Object.values(FileExtension).includes(extension as FileExtension)
+        ) {
             result.status(400).json({
                 error: 'This extension is not compatible',
             })
             return
         }
         const filename = path.basename(params.url)
-        switch (extension) {
-            case '.png':
-            case '.jpg':
+        switch (extension as FileExtension) {
+            case FileExtension.Png:
+            case FileExtension.Jpg:
                 await VideoContext.instance.stop()
                 VideoContext.instance.play(`${filename}.mp4`, true)
                 break
-            case '.mp3':
+            case FileExtension.Mp3:
                 await SoundContext.instance.stop()
                 SoundContext.instance.play(`${filename}`, false)
                 break
-            case '.mp4':
+            case FileExtension.Mp4:
                 await VideoContext.instance.stop()
                 await SoundContext.instance.stop()
                 VideoContext.instance.play(`${filename}`, false)

@@ -25,9 +25,6 @@ setupConsoleLogger()
 // Setup crash handlers to upload logs in case of unexpected exit
 setupExitHandler()
 
-// Configuration to enable/disable recording
-export const RECORDING = process.env.RECORDING === 'true' // Default false, true if RECORDING=true
-
 // Configuration to enable/disable DEBUG logs
 export const DEBUG_LOGS =
     process.argv.includes('--debug') || process.env.DEBUG_LOGS === 'true'
@@ -123,13 +120,20 @@ async function handleFailedRecording(): Promise<void> {
     const meetingParams = await readFromStdin()
 
     try {
+        // Log all meeting parameters (masking sensitive data)
+        const logParams = { ...meetingParams }
+
+        // Mask sensitive data for security
+        if (logParams.secret) logParams.secret = '***MASKED***'
+        if (logParams.user_token) logParams.user_token = '***MASKED***'
+        if (logParams.bots_api_key) logParams.bots_api_key = '***MASKED***'
+        if (logParams.speech_to_text_api_key)
+            logParams.speech_to_text_api_key = '***MASKED***'
+        if (logParams.zoom_sdk_pwd) logParams.zoom_sdk_pwd = '***MASKED***'
+
         console.log(
             'Received meeting parameters:',
-            JSON.stringify({
-                meeting_url: meetingParams.meeting_url,
-                bot_uuid: meetingParams.bot_uuid,
-                bot_name: meetingParams.bot_name,
-            }),
+            JSON.stringify(logParams, null, 2),
         )
 
         console.log('About to redirect logs to bot:', meetingParams.bot_uuid)

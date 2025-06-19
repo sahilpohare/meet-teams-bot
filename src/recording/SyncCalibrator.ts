@@ -8,14 +8,14 @@ import * as fsSync from 'fs'
 
 const execAsync = promisify(exec)
 
-export interface SyncResult {
+interface SyncResult {
     audioOffset: number // en secondes, positif = audio en avance
     confidence: number // 0-1, confiance dans la mesure
     flashTimestamp: number // timestamp du flash détecté
     beepTimestamp: number // timestamp du bip détecté
 }
 
-export interface SyncHistoryEntry {
+interface SyncHistoryEntry {
     timestamp: number
     detectedOffset: number
     empiricalAdjustment: number
@@ -23,7 +23,7 @@ export interface SyncHistoryEntry {
     userFeedback?: 'good' | 'bad' | 'perfect' // Future: user feedback
 }
 
-export interface SyncLearningData {
+interface SyncLearningData {
     history: SyncHistoryEntry[]
     statistics: {
         averageDetectedOffset: number

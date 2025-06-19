@@ -1,6 +1,5 @@
 import { Events } from '../../events'
 
-import { RECORDING } from '../../main'
 import { MEETING_CONSTANTS } from '../constants'
 import { MeetingStateType, StateExecuteResult } from '../types'
 import { BaseState } from './base-state'
@@ -68,26 +67,15 @@ export class PausedState extends BaseState {
 
     private async pauseRecording(): Promise<void> {
         const pausePromise = async () => {
-            // Note: ScreenRecorder ne supporte pas pause/resume - l'enregistrement continue
-            if (RECORDING) {
-                console.log(
-                    'Note: ScreenRecorder recording continues during pause (no pause/resume support)',
-                )
-            } else {
-                console.log('RECORDING disabled - no recording to pause')
-            }
+            // TODO: PAUSE SCREEN RECORDER
 
-            // Pause du streaming
-            if (RECORDING && this.context.streamingService) {
+            // Streaming service paused
+            if (this.context.streamingService) {
                 this.context.streamingService.pause()
                 console.log('Streaming service paused successfully')
-            } else if (!RECORDING) {
-                console.log(
-                    'RECORDING disabled - skipping streaming service pause',
-                )
             }
 
-            // Pause speakers observation
+            // Speakers observation paused
             if (this.context.speakersObserver) {
                 this.context.speakersObserver.stopObserving()
                 console.log('Speakers observation paused')

@@ -1,7 +1,6 @@
 import { Events } from '../../events'
 import { SpeakerManager } from '../../speaker-manager'
 
-import { RECORDING } from '../../main'
 import { MeetingStateType, StateExecuteResult } from '../types'
 import { BaseState } from './base-state'
 import { GLOBAL } from '../../singleton'
@@ -43,23 +42,12 @@ export class ResumingState extends BaseState {
 
     private async resumeRecording(): Promise<void> {
         const resumePromise = async () => {
-            // Note: ScreenRecorder ne supporte pas pause/resume - l'enregistrement a continué
-            if (RECORDING) {
-                console.log(
-                    'Note: ScreenRecorder recording continued during pause (no pause/resume support)',
-                )
-            } else {
-                console.log('RECORDING disabled - no recording to resume')
-            }
+            // TODO: RESUME SCREEN RECORDER
 
             // Reprendre le streaming
-            if (RECORDING && this.context.streamingService) {
+            if (this.context.streamingService) {
                 this.context.streamingService.resume()
                 console.log('Streaming service resumed successfully')
-            } else if (!RECORDING) {
-                console.log(
-                    'RECORDING disabled - skipping streaming service resume',
-                )
             }
 
             // Resume speakers observation if it was paused

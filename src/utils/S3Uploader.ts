@@ -1,23 +1,12 @@
 import { spawn } from 'child_process'
-import { EventEmitter } from 'events'
 import * as fs from 'fs'
 import { GLOBAL } from '../singleton'
 
 // Singleton instance
 let instance: S3Uploader | null = null
 
-export class S3Uploader extends EventEmitter {
-    private environment: string
-    private defaultBucketName: string
-
-    private constructor() {
-        super()
-        this.environment = GLOBAL.get().environ || 'local'
-        this.defaultBucketName =
-            this.environment === 'preprod'
-                ? 'preprod-meeting-baas-logs'
-                : 'meeting-baas-logs'
-    }
+export class S3Uploader {
+    private constructor() {}
 
     public static getInstance(): S3Uploader {
         if (GLOBAL.isServerless()) {
@@ -76,18 +65,18 @@ export class S3Uploader extends EventEmitter {
 
                 awsProcess.stdout.on('data', (data) => {
                     output += data.toString()
-                    this.emit('progress', data.toString())
+                    console.log('S3 upload progress:', data.toString().trim())
                 })
 
                 awsProcess.stderr.on('data', (data) => {
                     errorOutput += data.toString()
-                    this.emit('error', data.toString())
+                    console.error('S3 upload error:', data.toString().trim())
                 })
 
                 awsProcess.on('error', (error) => {
-                    this.emit(
-                        'error',
-                        `Failed to start AWS CLI process: ${error.message}`,
+                    console.error(
+                        'Failed to start AWS CLI process:',
+                        error.message,
                     )
                     reject(
                         new Error(
@@ -102,13 +91,13 @@ export class S3Uploader extends EventEmitter {
                         resolve(publicUrl)
                     } else {
                         const errorMessage = `S3 upload failed (${code}): ${errorOutput || output}`
-                        this.emit('error', errorMessage)
+                        console.error(errorMessage)
                         reject(new Error(errorMessage))
                     }
                 })
             })
         } catch (error: any) {
-            this.emit('error', error.message)
+            console.error('S3 upload error:', error.message)
             throw error
         }
     }
@@ -126,15 +115,12 @@ export class S3Uploader extends EventEmitter {
         try {
             return await this.uploadFile(
                 filePath,
-                this.defaultBucketName,
+                GLOBAL.get().remote.aws_s3_log_bucket,
                 s3Path,
                 s3_args,
             )
         } catch (error: any) {
-            this.emit(
-                'error',
-                `Failed to upload to default bucket: ${error.message}`,
-            )
+            console.error('Failed to upload to default bucket:', error.message)
             throw error
         }
     }

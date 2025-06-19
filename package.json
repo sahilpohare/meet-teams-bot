@@ -2,22 +2,29 @@
     "name": "meet-teams-bot",
     "version": "1.0.0",
     "description": "Automated meeting recording bot for Google Meet, Microsoft Teams, and Zoom",
-    "keywords": ["meeting", "recording", "bot", "automation", "google-meet", "teams", "zoom", "playwright"],
+    "keywords": [
+        "meeting",
+        "recording",
+        "bot",
+        "automation",
+        "google-meet",
+        "teams",
+        "zoom",
+        "playwright"
+    ],
     "engines": {
         "node": ">= 18.0.0 <=20"
     },
     "dependencies": {
         "@playwright/test": "^1.52.0",
-        "playwright": "^1.52.0",
         "@types/sharp": "^0.31.1",
         "amqplib": "^0.10.3",
         "async": "^3.2.6",
         "axios": "0.21.1",
         "express": "4.17.1",
-        "fs": "^0.0.1-security",
         "jsdom": "24.0.0",
         "node-fetch": "^2.7.0",
-        "path": "^0.12.7",
+        "playwright": "^1.52.0",
         "ramda": "0.29.1",
         "redis": "4.6.7",
         "retry-axios": "^2.5.0",
@@ -40,12 +47,15 @@
         "@types/redis": "^4.0.10",
         "@types/wav-encoder": "1.3.3",
         "@types/ws": "8.5.12",
+        "depcheck": "^1.4.7",
         "prettier": "3.3.3",
         "rimraf": "~3.0.2",
         "ts-jest": "^29.2.5",
         "ts-node": "^10.9.2",
         "ts-node-dev": "^2.0.0",
-        "typescript": "^5.4"
+        "ts-unused-exports": "^11.0.1",
+        "typescript": "^5.4",
+        "unimported": "^1.31.0"
     },
     "scripts": {
         "start": "node build/src/main.js",
@@ -57,7 +67,11 @@
         "format": "prettier --log-level warn --write \"src/**/*.{jsx,js,ts}\"",
         "test": "jest",
         "test:watch": "jest --watch",
-        "test:coverage": "jest --coverage"
+        "test:coverage": "jest --coverage",
+        "check:unused-exports": "ts-unused-exports tsconfig.json",
+        "check:unused-imports": "unimported",
+        "check:unused-deps": "depcheck",
+        "check:dead-code": "npm run check:unused-exports && npm run check:unused-imports && npm run check:unused-deps"
     },
     "author": "Meet Teams Bot Contributors",
     "license": "Apache-2.0",

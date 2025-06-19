@@ -1,5 +1,4 @@
 import { Events } from '../../events'
-import { RECORDING } from '../../main'
 import { ScreenRecorderManager } from '../../recording/ScreenRecorder'
 import { SpeakerManager } from '../../speaker-manager'
 import { SpeakersObserver } from '../../meeting/speakersObserver'
@@ -66,22 +65,15 @@ export class InCallState extends BaseState {
             throw new Error('PathManager not initialized')
         }
 
-        // Configure SCREEN_RECORDER if RECORDING is enabled
-        if (RECORDING) {
-            console.info('Configuring SCREEN_RECORDER...')
+        console.info('Configuring SCREEN_RECORDER...')
 
-            // Configure SCREEN_RECORDER with PathManager and recording params
-            ScreenRecorderManager.getInstance().configure(
-                this.context.pathManager,
-                GLOBAL.get().recording_mode,
-            )
+        // Configure SCREEN_RECORDER with PathManager and recording params
+        ScreenRecorderManager.getInstance().configure(
+            this.context.pathManager,
+            GLOBAL.get().recording_mode,
+        )
 
-            console.info('SCREEN_RECORDER configured successfully')
-        } else {
-            console.info(
-                'RECORDING disabled - skipping screen recorder initialization',
-            )
-        }
+        console.info('SCREEN_RECORDER configured successfully')
 
         console.info('Services initialized successfully')
     }
@@ -98,17 +90,6 @@ export class InCallState extends BaseState {
 
             // Start HTML cleanup first to clean the interface
             await this.startHtmlCleaning()
-
-            // If RECORDING=false, start speakers observation immediately
-            if (!RECORDING) {
-                await this.startSpeakersObservation()
-                console.log(
-                    'RECORDING disabled - skipping video recording setup',
-                )
-                this.context.startTime = Date.now()
-                Events.inCallRecording({ start_time: this.context.startTime })
-                return
-            }
         } catch (error) {
             console.error('Error in setupBrowserComponents:', error)
             console.error('Context state:', {
@@ -127,10 +108,7 @@ export class InCallState extends BaseState {
         console.log('🎯 === STARTING SCREEN RECORDING ===')
 
         // 🍎 MAC TESTING: Skip screen recording for Mac local testing
-        if (
-            process.env.DISABLE_RECORDING === 'true' ||
-            process.platform === 'darwin'
-        ) {
+        if (process.platform === 'darwin') {
             console.log(
                 '🍎 Screen recording disabled for Mac testing - focusing on speakers detection only',
             )

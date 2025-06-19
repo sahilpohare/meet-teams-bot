@@ -10,7 +10,7 @@ import { S3Uploader } from '../utils/S3Uploader'
 import { SyncCalibrator } from './SyncCalibrator'
 import { GLOBAL } from '../singleton'
 
-export interface ScreenRecordingConfig {
+interface ScreenRecordingConfig {
     display: string
     audioDevice?: string
     outputFormat: 'webm' | 'mp4'
@@ -47,14 +47,6 @@ export class ScreenRecorder extends EventEmitter {
     constructor(config: Partial<ScreenRecordingConfig> = {}) {
         super()
 
-        // Native bucket logic (no legacy complexity)
-        const env = GLOBAL.get().environ || 'local'
-        const transcriptionAudioBucket = this.determineBucket(env)
-
-        console.log(
-            `Native ScreenRecorder: Using audio bucket for ${env}: ${transcriptionAudioBucket}`,
-        )
-
         this.config = {
             display: process.env.DISPLAY || ':99',
             audioDevice: 'pulse',
@@ -69,7 +61,8 @@ export class ScreenRecorder extends EventEmitter {
             recordingMode: 'speaker_view',
             enableTranscriptionChunking: false,
             transcriptionChunkDuration: 3600,
-            transcriptionAudioBucket: transcriptionAudioBucket,
+            transcriptionAudioBucket:
+                GLOBAL.get().aws_s3_temporary_audio_bucket,
             bucketName: GLOBAL.get().remote?.aws_s3_video_bucket || '',
             s3Path: '',
             ...config,
@@ -86,20 +79,6 @@ export class ScreenRecorder extends EventEmitter {
             enableTranscriptionChunking:
                 this.config.enableTranscriptionChunking,
         })
-    }
-
-    private determineBucket(env: string): string {
-        switch (env) {
-            case 'prod':
-                return 'meeting-baas-audio'
-            case 'preprod':
-                return 'preprod-meeting-baas-audio'
-            default:
-                return (
-                    GLOBAL.get().aws_s3_temporary_audio_bucket ||
-                    'local-meeting-baas-audio'
-                )
-        }
     }
 
     public configure(
@@ -449,6 +428,7 @@ export class ScreenRecorder extends EventEmitter {
         try {
             const STREAMING_SAMPLE_RATE = 24_000
 
+            // Use SEPARATE audio device for streaming to avoid PulseAudio conflicts
             this.streamingProcess = spawn(
                 'ffmpeg',
                 [
@@ -457,7 +437,7 @@ export class ScreenRecorder extends EventEmitter {
                     '-thread_queue_size',
                     '256',
                     '-i',
-                    'virtual_speaker.monitor',
+                    'virtual_streaming.monitor', // Separate device for streaming
                     '-acodec',
                     'pcm_f32le',
                     '-ac',

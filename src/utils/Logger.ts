@@ -117,7 +117,7 @@ function getCaller(): string {
 }
 
 // Global winston logger
-export let logger = winston.createLogger({
+let logger = winston.createLogger({
     level: 'debug',
     format: format,
     transports: [
