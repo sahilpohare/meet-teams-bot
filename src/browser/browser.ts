@@ -59,14 +59,13 @@ export async function openBrowser(
         })
 
         console.log('Creating main page for meeting interaction...')
-        
+
         // Create a main page for meeting interaction
         const mainPage = await context.newPage()
-        
+
         console.log('Browser launched successfully')
-        
+
         return { browser: context, backgroundPage: mainPage }
-        
     } catch (error) {
         console.error('Failed to open browser:', error)
         throw error

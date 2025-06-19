@@ -10,6 +10,7 @@ import {
 import { parseMeetingUrlFromJoinInfos } from '../urlParser/teamsUrlParser'
 import { sleep } from '../utils/sleep'
 import { takeScreenshot } from '../utils/takeScreenshot'
+import { GLOBAL } from '../singleton'
 
 export class TeamsProvider implements MeetingProviderInterface {
     constructor() {}
@@ -54,25 +55,43 @@ export class TeamsProvider implements MeetingProviderInterface {
                 waitUntil: 'domcontentloaded',
                 timeout: 15000, // Reduced from 30s
             })
-            
+
             // Quick check for buttons with reduced timeout
             await Promise.race([
-                page.getByRole('button', { name: 'Join now' }).waitFor({ timeout: 5000 }),
-                page.getByRole('button', { name: 'Continue without audio or video' }).waitFor({ timeout: 5000 }),
+                page
+                    .getByRole('button', { name: 'Join now' })
+                    .waitFor({ timeout: 5000 }),
+                page
+                    .getByRole('button', {
+                        name: 'Continue without audio or video',
+                    })
+                    .waitFor({ timeout: 5000 }),
             ]).catch(() => {
                 // Silent catch - no need to log timeout
             })
-            
-            const currentUrl = await page.url()
-            const isLightInterface = currentUrl.includes('light-meetings') || currentUrl.includes('light')
 
-            if (isLightInterface && attempts < 3) { // Limit retries to 3
+            const currentUrl = await page.url()
+            const isLightInterface =
+                currentUrl.includes('light-meetings') ||
+                currentUrl.includes('light')
+
+            if (isLightInterface && attempts < 3) {
+                // Limit retries to 3
                 await page.close()
-                console.log(`🥕 Light interface detected, retry ${attempts + 1}/3`)
+                console.log(
+                    `🥕 Light interface detected, retry ${attempts + 1}/3`,
+                )
                 await sleep(500) // Reduced wait time
-                return await this.openMeetingPage(browserContext, link, streaming_input, attempts + 1)
+                return await this.openMeetingPage(
+                    browserContext,
+                    link,
+                    streaming_input,
+                    attempts + 1,
+                )
             } else if (isLightInterface && attempts >= 3) {
-                console.log('🥕 Light interface persists after 3 retries, continuing anyway')
+                console.log(
+                    '🥕 Light interface persists after 3 retries, continuing anyway',
+                )
             }
 
             return page
@@ -85,7 +104,6 @@ export class TeamsProvider implements MeetingProviderInterface {
     async joinMeeting(
         page: Page,
         cancelCheck: () => boolean,
-        meetingParams: MeetingParams,
         onJoinSuccess: () => void,
     ): Promise<void> {
         console.log('joining meeting', cancelCheck)
@@ -100,47 +118,89 @@ export class TeamsProvider implements MeetingProviderInterface {
         try {
             // Try multiple approaches to handle Teams button scenarios
             const maxAttempts = 15 // Increased for better reliability
-            
+
             for (let i = 0; i < maxAttempts; i++) {
                 if (cancelCheck?.()) break
-                
+
                 // Check all buttons in one pass with more attempts
-                const [continueOnBrowser, joinNow, continueWithoutAudio] = await Promise.all([
-                    clickWithInnerText(page, 'button', 'Continue on this browser', 2, false),
-                    clickWithInnerText(page, 'button', 'Join now', 2, false),
-                    clickWithInnerText(page, 'button', 'Continue without audio or video', 2, false),
-                ])
+                const [continueOnBrowser, joinNow, continueWithoutAudio] =
+                    await Promise.all([
+                        clickWithInnerText(
+                            page,
+                            'button',
+                            'Continue on this browser',
+                            2,
+                            false,
+                        ),
+                        clickWithInnerText(
+                            page,
+                            'button',
+                            'Join now',
+                            2,
+                            false,
+                        ),
+                        clickWithInnerText(
+                            page,
+                            'button',
+                            'Continue without audio or video',
+                            2,
+                            false,
+                        ),
+                    ])
 
                 if (continueOnBrowser) {
-                    await clickWithInnerText(page, 'button', 'Continue on this browser', 3, true)
+                    await clickWithInnerText(
+                        page,
+                        'button',
+                        'Continue on this browser',
+                        3,
+                        true,
+                    )
                     console.log('✅ Clicked "Continue on this browser"')
                     break
                 }
-                
+
                 if (joinNow) {
                     console.log('✅ Already at Join screen')
                     break
                 }
-                
+
                 if (continueWithoutAudio) {
-                    await clickWithInnerText(page, 'button', 'Continue without audio or video', 3, true)
+                    await clickWithInnerText(
+                        page,
+                        'button',
+                        'Continue without audio or video',
+                        3,
+                        true,
+                    )
                     console.log('✅ Clicked "Continue without audio"')
                     // Don't break immediately - sometimes there are multiple steps
                     await sleep(1000)
                 }
 
-                if (i === 7) console.log('⏳ Still looking for Teams buttons...') // Log midway
+                if (i === 7)
+                    console.log('⏳ Still looking for Teams buttons...') // Log midway
                 await sleep(300) // Slightly reduced wait time
             }
-            
+
             // Extra attempts for "Continue without audio" in light interface
-            console.log('🔄 Extra attempts for "Continue without audio or video"...')
+            console.log(
+                '🔄 Extra attempts for "Continue without audio or video"...',
+            )
             for (let i = 0; i < 5; i++) {
                 if (cancelCheck?.()) break
-                
-                const found = await clickWithInnerText(page, 'button', 'Continue without audio or video', 3, true)
+
+                const found = await clickWithInnerText(
+                    page,
+                    'button',
+                    'Continue without audio or video',
+                    3,
+                    true,
+                )
                 if (found) {
-                    console.log('✅ Successfully clicked "Continue without audio" (extra attempt)')
+                    console.log(
+                        '✅ Successfully clicked "Continue without audio" (extra attempt)',
+                    )
                     await sleep(1000)
                     break
                 }
@@ -168,48 +228,74 @@ export class TeamsProvider implements MeetingProviderInterface {
         } catch (e) {
             console.warn('Failed to find "Join now" button (first attempt):', e)
         }
-        
+
         // Additional attempt for "Continue without audio" in case it appears later
         try {
-            console.log('🔄 Additional attempt for "Continue without audio or video"...')
+            console.log(
+                '🔄 Additional attempt for "Continue without audio or video"...',
+            )
             for (let i = 0; i < 3; i++) {
                 if (cancelCheck?.()) break
-                
-                const found = await clickWithInnerText(page, 'button', 'Continue without audio or video', 2, true)
+
+                const found = await clickWithInnerText(
+                    page,
+                    'button',
+                    'Continue without audio or video',
+                    2,
+                    true,
+                )
                 if (found) {
-                    console.log('✅ Successfully clicked "Continue without audio" (delayed attempt)')
+                    console.log(
+                        '✅ Successfully clicked "Continue without audio" (delayed attempt)',
+                    )
                     await sleep(1000)
                     break
                 }
                 await sleep(500)
             }
         } catch (e) {
-            console.warn('Additional "Continue without audio" attempt failed:', e)
+            console.warn(
+                'Additional "Continue without audio" attempt failed:',
+                e,
+            )
         }
 
         if (isLightInterface) {
             try {
                 await handlePermissionDialog(page)
-                
+
                 // Quick camera/mic setup with timeouts
                 await Promise.race([
                     activateCamera(page),
-                    sleep(3000).then(() => { throw new Error('Camera timeout') })
-                ]).catch(e => console.warn('Camera setup failed:', e instanceof Error ? e.message : e))
+                    sleep(3000).then(() => {
+                        throw new Error('Camera timeout')
+                    }),
+                ]).catch((e) =>
+                    console.warn(
+                        'Camera setup failed:',
+                        e instanceof Error ? e.message : e,
+                    ),
+                )
 
-                const streaming_input = meetingParams.streaming_input
+                const streaming_input = GLOBAL.get().streaming_input
                 if (streaming_input) {
                     await Promise.race([activateMicrophone(page), sleep(2000)])
                 } else {
-                    await Promise.race([deactivateMicrophone(page), sleep(2000)])
+                    await Promise.race([
+                        deactivateMicrophone(page),
+                        sleep(2000),
+                    ])
                 }
-                          } catch (e) {
-                console.warn('Camera/mic setup failed, continuing:', e instanceof Error ? e.message : String(e))
-              }
+            } catch (e) {
+                console.warn(
+                    'Camera/mic setup failed, continuing:',
+                    e instanceof Error ? e.message : String(e),
+                )
+            }
         }
 
         try {
-            await typeBotName(page, meetingParams.bot_name, 20)
+            await typeBotName(page, GLOBAL.get().bot_name, 20)
             await clickWithInnerText(page, 'button', 'Join now', 20)
         } catch (e) {
             console.error(
@@ -246,33 +332,48 @@ export class TeamsProvider implements MeetingProviderInterface {
         }
 
         console.log('Successfully confirmed we are in the meeting')
-        
+
         // 🎯 CRITICAL: Notify that join was successful (fixes waiting room timeout)
         onJoinSuccess()
-        console.log('✅ onJoinSuccess callback called - no more waiting room timeout!')
+        console.log(
+            '✅ onJoinSuccess callback called - no more waiting room timeout!',
+        )
 
         // Check for "Continue without audio or video" that might appear AFTER joining (light interface)
         try {
-            console.log('🔄 Post-meeting check for "Continue without audio or video"...')
+            console.log(
+                '🔄 Post-meeting check for "Continue without audio or video"...',
+            )
             for (let i = 0; i < 5; i++) {
                 if (cancelCheck?.()) break
-                
-                const found = await clickWithInnerText(page, 'button', 'Continue without audio or video', 2, true)
+
+                const found = await clickWithInnerText(
+                    page,
+                    'button',
+                    'Continue without audio or video',
+                    2,
+                    true,
+                )
                 if (found) {
-                    console.log('✅ Successfully clicked post-meeting "Continue without audio"')
+                    console.log(
+                        '✅ Successfully clicked post-meeting "Continue without audio"',
+                    )
                     await sleep(1500) // Give time for interface to update
                     break
                 }
                 await sleep(800)
             }
         } catch (e) {
-            console.warn('Post-meeting "Continue without audio" check failed:', e)
+            console.warn(
+                'Post-meeting "Continue without audio" check failed:',
+                e,
+            )
         }
 
         // Once in the meeting, configure the view
         try {
             if (await clickWithInnerText(page, 'button', 'View', 10, false)) {
-                if (meetingParams.recording_mode !== 'gallery_view') {
+                if (GLOBAL.get().recording_mode !== 'gallery_view') {
                     await clickWithInnerText(page, 'button', 'View', 10)
                     await clickWithInnerText(page, 'div', 'Speaker', 20)
                 }
@@ -282,10 +383,7 @@ export class TeamsProvider implements MeetingProviderInterface {
         }
     }
 
-    async findEndMeeting(
-        _meetingParams: MeetingParams,
-        page: Page,
-    ): Promise<boolean> {
+    async findEndMeeting(page: Page): Promise<boolean> {
         return await isRemovedFromTheMeeting(page)
     }
 
@@ -415,7 +513,9 @@ export async function clickWithInnerText(
 
         // Only log if found or on final attempt
         if (continueButton || i === iterations - 1) {
-            console.log(`${innerText} ${click ? 'clicked' : 'found'} : ${continueButton}`)
+            console.log(
+                `${innerText} ${click ? 'clicked' : 'found'} : ${continueButton}`,
+            )
         }
         i++
     }

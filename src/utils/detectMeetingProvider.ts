@@ -1,4 +1,4 @@
-import { MeetingProvider } from "../types"
+import { MeetingProvider } from '../types'
 
 export function detectMeetingProvider(url: string): MeetingProvider {
     if (url.includes('https://teams')) {

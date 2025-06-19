@@ -11,6 +11,7 @@ import { BaseState } from './base-state'
 
 import { RECORDING } from '../../main'
 import { SCREEN_RECORDER } from '../../recording/ScreenRecorder'
+import { GLOBAL } from '../../singleton'
 
 // Sound level threshold for considering activity (0-100)
 const SOUND_LEVEL_ACTIVITY_THRESHOLD = 5
@@ -96,7 +97,9 @@ export class RecordingState extends BaseState {
                 Streaming.instance = this.context.streamingService
             }
         } else if (!RECORDING) {
-            console.info('RECORDING disabled - skipping streaming service initialization')
+            console.info(
+                'RECORDING disabled - skipping streaming service initialization',
+            )
         } else {
             console.warn('No streaming service available in context')
         }
@@ -106,7 +109,9 @@ export class RecordingState extends BaseState {
             hasPathManager: !!this.context.pathManager,
             hasStreamingService: !!this.context.streamingService,
             isStreamingInstanceAvailable: !!Streaming.instance,
-            isScreenRecorderConfigured: RECORDING ? SCREEN_RECORDER.getStatus().isConfigured : 'N/A (RECORDING disabled)',
+            isScreenRecorderConfigured: RECORDING
+                ? SCREEN_RECORDER.getStatus().isConfigured
+                : 'N/A (RECORDING disabled)',
         })
 
         // Configure listeners
@@ -128,10 +133,12 @@ export class RecordingState extends BaseState {
             SCREEN_RECORDER.on('stopped', async () => {
                 console.info('ScreenRecorder stopped - recording completed')
             })
-            
+
             console.info('ScreenRecorder event listeners configured')
         } else {
-            console.info('RECORDING disabled - skipping screen recorder event listeners')
+            console.info(
+                'RECORDING disabled - skipping screen recorder event listeners',
+            )
         }
 
         console.info('Event listeners setup complete')
@@ -252,13 +259,23 @@ export class RecordingState extends BaseState {
             console.info('Stopping screen recorder')
             try {
                 // 🍎 MAC TESTING: Skip screen recording stop for Mac local testing
-                if (process.env.DISABLE_RECORDING === 'true' || process.platform === 'darwin') {
-                    console.log('🍎 Screen recording disabled for Mac - nothing to stop')
-                } else if (RECORDING && SCREEN_RECORDER.isCurrentlyRecording()) {
+                if (
+                    process.env.DISABLE_RECORDING === 'true' ||
+                    process.platform === 'darwin'
+                ) {
+                    console.log(
+                        '🍎 Screen recording disabled for Mac - nothing to stop',
+                    )
+                } else if (
+                    RECORDING &&
+                    SCREEN_RECORDER.isCurrentlyRecording()
+                ) {
                     await SCREEN_RECORDER.stopRecording()
                     console.info('ScreenRecorder stopped successfully')
                 } else {
-                    console.info('RECORDING disabled or not recording - skipping screen recorder stop')
+                    console.info(
+                        'RECORDING disabled or not recording - skipping screen recorder stop',
+                    )
                 }
             } catch (error) {
                 console.error(
@@ -288,7 +305,9 @@ export class RecordingState extends BaseState {
         if (this.context.screenRecorder) {
             try {
                 if (this.context.screenRecorder.isCurrentlyRecording()) {
-                    console.log('Stopping screen recording via ScreenRecorder...')
+                    console.log(
+                        'Stopping screen recording via ScreenRecorder...',
+                    )
                     await this.context.screenRecorder.stopRecording()
                     console.log('Screen recording stopped successfully')
                 } else {
@@ -300,7 +319,9 @@ export class RecordingState extends BaseState {
                 throw error
             }
         } else {
-            console.warn('ScreenRecorder not available - recording may not have been properly started')
+            console.warn(
+                'ScreenRecorder not available - recording may not have been properly started',
+            )
         }
     }
 
@@ -312,7 +333,9 @@ export class RecordingState extends BaseState {
 
         // Audio streaming is now handled directly by ScreenRecorder
         // No need to stop via extension anymore
-        console.info('Audio streaming stop handled by ScreenRecorder - no extension call needed')
+        console.info(
+            'Audio streaming stop handled by ScreenRecorder - no extension call needed',
+        )
     }
 
     private async checkBotRemoved(): Promise<boolean> {
@@ -323,7 +346,6 @@ export class RecordingState extends BaseState {
 
         try {
             return await this.context.provider.findEndMeeting(
-                this.context.params,
                 this.context.playwrightPage,
             )
         } catch (error) {
@@ -446,4 +468,3 @@ export class RecordingState extends BaseState {
         return new Promise((resolve) => setTimeout(resolve, ms))
     }
 }
-

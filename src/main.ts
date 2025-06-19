@@ -1,35 +1,41 @@
 import { MeetingHandle } from './meeting'
+import { Api } from './api/methods'
+import { Events } from './events'
+import { GLOBAL } from './singleton'
+import { PathManager } from './utils/PathManager'
+import { detectMeetingProvider } from './utils/detectMeetingProvider' //TODO: RENAME
+import { uploadLogsToS3, setupExitHandler } from './utils/Logger'
+import { server } from './server'
+
+import { JoinError, MeetingParams } from './types'
 
 import axios from 'axios'
 import { exit } from 'process'
-import { Api } from './api/methods'
-import { detectMeetingProvider } from './utils/detectMeetingProvider' //TODO: RENAME 
-import {
-    JoinError,
-    JoinErrorCode,
-    MeetingParams,
-} from './types'
 
-import { Events } from './events'
-import { RecordingEndReason } from './state-machine/types'
-import {
+// ========================================
+// CONFIGURATION
+// ========================================
 
-    uploadLogsToS3,
-} from './utils/Logger'
-import { GLOBAL } from './singleton'
-import { PathManager } from './utils/PathManager'
+// Setup crash handlers to upload logs in case of unexpected exit
+setupExitHandler()
 
-// Configuration pour activer/désactiver l'enregistrement
-export const RECORDING = process.env.RECORDING === 'true' // Par défaut false, true si RECORDING=true
+// Configuration to enable/disable recording
+export const RECORDING = process.env.RECORDING === 'true' // Default false, true if RECORDING=true
 
-// Configuration pour activer/désactiver les logs DEBUG
-export const DEBUG_LOGS = process.argv.includes('--debug') || process.env.DEBUG_LOGS === 'true'
+// Configuration to enable/disable DEBUG logs
+export const DEBUG_LOGS =
+    process.argv.includes('--debug') || process.env.DEBUG_LOGS === 'true'
 if (DEBUG_LOGS) {
     console.log('🐛 DEBUG mode activated - speakers debug logs will be shown')
 }
 
+// ========================================
+// UTILITY FUNCTIONS
+// ========================================
 
-// Helper function to read data from stdin (for serverless mode)
+/**
+ * Read and parse meeting parameters from stdin
+ */
 async function readFromStdin(): Promise<MeetingParams> {
     return new Promise((resolve) => {
         let data = ''
@@ -38,9 +44,10 @@ async function readFromStdin(): Promise<MeetingParams> {
         })
 
         process.stdin.on('end', () => {
-            console.log('Raw data received from stdin:', JSON.stringify(data));
+            console.log('Raw data received from stdin:', JSON.stringify(data))
             try {
                 const params = JSON.parse(data) as MeetingParams
+
                 // Detect the meeting provider
                 params.meetingProvider = detectMeetingProvider(
                     params.meeting_url,
@@ -57,17 +64,58 @@ async function readFromStdin(): Promise<MeetingParams> {
     })
 }
 
-// ENTRY POINT
-// syntax convention
-// minus => Library
-// CONST => Const
-// camelCase => Fn
-// PascalCase => Classes
+/**
+ * Handle successful recording completion
+ */
+async function handleSuccessfulRecording(): Promise<void> {
+    console.log(`${Date.now()} Finalize project && Sending WebHook complete`)
 
-; (async () => {
-    let isServerless: boolean = false
-    const originalDirectory = process.cwd()
+    // Log the end reason for debugging
+    console.log(
+        `Recording ended normally with reason: ${MeetingHandle.instance.getEndReason()}`,
+    )
+
+    // Handle API endpoint call with built-in retry logic
+    if (!GLOBAL.isServerless()) {
+        await Api.instance.handleEndMeetingWithRetry()
+    }
+
+    // Send success webhook
+    await Events.recordingSucceeded()
+}
+
+/**
+ * Handle failed recording
+ */
+async function handleFailedRecording(): Promise<void> {
+    console.error('Recording did not complete successfully')
+
+    // Log the end reason for debugging
+    const endReason = MeetingHandle.instance.getEndReason()
+    console.log(`Recording failed with reason: ${endReason || 'Unknown'}`)
+
+    // Send failure webhook
+    await Events.recordingFailed(
+        String(endReason) || 'Recording did not complete successfully',
+    )
+}
+
+// ========================================
+// MAIN ENTRY POINT
+// ========================================
+
+/**
+ * Main application entry point
+ *
+ * Syntax conventions:
+ * - minus => Library
+ * - CONST => Const
+ * - camelCase => Fn
+ * - PascalCase => Classes
+ */
+;(async () => {
     const meetingParams = await readFromStdin()
+
     try {
         console.log(
             'Received meeting parameters:',
@@ -77,311 +125,55 @@ async function readFromStdin(): Promise<MeetingParams> {
                 bot_name: meetingParams.bot_name,
             }),
         )
-        // Redirect logs to bot-specific file
-        axios.defaults.baseURL = meetingParams.remote.api_server_baseurl
-        axios.defaults.withCredentials = true
 
-        isServerless = meetingParams.remote !== undefined
-        console.log(
-            'About to redirect logs to bot:',
-            meetingParams.bot_uuid,
-        )
+        console.log('About to redirect logs to bot:', meetingParams.bot_uuid)
         console.log('Logs redirected successfully')
 
-        // In serverless mode, we need to initialize MeetingHandle ourselves
-        if (isServerless) {
-            // Create the API instance
+        // Start the server
+        await server().catch((e) => {
+            console.error(`Failed to start server: ${e}`)
+            throw e
+        })
+        console.log('Server started successfully')
+
+        // Initialize components
+        MeetingHandle.init()
+        Events.init()
+        Events.joiningCall()
+
+        // Create API instance for non-serverless mode
+        if (!GLOBAL.isServerless()) {
             new Api()
-
-            // Import necessary modules
-            const { server } = await import('./server')
-            const { Events } = await import('./events')
-
-            // Start the server
-            await server().catch((e) => {
-                console.error(`Fail to start server: ${e}`)
-                throw e
-            })
-            console.log('Server started successfully')
-
-            // Initialize MeetingHandle with parameters
-            MeetingHandle.init(meetingParams)
-
-            // Initialize events
-            Events.init(meetingParams)
-            Events.joiningCall()
         }
 
-
-
-        // Start the meeting with state machine
+        // Start the meeting recording
         await MeetingHandle.instance.startRecordMeeting()
 
-        // Check if recording was successful and ended normally
+        // Handle recording result
         if (MeetingHandle.instance.wasRecordingSuccessful()) {
-            console.log(
-                `${Date.now()} Finalize project && Sending WebHook complete`,
-            )
-
-            // Log the end reason for debugging
-            const endReason = MeetingHandle.instance.getEndReason()
-            console.log(
-                `Recording ended normally with reason: ${endReason}`,
-            )
-
-            // Start retry process and set a timeout
-            let webhookSentForApiFailure = false
-            const apiStartTime = Date.now()
-            const maxApiWaitTime = 20 * 60 * 1000 // 20 minutes
-            const retryDelay = 10000 // 10 seconds
-
-            try {
-                // Try to call the API
-                if (isServerless) {
-                    console.log(
-                        'Skipping endMeetingTrampoline - serverless mode',
-                    )
-                } else {
-                    await Api.instance.endMeetingTrampoline()
-                }
-                console.log(
-                    'API call to endMeetingTrampoline succeeded',
-                )
-            } catch (apiError) {
-                const elapsedSeconds =
-                    (Date.now() - apiStartTime) / 1000
-                const remainingSeconds =
-                    Math.max(
-                        0,
-                        maxApiWaitTime - (Date.now() - apiStartTime),
-                    ) / 1000
-
-                console.log(
-                    `API call failed after ${elapsedSeconds.toFixed(1)}s, ` +
-                    `${remainingSeconds.toFixed(1)}s remaining before timeout. ` +
-                    `Retrying in ${retryDelay / 1000}s...`,
-                    apiError,
-                )
-
-                // Only send the webhook once if we're going to keep trying
-                if (
-                    !webhookSentForApiFailure &&
-                    remainingSeconds < maxApiWaitTime / 1000 - 60
-                ) {
-                    // If we've been retrying for more than a minute, send webhook but keep trying
-                    try {
-                        await sendWebhookOnce({
-                            meetingUrl:
-                                meetingParams.meeting_url,
-                            botUuid: meetingParams.bot_uuid,
-                            success: true,
-                            errorMessage:
-                                'Recording completed successfully but having difficulty notifying API',
-                        })
-                        webhookSentForApiFailure = true
-                        console.log(
-                            'Sent webhook for successful recording while API retries continue',
-                        )
-                    } catch (webhookError) {
-                        console.error(
-                            'Failed to send interim webhook:',
-                            webhookError,
-                        )
-                    }
-                }
-
-                // Wait before retrying
-                await new Promise((resolve) =>
-                    setTimeout(resolve, retryDelay),
-                )
-            }
+            await handleSuccessfulRecording()
         } else {
-            // Recording did not reach Recording state or failed
-            console.error('Recording did not complete successfully')
-
-            // Get the specific reason for the failure
-            const endReason = MeetingHandle.instance.getEndReason()
-            let errorMessage
-
-            // Check if we have a JoinError type error in the context
-            const joinError =
-                MeetingHandle.instance?.stateMachine?.context?.error
-            if (joinError && joinError instanceof JoinError) {
-                // Use the JoinError message directly
-                errorMessage = joinError.message
-                console.log(
-                    `Found JoinError in context with code: ${errorMessage}`,
-                )
-            } else if (endReason) {
-                // Use endReason as fallback
-                errorMessage = String(endReason)
-            }
-
-            console.log(
-                `Recording failed with reason: ${errorMessage || 'Unknown'}`,
-            )
-
-            // Don't call endMeetingTrampoline here
-            await sendWebhookOnce({
-                meetingUrl: meetingParams.meeting_url,
-                botUuid: meetingParams.bot_uuid,
-                success: false,
-                errorMessage:
-                    errorMessage ||
-                    'Recording did not complete successfully',
-            })
+            await handleFailedRecording()
         }
     } catch (error) {
-        // Explicit error propagated from state machine (error during recording)
+        // Handle explicit errors from state machine
         console.error('Meeting failed:', error)
 
-        await sendWebhookOnce({
-            meetingUrl: meetingParams.meeting_url,
-            botUuid: meetingParams.bot_uuid,
-            success: false,
-            errorMessage:
-                error instanceof JoinError
-                    ? error.message
-                    : 'Recording failed to complete',
-        })
-    }
+        const errorMessage =
+            error instanceof JoinError
+                ? error.message
+                : 'Recording failed to complete'
 
-
-    // Only do Redis cleanup in normal mode
-    if (!isServerless) {
-
-        // Upload logs to S3 before exiting
-        try {
-            // Return to the original directory before uploading logs
-            if (originalDirectory) {
-                console.log(
-                    `Switching back to original directory: ${originalDirectory}`,
-                )
-                process.chdir(originalDirectory)
-            }
-
-            await uploadLogsToS3({})
-        } catch (error) {
-            console.error('Failed to upload logs to S3:', error)
-        }
-    }
-    console.log('exiting instance')
-    exit(0)
-})()
-
-let webhookSent = false
-
-async function sendWebhookOnce(params: {
-    meetingUrl: string
-    botUuid: string
-    success: boolean
-    errorMessage?: string
-}) {
-    if (webhookSent) {
-        console.log('Webhook already sent, skipping...')
-        return
-    }
-
-    try {
-        // Multiple attempts for webhook sending
-        const maxRetries = 3
-        let attempt = 0
-
-        while (attempt < maxRetries) {
-            try {
-                const callEndedPromise = Events.callEnded()
-                await Promise.race([
-                    callEndedPromise,
-                    new Promise((_, reject) =>
-                        setTimeout(
-                            () => reject(new Error('Call ended event timeout')),
-                            30000,
-                        ),
-                    ),
-                ])
-
-                if (!params.success) {
-                    await meetingBotStartRecordFailed(
-                        params.meetingUrl,
-                        params.botUuid,
-                        params.errorMessage || 'Unknown error',
-                        GLOBAL.isServerless()
-                    )
-                }
-
-                console.log('All webhooks sent successfully')
-                break
-            } catch (e) {
-                attempt++
-                if (attempt === maxRetries) {
-                    console.error('Final webhook attempt failed:', e)
-                } else {
-                    console.warn(
-                        `Webhook attempt ${attempt} failed, retrying...`,
-                    )
-                    await new Promise((resolve) =>
-                        setTimeout(resolve, 2000 * attempt),
-                    )
-                }
-            }
-        }
+        await Events.recordingFailed(errorMessage)
     } finally {
-        webhookSent = true // Mark as sent even in case of failure
+        if (!GLOBAL.isServerless()) {
+            try {
+                await uploadLogsToS3({})
+            } catch (error) {
+                console.error('Failed to upload logs to S3:', error)
+            }
+        }
+        console.log('exiting instance')
+        exit(0)
     }
-}
-
-async function handleErrorInStartRecording(error: Error, data: MeetingParams, isServerless: boolean) {
-    console.log('Handling error in start recording:', {
-        errorType: error.constructor.name,
-        isJoinError: error instanceof JoinError,
-        message: error.message,
-        endReason: MeetingHandle.instance?.stateMachine?.context?.endReason,
-    })
-
-    // Utiliser le endReason du context si disponible
-    const endReason = MeetingHandle.instance?.stateMachine?.context?.endReason
-
-    let errorMessage
-    if (endReason === RecordingEndReason.ApiRequest) {
-        errorMessage = JoinErrorCode.ApiRequest
-    } else if (error instanceof JoinError) {
-        errorMessage = error.message
-    } else {
-        errorMessage = 'InternalError : ' + error.message
-    }
-
-    await meetingBotStartRecordFailed(
-        data.meeting_url,
-        data.bot_uuid,
-        errorMessage,
-        isServerless
-    )
-}
-
-export function meetingBotStartRecordFailed(
-    meetingLink: string,
-    bot_uuid: string,
-    message: string,
-    isServerless: boolean
-): Promise<void> {
-    if (isServerless) {
-        console.log('Notifying failed recording attempt:', {
-            meetingLink,
-            bot_uuid,
-            message,
-        })
-        return Promise.resolve()
-    }
-    console.log('Notifying failed recording attempt:', {
-        meetingLink,
-        bot_uuid,
-        message,
-    })
-
-    if (!Api.instance) {
-        console.error('API instance not initialized')
-        return Promise.reject(new Error('API instance not initialized'))
-    }
-
-    return Api.instance.notifyRecordingFailure(meetingLink, message, bot_uuid)
-}
+})()

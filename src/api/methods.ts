@@ -18,7 +18,8 @@ export class Api {
         axios.defaults.baseURL = GLOBAL.get().remote.api_server_baseurl
         axios.defaults.withCredentials = true
         if (!GLOBAL.isServerless() && GLOBAL.get().user_token) {
-            axios.defaults.headers.common['Authorization'] = GLOBAL.get().user_token
+            axios.defaults.headers.common['Authorization'] =
+                GLOBAL.get().user_token
         }
         axios.defaults.raxConfig = {
             instance: axios,
@@ -123,6 +124,23 @@ export class Api {
             console.log('Successfully notified backend of recording failure')
         } catch (error) {
             console.error('Failed to notify recording failure:', error)
+            throw error
+        }
+    }
+
+    // Handle end meeting with retry logic
+    public async handleEndMeetingWithRetry(): Promise<void> {
+        if (GLOBAL.isServerless()) {
+            console.log('Skipping endMeetingTrampoline - serverless mode')
+            return
+        }
+
+        try {
+            await this.endMeetingTrampoline()
+            console.log('API call to endMeetingTrampoline succeeded')
+        } catch (error) {
+            console.error('API call to endMeetingTrampoline failed:', error)
+            // The retry logic is already handled by the rax configuration in the constructor
             throw error
         }
     }

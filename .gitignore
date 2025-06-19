@@ -24,6 +24,9 @@ build/
 # Optional npm cache directory
 .npm
 
+# Prevent yarn usage (project uses npm)
+yarn.lock
+
 # Optional eslint cache
 .eslintcache
 

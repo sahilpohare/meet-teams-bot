@@ -5,6 +5,36 @@ import { s3cp } from './S3Uploader'
 
 // Reference to current bot log file
 let currentBotLogFile: string | null = null
+
+// Function to get caller file info
+function getCallerInfo(): string {
+    const stack = new Error().stack
+    if (!stack) return 'unknown:0'
+
+    const lines = stack.split('\n')
+    // Look for the first line that's not from this file or winston
+    for (let i = 1; i < lines.length; i++) {
+        const line = lines[i]
+        if (
+            line &&
+            !line.includes('node_modules') &&
+            !line.includes('Logger.ts') &&
+            !line.includes('winston')
+        ) {
+            const match =
+                line.match(/at.*\((.+):(\d+):\d+\)/) ||
+                line.match(/at (.+):(\d+):\d+/)
+            if (match) {
+                const filename =
+                    match[1].split('/').pop()?.split('.')[0] || 'unknown'
+                const lineNumber = match[2]
+                return `${filename}:${lineNumber}`
+            }
+        }
+    }
+    return 'unknown:0'
+}
+
 let format = winston.format.combine(
     winston.format.colorize({
         all: true,
@@ -15,9 +45,12 @@ let format = winston.format.combine(
             debug: 'blue',
         },
     }),
-    winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+    winston.format.timestamp({
+        format: () => new Date().toISOString(),
+    }),
     winston.format.printf(({ timestamp, level, message }) => {
-        return `[${timestamp}] ${level} : ${message}`
+        const fileInfo = getCallerInfo()
+        return `${timestamp}  ${level} ${fileInfo}: ${message}`
     }),
 )
 
@@ -89,15 +122,12 @@ export let logger = winston.createLogger({
         new winston.transports.Console({
             format: format,
         }),
-        new winston.transports.File({
-            filename: './data/initial.log',
-            format: format,
-        }),
     ],
 })
 
 export function setupConsoleLogger() {
     console.log('Setting up console logger')
+
     console.log = (msg: string, ...args: any[]) =>
         logger.info(formatArgs(msg, args))
     console.info = (msg: string, ...args: any[]) =>
@@ -109,6 +139,7 @@ export function setupConsoleLogger() {
     console.debug = (msg: string, ...args: any[]) =>
         logger.debug(formatArgs(msg, args))
     console.table = (data: any) => logger.info(formatTable(data))
+
     console.log('Console logger setup complete')
 }
 
@@ -116,34 +147,19 @@ export async function uploadLogsToS3(options: {
     error?: Error
 }): Promise<void> {
     try {
-        let logPath: string
         let soundLogPath: string
-        let s3LogPath: string
         let s3SoundLogPath: string
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
 
+        const pathManager = PathManager.getInstance()
+        const logPath = currentBotLogFile || pathManager.getIdentifier()
+        soundLogPath = pathManager.getSoundLogPath()
+        console.log('Looking for internal log files at:', {
+            soundLogPath,
+        })
+        s3SoundLogPath = `${logPath}/sound.log`
 
-                const pathManager = PathManager.getInstance()
-                logPath = currentBotLogFile || pathManager.getIdentifier()
-                soundLogPath = pathManager.getSoundLogPath()
-                console.log('Looking for log files at:', {
-                    logPath,
-                    soundLogPath,
-                })
-                s3LogPath = `${logPath}/logs.log`
-                s3SoundLogPath = `${logPath}/sound.log`
-        
-
-        // Upload main log file
-        if (fs.existsSync(logPath)) {
-            logger.info(`Uploading logs to S3...`)
-            await s3cp(logPath, s3LogPath, []) // TODO : s3_args !
-            logger.info(`logs uploaded to S3`)
-        } else {
-            console.error('No log file found at path:', logPath)
-        }
-
-        // Upload sound log file
+        // Upload sound log file (internal log file)
         if (fs.existsSync(soundLogPath)) {
             logger.info(`Uploading sound logs to S3...`)
             await s3cp(soundLogPath, s3SoundLogPath, []) // TODO : s3_args !
@@ -151,6 +167,8 @@ export async function uploadLogsToS3(options: {
         } else {
             console.log('No sound log file found at path:', soundLogPath)
         }
+
+        // TODO: Add other internal log files upload here as needed
     } catch (error) {
         logger.error(`Failed to upload logs to S3:`, error)
         throw error

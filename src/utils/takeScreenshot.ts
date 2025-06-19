@@ -4,6 +4,7 @@ import * as path from 'path'
 import sharp from 'sharp'
 import { PathManager } from '../utils/PathManager'
 import { s3cp } from './S3Uploader'
+import { GLOBAL } from '../singleton'
 
 export async function takeScreenshot(page: Page, name: string) {
     try {
@@ -52,13 +53,14 @@ export async function takeScreenshot(page: Page, name: string) {
         // Supprimer le fichier temporaire
         await fs.unlink(tempScreenshotPath).catch(() => {})
 
-        if (process.env.SERVERLESS !== 'true') {
+        if (!GLOBAL.isServerless()) {
             // Obtenir les chemins S3 depuis PathManager
             const { bucketName, s3Path } = pathManager.getS3Paths()
             const s3FilePath = `${s3Path}/${timestamp}_${name.replaceAll('/', '')}.png`
 
             // Upload vers S3
-            await s3cp(finalScreenshotPath, s3FilePath, []).catch((e) => {  // TODO : s3_args !
+            await s3cp(finalScreenshotPath, s3FilePath, []).catch((e) => {
+                // TODO : s3_args !
                 console.error(`Failed to upload screenshot to s3: ${e}`)
             })
         }

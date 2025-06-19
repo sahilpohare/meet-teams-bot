@@ -59,15 +59,13 @@ async function upload(speaker: SpeakerData, end: boolean) {
         const api = Api.instance
         if (LAST_TRANSRIPT) {
             try {
-                await api.patchTranscript(
-                    {
-                        id: LAST_TRANSRIPT.id,
-                        end_time:
-                            (speaker.timestamp -
-                                MeetingHandle.instance.getStartTime()) /
-                            1000,
-                    } as ApiTypes.ChangeableTranscript,
-                )
+                await api.patchTranscript({
+                    id: LAST_TRANSRIPT.id,
+                    end_time:
+                        (speaker.timestamp -
+                            MeetingHandle.instance.getStartTime()) /
+                        1000,
+                } as ApiTypes.ChangeableTranscript)
             } catch (e) {
                 console.error(
                     'Failed to patch transcript, continuing execution:',
@@ -83,15 +81,13 @@ async function upload(speaker: SpeakerData, end: boolean) {
             return
         } else {
             try {
-                LAST_TRANSRIPT = await api.postTranscript(
-                    {
-                        speaker: speaker.name,
-                        start_time:
-                            (speaker.timestamp -
-                                MeetingHandle.instance.getStartTime()) /
-                            1000,
-                    } as ApiTypes.PostableTranscript,
-                )
+                LAST_TRANSRIPT = await api.postTranscript({
+                    speaker: speaker.name,
+                    start_time:
+                        (speaker.timestamp -
+                            MeetingHandle.instance.getStartTime()) /
+                        1000,
+                } as ApiTypes.PostableTranscript)
             } catch (e) {
                 console.error(
                     'Failed to post transcript, continuing execution:',

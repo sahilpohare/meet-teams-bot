@@ -46,16 +46,18 @@ export class ScreenRecorder extends EventEmitter {
 
     constructor(config: Partial<ScreenRecordingConfig> = {}) {
         super()
-        
+
         // Native bucket logic (no legacy complexity)
-        const env = process.env.ENVIRON || 'local'
+        const env = GLOBAL.get().environ || 'local'
         const transcriptionAudioBucket = this.determineBucket(env)
 
-        console.log(`Native ScreenRecorder: Using audio bucket for ${env}: ${transcriptionAudioBucket}`)
-        
+        console.log(
+            `Native ScreenRecorder: Using audio bucket for ${env}: ${transcriptionAudioBucket}`,
+        )
+
         // Clean configuration (no legacy defaults)
         this.config = {
-            display: process.env.DISPLAY || ':99',
+            display: GLOBAL.get().environ || ':99',
             audioDevice: 'pulse',
             outputFormat: 'mp4',
             videoCodec: 'libx264',
@@ -69,35 +71,41 @@ export class ScreenRecorder extends EventEmitter {
             enableTranscriptionChunking: false,
             transcriptionChunkDuration: 3600,
             transcriptionAudioBucket: transcriptionAudioBucket,
-            bucketName: process.env.AWS_S3_VIDEO_BUCKET || '',
+            bucketName: GLOBAL.get().remote?.aws_s3_video_bucket || '',
             s3Path: '',
-            ...config
+            ...config,
         }
-        
+
         this.syncCalibrator = new SyncCalibrator()
-        
-        if (process.env.SERVERLESS !== 'true') {
+
+        if (!GLOBAL.isServerless()) {
             this.s3Uploader = S3Uploader.getInstance()
         }
-        
+
         console.log('Native ScreenRecorder initialized:', {
             recordingMode: this.config.recordingMode,
-            enableTranscriptionChunking: this.config.enableTranscriptionChunking,
+            enableTranscriptionChunking:
+                this.config.enableTranscriptionChunking,
         })
     }
 
     private determineBucket(env: string): string {
         switch (env) {
-            case 'prod': return 'meeting-baas-audio'
-            case 'preprod': return 'preprod-meeting-baas-audio'
-            default: return process.env.AWS_S3_TEMPORARY_AUDIO_BUCKET || 'local-meeting-baas-audio'
+            case 'prod':
+                return 'meeting-baas-audio'
+            case 'preprod':
+                return 'preprod-meeting-baas-audio'
+            default:
+                return (
+                    GLOBAL.get().aws_s3_temporary_audio_bucket ||
+                    'local-meeting-baas-audio'
+                )
         }
     }
 
     public configure(
         pathManager: PathManager,
         recordingMode?: RecordingMode,
-        meetingParams?: any,
     ): void {
         if (!pathManager) {
             throw new Error('PathManager is required for configuration')
@@ -110,9 +118,9 @@ export class ScreenRecorder extends EventEmitter {
         }
 
         // Simple transcription detection
-        if (meetingParams) {
-            const hasTranscription = this.detectTranscription(meetingParams)
-            this.config.enableTranscriptionChunking = hasTranscription
+        if (GLOBAL.get().speech_to_text_provider) {
+            this.config.enableTranscriptionChunking =
+                GLOBAL.get().speech_to_text_provider !== null
         }
 
         // Native path generation (no legacy patterns)
@@ -132,16 +140,9 @@ export class ScreenRecorder extends EventEmitter {
         })
     }
 
-    private detectTranscription(meetingParams: any): boolean {
-        return (meetingParams.speech_to_text_provider && 
-                meetingParams.speech_to_text_provider !== 'None') ||
-               (meetingParams.speech_to_text?.provider && 
-                meetingParams.speech_to_text.provider !== 'None')
-    }
-
     private generateOutputPaths(pathManager: PathManager): void {
         const isAudioOnly = this.config.recordingMode === 'audio_only'
-        
+
         if (isAudioOnly) {
             this.outputPath = pathManager.getOutputPath() + '.wav'
             this.audioOutputPath = this.outputPath
@@ -157,7 +158,7 @@ export class ScreenRecorder extends EventEmitter {
 
     public async startRecording(): Promise<void> {
         this.validateConfiguration()
-        
+
         if (this.isRecording) {
             throw new Error('Recording is already in progress')
         }
@@ -170,7 +171,7 @@ export class ScreenRecorder extends EventEmitter {
             const ffmpegArgs = this.buildNativeFFmpegArgs(syncOffset)
 
             this.ffmpegProcess = spawn('ffmpeg', ffmpegArgs, {
-                stdio: ['pipe', 'pipe', 'pipe']
+                stdio: ['pipe', 'pipe', 'pipe'],
             })
 
             this.isRecording = true
@@ -182,7 +183,6 @@ export class ScreenRecorder extends EventEmitter {
                 outputPath: this.outputPath,
                 isAudioOnly: this.config.recordingMode === 'audio_only',
             })
-
         } catch (error) {
             console.error('Failed to start native recording:', error)
             this.isRecording = false
@@ -208,18 +208,23 @@ export class ScreenRecorder extends EventEmitter {
         // Native sync calculation (simplified)
         const systemLoad = await this.getSystemLoad()
         const roughEstimate = this.estimateOffsetFromLoad(systemLoad)
-        
+
         if (this.page) {
             try {
-                const preciseOffset = await this.syncCalibrator.quickCalibrateOnceOptimized(this.page)
+                const preciseOffset =
+                    await this.syncCalibrator.quickCalibrateOnceOptimized(
+                        this.page,
+                    )
                 if (Math.abs(preciseOffset) > 0.001) {
-                    return -preciseOffset + 0.020
+                    return -preciseOffset + 0.02
                 }
             } catch (error) {
-                console.warn('Precise calibration failed, using system estimate')
+                console.warn(
+                    'Precise calibration failed, using system estimate',
+                )
             }
         }
-        
+
         return roughEstimate
     }
 
@@ -232,94 +237,170 @@ export class ScreenRecorder extends EventEmitter {
 
         if (isAudioOnly) {
             args.push(
-                '-f', 'pulse',
-                '-thread_queue_size', '512',
-                '-probesize', '50M',
-                '-analyzeduration', '10000000',
-                '-i', 'virtual_speaker.monitor',
-                '-itsoffset', syncOffset.toString(),
-                '-acodec', 'pcm_s16le',
-                '-ac', '1', '-ar', '16000',
-                '-f', 'wav', '-y',
-                this.outputPath
+                '-f',
+                'pulse',
+                '-thread_queue_size',
+                '512',
+                '-probesize',
+                '50M',
+                '-analyzeduration',
+                '10000000',
+                '-i',
+                'virtual_speaker.monitor',
+                '-itsoffset',
+                syncOffset.toString(),
+                '-acodec',
+                'pcm_s16le',
+                '-ac',
+                '1',
+                '-ar',
+                '16000',
+                '-f',
+                'wav',
+                '-y',
+                this.outputPath,
             )
         } else {
             args.push(
                 // Video input with Docker sync fixes
-                '-f', 'x11grab',
-                '-video_size', '1280x880',
-                '-framerate', '30',
-                '-probesize', '50M',
-                '-analyzeduration', '10000000',
-                '-thread_queue_size', '512',
-                '-rtbufsize', '100M',
-                '-fflags', '+genpts',
-                '-use_wallclock_as_timestamps', '1',
-                '-i', this.config.display
+                '-f',
+                'x11grab',
+                '-video_size',
+                '1280x880',
+                '-framerate',
+                '30',
+                '-probesize',
+                '50M',
+                '-analyzeduration',
+                '10000000',
+                '-thread_queue_size',
+                '512',
+                '-rtbufsize',
+                '100M',
+                '-fflags',
+                '+genpts',
+                '-use_wallclock_as_timestamps',
+                '1',
+                '-i',
+                this.config.display,
             )
 
             // Audio input with calibrated offset + sync
             args.push(
-                '-f', 'pulse',
-                '-thread_queue_size', '512',
-                '-probesize', '50M',
-                '-analyzeduration', '10000000',
-                '-fflags', '+genpts',
-                '-use_wallclock_as_timestamps', '1',
-                '-itsoffset', syncOffset.toString(),
-                '-i', 'virtual_speaker.monitor'
+                '-f',
+                'pulse',
+                '-thread_queue_size',
+                '512',
+                '-probesize',
+                '50M',
+                '-analyzeduration',
+                '10000000',
+                '-fflags',
+                '+genpts',
+                '-use_wallclock_as_timestamps',
+                '1',
+                '-itsoffset',
+                syncOffset.toString(),
+                '-i',
+                'virtual_speaker.monitor',
             )
 
             // **FIXED: Restore simultaneous MP4 + WAV multi-output (like working version)**
             args.push(
                 // === OUTPUT 1: MP4 (video + audio) ===
-                '-map', '0:v:0', '-map', '1:a:0',
-                '-c:v', 'libx264', '-preset', 'medium', '-crf', '20',
-                '-vf', 'crop=1280:720:0:160',
-                '-c:a', 'aac', '-b:a', '160k',
-                '-avoid_negative_ts', 'make_zero',
-                '-max_muxing_queue_size', '1024',
-                '-async', '1',
-                '-f', 'mp4', '-movflags', '+faststart',
+                '-map',
+                '0:v:0',
+                '-map',
+                '1:a:0',
+                '-c:v',
+                'libx264',
+                '-preset',
+                'medium',
+                '-crf',
+                '20',
+                '-vf',
+                'crop=1280:720:0:160',
+                '-c:a',
+                'aac',
+                '-b:a',
+                '160k',
+                '-avoid_negative_ts',
+                'make_zero',
+                '-max_muxing_queue_size',
+                '1024',
+                '-async',
+                '1',
+                '-f',
+                'mp4',
+                '-movflags',
+                '+faststart',
                 this.outputPath,
-                
+
                 // === OUTPUT 2: WAV (simultaneous audio for transcription) ===
-                '-map', '1:a:0', '-vn',
-                '-acodec', 'pcm_s16le', '-ac', '1', '-ar', '16000',
-                '-async', '1',
-                '-avoid_negative_ts', 'make_zero',
-                '-f', 'wav',
-                this.audioOutputPath
+                '-map',
+                '1:a:0',
+                '-vn',
+                '-acodec',
+                'pcm_s16le',
+                '-ac',
+                '1',
+                '-ar',
+                '16000',
+                '-async',
+                '1',
+                '-avoid_negative_ts',
+                'make_zero',
+                '-f',
+                'wav',
+                this.audioOutputPath,
             )
 
             // === OUTPUT 3: Real-time chunks (if enabled) ===
             if (this.config.enableTranscriptionChunking) {
                 // Use audio_tmp directory and UUID-based naming like production
-                const chunksDir = this.pathManager ? this.pathManager.getAudioTmpPath() : path.join(path.dirname(this.outputPath), 'audio_tmp')
+                const chunksDir = this.pathManager
+                    ? this.pathManager.getAudioTmpPath()
+                    : path.join(path.dirname(this.outputPath), 'audio_tmp')
                 if (!fs.existsSync(chunksDir)) {
                     fs.mkdirSync(chunksDir, { recursive: true })
                 }
-                
+
                 // Use botUuid for chunk naming format: ${botUuid}-%d.wav
                 const botUuid = GLOBAL.get().bot_uuid
                 const chunkPattern = path.join(chunksDir, `${botUuid}-%d.wav`)
-                
+
                 args.push(
-                    '-map', '1:a:0', '-vn',
-                    '-acodec', 'pcm_s16le', '-ac', '1', '-ar', '16000',
-                    '-f', 'segment',
-                    '-segment_time', (this.config.transcriptionChunkDuration || 3600).toString(),
-                    '-segment_format', 'wav',
-                    chunkPattern
+                    '-map',
+                    '1:a:0',
+                    '-vn',
+                    '-acodec',
+                    'pcm_s16le',
+                    '-ac',
+                    '1',
+                    '-ar',
+                    '16000',
+                    '-f',
+                    'segment',
+                    '-segment_time',
+                    (this.config.transcriptionChunkDuration || 3600).toString(),
+                    '-segment_format',
+                    'wav',
+                    chunkPattern,
                 )
-                
+
                 this.startChunkMonitoring(chunksDir)
-                console.log(`🎯 Real-time chunks: ${this.config.transcriptionChunkDuration}s chunks enabled`)
+                console.log(
+                    `🎯 Real-time chunks: ${this.config.transcriptionChunkDuration}s chunks enabled`,
+                )
                 console.log(`🎯 Chunk naming format: ${botUuid}-[index].wav`)
             }
 
-            console.log(`✅ FFmpeg itsoffset parameter: ${syncOffset.toFixed(3)}s`)
-            console.log(`🎯 Simultaneous generation: MP4 + WAV during recording`)
+            console.log(
+                `✅ FFmpeg itsoffset parameter: ${syncOffset.toFixed(3)}s`,
+            )
+            console.log(
+                `🎯 Simultaneous generation: MP4 + WAV during recording`,
+            )
         }
 
         return args
@@ -335,11 +416,11 @@ export class ScreenRecorder extends EventEmitter {
 
         this.ffmpegProcess.on('exit', (code) => {
             console.log(`FFmpeg exited with code ${code}`)
-            
+
             if (code === 0) {
                 this.handleSuccessfulRecording()
             }
-            
+
             this.isRecording = false
             this.emit('stopped')
         })
@@ -354,12 +435,12 @@ export class ScreenRecorder extends EventEmitter {
 
     private async handleSuccessfulRecording(): Promise<void> {
         console.log('Native recording completed')
-        
+
         // Auto-upload if not serverless
-        if (process.env.SERVERLESS !== 'true') {
+        if (!GLOBAL.isServerless()) {
             setTimeout(() => this.uploadToS3().catch(console.error), 200)
         }
-        
+
         this.cleanupChunkMonitoring()
     }
 
@@ -369,21 +450,34 @@ export class ScreenRecorder extends EventEmitter {
         try {
             const STREAMING_SAMPLE_RATE = 24_000
 
-            this.streamingProcess = spawn('ffmpeg', [
-                '-f', 'pulse',
-                '-thread_queue_size', '256',
-                '-i', 'virtual_speaker.monitor',
-                '-acodec', 'pcm_f32le',
-                '-ac', '1',
-                '-ar', STREAMING_SAMPLE_RATE.toString(),
-                '-f', 'f32le',
-                'pipe:1'
-            ], { stdio: ['pipe', 'pipe', 'pipe'] })
+            this.streamingProcess = spawn(
+                'ffmpeg',
+                [
+                    '-f',
+                    'pulse',
+                    '-thread_queue_size',
+                    '256',
+                    '-i',
+                    'virtual_speaker.monitor',
+                    '-acodec',
+                    'pcm_f32le',
+                    '-ac',
+                    '1',
+                    '-ar',
+                    STREAMING_SAMPLE_RATE.toString(),
+                    '-f',
+                    'f32le',
+                    'pipe:1',
+                ],
+                { stdio: ['pipe', 'pipe', 'pipe'] },
+            )
 
             this.streamingProcess.stdout?.on('data', (data: Buffer) => {
                 if (Streaming.instance) {
                     const float32Array = new Float32Array(
-                        data.buffer, data.byteOffset, data.length / 4
+                        data.buffer,
+                        data.byteOffset,
+                        data.length / 4,
                     )
                     Streaming.instance.processAudioChunk(float32Array)
                 }
@@ -394,7 +488,6 @@ export class ScreenRecorder extends EventEmitter {
                     this.streamingProcess.kill('SIGINT')
                 }
             })
-
         } catch (error) {
             console.error('Failed to start native audio streaming:', error)
         }
@@ -409,18 +502,21 @@ export class ScreenRecorder extends EventEmitter {
         })
     }
 
-    private async uploadChunk(chunkPath: string, filename: string): Promise<void> {
+    private async uploadChunk(
+        chunkPath: string,
+        filename: string,
+    ): Promise<void> {
         if (!this.s3Uploader || !fs.existsSync(chunkPath)) return
 
         try {
             // Upload directly with the filename (UUID-index.wav format) without chunks/ prefix
             // This matches production format where chunks are uploaded as: 009abdef-dd02-4a30-bac3-c514ebc69173-0.wav
             await this.s3Uploader.uploadFile(
-                chunkPath, 
-                this.config.transcriptionAudioBucket!, 
-                filename, 
+                chunkPath,
+                this.config.transcriptionAudioBucket!,
+                filename,
                 [],
-                true
+                true,
             )
             console.log(`✅ Chunk uploaded: ${filename}`)
         } catch (error) {
@@ -439,7 +535,11 @@ export class ScreenRecorder extends EventEmitter {
      * External API: uploadToS3() - Maintain compatibility
      */
     public async uploadToS3(): Promise<void> {
-        if (this.filesUploaded || !this.s3Uploader || !fs.existsSync(this.outputPath)) {
+        if (
+            this.filesUploaded ||
+            !this.s3Uploader ||
+            !fs.existsSync(this.outputPath)
+        ) {
             return
         }
 
@@ -457,7 +557,7 @@ export class ScreenRecorder extends EventEmitter {
 
             fs.unlinkSync(this.outputPath)
             this.filesUploaded = true
-            
+
             console.log(`Native S3 upload completed`)
         } catch (error) {
             console.error('Native S3 upload error:', error)
@@ -528,7 +628,7 @@ export class ScreenRecorder extends EventEmitter {
             const { exec } = require('child_process')
             const { promisify } = require('util')
             const execAsync = promisify(exec)
-            
+
             const { stdout } = await execAsync('uptime')
             const loadMatch = stdout.match(/load average: ([\d.]+)/)
             return loadMatch ? parseFloat(loadMatch[1]) : 0
@@ -539,14 +639,14 @@ export class ScreenRecorder extends EventEmitter {
 
     private estimateOffsetFromLoad(load: number): number {
         if (load < 1.5) return -0.065
-        else if (load < 2.5) return 0.000
-        else return -0.050
+        else if (load < 2.5) return 0.0
+        else return -0.05
     }
 }
 
 // External API: Global instance (maintain compatibility)
 export const SCREEN_RECORDER = new ScreenRecorder({
     recordingMode: 'speaker_view',
-    enableTranscriptionChunking: process.env.ENABLE_TRANSCRIPTION_CHUNKING === 'true',
-    transcriptionAudioBucket: process.env.TRANSCRIPTION_AUDIO_BUCKET,
-}) 
+    enableTranscriptionChunking: GLOBAL.get().speech_to_text_provider !== null,
+    transcriptionAudioBucket: GLOBAL.get().aws_s3_temporary_audio_bucket,
+})

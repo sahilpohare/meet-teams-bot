@@ -18,7 +18,7 @@ export class Streaming {
 
     // External services WebSockets (kept for backward compatibility)
     private output_ws: WebSocket | null = null // For external audio output services
-    private input_ws: WebSocket | null = null  // For external audio input services
+    private input_ws: WebSocket | null = null // For external audio input services
     private sample_rate: number = DEFAULT_SAMPLE_RATE
 
     // Configuration parameters
@@ -74,21 +74,23 @@ export class Streaming {
             return
         }
 
-        console.log('🎵 Starting simplified streaming service (direct audio processing)')
+        console.log(
+            '🎵 Starting simplified streaming service (direct audio processing)',
+        )
 
         // Setup external output WebSocket if configured
         if (this.outputUrl) {
             this.setupExternalOutputWS()
         }
 
-        // Setup external input WebSocket if configured  
+        // Setup external input WebSocket if configured
         if (this.inputUrl && this.outputUrl !== this.inputUrl) {
             this.setupExternalInputWS()
         }
 
         this.isInitialized = true
         this.isPaused = false
-        
+
         console.log('✅ Streaming service ready for direct audio processing')
     }
 
@@ -108,7 +110,9 @@ export class Streaming {
         const now = Date.now()
         if (now - this.lastStatsLogTime >= this.STATS_LOG_INTERVAL_MS) {
             const packetsInInterval = this.audioPacketsReceived
-            console.log(`🎵 Direct audio packets processed: ${packetsInInterval} in last ${this.STATS_LOG_INTERVAL_MS}ms`)
+            console.log(
+                `🎵 Direct audio packets processed: ${packetsInInterval} in last ${this.STATS_LOG_INTERVAL_MS}ms`,
+            )
             this.audioPacketsReceived = 0
             this.lastStatsLogTime = now
         }
@@ -255,7 +259,7 @@ export class Streaming {
         this.isPaused = false
         this.pausedChunks = []
         Streaming.instance = null
-        
+
         console.log('✅ Streaming service stopped successfully')
     }
 
@@ -263,8 +267,10 @@ export class Streaming {
         // Close external output WebSocket
         try {
             if (this.output_ws) {
-                if (this.output_ws.readyState === WebSocket.OPEN || 
-                    this.output_ws.readyState === WebSocket.CONNECTING) {
+                if (
+                    this.output_ws.readyState === WebSocket.OPEN ||
+                    this.output_ws.readyState === WebSocket.CONNECTING
+                ) {
                     this.output_ws.close()
                 }
                 this.output_ws = null
@@ -277,8 +283,10 @@ export class Streaming {
         // Close external input WebSocket
         try {
             if (this.input_ws) {
-                if (this.input_ws.readyState === WebSocket.OPEN || 
-                    this.input_ws.readyState === WebSocket.CONNECTING) {
+                if (
+                    this.input_ws.readyState === WebSocket.OPEN ||
+                    this.input_ws.readyState === WebSocket.CONNECTING
+                ) {
                     this.input_ws.close()
                 }
                 this.input_ws = null
@@ -310,9 +318,12 @@ export class Streaming {
         if (this.audioBuffer.length === 0) return
 
         // Combine all audio buffers into one for analysis
-        const totalLength = this.audioBuffer.reduce((sum, buffer) => sum + buffer.length, 0)
+        const totalLength = this.audioBuffer.reduce(
+            (sum, buffer) => sum + buffer.length,
+            0,
+        )
         const combinedBuffer = new Float32Array(totalLength)
-        
+
         let offset = 0
         for (const buffer of this.audioBuffer) {
             combinedBuffer.set(buffer, offset)
@@ -330,12 +341,12 @@ export class Streaming {
         // Apply adaptive sampling to reduce computational load
         const sampleRate = audioData.length > 2000 ? 16 : 8
         const sampledLength = Math.floor(audioData.length / sampleRate)
-        
+
         // Skip analysis for very small buffers
         if (sampledLength < 10) {
             return
         }
-        
+
         let sum = 0
 
         // Calculate RMS (Root Mean Square)
@@ -383,11 +394,17 @@ export class Streaming {
                 this.analyzeSoundLevel(f32Array).catch(console.error)
 
                 // Forward to external services if needed
-                if (this.output_ws && this.output_ws.readyState === WebSocket.OPEN) {
+                if (
+                    this.output_ws &&
+                    this.output_ws.readyState === WebSocket.OPEN
+                ) {
                     const s16Array = new Int16Array(f32Array.length)
                     for (let i = 0; i < f32Array.length; i++) {
                         s16Array[i] = Math.round(
-                            Math.max(-32768, Math.min(32767, f32Array[i] * 32768)),
+                            Math.max(
+                                -32768,
+                                Math.min(32767, f32Array[i] * 32768),
+                            ),
                         )
                     }
                     this.output_ws.send(s16Array.buffer)
@@ -403,11 +420,11 @@ export class Streaming {
         new SoundContext(this.sample_rate)
         let stdin = SoundContext.instance.play_stdin()
         let audio_stream = this.createAudioStreamFromWebSocket(input_ws)
-        
+
         audio_stream.on('data', (chunk) => {
             stdin.write(chunk)
         })
-        
+
         audio_stream.on('end', () => {
             stdin.end()
         })
@@ -436,7 +453,10 @@ export class Streaming {
                     const buffer = Buffer.from(f32Array.buffer)
                     stream.push(buffer)
                 } catch (error) {
-                    console.error('Error processing external audio chunk:', error)
+                    console.error(
+                        'Error processing external audio chunk:',
+                        error,
+                    )
                 }
             }
         })
@@ -447,4 +467,4 @@ export class Streaming {
     public getCurrentSoundLevel(): number {
         return this.currentSoundLevel
     }
-} 
+}

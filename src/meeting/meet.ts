@@ -11,6 +11,7 @@ import { parseMeetingUrlFromJoinInfos } from '../urlParser/meetUrlParser'
 import { sleep } from '../utils/sleep'
 import { takeScreenshot } from '../utils/takeScreenshot'
 import { closeMeeting } from './meet/closeMeeting'
+import { GLOBAL } from '../singleton'
 
 export class MeetProvider implements MeetingProviderInterface {
     async parseMeetingUrl(meeting_url: string) {
@@ -63,7 +64,6 @@ export class MeetProvider implements MeetingProviderInterface {
     async joinMeeting(
         page: Page,
         cancelCheck: () => boolean,
-        meetingParams: MeetingParams,
         onJoinSuccess: () => void,
     ): Promise<void> {
         try {
@@ -83,7 +83,7 @@ export class MeetProvider implements MeetingProviderInterface {
             await takeScreenshot(page, `before_typing_bot_name`)
 
             for (let attempt = 1; attempt <= 5; attempt++) {
-                if (await typeBotName(page, meetingParams.bot_name)) {
+                if (await typeBotName(page, GLOBAL.get().bot_name)) {
                     console.log('Bot name typed at attempt', attempt)
                     break
                 }
@@ -98,7 +98,7 @@ export class MeetProvider implements MeetingProviderInterface {
             await takeScreenshot(page, `after_typing_bot_name`)
 
             // Control microphone based on streaming_input
-            if (meetingParams.streaming_input) {
+            if (GLOBAL.get().streaming_input) {
                 await activateMicrophone(page)
             } else {
                 await deactivateMicrophone(page)
@@ -214,15 +214,15 @@ export class MeetProvider implements MeetingProviderInterface {
             // Once in the meeting, execute all post-join actions
             // WITHOUT checking cancelCheck since we are already in the meeting
 
-            if (meetingParams.enter_message) {
+            if (GLOBAL.get().enter_message) {
                 console.log('Sending entry message...')
-                await sendEntryMessage(page, meetingParams.enter_message)
+                await sendEntryMessage(page, GLOBAL.get().enter_message)
                 await sleep(100)
             }
 
             await clickOutsideModal(page)
             const maxAttempts = 3
-            if (meetingParams.recording_mode !== 'audio_only') {
+            if (GLOBAL.get().recording_mode !== 'audio_only') {
                 for (let attempt = 1; attempt <= maxAttempts; attempt++) {
                     if (await changeLayout(page, attempt)) {
                         console.log(
@@ -240,7 +240,7 @@ export class MeetProvider implements MeetingProviderInterface {
                 }
             }
 
-            if (meetingParams.recording_mode !== 'gallery_view') {
+            if (GLOBAL.get().recording_mode !== 'gallery_view') {
                 await findShowEveryOne(page, true, cancelCheck)
             }
         } catch (error) {
@@ -252,11 +252,7 @@ export class MeetProvider implements MeetingProviderInterface {
         }
     }
 
-    async findEndMeeting(
-        meetingParams: MeetingParams,
-        page: Page,
-        // cancellationToken: CancellationToken,
-    ): Promise<boolean> {
+    async findEndMeeting(page: Page): Promise<boolean> {
         try {
             try {
                 await Promise.race([

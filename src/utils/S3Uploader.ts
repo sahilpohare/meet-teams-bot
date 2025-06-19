@@ -43,7 +43,7 @@ export class S3Uploader extends EventEmitter {
         filePath: string,
         bucketName: string,
         s3Path: string,
-        s3Args?:   string[],
+        s3Args?: string[],
         isAudio: boolean = false,
     ): Promise<string> {
         if (GLOBAL.isServerless()) {
@@ -57,7 +57,7 @@ export class S3Uploader extends EventEmitter {
             const s3FullPath = `s3://${bucketName}/${s3Path}`
 
             if (isAudio) {
-                s3Args = [];
+                s3Args = []
             }
 
             s3Args.push(
@@ -116,7 +116,7 @@ export class S3Uploader extends EventEmitter {
     public async uploadToDefaultBucket(
         filePath: string,
         s3Path: string,
-        s3_args: string[]
+        s3_args: string[],
     ): Promise<string> {
         if (GLOBAL.isServerless()) {
             console.log('Skipping S3 upload - serverless mode')
@@ -128,7 +128,7 @@ export class S3Uploader extends EventEmitter {
                 filePath,
                 this.defaultBucketName,
                 s3Path,
-                s3_args
+                s3_args,
             )
         } catch (error: any) {
             this.emit(
@@ -141,5 +141,9 @@ export class S3Uploader extends EventEmitter {
 }
 
 // Export utility functions that use the singleton instance
-export const s3cp = (local: string, s3path: string, s3_args: string[]): Promise<string> =>
+export const s3cp = (
+    local: string,
+    s3path: string,
+    s3_args: string[],
+): Promise<string> =>
     S3Uploader.getInstance().uploadToDefaultBucket(local, s3path, s3_args)

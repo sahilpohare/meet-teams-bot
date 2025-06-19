@@ -25,7 +25,9 @@ export class SpeakersObserver {
             return
         }
 
-        console.log(`[SpeakersObserver] Starting for ${this.meetingProvider}...`)
+        console.log(
+            `[SpeakersObserver] Starting for ${this.meetingProvider}...`,
+        )
 
         // Create the appropriate observer based on meeting provider - SIMPLE ROUTING
         switch (this.meetingProvider) {
@@ -48,7 +50,9 @@ export class SpeakersObserver {
                 break
 
             default:
-                throw new Error(`Unknown meeting provider: ${this.meetingProvider}`)
+                throw new Error(
+                    `Unknown meeting provider: ${this.meetingProvider}`,
+                )
         }
 
         if (this.observer) {
@@ -56,19 +60,33 @@ export class SpeakersObserver {
                 await this.observer.startObserving()
                 this.isObserving = true
                 this.retryCount = 0
-                console.log(`[SpeakersObserver] ✅ Started for ${this.meetingProvider}`)
+                console.log(
+                    `[SpeakersObserver] ✅ Started for ${this.meetingProvider}`,
+                )
             } catch (error) {
-                console.warn(`[SpeakersObserver] Failed to initialize (attempt ${this.retryCount + 1}/${this.maxRetries}):`, error)
-                
+                console.warn(
+                    `[SpeakersObserver] Failed to initialize (attempt ${this.retryCount + 1}/${this.maxRetries}):`,
+                    error,
+                )
+
                 // Retry logic - same as before
                 if (this.retryCount < this.maxRetries) {
                     this.retryCount++
                     setTimeout(() => {
-                        console.log(`[SpeakersObserver] Retrying (attempt ${this.retryCount}/${this.maxRetries})...`)
-                        this.startObserving(page, recordingMode, botName, onSpeakersChange)
+                        console.log(
+                            `[SpeakersObserver] Retrying (attempt ${this.retryCount}/${this.maxRetries})...`,
+                        )
+                        this.startObserving(
+                            page,
+                            recordingMode,
+                            botName,
+                            onSpeakersChange,
+                        )
                     }, 5000)
                 } else {
-                    console.error(`[SpeakersObserver] Max retries (${this.maxRetries}) reached. Giving up.`)
+                    console.error(
+                        `[SpeakersObserver] Max retries (${this.maxRetries}) reached. Giving up.`,
+                    )
                     this.isObserving = false
                     this.observer = null
                 }
@@ -81,7 +99,9 @@ export class SpeakersObserver {
             return
         }
 
-        console.log(`[SpeakersObserver] Stopping for ${this.meetingProvider}...`)
+        console.log(
+            `[SpeakersObserver] Stopping for ${this.meetingProvider}...`,
+        )
         this.observer.stopObserving()
         this.observer = null
         this.isObserving = false
@@ -92,4 +112,4 @@ export class SpeakersObserver {
     public isCurrentlyObserving(): boolean {
         return this.isObserving
     }
-} 
+}

@@ -1,6 +1,7 @@
 import { generateBranding, playBranding } from '../../branding'
-import { openBrowser } from '../../browser'
+import { openBrowser } from '../../browser/browser'
 import { MeetingHandle } from '../../meeting'
+import { GLOBAL } from '../../singleton'
 import { Streaming } from '../../streaming'
 import { JoinError, JoinErrorCode } from '../../types'
 import { PathManager } from '../../utils/PathManager'
@@ -11,22 +12,20 @@ export class InitializationState extends BaseState {
     async execute(): StateExecuteResult {
         try {
             // Validate parameters
-            if (!this.context.params.meeting_url) {
+            if (!GLOBAL.get().meeting_url) {
                 throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
             }
 
             // Initialize meeting handle if not exists
             if (!this.context.meetingHandle) {
-                this.context.meetingHandle = new MeetingHandle(
-                    this.context.params,
-                )
+                this.context.meetingHandle = new MeetingHandle()
             }
 
             // Setup path manager first (important for logs)
             await this.setupPathManager()
 
             // Setup branding if needed - non-bloquant
-            if (this.context.params.bot_branding) {
+            if (GLOBAL.get().bot_branding) {
                 this.setupBranding().catch((error) => {
                     console.warn(
                         'Branding setup failed, continuing anyway:',
@@ -50,10 +49,10 @@ export class InitializationState extends BaseState {
             }
 
             this.context.streamingService = new Streaming(
-                this.context.params.streaming_input,
-                this.context.params.streaming_output,
-                this.context.params.streaming_audio_frequency,
-                this.context.params.bot_uuid,
+                GLOBAL.get().streaming_input,
+                GLOBAL.get().streaming_output,
+                GLOBAL.get().streaming_audio_frequency,
+                GLOBAL.get().bot_uuid,
             )
 
             // All initialization successful
@@ -64,10 +63,9 @@ export class InitializationState extends BaseState {
     }
 
     private async setupBranding(): Promise<void> {
-        const { bot_name, custom_branding_bot_path } = this.context.params
         this.context.brandingProcess = generateBranding(
-            bot_name,
-            custom_branding_bot_path,
+            GLOBAL.get().bot_name,
+            GLOBAL.get().custom_branding_bot_path,
         )
         await this.context.brandingProcess.wait
         playBranding()
@@ -104,18 +102,18 @@ export class InitializationState extends BaseState {
                     },
                 )
 
-                // Exécuter la promesse d'ouverture du navigateur avec un timeout
+                // Execute the promise to open the browser with a timeout
                 const result = await Promise.race<BrowserResult>([
                     openBrowser(false, false),
                     timeoutPromise,
                 ])
 
-                // Si on arrive ici, c'est que openBrowser a réussi
+                // If we get here, openBrowser has succeeded
                 this.context.browserContext = result.browser
                 this.context.backgroundPage = result.backgroundPage
 
                 console.info('Browser setup completed successfully')
-                return // Sortir de la fonction si réussi
+                return // Exit the function if successful
             } catch (error) {
                 lastError = error as Error
                 console.error(`Browser setup attempt ${attempt} failed:`, error)
@@ -153,7 +151,7 @@ export class InitializationState extends BaseState {
                 const baseDir = path.join(
                     process.cwd(),
                     'logs',
-                    this.context.params.bot_uuid,
+                    GLOBAL.get().bot_uuid,
                 )
                 fs.mkdirSync(baseDir, { recursive: true })
                 console.info('Created fallback log directory:', baseDir)

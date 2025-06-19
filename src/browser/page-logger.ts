@@ -22,7 +22,7 @@ export function listenPage(page: Page) {
 
             // Only show DEBUG logs when --debug flag is used
             const isDebugLog = text.includes('DEBUG')
-            
+
             if (!DEBUG_LOGS || !isDebugLog) {
                 return // Skip all logs unless --debug is enabled and log contains DEBUG
             }

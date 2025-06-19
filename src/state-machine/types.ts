@@ -32,7 +32,6 @@ export enum RecordingEndReason {
 export interface MeetingContext {
     // Références aux objets principaux
     meetingHandle: MeetingHandle
-    params: MeetingParams
     provider: MeetingProviderInterface
 
     // Pages et contexte du navigateur

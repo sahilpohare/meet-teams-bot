@@ -18,13 +18,19 @@ export class MeetHtmlCleaner {
             async function removeInitialShityHtml(mode: string) {
                 let div
                 try {
-                    document.querySelectorAll('[data-purpose="non-essential-ui"]').forEach(
-                        elem => (elem as HTMLElement).style.display = 'none'
-                    );
+                    document
+                        .querySelectorAll('[data-purpose="non-essential-ui"]')
+                        .forEach(
+                            (elem) =>
+                                ((elem as HTMLElement).style.display = 'none'),
+                        )
                 } catch (e) {}
                 try {
                     for (div of document.getElementsByTagName('div')) {
-                        if (div.clientWidth === 360 && div.clientHeight === 326) {
+                        if (
+                            div.clientWidth === 360 &&
+                            div.clientHeight === 326
+                        ) {
                             div.style.display = 'none'
                         }
                     }
@@ -37,7 +43,9 @@ export class MeetHtmlCleaner {
                     }
                 } catch (e) {}
                 try {
-                    const bannerDiv = document.querySelector('div[role="banner"]') as HTMLElement
+                    const bannerDiv = document.querySelector(
+                        'div[role="banner"]',
+                    ) as HTMLElement
                     if (bannerDiv) {
                         bannerDiv.style.opacity = '0'
                     }
@@ -53,7 +61,8 @@ export class MeetHtmlCleaner {
                     let span
                     for (span of document.getElementsByTagName('span')) {
                         if (span.innerText.includes(':')) {
-                            span.parentElement.parentElement.style.display = 'none'
+                            span.parentElement.parentElement.style.display =
+                                'none'
                         }
                     }
                 } catch (e) {}
@@ -61,9 +70,11 @@ export class MeetHtmlCleaner {
                     removeBlackBox()
                 } catch (e) {}
                 try {
-                    const politeDivs = document.querySelectorAll('div[aria-live="polite"]')
+                    const politeDivs = document.querySelectorAll(
+                        'div[aria-live="polite"]',
+                    )
                     politeDivs.forEach((div) => {
-                        (div as HTMLElement).style.opacity = '0'
+                        ;(div as HTMLElement).style.opacity = '0'
                     })
                 } catch (e) {}
 
@@ -72,7 +83,8 @@ export class MeetHtmlCleaner {
                 while (root == null) {
                     root = (Array as any)
                         .from(document.querySelectorAll('div'))
-                        .find((d) => d.innerText === 'People')?.parentElement?.parentElement
+                        .find((d) => d.innerText === 'People')
+                        ?.parentElement?.parentElement
                     if (root != null) {
                         try {
                             root.parentElement.style.opacity = 0
@@ -80,14 +92,17 @@ export class MeetHtmlCleaner {
                             const rootLeft = (Array as any)
                                 .from(document.querySelectorAll('div'))
                                 .find((d) => d.innerText === 'You')
-                            rootLeft.parentElement.parentElement.parentElement.parentElement.style.width = '97vw'
+                            rootLeft.parentElement.parentElement.parentElement.parentElement.style.width =
+                                '97vw'
                         } catch (e) {}
                     }
                 }
 
                 if (mode !== 'gallery_view') {
                     try {
-                        const video = document.getElementsByTagName('video')[0] as HTMLVideoElement
+                        const video = document.getElementsByTagName(
+                            'video',
+                        )[0] as HTMLVideoElement
                         if (video) {
                             video.style.position = 'fixed'
                             video.style.display = 'block'
@@ -103,7 +118,8 @@ export class MeetHtmlCleaner {
                                 video.parentElement.style.position = 'fixed'
                                 video.parentElement.style.display = 'flex'
                                 video.parentElement.style.alignItems = 'center'
-                                video.parentElement.style.justifyContent = 'center'
+                                video.parentElement.style.justifyContent =
+                                    'center'
                             }
                         }
                     } catch (e) {}
@@ -113,7 +129,9 @@ export class MeetHtmlCleaner {
             function removeShityHtml(mode: string) {
                 if (mode !== 'gallery_view') {
                     try {
-                        const video = document.getElementsByTagName('video')[0] as HTMLVideoElement
+                        const video = document.getElementsByTagName(
+                            'video',
+                        )[0] as HTMLVideoElement
                         if (video) {
                             video.style.position = 'fixed'
                             video.style.display = 'block'
@@ -129,24 +147,32 @@ export class MeetHtmlCleaner {
                                 video.parentElement.style.position = 'fixed'
                                 video.parentElement.style.display = 'flex'
                                 video.parentElement.style.alignItems = 'center'
-                                video.parentElement.style.justifyContent = 'center'
+                                video.parentElement.style.justifyContent =
+                                    'center'
                             }
                         }
                     } catch (e) {}
                     try {
-                        document.getElementsByTagName('video')[1].style.position = 'fixed'
+                        document.getElementsByTagName(
+                            'video',
+                        )[1].style.position = 'fixed'
                     } catch (e) {}
                 }
 
                 try {
-                    const bannerDiv = document.querySelector('div[role="banner"]') as HTMLElement
+                    const bannerDiv = document.querySelector(
+                        'div[role="banner"]',
+                    ) as HTMLElement
                     if (bannerDiv) {
                         bannerDiv.style.opacity = '0'
                     }
                 } catch (e) {}
                 try {
                     for (const div of document.getElementsByTagName('div')) {
-                        if (div.clientHeight === 164 && div.clientWidth === 322) {
+                        if (
+                            div.clientHeight === 164 &&
+                            div.clientWidth === 322
+                        ) {
                             div.style.display = 'none'
                         }
                     }
@@ -159,14 +185,17 @@ export class MeetHtmlCleaner {
                     }
                 } catch (e) {}
                 try {
-                    const politeDivs = document.querySelectorAll('div[aria-live="polite"]')
+                    const politeDivs = document.querySelectorAll(
+                        'div[aria-live="polite"]',
+                    )
                     politeDivs.forEach((div) => {
-                        (div as HTMLElement).style.opacity = '0'
+                        ;(div as HTMLElement).style.opacity = '0'
                     })
                 } catch (e) {}
                 try {
-                    var icons = Array.from(document.querySelectorAll('i.google-material-icons'))
-                        .filter((el) => el.textContent?.trim() === 'devices')
+                    var icons = Array.from(
+                        document.querySelectorAll('i.google-material-icons'),
+                    ).filter((el) => el.textContent?.trim() === 'devices')
                     icons.forEach((icon) => {
                         if (icon.parentElement) {
                             icon.parentElement.style.opacity = '0'
@@ -179,7 +208,8 @@ export class MeetHtmlCleaner {
                 while (root == null) {
                     root = (Array as any)
                         .from(document.querySelectorAll('div'))
-                        .find((d) => d.innerText === 'People')?.parentElement?.parentElement
+                        .find((d) => d.innerText === 'People')
+                        ?.parentElement?.parentElement
                     if (root != null) {
                         try {
                             root.parentElement.style.opacity = 0
@@ -187,19 +217,24 @@ export class MeetHtmlCleaner {
                             const rootLeft = (Array as any)
                                 .from(document.querySelectorAll('div'))
                                 .find((d) => d.innerText === 'You')
-                            rootLeft.parentElement.parentElement.parentElement.parentElement.style.width = '97vw'
+                            rootLeft.parentElement.parentElement.parentElement.parentElement.style.width =
+                                '97vw'
                         } catch (e) {}
                     }
                 }
 
                 try {
-                    var moodIcons = Array.from(document.querySelectorAll('i.google-material-icons'))
-                        .filter((el) => el.textContent?.trim() === 'mood')
+                    var moodIcons = Array.from(
+                        document.querySelectorAll('i.google-material-icons'),
+                    ).filter((el) => el.textContent?.trim() === 'mood')
                     if (moodIcons.length > 0) {
                         var icon = moodIcons[0]
                         var currentElement = icon.parentElement
                         while (currentElement != null) {
-                            var bgColor = window.getComputedStyle(currentElement).backgroundColor
+                            var bgColor =
+                                window.getComputedStyle(
+                                    currentElement,
+                                ).backgroundColor
                             if (bgColor === 'rgb(32, 33, 36)') {
                                 currentElement.style.opacity = '0'
                                 break
@@ -211,7 +246,8 @@ export class MeetHtmlCleaner {
             }
 
             function removeBlackBox(): void {
-                const elements: NodeListOf<HTMLElement> = document.querySelectorAll('[data-layout="roi-crop"]')
+                const elements: NodeListOf<HTMLElement> =
+                    document.querySelectorAll('[data-layout="roi-crop"]')
                 if (elements.length === 0) {
                     return
                 }
@@ -270,13 +306,15 @@ export class MeetHtmlCleaner {
 
     public async stop(): Promise<void> {
         console.log('[Meet] Stopping HTML cleaner')
-        
-        await this.page.evaluate(() => {
-            if ((window as any).htmlCleanerObserver) {
-                (window as any).htmlCleanerObserver.disconnect()
-                delete (window as any).htmlCleanerObserver
-            }
-        }).catch(e => console.error('[Meet] HTML cleaner stop error:', e))
+
+        await this.page
+            .evaluate(() => {
+                if ((window as any).htmlCleanerObserver) {
+                    ;(window as any).htmlCleanerObserver.disconnect()
+                    delete (window as any).htmlCleanerObserver
+                }
+            })
+            .catch((e) => console.error('[Meet] HTML cleaner stop error:', e))
 
         console.log('[Meet] HTML cleaner stopped')
     }

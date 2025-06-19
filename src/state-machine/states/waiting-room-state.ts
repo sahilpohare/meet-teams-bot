@@ -7,6 +7,7 @@ import {
 } from '../types'
 import { BaseState } from './base-state'
 import { takeScreenshot } from '../../utils/takeScreenshot'
+import { GLOBAL } from '../../singleton'
 
 export class WaitingRoomState extends BaseState {
     async execute(): StateExecuteResult {
@@ -26,8 +27,8 @@ export class WaitingRoomState extends BaseState {
                 meetingId,
                 password,
                 0,
-                this.context.params.bot_name,
-                this.context.params.enter_message,
+                GLOBAL.get().bot_name,
+                GLOBAL.get().enter_message,
             )
 
             // Open the meeting page
@@ -69,8 +70,9 @@ export class WaitingRoomState extends BaseState {
         }
 
         try {
-            const { meeting_url } = this.context.params
-            return await this.context.provider.parseMeetingUrl(meeting_url)
+            return await this.context.provider.parseMeetingUrl(
+                GLOBAL.get().meeting_url,
+            )
         } catch (error) {
             console.error('Failed to parse meeting URL:', error)
             throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
@@ -88,7 +90,7 @@ export class WaitingRoomState extends BaseState {
                 await this.context.provider.openMeetingPage(
                     this.context.browserContext,
                     meetingLink,
-                    this.context.params.streaming_input,
+                    GLOBAL.get().streaming_input,
                 )
             console.info('Meeting page opened successfully')
         } catch (error) {
@@ -129,7 +131,7 @@ export class WaitingRoomState extends BaseState {
         }
 
         const timeoutMs =
-            this.context.params.automatic_leave.waiting_room_timeout * 1000
+            GLOBAL.get().automatic_leave.waiting_room_timeout * 1000
         console.info(`Setting waiting room timeout to ${timeoutMs}ms`)
 
         let joinSuccessful = false // Flag indicating we joined the meeting
@@ -160,7 +162,6 @@ export class WaitingRoomState extends BaseState {
                     () =>
                         this.context.endReason ===
                         RecordingEndReason.ApiRequest,
-                    this.context.params,
                     // Add a callback to notify that the join succeeded
                     () => {
                         joinSuccessful = true

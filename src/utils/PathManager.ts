@@ -17,7 +17,7 @@ export class PathManager {
         this.isServerless = GLOBAL.isServerless()
         this.botUuid = global.bot_uuid
         this.secret = global.secret
-       }
+    }
 
     public static getInstance(): PathManager {
         if (!PathManager.instance) {

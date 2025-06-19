@@ -19,14 +19,9 @@ export interface MeetingProviderInterface {
     joinMeeting(
         page: Page,
         cancelCheck: () => boolean,
-        meetingParams: MeetingParams,
         onJoinSuccess: () => void,
     ): Promise<void>
-    findEndMeeting(
-        meetingParams: MeetingParams,
-        page: Page,
-        // cancellationToken: CancellationToken,
-    ): Promise<boolean>
+    findEndMeeting(page: Page): Promise<boolean>
     parseMeetingUrl(
         meeting_url: string,
     ): Promise<{ meetingId: string; password: string }>
@@ -84,14 +79,14 @@ export type MeetingParams = {
     }
     mp4_s3_path: string
     // ----------------- TODO -------------------- SECTION RAJOUTEE
-    environ: string, // local, prod or preprod
-    aws_s3_temporary_audio_bucket: string,
-    remote : {
-        s3_args: string[],
-        api_server_baseurl: string,
-        aws_s3_video_bucket: string,
-        aws_s3_log_bucket: string,
-    }
+    environ: string // local, prod or preprod
+    aws_s3_temporary_audio_bucket: string
+    remote: {
+        s3_args: string[]
+        api_server_baseurl: string
+        aws_s3_video_bucket: string
+        aws_s3_log_bucket: string
+    } | null
     // -----------------------------------------------------------
     secret: string
     extra?: any

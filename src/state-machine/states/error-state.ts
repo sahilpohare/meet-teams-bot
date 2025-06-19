@@ -1,4 +1,5 @@
 import { Events } from '../../events'
+import { GLOBAL } from '../../singleton'
 import { JoinError, JoinErrorCode } from '../../types'
 import { MeetingStateType, StateExecuteResult } from '../types'
 import { BaseState } from './base-state'
@@ -41,9 +42,9 @@ export class ErrorState extends BaseState {
             code: error instanceof JoinError ? error.message : undefined,
             details: error instanceof JoinError ? error.details : undefined,
             state: this.stateType,
-            meetingUrl: this.context.params?.meeting_url,
-            botName: this.context.params?.bot_name,
-            sessionId: this.context.params?.session_id,
+            meetingUrl: GLOBAL.get().meeting_url,
+            botName: GLOBAL.get().bot_name,
+            sessionId: GLOBAL.get().session_id,
             timestamp: Date.now(),
         }
 
@@ -141,7 +142,7 @@ export class ErrorState extends BaseState {
             // Other relevant context metrics
             attendeesCount: this.context.attendeesCount,
             firstUserJoined: this.context.firstUserJoined,
-            sessionId: this.context.params?.session_id,
+            sessionId: GLOBAL.get().session_id,
         }
 
         // Log metrics

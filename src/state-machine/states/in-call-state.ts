@@ -7,6 +7,7 @@ import { HtmlCleaner } from '../../meeting/htmlCleaner'
 import { MEETING_CONSTANTS } from '../constants'
 import { MeetingStateType, StateExecuteResult } from '../types'
 import { BaseState } from './base-state'
+import { GLOBAL } from '../../singleton'
 
 export class InCallState extends BaseState {
     async execute(): StateExecuteResult {
@@ -68,17 +69,18 @@ export class InCallState extends BaseState {
         // Configure SCREEN_RECORDER if RECORDING is enabled
         if (RECORDING) {
             console.info('Configuring SCREEN_RECORDER...')
-            
+
             // Configure SCREEN_RECORDER with PathManager and recording params
             SCREEN_RECORDER.configure(
                 this.context.pathManager,
-                this.context.params.recording_mode,
-                this.context.params,
+                GLOBAL.get().recording_mode,
             )
 
             console.info('SCREEN_RECORDER configured successfully')
         } else {
-            console.info('RECORDING disabled - skipping screen recorder initialization')
+            console.info(
+                'RECORDING disabled - skipping screen recorder initialization',
+            )
         }
 
         console.info('Services initialized successfully')
@@ -90,7 +92,9 @@ export class InCallState extends BaseState {
         }
 
         try {
-            console.log('Setting up browser components with integrated HTML cleanup...')
+            console.log(
+                'Setting up browser components with integrated HTML cleanup...',
+            )
 
             // Start HTML cleanup first to clean the interface
             await this.startHtmlCleaning()
@@ -98,19 +102,20 @@ export class InCallState extends BaseState {
             // If RECORDING=false, start speakers observation immediately
             if (!RECORDING) {
                 await this.startSpeakersObservation()
-                console.log('RECORDING disabled - skipping video recording setup')
+                console.log(
+                    'RECORDING disabled - skipping video recording setup',
+                )
                 this.context.startTime = Date.now()
                 Events.inCallRecording({ start_time: this.context.startTime })
                 return
             }
-
         } catch (error) {
             console.error('Error in setupBrowserComponents:', error)
             console.error('Context state:', {
                 hasPlaywrightPage: !!this.context.playwrightPage,
-                recordingMode: this.context.params.recording_mode,
-                meetingProvider: this.context.params.meetingProvider,
-                botName: this.context.params.bot_name,
+                recordingMode: GLOBAL.get().recording_mode,
+                meetingProvider: GLOBAL.get().meetingProvider,
+                botName: GLOBAL.get().bot_name,
             })
             throw new Error(`Browser component setup failed: ${error as Error}`)
         }
@@ -118,12 +123,17 @@ export class InCallState extends BaseState {
         // RECORDING=true mode: Start screen recording
         let startTime: number
         let recordingStartedSuccessfully = false
-        
+
         console.log('🎯 === STARTING SCREEN RECORDING ===')
-        
+
         // 🍎 MAC TESTING: Skip screen recording for Mac local testing
-        if (process.env.DISABLE_RECORDING === 'true' || process.platform === 'darwin') {
-            console.log('🍎 Screen recording disabled for Mac testing - focusing on speakers detection only')
+        if (
+            process.env.DISABLE_RECORDING === 'true' ||
+            process.platform === 'darwin'
+        ) {
+            console.log(
+                '🍎 Screen recording disabled for Mac testing - focusing on speakers detection only',
+            )
             startTime = Date.now()
             recordingStartedSuccessfully = true
         } else {
@@ -131,7 +141,9 @@ export class InCallState extends BaseState {
                 // Configure the meeting page for sync (if available)
                 if (this.context.playwrightPage) {
                     SCREEN_RECORDER.setPage(this.context.playwrightPage)
-                    console.log('📄 Meeting page configured for SCREEN_RECORDER')
+                    console.log(
+                        '📄 Meeting page configured for SCREEN_RECORDER',
+                    )
                 } else {
                     console.warn('⚠️ No playwright page available')
                 }
@@ -164,9 +176,13 @@ export class InCallState extends BaseState {
         }
 
         if (recordingStartedSuccessfully) {
-            console.log('✅ Screen recording and speakers observation setup complete')
+            console.log(
+                '✅ Screen recording and speakers observation setup complete',
+            )
         } else {
-            console.warn('⚠️ Screen recording failed but speakers observation is running')
+            console.warn(
+                '⚠️ Screen recording failed but speakers observation is running',
+            )
         }
 
         // Notify that recording has started
@@ -174,19 +190,25 @@ export class InCallState extends BaseState {
     }
 
     private async startSpeakersObservation(): Promise<void> {
-        console.log(`Starting speakers observation for ${this.context.params.meetingProvider}`)
-        
+        console.log(
+            `Starting speakers observation for ${GLOBAL.get().meetingProvider}`,
+        )
+
         // Start SpeakerManager
         SpeakerManager.start()
 
         if (!this.context.playwrightPage) {
-            console.error('Playwright page not available for speakers observation')
+            console.error(
+                'Playwright page not available for speakers observation',
+            )
             return
         }
 
         // Create and start integrated speakers observer
-        const speakersObserver = new SpeakersObserver(this.context.params.meetingProvider)
-        
+        const speakersObserver = new SpeakersObserver(
+            GLOBAL.get().meetingProvider,
+        )
+
         // Callback to handle speakers changes
         const onSpeakersChange = async (speakers: any[]) => {
             try {
@@ -199,17 +221,20 @@ export class InCallState extends BaseState {
         try {
             await speakersObserver.startObserving(
                 this.context.playwrightPage,
-                this.context.params.recording_mode,
-                this.context.params.bot_name,
-                onSpeakersChange
+                GLOBAL.get().recording_mode,
+                GLOBAL.get().bot_name,
+                onSpeakersChange,
             )
-            
+
             // Store the observer in context for cleanup later
             this.context.speakersObserver = speakersObserver
-            
+
             console.log('Integrated speakers observer started successfully')
         } catch (error) {
-            console.error('Failed to start integrated speakers observer:', error)
+            console.error(
+                'Failed to start integrated speakers observer:',
+                error,
+            )
             throw error
         }
     }
@@ -220,14 +245,14 @@ export class InCallState extends BaseState {
             return
         }
 
-        console.log(`Starting HTML cleanup for ${this.context.params.meetingProvider}`)
+        console.log(`Starting HTML cleanup for ${GLOBAL.get().meetingProvider}`)
 
         try {
             // EXACT SAME LOGIC AS EXTENSION: Use centralized HtmlCleaner
             const htmlCleaner = new HtmlCleaner(
                 this.context.playwrightPage,
-                this.context.params.meetingProvider,
-                this.context.params.recording_mode
+                GLOBAL.get().meetingProvider,
+                GLOBAL.get().recording_mode,
             )
 
             await htmlCleaner.start()
@@ -241,6 +266,4 @@ export class InCallState extends BaseState {
             // Continue even if HTML cleanup fails - it's not critical
         }
     }
-
-
 }

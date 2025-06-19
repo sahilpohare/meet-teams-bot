@@ -5,6 +5,7 @@ import { SpeakerManager } from '../../speaker-manager'
 import { RECORDING } from '../../main'
 import { MeetingStateType, StateExecuteResult } from '../types'
 import { BaseState } from './base-state'
+import { GLOBAL } from '../../singleton'
 
 export class ResumingState extends BaseState {
     async execute(): StateExecuteResult {
@@ -45,7 +46,9 @@ export class ResumingState extends BaseState {
         const resumePromise = async () => {
             // Note: ScreenRecorder ne supporte pas pause/resume - l'enregistrement a continué
             if (RECORDING) {
-                console.log('Note: ScreenRecorder recording continued during pause (no pause/resume support)')
+                console.log(
+                    'Note: ScreenRecorder recording continued during pause (no pause/resume support)',
+                )
             } else {
                 console.log('RECORDING disabled - no recording to resume')
             }
@@ -55,16 +58,20 @@ export class ResumingState extends BaseState {
                 this.context.streamingService.resume()
                 console.log('Streaming service resumed successfully')
             } else if (!RECORDING) {
-                console.log('RECORDING disabled - skipping streaming service resume')
+                console.log(
+                    'RECORDING disabled - skipping streaming service resume',
+                )
             }
 
             // Resume speakers observation if it was paused
             if (this.context.speakersObserver && this.context.playwrightPage) {
                 console.log('Resuming speakers observation...')
-                
+
                 const onSpeakersChange = async (speakers: any[]) => {
                     try {
-                        await SpeakerManager.getInstance().handleSpeakerUpdate(speakers)
+                        await SpeakerManager.getInstance().handleSpeakerUpdate(
+                            speakers,
+                        )
                     } catch (error) {
                         console.error('Error handling speaker update:', error)
                     }
@@ -72,9 +79,9 @@ export class ResumingState extends BaseState {
 
                 await this.context.speakersObserver.startObserving(
                     this.context.playwrightPage,
-                    this.context.params.recording_mode,
-                    this.context.params.bot_name,
-                    onSpeakersChange
+                    GLOBAL.get().recording_mode,
+                    GLOBAL.get().bot_name,
+                    onSpeakersChange,
                 )
                 console.log('Speakers observation resumed')
             }

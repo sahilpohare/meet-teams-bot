@@ -11,7 +11,7 @@ export class HtmlCleaner {
     constructor(
         page: Page,
         meetingProvider: MeetingProvider,
-        recordingMode: RecordingMode
+        recordingMode: RecordingMode,
     ) {
         this.meetingProvider = meetingProvider
 
@@ -26,7 +26,9 @@ export class HtmlCleaner {
                 break
 
             default:
-                throw new Error(`Unknown meeting provider: ${this.meetingProvider}`)
+                throw new Error(
+                    `Unknown meeting provider: ${this.meetingProvider}`,
+                )
         }
     }
 
@@ -42,9 +44,14 @@ export class HtmlCleaner {
             try {
                 await this.cleaner.start()
                 this.isRunning = true
-                console.log(`[HtmlCleaner] ✅ Started for ${this.meetingProvider}`)
+                console.log(
+                    `[HtmlCleaner] ✅ Started for ${this.meetingProvider}`,
+                )
             } catch (error) {
-                console.error(`Failed to start ${this.meetingProvider} HTML cleaner:`, error)
+                console.error(
+                    `Failed to start ${this.meetingProvider} HTML cleaner:`,
+                    error,
+                )
                 throw error
             }
         }
@@ -56,17 +63,20 @@ export class HtmlCleaner {
         }
 
         console.log(`[HtmlCleaner] Stopping for ${this.meetingProvider}...`)
-        
+
         try {
             await this.cleaner.stop()
             this.isRunning = false
             console.log(`[HtmlCleaner] ✅ Stopped for ${this.meetingProvider}`)
         } catch (error) {
-            console.error(`Failed to stop ${this.meetingProvider} HTML cleaner:`, error)
+            console.error(
+                `Failed to stop ${this.meetingProvider} HTML cleaner:`,
+                error,
+            )
         }
     }
 
     public isCurrentlyRunning(): boolean {
         return this.isRunning
     }
-} 
+}

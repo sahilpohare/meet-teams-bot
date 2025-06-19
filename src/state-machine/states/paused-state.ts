@@ -71,7 +71,9 @@ export class PausedState extends BaseState {
         const pausePromise = async () => {
             // Note: ScreenRecorder ne supporte pas pause/resume - l'enregistrement continue
             if (RECORDING) {
-                console.log('Note: ScreenRecorder recording continues during pause (no pause/resume support)')
+                console.log(
+                    'Note: ScreenRecorder recording continues during pause (no pause/resume support)',
+                )
             } else {
                 console.log('RECORDING disabled - no recording to pause')
             }
@@ -81,7 +83,9 @@ export class PausedState extends BaseState {
                 this.context.streamingService.pause()
                 console.log('Streaming service paused successfully')
             } else if (!RECORDING) {
-                console.log('RECORDING disabled - skipping streaming service pause')
+                console.log(
+                    'RECORDING disabled - skipping streaming service pause',
+                )
             }
 
             // Pause speakers observation

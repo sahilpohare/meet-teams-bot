@@ -1,7 +1,6 @@
 import express from 'express'
 import * as fs from 'fs/promises'
 
-
 import { execSync } from 'child_process'
 import { SoundContext, VideoContext } from './media_context'
 import { StopRecordParams } from './types'
@@ -16,9 +15,7 @@ const HOST = '0.0.0.0'
 export const PORT = 8080
 
 async function getAllowedOrigins(): Promise<string[]> {
-    return [
-        process.env.ALLOWED_ORIGIN,
-    ]
+    return [process.env.ALLOWED_ORIGIN]
 }
 
 export async function server() {

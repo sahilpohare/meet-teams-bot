@@ -94,8 +94,13 @@ export class CleanupState extends BaseState {
     private async stopScreenRecorder(): Promise<void> {
         try {
             // 🍎 MAC TESTING: Skip screen recording stop for Mac local testing
-            if (process.env.DISABLE_RECORDING === 'true' || process.platform === 'darwin') {
-                console.log('🍎 Screen recording disabled for Mac - nothing to stop')
+            if (
+                process.env.DISABLE_RECORDING === 'true' ||
+                process.platform === 'darwin'
+            ) {
+                console.log(
+                    '🍎 Screen recording disabled for Mac - nothing to stop',
+                )
                 return
             }
 
