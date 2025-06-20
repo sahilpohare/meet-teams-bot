@@ -167,7 +167,6 @@ export class MeetingStateMachine {
             this.context.startGlobalDialogObserver?.()
 
             while (
-                this.currentState !== MeetingStateType.Cleanup &&
                 this.currentState !== MeetingStateType.Terminated &&
                 !this.forceStop
             ) {

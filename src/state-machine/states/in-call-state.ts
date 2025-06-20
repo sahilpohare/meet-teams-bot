@@ -107,39 +107,28 @@ export class InCallState extends BaseState {
 
         console.log('🎯 === STARTING SCREEN RECORDING ===')
 
-        // 🍎 MAC TESTING: Skip screen recording for Mac local testing
-        if (process.platform === 'darwin') {
-            console.log(
-                '🍎 Screen recording disabled for Mac testing - focusing on speakers detection only',
-            )
+        try {
+            // Configure the meeting page for sync (if available)
+            if (this.context.playwrightPage) {
+                ScreenRecorderManager.getInstance().setPage(
+                    this.context.playwrightPage,
+                )
+                console.log('📄 Meeting page configured for SCREEN_RECORDER')
+            } else {
+                console.warn('⚠️ No playwright page available')
+            }
+
+            // Start screen recording
+            console.log('🚀 Starting screen recording...')
+            await ScreenRecorderManager.getInstance().startRecording()
+
             startTime = Date.now()
             recordingStartedSuccessfully = true
-        } else {
-            try {
-                // Configure the meeting page for sync (if available)
-                if (this.context.playwrightPage) {
-                    ScreenRecorderManager.getInstance().setPage(
-                        this.context.playwrightPage,
-                    )
-                    console.log(
-                        '📄 Meeting page configured for SCREEN_RECORDER',
-                    )
-                } else {
-                    console.warn('⚠️ No playwright page available')
-                }
-
-                // Start screen recording
-                console.log('🚀 Starting screen recording...')
-                await ScreenRecorderManager.getInstance().startRecording()
-
-                startTime = Date.now()
-                recordingStartedSuccessfully = true
-                console.log('✅ Screen recording started successfully')
-            } catch (error) {
-                console.error('❌ Error starting screen recording:', error)
-                startTime = Date.now()
-                recordingStartedSuccessfully = false
-            }
+            console.log('✅ Screen recording started successfully')
+        } catch (error) {
+            console.error('❌ Error starting screen recording:', error)
+            startTime = Date.now()
+            recordingStartedSuccessfully = false
         }
 
         // Set start time in context

@@ -10,7 +10,6 @@ import {
 import { BaseState } from './base-state'
 
 import { ScreenRecorderManager } from '../../recording/ScreenRecorder'
-import { GLOBAL } from '../../singleton'
 
 // Sound level threshold for considering activity (0-100)
 const SOUND_LEVEL_ACTIVITY_THRESHOLD = 5
@@ -68,13 +67,16 @@ export class RecordingState extends BaseState {
             }
 
             // Stop the observer before transitioning to Cleanup state
-            this.stopDialogObserver()
+            console.info(
+                '🔄 Recording state loop ended, transitioning to cleanup state',
+            )
             return this.transition(MeetingStateType.Cleanup)
         } catch (error) {
             // Stop the observer in case of error
             this.stopDialogObserver()
 
-            console.error('Error in recording state:', error)
+            console.error('❌ Error in recording state:', error)
+            console.error('❌ Error stack:', (error as Error).stack)
             return this.handleError(error as Error)
         }
     }
@@ -122,12 +124,6 @@ export class RecordingState extends BaseState {
             this.context.error = error
             this.isProcessing = false
         })
-
-        ScreenRecorderManager.getInstance().on('stopped', async () => {
-            console.info('ScreenRecorder stopped - recording completed')
-        })
-
-        console.info('ScreenRecorder event listeners configured')
 
         console.info('Event listeners setup complete')
     }
@@ -202,9 +198,6 @@ export class RecordingState extends BaseState {
         this.context.endReason = reason
 
         try {
-            // Stop the dialog observer
-            this.stopDialogObserver()
-
             // Try to close the meeting but don't let an error here affect the rest
             try {
                 // If the reason is bot_removed, we know the meeting is already effectively closed
@@ -228,37 +221,6 @@ export class RecordingState extends BaseState {
             console.info('Triggering call ended event')
             await Events.callEnded()
 
-            console.info('Stopping video recording')
-            await this.stopVideoRecording().catch((err) => {
-                console.error(
-                    'Error stopping video recording, continuing:',
-                    err,
-                )
-            })
-
-            console.info('Stopping screen recorder')
-            try {
-                // 🍎 MAC TESTING: Skip screen recording stop for Mac local testing
-                if (
-                    process.env.DISABLE_RECORDING === 'true' ||
-                    process.platform === 'darwin'
-                ) {
-                    console.log(
-                        '🍎 Screen recording disabled for Mac - nothing to stop',
-                    )
-                } else if (
-                    ScreenRecorderManager.getInstance().isCurrentlyRecording()
-                ) {
-                    await ScreenRecorderManager.getInstance().stopRecording()
-                    console.info('ScreenRecorder stopped successfully')
-                }
-            } catch (error) {
-                console.error(
-                    'Error stopping screen recorder, continuing cleanup:',
-                    error,
-                )
-            }
-
             console.info('Setting isProcessing to false to end recording loop')
             await this.sleep(2000)
         } catch (error) {
@@ -267,31 +229,6 @@ export class RecordingState extends BaseState {
             // Always ensure this flag is set to stop the processing loop
             this.isProcessing = false
             console.info('Meeting end handling completed')
-        }
-    }
-
-    private async stopVideoRecording(): Promise<void> {
-        // Stop screen recording via ScreenRecorder
-        if (this.context.screenRecorder) {
-            try {
-                if (this.context.screenRecorder.isCurrentlyRecording()) {
-                    console.log(
-                        'Stopping screen recording via ScreenRecorder...',
-                    )
-                    await this.context.screenRecorder.stopRecording()
-                    console.log('Screen recording stopped successfully')
-                } else {
-                    console.log('Screen recording was not active')
-                }
-                return
-            } catch (error) {
-                console.error('Error stopping screen recording:', error)
-                throw error
-            }
-        } else {
-            console.warn(
-                'ScreenRecorder not available - recording may not have been properly started',
-            )
         }
     }
 

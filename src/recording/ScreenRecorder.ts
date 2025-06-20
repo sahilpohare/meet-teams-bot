@@ -487,20 +487,16 @@ export class ScreenRecorder extends EventEmitter {
     ): Promise<void> {
         if (!this.s3Uploader || !fs.existsSync(chunkPath)) return
 
-        try {
-            // Upload directly with the filename (UUID-index.wav format) without chunks/ prefix
-            // This matches production format where chunks are uploaded as: 009abdef-dd02-4a30-bac3-c514ebc69173-0.wav
-            await this.s3Uploader.uploadFile(
-                chunkPath,
-                this.config.transcriptionAudioBucket!,
-                filename,
-                [],
-                true,
-            )
-            console.log(`✅ Chunk uploaded: ${filename}`)
-        } catch (error) {
-            console.error(`Failed to upload chunk ${filename}:`, error)
-        }
+        const botUuid = GLOBAL.get().bot_uuid || 'unknown'
+        const s3Key = `${botUuid}/${filename}`
+
+        await this.s3Uploader.uploadFile(
+            chunkPath,
+            this.config.transcriptionAudioBucket!,
+            s3Key,
+            [],
+            true,
+        )
     }
 
     private cleanupChunkMonitoring(): void {
@@ -510,43 +506,45 @@ export class ScreenRecorder extends EventEmitter {
         }
     }
 
-    /**
-     * External API: uploadToS3() - Maintain compatibility
-     */
     public async uploadToS3(): Promise<void> {
-        if (
-            this.filesUploaded ||
-            !this.s3Uploader ||
-            !fs.existsSync(this.outputPath)
-        ) {
+        if (this.filesUploaded || !this.s3Uploader) {
             return
         }
 
-        try {
-            const isAudioOnly = this.config.recordingMode === 'audio_only'
-            const fileExtension = isAudioOnly ? '.wav' : '.mp4'
-            const s3Key = `${this.config.s3Path}${fileExtension}`
+        const isAudioOnly = this.config.recordingMode === 'audio_only'
+        const botUuid = GLOBAL.get().bot_uuid || 'unknown'
 
-            await this.s3Uploader.uploadFile(
-                this.outputPath,
-                this.config.bucketName!,
-                s3Key,
-                [],
-            )
-
-            fs.unlinkSync(this.outputPath)
-            this.filesUploaded = true
-
-            console.log(`Native S3 upload completed`)
-        } catch (error) {
-            console.error('Native S3 upload error:', error)
-            throw error
+        if (isAudioOnly) {
+            if (fs.existsSync(this.outputPath)) {
+                await this.s3Uploader.uploadFile(
+                    this.outputPath,
+                    this.config.transcriptionAudioBucket!,
+                    `${botUuid}.wav`,
+                )
+                fs.unlinkSync(this.outputPath)
+            }
+        } else {
+            if (fs.existsSync(this.outputPath)) {
+                await this.s3Uploader.uploadFile(
+                    this.outputPath,
+                    this.config.bucketName!,
+                    `${botUuid}.mp4`,
+                )
+                fs.unlinkSync(this.outputPath)
+            }
+            if (fs.existsSync(this.audioOutputPath)) {
+                await this.s3Uploader.uploadFile(
+                    this.audioOutputPath,
+                    this.config.transcriptionAudioBucket!,
+                    `${botUuid}.wav`,
+                )
+                fs.unlinkSync(this.audioOutputPath)
+            }
         }
+
+        this.filesUploaded = true
     }
 
-    /**
-     * External API: stopRecording() - Maintain compatibility
-     */
     public async stopRecording(): Promise<void> {
         if (!this.isRecording || !this.ffmpegProcess) {
             return
@@ -569,20 +567,8 @@ export class ScreenRecorder extends EventEmitter {
         })
     }
 
-    // External API methods (maintain compatibility)
     public isCurrentlyRecording(): boolean {
         return this.isRecording
-    }
-
-    public getConfig(): ScreenRecordingConfig {
-        return { ...this.config }
-    }
-
-    public updateConfig(newConfig: Partial<ScreenRecordingConfig>): void {
-        if (this.isRecording) {
-            throw new Error('Cannot update config while recording')
-        }
-        this.config = { ...this.config, ...newConfig }
     }
 
     public getStatus(): {
