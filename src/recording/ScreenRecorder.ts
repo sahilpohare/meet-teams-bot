@@ -27,6 +27,9 @@ interface ScreenRecordingConfig {
     transcriptionAudioBucket?: string
     bucketName?: string
     s3Path?: string
+    // Grace period settings for clean endings
+    gracePeriodSeconds?: number
+    trimEndSeconds?: number
 }
 
 export class ScreenRecorder extends EventEmitter {
@@ -43,6 +46,8 @@ export class ScreenRecorder extends EventEmitter {
     private syncCalibrator: SyncCalibrator
     private pathManager: PathManager | null = null
     private page: any = null
+    private gracePeriodActive: boolean = false
+    private recordingStartTime: number = 0
 
     constructor(config: Partial<ScreenRecordingConfig> = {}) {
         super()
@@ -65,6 +70,9 @@ export class ScreenRecorder extends EventEmitter {
                 GLOBAL.get().aws_s3_temporary_audio_bucket,
             bucketName: GLOBAL.get().remote?.aws_s3_video_bucket || '',
             s3Path: '',
+            // Default grace period: 3s recording + 2s trim = clean ending
+            gracePeriodSeconds: 3,
+            trimEndSeconds: 2,
             ...config,
         }
 
@@ -153,6 +161,8 @@ export class ScreenRecorder extends EventEmitter {
             })
 
             this.isRecording = true
+            this.recordingStartTime = Date.now()
+            this.gracePeriodActive = false
             this.setupProcessMonitoring()
             this.startNativeAudioStreaming()
 
@@ -217,12 +227,6 @@ export class ScreenRecorder extends EventEmitter {
             args.push(
                 '-f',
                 'pulse',
-                '-thread_queue_size',
-                '512',
-                '-probesize',
-                '50M',
-                '-analyzeduration',
-                '10000000',
                 '-i',
                 'virtual_speaker.monitor',
                 '-itsoffset',
@@ -240,43 +244,21 @@ export class ScreenRecorder extends EventEmitter {
             )
         } else {
             args.push(
-                // Video input with Docker sync fixes
+                // Video input - simplified and optimized
                 '-f',
                 'x11grab',
                 '-video_size',
                 '1280x880',
                 '-framerate',
                 '30',
-                '-probesize',
-                '50M',
-                '-analyzeduration',
-                '10000000',
-                '-thread_queue_size',
-                '512',
-                '-rtbufsize',
-                '100M',
-                '-fflags',
-                '+genpts',
-                '-use_wallclock_as_timestamps',
-                '1',
                 '-i',
                 this.config.display,
             )
 
-            // Audio input with calibrated offset + sync
+            // Audio input - auto-detect PulseAudio config
             args.push(
                 '-f',
                 'pulse',
-                '-thread_queue_size',
-                '512',
-                '-probesize',
-                '50M',
-                '-analyzeduration',
-                '10000000',
-                '-fflags',
-                '+genpts',
-                '-use_wallclock_as_timestamps',
-                '1',
                 '-itsoffset',
                 syncOffset.toString(),
                 '-i',
@@ -293,9 +275,11 @@ export class ScreenRecorder extends EventEmitter {
                 '-c:v',
                 'libx264',
                 '-preset',
-                'medium',
+                'fast', // Optimized for real-time recording
                 '-crf',
-                '20',
+                '23', // Slightly higher CRF for faster encoding
+                '-tune',
+                'zerolatency', // Optimize for low-latency streaming
                 '-vf',
                 'crop=1280:720:0:160',
                 '-c:a',
@@ -311,7 +295,7 @@ export class ScreenRecorder extends EventEmitter {
                 '-f',
                 'mp4',
                 '-movflags',
-                '+faststart',
+                '+faststart+frag_keyframe+empty_moov', // Enhanced streaming support
                 this.outputPath,
 
                 // === OUTPUT 2: WAV (simultaneous audio for transcription) ===
@@ -414,6 +398,9 @@ export class ScreenRecorder extends EventEmitter {
     private async handleSuccessfulRecording(): Promise<void> {
         console.log('Native recording completed')
 
+        // Post-process files to remove corrupted endings
+        await this.postProcessRecordings()
+
         // Auto-upload if not serverless
         if (!GLOBAL.isServerless()) {
             setTimeout(() => this.uploadToS3().catch(console.error), 200)
@@ -428,16 +415,13 @@ export class ScreenRecorder extends EventEmitter {
         try {
             const STREAMING_SAMPLE_RATE = 24_000
 
-            // Use SEPARATE audio device for streaming to avoid PulseAudio conflicts
             this.streamingProcess = spawn(
                 'ffmpeg',
                 [
                     '-f',
                     'pulse',
-                    '-thread_queue_size',
-                    '256',
                     '-i',
-                    'virtual_streaming.monitor', // Separate device for streaming
+                    'virtual_speaker.monitor',
                     '-acodec',
                     'pcm_f32le',
                     '-ac',
@@ -506,6 +490,195 @@ export class ScreenRecorder extends EventEmitter {
         }
     }
 
+    /**
+     * Post-process recordings to remove corrupted endings
+     * Creates trimmed copies and replaces originals
+     */
+    private async postProcessRecordings(): Promise<void> {
+        const trimSeconds = this.config.trimEndSeconds || 2
+        const isAudioOnly = this.config.recordingMode === 'audio_only'
+
+        console.log(
+            `🔧 Post-processing: trimming last ${trimSeconds}s to remove corruption`,
+        )
+
+        try {
+            if (isAudioOnly) {
+                // Audio-only mode: trim WAV file
+                await this.trimAudioFile(this.outputPath, trimSeconds)
+            } else {
+                // Video mode: trim both MP4 and WAV files
+                await Promise.all([
+                    this.trimVideoFile(this.outputPath, trimSeconds),
+                    this.trimAudioFile(this.audioOutputPath, trimSeconds),
+                ])
+            }
+
+            console.log('✅ Post-processing completed - clean endings applied')
+        } catch (error) {
+            console.error(
+                '⚠️ Post-processing failed, keeping original files:',
+                error,
+            )
+        }
+    }
+
+    /**
+     * Trim end of MP4 video file using FFmpeg
+     */
+    private async trimVideoFile(
+        filePath: string,
+        trimSeconds: number,
+    ): Promise<void> {
+        if (!fs.existsSync(filePath)) {
+            console.warn(`Video file not found for trimming: ${filePath}`)
+            return
+        }
+
+        const tempPath = filePath + '.trimmed.mp4'
+
+        return new Promise((resolve, reject) => {
+            // Get video duration first, then calculate trim duration
+            const durationProcess = spawn('ffprobe', [
+                '-v',
+                'quiet',
+                '-show_entries',
+                'format=duration',
+                '-of',
+                'csv=p=0',
+                filePath,
+            ])
+
+            let durationOutput = ''
+            durationProcess.stdout?.on('data', (data) => {
+                durationOutput += data.toString()
+            })
+
+            durationProcess.on('close', (code) => {
+                if (code !== 0) {
+                    reject(new Error('Failed to get video duration'))
+                    return
+                }
+
+                const duration = parseFloat(durationOutput.trim())
+                const trimmedDuration = Math.max(1, duration - trimSeconds) // Minimum 1 second
+
+                console.log(
+                    `📹 Trimming MP4: ${duration.toFixed(1)}s → ${trimmedDuration.toFixed(1)}s`,
+                )
+
+                // Trim the video
+                const trimProcess = spawn('ffmpeg', [
+                    '-i',
+                    filePath,
+                    '-t',
+                    trimmedDuration.toString(),
+                    '-c',
+                    'copy', // Copy streams without re-encoding for speed
+                    '-avoid_negative_ts',
+                    'make_zero',
+                    '-y',
+                    tempPath,
+                ])
+
+                trimProcess.on('close', (trimCode) => {
+                    if (trimCode === 0 && fs.existsSync(tempPath)) {
+                        // Replace original with trimmed version
+                        fs.renameSync(tempPath, filePath)
+                        resolve()
+                    } else {
+                        // Cleanup temp file if it exists
+                        if (fs.existsSync(tempPath)) {
+                            fs.unlinkSync(tempPath)
+                        }
+                        reject(
+                            new Error(
+                                `FFmpeg trim failed with code ${trimCode}`,
+                            ),
+                        )
+                    }
+                })
+            })
+        })
+    }
+
+    /**
+     * Trim end of WAV audio file using FFmpeg
+     */
+    private async trimAudioFile(
+        filePath: string,
+        trimSeconds: number,
+    ): Promise<void> {
+        if (!fs.existsSync(filePath)) {
+            console.warn(`Audio file not found for trimming: ${filePath}`)
+            return
+        }
+
+        const tempPath = filePath + '.trimmed.wav'
+
+        return new Promise((resolve, reject) => {
+            // Get audio duration first
+            const durationProcess = spawn('ffprobe', [
+                '-v',
+                'quiet',
+                '-show_entries',
+                'format=duration',
+                '-of',
+                'csv=p=0',
+                filePath,
+            ])
+
+            let durationOutput = ''
+            durationProcess.stdout?.on('data', (data) => {
+                durationOutput += data.toString()
+            })
+
+            durationProcess.on('close', (code) => {
+                if (code !== 0) {
+                    reject(new Error('Failed to get audio duration'))
+                    return
+                }
+
+                const duration = parseFloat(durationOutput.trim())
+                const trimmedDuration = Math.max(1, duration - trimSeconds) // Minimum 1 second
+
+                console.log(
+                    `🎵 Trimming WAV: ${duration.toFixed(1)}s → ${trimmedDuration.toFixed(1)}s`,
+                )
+
+                // Trim the audio
+                const trimProcess = spawn('ffmpeg', [
+                    '-i',
+                    filePath,
+                    '-t',
+                    trimmedDuration.toString(),
+                    '-c',
+                    'copy', // Copy stream without re-encoding
+                    '-y',
+                    tempPath,
+                ])
+
+                trimProcess.on('close', (trimCode) => {
+                    if (trimCode === 0 && fs.existsSync(tempPath)) {
+                        // Replace original with trimmed version
+                        fs.renameSync(tempPath, filePath)
+                        resolve()
+                    } else {
+                        // Cleanup temp file if it exists
+                        if (fs.existsSync(tempPath)) {
+                            fs.unlinkSync(tempPath)
+                        }
+                        reject(
+                            new Error(
+                                `FFmpeg audio trim failed with code ${trimCode}`,
+                            ),
+                        )
+                    }
+                })
+            })
+        })
+    }
+
     public async uploadToS3(): Promise<void> {
         if (this.filesUploaded || !this.s3Uploader) {
             return
@@ -550,20 +723,43 @@ export class ScreenRecorder extends EventEmitter {
             return
         }
 
+        console.log('🛑 Stop recording requested - starting grace period...')
+        this.gracePeriodActive = true
+
+        const gracePeriodMs = (this.config.gracePeriodSeconds || 3) * 1000
+
+        // Wait for grace period to allow clean ending
+        console.log(
+            `⏳ Grace period: ${this.config.gracePeriodSeconds}s for clean ending`,
+        )
+
+        await new Promise<void>((resolve) => {
+            setTimeout(() => {
+                console.log(
+                    '✅ Grace period completed - stopping FFmpeg cleanly',
+                )
+                resolve()
+            }, gracePeriodMs)
+        })
+
         return new Promise((resolve) => {
             this.ffmpegProcess!.once('exit', () => {
                 this.isRecording = false
+                this.gracePeriodActive = false
                 this.ffmpegProcess = null
                 resolve()
             })
 
+            // Send graceful termination signal
             this.ffmpegProcess!.kill('SIGINT')
 
+            // Fallback force kill after timeout
             setTimeout(() => {
                 if (this.ffmpegProcess && !this.ffmpegProcess.killed) {
+                    console.warn('⚠️ Force killing FFmpeg process')
                     this.ffmpegProcess.kill('SIGKILL')
                 }
-            }, 5000)
+            }, 8000)
         })
     }
 
@@ -575,11 +771,18 @@ export class ScreenRecorder extends EventEmitter {
         isRecording: boolean
         isConfigured: boolean
         filesUploaded: boolean
+        gracePeriodActive: boolean
+        recordingDurationMs: number
     } {
         return {
             isRecording: this.isRecording,
             isConfigured: this.isConfigured,
             filesUploaded: this.filesUploaded,
+            gracePeriodActive: this.gracePeriodActive,
+            recordingDurationMs:
+                this.recordingStartTime > 0
+                    ? Date.now() - this.recordingStartTime
+                    : 0,
         }
     }
 
@@ -620,6 +823,9 @@ export class ScreenRecorderManager {
                     GLOBAL.get().speech_to_text_provider !== null,
                 transcriptionAudioBucket:
                     GLOBAL.get().aws_s3_temporary_audio_bucket,
+                // Clean endings by default
+                gracePeriodSeconds: 3,
+                trimEndSeconds: 2,
             })
         }
         return ScreenRecorderManager.instance
