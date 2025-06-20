@@ -45,7 +45,7 @@ export class S3Uploader {
 
             const s3FullPath = `s3://${bucketName}/${s3Path}`
 
-            if (isAudio) {
+            if (isAudio || !s3Args) {
                 s3Args = []
             }
 

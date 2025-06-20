@@ -36,7 +36,6 @@ export interface MeetingContext {
 
     // Pages et contexte du navigateur
     playwrightPage?: Page
-    backgroundPage?: Page
     browserContext?: BrowserContext
 
     // Timers et intervalles

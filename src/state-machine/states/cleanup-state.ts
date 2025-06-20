@@ -40,7 +40,7 @@ export class CleanupState extends BaseState {
     private async performCleanup(): Promise<void> {
         try {
             // 🎬 PRIORITY 1: Stop video recording immediately to avoid data loss
-            console.info('🧹 Step 1/6: Stopping ScreenRecorder (PRIORITY)')
+            console.info('🧹 Step 1/5: Stopping ScreenRecorder (PRIORITY)')
             await this.stopScreenRecorder()
 
             // 🚀 PARALLEL CLEANUP: Independent steps that can run simultaneously
@@ -49,12 +49,12 @@ export class CleanupState extends BaseState {
             )
             await Promise.allSettled([
                 (async () => {
-                    console.info('🧹 Step 1.5/6: Stopping dialog observer')
+                    console.info('🧹 Step 1.5/5: Stopping dialog observer')
                     this.stopDialogObserver()
                 })(),
                 // 2. Stop the streaming (fast, no await needed)
                 (async () => {
-                    console.info('🧹 Step 2/6: Stopping streaming service')
+                    console.info('🧹 Step 2/5: Stopping streaming service')
                     if (this.context.streamingService) {
                         this.context.streamingService.stop()
                     }
@@ -62,26 +62,22 @@ export class CleanupState extends BaseState {
 
                 // 3. Stop speakers observer (with 3s timeout)
                 (async () => {
-                    console.info('🧹 Step 3/6: Stopping speakers observer')
+                    console.info('🧹 Step 3/5: Stopping speakers observer')
                     await this.stopSpeakersObserver()
                 })(),
 
                 // 4. Stop HTML cleaner (with 3s timeout)
                 (async () => {
-                    console.info('🧹 Step 4/6: Stopping HTML cleaner')
+                    console.info('🧹 Step 4/5: Stopping HTML cleaner')
                     await this.stopHtmlCleaner()
                 })(),
             ])
 
             console.info('🧹 Parallel cleanup completed')
 
-            console.info('🧹 Step 5/6: Cleaning up browser resources')
+            console.info('🧹 Step 5/5: Cleaning up browser resources')
             // 5. Clean up browser resources (must be sequential after others)
             await this.cleanupBrowserResources()
-
-            console.info('🧹 Step 6/6: Uploading video to S3')
-            // 6. Upload the video to S3
-            await this.uploadVideoToS3()
 
             console.info('🧹 All cleanup steps completed')
         } catch (error) {
@@ -214,23 +210,6 @@ export class CleanupState extends BaseState {
             }
         } catch (error) {
             console.error('Failed to cleanup browser resources:', error)
-        }
-    }
-
-    private async uploadVideoToS3(): Promise<void> {
-        try {
-            // ScreenRecorder handles S3 upload automatically during stopRecording()
-            // Only upload manually if not already done
-            if (!ScreenRecorderManager.getInstance().getFilesUploaded()) {
-                console.log('Uploading video to S3 via ScreenRecorder')
-                await ScreenRecorderManager.getInstance().uploadToS3()
-            } else {
-                console.log(
-                    'Files already uploaded to S3 by ScreenRecorder, skipping',
-                )
-            }
-        } catch (error) {
-            console.error('Failed to upload video to S3:', error)
         }
     }
 }

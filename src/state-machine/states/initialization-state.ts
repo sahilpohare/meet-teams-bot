@@ -110,7 +110,6 @@ export class InitializationState extends BaseState {
 
                 // If we get here, openBrowser has succeeded
                 this.context.browserContext = result.browser
-                this.context.backgroundPage = result.backgroundPage
 
                 console.info('Browser setup completed successfully')
                 return // Exit the function if successful

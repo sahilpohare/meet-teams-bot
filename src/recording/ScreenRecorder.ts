@@ -24,8 +24,6 @@ interface ScreenRecordingConfig {
     recordingMode?: RecordingMode
     enableTranscriptionChunking?: boolean
     transcriptionChunkDuration?: number
-    transcriptionAudioBucket?: string
-    bucketName?: string
     s3Path?: string
     // Grace period settings for clean endings
     gracePeriodSeconds?: number
@@ -43,11 +41,11 @@ export class ScreenRecorder extends EventEmitter {
     private isConfigured: boolean = false
     private isRecording: boolean = false
     private filesUploaded: boolean = false
+    private recordingStartTime: number = 0
     private syncCalibrator: SyncCalibrator
     private pathManager: PathManager | null = null
     private page: any = null
     private gracePeriodActive: boolean = false
-    private recordingStartTime: number = 0
 
     constructor(config: Partial<ScreenRecordingConfig> = {}) {
         super()
@@ -66,9 +64,6 @@ export class ScreenRecorder extends EventEmitter {
             recordingMode: 'speaker_view',
             enableTranscriptionChunking: false,
             transcriptionChunkDuration: 3600,
-            transcriptionAudioBucket:
-                GLOBAL.get().aws_s3_temporary_audio_bucket,
-            bucketName: GLOBAL.get().remote?.aws_s3_video_bucket || '',
             s3Path: '',
             // Default grace period: 3s recording + 2s trim = clean ending
             gracePeriodSeconds: 3,
@@ -113,8 +108,7 @@ export class ScreenRecorder extends EventEmitter {
         this.generateOutputPaths(pathManager)
 
         // Simple S3 configuration
-        const { bucketName, s3Path } = pathManager.getS3Paths()
-        this.config.bucketName = bucketName
+        const { s3Path } = pathManager.getS3Paths()
         this.config.s3Path = s3Path
 
         this.isConfigured = true
@@ -127,11 +121,8 @@ export class ScreenRecorder extends EventEmitter {
     }
 
     private generateOutputPaths(pathManager: PathManager): void {
-        const isAudioOnly = this.config.recordingMode === 'audio_only'
-
-        if (isAudioOnly) {
-            this.outputPath = pathManager.getOutputPath() + '.wav'
-            this.audioOutputPath = this.outputPath
+        if (GLOBAL.get().recording_mode === 'audio_only') {
+            this.audioOutputPath = pathManager.getOutputPath() + '.wav'
         } else {
             this.outputPath = pathManager.getOutputPath() + '.mp4'
             this.audioOutputPath = pathManager.getOutputPath() + '.wav'
@@ -376,11 +367,23 @@ export class ScreenRecorder extends EventEmitter {
             this.emit('error', error)
         })
 
-        this.ffmpegProcess.on('exit', (code) => {
+        this.ffmpegProcess.on('exit', async (code) => {
             console.log(`FFmpeg exited with code ${code}`)
 
-            if (code === 0) {
-                this.handleSuccessfulRecording()
+            // Consider recording successful if:
+            // - Exit code 0 (normal completion)
+            // - Exit code 255 or 143 (SIGINT/SIGTERM) when we're in grace period (requested shutdown)
+            const isSuccessful =
+                code === 0 ||
+                (this.gracePeriodActive && (code === 255 || code === 143))
+
+            if (isSuccessful) {
+                console.log('✅ Recording considered successful, uploading...')
+                await this.handleSuccessfulRecording()
+            } else {
+                console.warn(
+                    `⚠️ Recording failed - unexpected exit code: ${code}`,
+                )
             }
 
             this.isRecording = false
@@ -393,20 +396,6 @@ export class ScreenRecorder extends EventEmitter {
                 console.error('FFmpeg stderr:', output.trim())
             }
         })
-    }
-
-    private async handleSuccessfulRecording(): Promise<void> {
-        console.log('Native recording completed')
-
-        // Post-process files to remove corrupted endings
-        await this.postProcessRecordings()
-
-        // Auto-upload if not serverless
-        if (!GLOBAL.isServerless()) {
-            setTimeout(() => this.uploadToS3().catch(console.error), 200)
-        }
-
-        this.cleanupChunkMonitoring()
     }
 
     private startNativeAudioStreaming(): void {
@@ -460,27 +449,67 @@ export class ScreenRecorder extends EventEmitter {
         this.chunkWatcher = fs.watch(chunksDir, async (eventType, filename) => {
             if (eventType === 'rename' && filename?.endsWith('.wav')) {
                 const chunkPath = path.join(chunksDir, filename)
-                setTimeout(() => this.uploadChunk(chunkPath, filename), 2000)
+                setTimeout(
+                    () => this.verifyAndUploadChunk(chunkPath, filename),
+                    5000,
+                )
             }
         })
     }
 
-    private async uploadChunk(
+    private async verifyAndUploadChunk(
         chunkPath: string,
         filename: string,
     ): Promise<void> {
-        if (!this.s3Uploader || !fs.existsSync(chunkPath)) return
+        if (!this.s3Uploader || !fs.existsSync(chunkPath)) {
+            console.warn(`Chunk file not found: ${chunkPath}`)
+            return
+        }
 
-        const botUuid = GLOBAL.get().bot_uuid || 'unknown'
-        const s3Key = `${botUuid}/${filename}`
+        try {
+            // Verify the file has content before uploading
+            const stats = fs.statSync(chunkPath)
+            if (stats.size === 0) {
+                console.warn(`Chunk file is empty, waiting longer: ${filename}`)
+                // Wait additional time for FFmpeg to finish writing
+                setTimeout(
+                    () => this.verifyAndUploadChunk(chunkPath, filename),
+                    3000,
+                )
+                return
+            }
 
-        await this.s3Uploader.uploadFile(
-            chunkPath,
-            this.config.transcriptionAudioBucket!,
-            s3Key,
-            [],
-            true,
-        )
+            // Double-check file stability (size not changing)
+            await new Promise((resolve) => setTimeout(resolve, 1000))
+            const newStats = fs.statSync(chunkPath)
+            if (newStats.size !== stats.size) {
+                console.log(`Chunk still being written, waiting: ${filename}`)
+                setTimeout(
+                    () => this.verifyAndUploadChunk(chunkPath, filename),
+                    2000,
+                )
+                return
+            }
+
+            console.log(
+                `📤 Uploading complete chunk: ${filename} (${stats.size} bytes)`,
+            )
+
+            const botUuid = GLOBAL.get().bot_uuid || 'unknown'
+            const s3Key = `${botUuid}/${filename}`
+
+            await this.s3Uploader.uploadFile(
+                chunkPath,
+                GLOBAL.get().aws_s3_temporary_audio_bucket,
+                s3Key,
+                [],
+                true,
+            )
+
+            console.log(`✅ Chunk uploaded successfully: ${filename}`)
+        } catch (error) {
+            console.error(`Failed to upload chunk ${filename}:`, error)
+        }
     }
 
     private cleanupChunkMonitoring(): void {
@@ -496,16 +525,15 @@ export class ScreenRecorder extends EventEmitter {
      */
     private async postProcessRecordings(): Promise<void> {
         const trimSeconds = this.config.trimEndSeconds || 2
-        const isAudioOnly = this.config.recordingMode === 'audio_only'
-
+        
         console.log(
             `🔧 Post-processing: trimming last ${trimSeconds}s to remove corruption`,
         )
 
         try {
-            if (isAudioOnly) {
+            if (GLOBAL.get().recording_mode === 'audio_only') {
                 // Audio-only mode: trim WAV file
-                await this.trimAudioFile(this.outputPath, trimSeconds)
+                await this.trimAudioFile(this.audioOutputPath, trimSeconds)
             } else {
                 // Video mode: trim both MP4 and WAV files
                 await Promise.all([
@@ -684,37 +712,30 @@ export class ScreenRecorder extends EventEmitter {
             return
         }
 
-        const isAudioOnly = this.config.recordingMode === 'audio_only'
-        const botUuid = GLOBAL.get().bot_uuid || 'unknown'
+        const identifier = PathManager.getInstance().getIdentifier()
 
-        if (isAudioOnly) {
-            if (fs.existsSync(this.outputPath)) {
-                await this.s3Uploader.uploadFile(
-                    this.outputPath,
-                    this.config.transcriptionAudioBucket!,
-                    `${botUuid}.wav`,
-                )
-                fs.unlinkSync(this.outputPath)
-            }
-        } else {
-            if (fs.existsSync(this.outputPath)) {
-                await this.s3Uploader.uploadFile(
-                    this.outputPath,
-                    this.config.bucketName!,
-                    `${botUuid}.mp4`,
-                )
-                fs.unlinkSync(this.outputPath)
-            }
-            if (fs.existsSync(this.audioOutputPath)) {
-                await this.s3Uploader.uploadFile(
-                    this.audioOutputPath,
-                    this.config.transcriptionAudioBucket!,
-                    `${botUuid}.wav`,
-                )
-                fs.unlinkSync(this.audioOutputPath)
-            }
+        if (fs.existsSync(this.audioOutputPath)) {
+            console.log(
+                `📤 Uploading WAV audio to video bucket: ${GLOBAL.get().remote?.aws_s3_video_bucket}`,
+            )
+            await this.s3Uploader.uploadFile(
+                this.audioOutputPath,
+                GLOBAL.get().remote?.aws_s3_video_bucket!,
+                `${identifier}.wav`,
+            )
+            fs.unlinkSync(this.audioOutputPath)
         }
-
+        if (fs.existsSync(this.outputPath)) {
+            console.log(
+                `📤 Uploading MP4 to video bucket: ${GLOBAL.get().remote?.aws_s3_video_bucket}`,
+            )
+            await this.s3Uploader.uploadFile(
+                this.outputPath,
+                GLOBAL.get().remote?.aws_s3_video_bucket!,
+                `${identifier}.mp4`,
+            )
+            fs.unlinkSync(this.outputPath)
+        }
         this.filesUploaded = true
     }
 
@@ -743,8 +764,8 @@ export class ScreenRecorder extends EventEmitter {
         })
 
         return new Promise((resolve) => {
-            this.ffmpegProcess!.once('exit', () => {
-                this.isRecording = false
+            // Wait for the 'stopped' event instead of 'exit' to ensure upload is complete
+            this.once('stopped', () => {
                 this.gracePeriodActive = false
                 this.ffmpegProcess = null
                 resolve()
@@ -810,6 +831,25 @@ export class ScreenRecorder extends EventEmitter {
         else if (load < 2.5) return 0.0
         else return -0.05
     }
+
+    private async handleSuccessfulRecording(): Promise<void> {
+        console.log('Native recording completed')
+
+        // Post-process files to remove corrupted endings
+        await this.postProcessRecordings()
+
+        // Auto-upload if not serverless and wait for completion
+        if (!GLOBAL.isServerless()) {
+            try {
+                await this.uploadToS3()
+                console.log('✅ Upload completed successfully')
+            } catch (error) {
+                console.error('❌ Upload failed:', error)
+            }
+        }
+
+        this.cleanupChunkMonitoring()
+    }
 }
 
 export class ScreenRecorderManager {
@@ -821,8 +861,7 @@ export class ScreenRecorderManager {
                 recordingMode: 'speaker_view',
                 enableTranscriptionChunking:
                     GLOBAL.get().speech_to_text_provider !== null,
-                transcriptionAudioBucket:
-                    GLOBAL.get().aws_s3_temporary_audio_bucket,
+                transcriptionChunkDuration: 3600,
                 // Clean endings by default
                 gracePeriodSeconds: 3,
                 trimEndSeconds: 2,
