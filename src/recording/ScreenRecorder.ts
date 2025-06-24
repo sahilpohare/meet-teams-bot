@@ -16,7 +16,9 @@ const TRANSCRIPTION_CHUNK_DURATION = 3600
 const GRACE_PERIOD_SECONDS = 3
 const STREAMING_SAMPLE_RATE = 24_000
 const FLASH_SCREEN_SLEEP_TIME = 5000
-const SCREENSHOT_PERIOD = 2 // every 2 seconds
+const SCREENSHOT_PERIOD = 5 // every 5 seconds instead of 2
+const SCREENSHOT_WIDTH = 640 // reduced from 1280
+const SCREENSHOT_HEIGHT = 360 // reduced from 720
 interface ScreenRecordingConfig {
     display: string
     audioDevice?: string
@@ -146,15 +148,17 @@ export class ScreenRecorder extends EventEmitter {
                 '-y',
                 rawAudioPath,
 
-                // === OUTPUT 2: SCREENSHOTS (every 2 seconds) ===
+                // === OUTPUT 2: SCREENSHOTS (every 5 seconds) ===
                 '-map',
                 '1:v:0',
                 '-vf',
-                `fps=${1 / SCREENSHOT_PERIOD},crop=1280:720:0:160`,
+                `fps=${1 / SCREENSHOT_PERIOD},crop=${SCREENSHOT_WIDTH}:${SCREENSHOT_HEIGHT}:0:160,scale=${SCREENSHOT_WIDTH}:${SCREENSHOT_HEIGHT}`,
+                '-q:v',
+                '3', // High quality JPEG compression
                 '-f',
                 'image2',
                 '-y',
-                screenshotPattern,
+                screenshotPattern.replace('.png', '.jpg'),
 
                 // === OUTPUT 3: STREAMING AUDIO ===
                 '-map',
@@ -237,15 +241,17 @@ export class ScreenRecorder extends EventEmitter {
                 '-y',
                 rawAudioPath,
 
-                // === OUTPUT 3: SCREENSHOTS (every 2 seconds) ===
+                // === OUTPUT 3: SCREENSHOTS (every 5 seconds) ===
                 '-map',
                 '0:v:0',
                 '-vf',
-                `fps=${1 / SCREENSHOT_PERIOD},crop=1280:720:0:160`,
+                `fps=${1 / SCREENSHOT_PERIOD},crop=${SCREENSHOT_WIDTH}:${SCREENSHOT_HEIGHT}:0:160,scale=${SCREENSHOT_WIDTH}:${SCREENSHOT_HEIGHT}`,
+                '-q:v',
+                '3', // High quality JPEG compression
                 '-f',
                 'image2',
                 '-y',
-                screenshotPattern,
+                screenshotPattern.replace('.png', '.jpg'),
 
                 // === OUTPUT 4: STREAMING AUDIO ===
                 '-map',

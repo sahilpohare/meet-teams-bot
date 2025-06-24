@@ -3,7 +3,7 @@ import path from 'path'
 import winston from 'winston'
 import { GLOBAL } from '../singleton'
 import { PathManager } from './PathManager'
-import { s3cp } from './S3Uploader'
+import { s3cp, S3Uploader } from './S3Uploader'
 
 // Reference to current bot log file
 let currentBotLogFile: string | null = null
@@ -213,12 +213,25 @@ export async function uploadLogsToS3(options: {
                 logger.info(
                     `Uploading ${screenshotFiles.length} screenshots to S3...`,
                 )
-                for (const filename of screenshotFiles) {
-                    const screenshotPath = path.join(screenshotsPath, filename)
-                    const s3ScreenshotPath = `${s3ScreenshotsPath}${filename}`
-                    await s3cp(screenshotPath, s3ScreenshotPath, []) // TODO : s3_args !
+                
+                // Use directory sync for better performance
+                try {
+                    await S3Uploader.getInstance()?.uploadDirectory(
+                        screenshotsPath,
+                        GLOBAL.get().remote?.aws_s3_log_bucket!,
+                        s3ScreenshotsPath
+                    )
+                    logger.info('Screenshots uploaded to S3')
+                } catch (error) {
+                    logger.error('Directory sync failed, falling back to individual uploads:', error)
+                    // Fallback to individual uploads
+                    for (const filename of screenshotFiles) {
+                        const screenshotPath = path.join(screenshotsPath, filename)
+                        const s3ScreenshotPath = `${s3ScreenshotsPath}${filename}`
+                        await s3cp(screenshotPath, s3ScreenshotPath, [])
+                    }
+                    logger.info('Screenshots uploaded to S3 (fallback)')
                 }
-                logger.info(`Screenshots uploaded to S3`)
             } else {
                 console.log(
                     'Screenshots directory exists but is empty:',
