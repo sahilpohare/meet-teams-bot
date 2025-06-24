@@ -1,17 +1,11 @@
 import { BrowserContext, Page } from '@playwright/test'
 
-import {
-    JoinError,
-    JoinErrorCode,
-    MeetingParams,
-    MeetingProviderInterface,
-} from '../types'
+import { JoinError, JoinErrorCode, MeetingProviderInterface } from '../types'
 
+import { GLOBAL } from '../singleton'
 import { parseMeetingUrlFromJoinInfos } from '../urlParser/meetUrlParser'
 import { sleep } from '../utils/sleep'
-import { takeScreenshot } from '../utils/takeScreenshot'
 import { closeMeeting } from './meet/closeMeeting'
-import { GLOBAL } from '../singleton'
 
 export class MeetProvider implements MeetingProviderInterface {
     async parseMeetingUrl(meeting_url: string) {
@@ -80,22 +74,14 @@ export class MeetProvider implements MeetingProviderInterface {
                 ),
             )
 
-            await takeScreenshot(page, `before_typing_bot_name`)
-
             for (let attempt = 1; attempt <= 5; attempt++) {
                 if (await typeBotName(page, GLOBAL.get().bot_name)) {
                     console.log('Bot name typed at attempt', attempt)
                     break
                 }
-                await takeScreenshot(
-                    page,
-                    `bot_name_typing_failed_attempt_${attempt}`,
-                )
                 await clickOutsideModal(page)
                 await page.waitForTimeout(500)
             }
-
-            await takeScreenshot(page, `after_typing_bot_name`)
 
             // Control microphone based on streaming_input
             if (GLOBAL.get().streaming_input) {
@@ -103,8 +89,6 @@ export class MeetProvider implements MeetingProviderInterface {
             } else {
                 await deactivateMicrophone(page)
             }
-
-            await takeScreenshot(page, `before_join_button_attempts`)
 
             // Try multiple approaches to find the join button
             let askToJoinClicked = false
@@ -186,8 +170,6 @@ export class MeetProvider implements MeetingProviderInterface {
             }
 
             if (!askToJoinClicked) {
-                // Take a screenshot to see what the UI looks like at failure
-                await takeScreenshot(page, `join_button_not_found`)
                 throw new JoinError(JoinErrorCode.CannotJoinMeeting)
             }
 
@@ -231,10 +213,6 @@ export class MeetProvider implements MeetingProviderInterface {
                         break
                     }
                     console.log(`Attempt ${attempt} failed`)
-                    await takeScreenshot(
-                        page,
-                        `layout_change_failed_attempt_${attempt}`,
-                    )
                     await clickOutsideModal(page)
                     await page.waitForTimeout(500)
                 }
@@ -350,8 +328,6 @@ async function findShowEveryOne(
                 )
                 return
             }
-
-            await takeScreenshot(page, `findShowEveryone`)
 
             if (cancelCheck()) {
                 throw new JoinError(JoinErrorCode.TimeoutWaitingToStart)
@@ -520,8 +496,6 @@ async function clickWithInnerText(
     )
 
     // First, take a screenshot to see what the page looks like
-    await takeScreenshot(page, `before_click_${texts.join('_')}_attempt`)
-
     for (let i = 0; i < maxAttempts; i++) {
         try {
             // Dump the page content to log for analysis
@@ -581,18 +555,9 @@ async function clickWithInnerText(
                             `  - Found element with text "${text}" using selector "${sel}"`,
                         )
                         if (shouldClick) {
-                            // Take screenshot before clicking
-                            await takeScreenshot(
-                                page,
-                                `before_click_${text.replace(/\s+/g, '_')}`,
-                            )
                             await element.click()
                             console.log(
                                 `  - Clicked on element with text "${text}"`,
-                            )
-                            await takeScreenshot(
-                                page,
-                                `after_click_${text.replace(/\s+/g, '_')}`,
                             )
                         }
                         return true
@@ -607,9 +572,6 @@ async function clickWithInnerText(
         }
         await page.waitForTimeout(100 + i * 100)
     }
-
-    // Take a final screenshot to see what the page looks like after all attempts
-    await takeScreenshot(page, `failed_click_${texts.join('_')}_final`)
 
     // Log all visible text on the page as a last resort
     console.log(
@@ -714,9 +676,6 @@ async function changeLayout(
             message: (error as Error).message,
             stack: (error as Error).stack,
         })
-
-        await takeScreenshot(page, `error-layout-change-${currentAttempt}`)
-
         if (currentAttempt < maxAttempts) {
             console.log(
                 `Retrying layout change (attempt ${currentAttempt + 1}/${maxAttempts})...`,

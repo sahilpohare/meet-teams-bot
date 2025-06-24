@@ -1,15 +1,9 @@
 import { BrowserContext, Page } from '@playwright/test'
 
-import {
-    JoinError,
-    JoinErrorCode,
-    MeetingParams,
-    MeetingProviderInterface,
-} from '../types'
+import { JoinError, JoinErrorCode, MeetingProviderInterface } from '../types'
 
 import { parseMeetingUrlFromJoinInfos } from '../urlParser/teamsUrlParser'
 import { sleep } from '../utils/sleep'
-import { takeScreenshot } from '../utils/takeScreenshot'
 import { GLOBAL } from '../singleton'
 
 export class TeamsProvider implements MeetingProviderInterface {
@@ -304,8 +298,6 @@ export class TeamsProvider implements MeetingProviderInterface {
             )
             throw new Error('RetryableError')
         }
-
-        await takeScreenshot(page, 'afterjoinnow')
 
         // Wait to be in the meeting
         console.log('Waiting to confirm meeting join...')
