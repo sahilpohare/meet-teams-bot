@@ -1,5 +1,7 @@
-import fs, { promises as fsPromises } from 'fs'
+import fs from 'fs'
+import path from 'path'
 import winston from 'winston'
+import { GLOBAL } from '../singleton'
 import { PathManager } from './PathManager'
 import { s3cp } from './S3Uploader'
 
@@ -162,28 +164,73 @@ export async function uploadLogsToS3(options: {
     error?: Error
 }): Promise<void> {
     try {
-        let soundLogPath: string
-        let s3SoundLogPath: string
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-
         const pathManager = PathManager.getInstance()
         const logPath = currentBotLogFile || pathManager.getIdentifier()
-        soundLogPath = pathManager.getSoundLogPath()
+
+        // Sound log file
+        const soundLogPath = pathManager.getSoundLogPath()
+        const s3SoundLogPath = `${logPath}/sound.log`
+
+        // Speaker separation log file
+        const speakerLogPath = pathManager.getSpeakerLogPath()
+        const s3SpeakerLogPath = `${logPath}/speaker_separation.log`
+
+        // Screenshots directory
+        const screenshotsPath = pathManager.getScreenshotsPath()
+        const s3ScreenshotsPath = `${logPath}/screenshots/`
+
         console.log('Looking for internal log files at:', {
             soundLogPath,
+            speakerLogPath,
+            screenshotsPath,
         })
-        s3SoundLogPath = `${logPath}/sound.log`
 
         // Upload sound log file (internal log file)
         if (fs.existsSync(soundLogPath)) {
             logger.info(`Uploading sound logs to S3...`)
             await s3cp(soundLogPath, s3SoundLogPath, []) // TODO : s3_args !
-            logger.info(`sound logs uploaded to S3`)
+            logger.info(`Sound logs uploaded to S3`)
         } else {
             console.log('No sound log file found at path:', soundLogPath)
         }
 
-        // TODO: Add other internal log files upload here as needed
+        // Upload speaker separation log file
+        if (fs.existsSync(speakerLogPath)) {
+            logger.info(`Uploading speaker separation logs to S3...`)
+            await s3cp(speakerLogPath, s3SpeakerLogPath, []) // TODO : s3_args !
+            logger.info(`Speaker separation logs uploaded to S3`)
+        } else {
+            console.log(
+                'No speaker separation log file found at path:',
+                speakerLogPath,
+            )
+        }
+
+        // Upload screenshots directory
+        if (fs.existsSync(screenshotsPath)) {
+            const screenshotFiles = fs.readdirSync(screenshotsPath)
+            if (screenshotFiles.length > 0) {
+                logger.info(
+                    `Uploading ${screenshotFiles.length} screenshots to S3...`,
+                )
+                for (const filename of screenshotFiles) {
+                    const screenshotPath = path.join(screenshotsPath, filename)
+                    const s3ScreenshotPath = `${s3ScreenshotsPath}${filename}`
+                    await s3cp(screenshotPath, s3ScreenshotPath, []) // TODO : s3_args !
+                }
+                logger.info(`Screenshots uploaded to S3`)
+            } else {
+                console.log(
+                    'Screenshots directory exists but is empty:',
+                    screenshotsPath,
+                )
+            }
+        } else {
+            console.log(
+                'No screenshots directory found at path:',
+                screenshotsPath,
+            )
+        }
     } catch (error) {
         logger.error(`Failed to upload logs to S3:`, error)
         throw error
@@ -193,10 +240,14 @@ export async function uploadLogsToS3(options: {
 export function setupExitHandler() {
     process.on('uncaughtException', async (error) => {
         logger.error('Uncaught Exception: ' + error)
-        try {
-            await uploadLogsToS3({ error })
-        } catch (uploadError) {
-            logger.error('Failed to upload crash logs to S3: ' + uploadError)
+        if (!GLOBAL.isServerless()) {
+            try {
+                await uploadLogsToS3({ error })
+            } catch (uploadError) {
+                logger.error(
+                    'Failed to upload crash logs to S3: ' + uploadError,
+                )
+            }
         }
     })
 
@@ -204,15 +255,19 @@ export function setupExitHandler() {
         logger.error(
             'Unhandled Rejection at: ' + promise + ' reason: ' + reason,
         )
-        try {
-            await uploadLogsToS3({
-                error:
-                    reason instanceof Error
-                        ? reason
-                        : new Error(String(reason)),
-            })
-        } catch (uploadError) {
-            logger.error('Failed to upload crash logs to S3: ' + uploadError)
+        if (!GLOBAL.isServerless()) {
+            try {
+                await uploadLogsToS3({
+                    error:
+                        reason instanceof Error
+                            ? reason
+                            : new Error(String(reason)),
+                })
+            } catch (uploadError) {
+                logger.error(
+                    'Failed to upload crash logs to S3: ' + uploadError,
+                )
+            }
         }
     })
 }

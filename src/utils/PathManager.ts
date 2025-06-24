@@ -32,6 +32,7 @@ export class PathManager {
             path.dirname(this.getOutputPath()),
             this.getTempPath(),
             this.getAudioTmpPath(),
+            this.getScreenshotsPath(),
         ]
 
         for (const p of paths) {
@@ -72,7 +73,7 @@ export class PathManager {
     }
 
     public getSpeakerLogPath(): string {
-        return path.join(this.getBasePath(), 'SeparationSpeaker.log')
+        return path.join(this.getBasePath(), 'speaker_separation.log')
     }
 
     public getSoundLogPath(): string {
@@ -81,6 +82,10 @@ export class PathManager {
 
     public getTempPath(): string {
         return path.join(this.getBasePath(), 'temp')
+    }
+
+    public getScreenshotsPath(): string {
+        return path.join(this.getBasePath(), 'screenshots')
     }
 
     public getS3Paths(): { bucketName: string; s3Path: string } {

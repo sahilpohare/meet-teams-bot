@@ -1,13 +1,15 @@
 import { Events } from '../../events'
+import { ScreenRecorderManager } from '../../recording/ScreenRecorder'
+import { GLOBAL } from '../../singleton'
+import { Streaming } from '../../streaming'
 import { JoinError, JoinErrorCode } from '../../types'
+
 import {
     MeetingStateType,
     RecordingEndReason,
     StateExecuteResult,
 } from '../types'
 import { BaseState } from './base-state'
-import { takeScreenshot } from '../../utils/takeScreenshot'
-import { GLOBAL } from '../../singleton'
 
 export class WaitingRoomState extends BaseState {
     async execute(): StateExecuteResult {
@@ -33,6 +35,19 @@ export class WaitingRoomState extends BaseState {
 
             // Open the meeting page
             await this.openMeetingPage(meetingLink)
+
+            this.context.streamingService = new Streaming(
+                GLOBAL.get().streaming_input,
+                GLOBAL.get().streaming_output,
+                GLOBAL.get().streaming_audio_frequency,
+                GLOBAL.get().bot_uuid,
+            )
+
+            ScreenRecorderManager.getInstance().startRecording(
+                this.context.playwrightPage,
+            )
+
+            this.context.streamingService.start()
 
             // Start the dialog observer once the page is open
             this.startDialogObserver()
@@ -100,22 +115,6 @@ export class WaitingRoomState extends BaseState {
                     error instanceof Error ? error.message : 'Unknown error',
                 stack: error instanceof Error ? error.stack : undefined,
             })
-
-            // Take screenshot if possible
-            if (this.context.playwrightPage) {
-                try {
-                    await takeScreenshot(
-                        this.context.playwrightPage,
-                        'waiting-room-error',
-                    )
-                    console.info('Error screenshot saved')
-                } catch (screenshotError) {
-                    console.error(
-                        'Failed to take error screenshot:',
-                        screenshotError,
-                    )
-                }
-            }
 
             throw new Error(
                 error instanceof Error

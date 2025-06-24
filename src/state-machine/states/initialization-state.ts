@@ -2,7 +2,6 @@ import { generateBranding, playBranding } from '../../branding'
 import { openBrowser } from '../../browser/browser'
 import { MeetingHandle } from '../../meeting'
 import { GLOBAL } from '../../singleton'
-import { Streaming } from '../../streaming'
 import { JoinError, JoinErrorCode } from '../../types'
 import { PathManager } from '../../utils/PathManager'
 import { MeetingStateType, StateExecuteResult } from '../types'
@@ -47,14 +46,6 @@ export class InitializationState extends BaseState {
                     error instanceof Error ? error.stack : undefined
                 throw enhancedError
             }
-
-            this.context.streamingService = new Streaming(
-                GLOBAL.get().streaming_input,
-                GLOBAL.get().streaming_output,
-                GLOBAL.get().streaming_audio_frequency,
-                GLOBAL.get().bot_uuid,
-            )
-
             // All initialization successful
             return this.transition(MeetingStateType.WaitingRoom)
         } catch (error) {

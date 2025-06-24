@@ -4,148 +4,69 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { Streaming } from '../streaming'
 
-import { RecordingMode } from '../types'
+import { Page } from 'playwright'
+import { GLOBAL } from '../singleton'
+import { calculateVideoOffset } from '../utils/CalculVideoOffset'
 import { PathManager } from '../utils/PathManager'
 import { S3Uploader } from '../utils/S3Uploader'
-import { SyncCalibrator } from './SyncCalibrator'
-import { GLOBAL } from '../singleton'
+import { sleep } from '../utils/sleep'
+import { generateSyncSignal } from '../utils/SyncSignal'
 
+const TRANSCRIPTION_CHUNK_DURATION = 3600
+const GRACE_PERIOD_SECONDS = 3
+const STREAMING_SAMPLE_RATE = 24_000
+const FLASH_SCREEN_SLEEP_TIME = 5000
+const SCREENSHOT_PERIOD = 2 // every 2 seconds
 interface ScreenRecordingConfig {
     display: string
     audioDevice?: string
-    outputFormat: 'webm' | 'mp4'
-    videoCodec: 'libx264' | 'libvpx-vp9' | 'libvpx'
-    audioCodec: 'aac' | 'opus' | 'libmp3lame'
-    width: number
-    height: number
-    framerate: number
-    audioBitrate: string
-    videoBitrate: string
-    recordingMode?: RecordingMode
-    enableTranscriptionChunking?: boolean
-    transcriptionChunkDuration?: number
-    s3Path?: string
-    // Grace period settings for clean endings
-    gracePeriodSeconds?: number
-    trimEndSeconds?: number
 }
 
 export class ScreenRecorder extends EventEmitter {
     private ffmpegProcess: ChildProcess | null = null
-    private chunkWatcher: fs.FSWatcher | null = null
-    private streamingProcess: ChildProcess | null = null
     private outputPath: string = ''
     private audioOutputPath: string = ''
     private config: ScreenRecordingConfig
-    private s3Uploader: S3Uploader | null = null
-    private isConfigured: boolean = false
     private isRecording: boolean = false
     private filesUploaded: boolean = false
     private recordingStartTime: number = 0
-    private syncCalibrator: SyncCalibrator
-    private pathManager: PathManager | null = null
-    private page: any = null
+    private meetingStartTime: number = 0
     private gracePeriodActive: boolean = false
 
     constructor(config: Partial<ScreenRecordingConfig> = {}) {
         super()
 
         this.config = {
-            display: process.env.DISPLAY || ':99',
+            display: ':99',
             audioDevice: 'pulse',
-            outputFormat: 'mp4',
-            videoCodec: 'libx264',
-            audioCodec: 'aac',
-            width: 1280,
-            height: 720,
-            framerate: 30,
-            audioBitrate: '128k',
-            videoBitrate: '1000k',
-            recordingMode: 'speaker_view',
-            enableTranscriptionChunking: false,
-            transcriptionChunkDuration: 3600,
-            s3Path: '',
-            // Default grace period: 3s recording + 2s trim = clean ending
-            gracePeriodSeconds: 3,
-            trimEndSeconds: 2,
             ...config,
         }
-
-        this.syncCalibrator = new SyncCalibrator()
-
-        if (!GLOBAL.isServerless()) {
-            this.s3Uploader = S3Uploader.getInstance()
-        }
-
-        console.log('Native ScreenRecorder initialized:', {
-            recordingMode: this.config.recordingMode,
-            enableTranscriptionChunking:
-                this.config.enableTranscriptionChunking,
-        })
     }
 
-    public configure(
-        pathManager: PathManager,
-        recordingMode?: RecordingMode,
-    ): void {
-        if (!pathManager) {
-            throw new Error('PathManager is required for configuration')
-        }
-
-        this.pathManager = pathManager
-
-        if (recordingMode) {
-            this.config.recordingMode = recordingMode
-        }
-
-        // Simple transcription detection
-        if (GLOBAL.get().speech_to_text_provider) {
-            this.config.enableTranscriptionChunking =
-                GLOBAL.get().speech_to_text_provider !== null
-        }
-
-        // Native path generation (no legacy patterns)
-        this.generateOutputPaths(pathManager)
-
-        // Simple S3 configuration
-        const { s3Path } = pathManager.getS3Paths()
-        this.config.s3Path = s3Path
-
-        this.isConfigured = true
-
-        console.log('Native ScreenRecorder configured:', {
-            outputPath: this.outputPath,
-            audioOutputPath: this.audioOutputPath,
-            recordingMode: this.config.recordingMode,
-        })
-    }
-
-    private generateOutputPaths(pathManager: PathManager): void {
+    private generateOutputPaths(): void {
         if (GLOBAL.get().recording_mode === 'audio_only') {
-            this.audioOutputPath = pathManager.getOutputPath() + '.wav'
+            this.audioOutputPath =
+                PathManager.getInstance().getOutputPath() + '.wav'
         } else {
-            this.outputPath = pathManager.getOutputPath() + '.mp4'
-            this.audioOutputPath = pathManager.getOutputPath() + '.wav'
+            this.outputPath = PathManager.getInstance().getOutputPath() + '.mp4'
+            this.audioOutputPath =
+                PathManager.getInstance().getOutputPath() + '.wav'
         }
     }
 
-    public setPage(page: any): void {
-        this.page = page
+    public setMeetingStartTime(startTime: number): void {
+        this.meetingStartTime = startTime
     }
 
-    public async startRecording(): Promise<void> {
-        this.validateConfiguration()
-
+    public async startRecording(page: Page): Promise<void> {
         if (this.isRecording) {
             throw new Error('Recording is already in progress')
         }
 
-        console.log('🎬 Starting native recording...')
+        this.generateOutputPaths()
 
         try {
-            await this.ensureOutputDirectory()
-            const syncOffset = await this.calculateSyncOffset()
-            const ffmpegArgs = this.buildNativeFFmpegArgs(syncOffset)
+            const ffmpegArgs = this.buildNativeFFmpegArgs()
 
             this.ffmpegProcess = spawn('ffmpeg', ffmpegArgs, {
                 stdio: ['pipe', 'pipe', 'pipe'],
@@ -155,12 +76,15 @@ export class ScreenRecorder extends EventEmitter {
             this.recordingStartTime = Date.now()
             this.gracePeriodActive = false
             this.setupProcessMonitoring()
-            this.startNativeAudioStreaming()
+            this.setupStreamingAudio()
+
+            await sleep(FLASH_SCREEN_SLEEP_TIME)
+            await generateSyncSignal(page)
 
             console.log('Native recording started successfully')
             this.emit('started', {
                 outputPath: this.outputPath,
-                isAudioOnly: this.config.recordingMode === 'audio_only',
+                isAudioOnly: GLOBAL.get().recording_mode === 'audio_only',
             })
         } catch (error) {
             console.error('Failed to start native recording:', error)
@@ -170,72 +94,33 @@ export class ScreenRecorder extends EventEmitter {
         }
     }
 
-    private validateConfiguration(): void {
-        if (!this.isConfigured) {
-            throw new Error('ScreenRecorder must be configured before starting')
-        }
-    }
-
-    private async ensureOutputDirectory(): Promise<void> {
-        const outputDir = path.dirname(this.outputPath)
-        if (!fs.existsSync(outputDir)) {
-            fs.mkdirSync(outputDir, { recursive: true })
-        }
-    }
-
-    private async calculateSyncOffset(): Promise<number> {
-        // Native sync calculation (simplified)
-        const systemLoad = await this.getSystemLoad()
-        const roughEstimate = this.estimateOffsetFromLoad(systemLoad)
-
-        if (this.page) {
-            try {
-                const preciseOffset =
-                    await this.syncCalibrator.quickCalibrateOnceOptimized(
-                        this.page,
-                    )
-                if (Math.abs(preciseOffset) > 0.001) {
-                    return -preciseOffset + 0.02
-                }
-            } catch (error) {
-                console.warn(
-                    'Precise calibration failed, using system estimate',
-                )
-            }
-        }
-
-        return roughEstimate
-    }
-
-    private buildNativeFFmpegArgs(syncOffset: number): string[] {
+    private buildNativeFFmpegArgs(): string[] {
         const args: string[] = []
-        const isAudioOnly = this.config.recordingMode === 'audio_only'
 
-        console.log('🛠️ Building FFmpeg args for native synchronization...')
-        console.log(`🎯 Applying audio offset: ${syncOffset.toFixed(3)}s`)
+        console.log(
+            '🛠️ Building FFmpeg args for separate audio/video recording...',
+        )
 
-        if (isAudioOnly) {
+        const screenshotsPath = PathManager.getInstance().getScreenshotsPath()
+        const timestamp = Date.now()
+        const screenshotPattern = path.join(
+            screenshotsPath,
+            `${timestamp}_%4d.png`,
+        )
+
+        if (GLOBAL.get().recording_mode === 'audio_only') {
+            // Audio-only recording with screenshots
+            const tempDir = PathManager.getInstance().getTempPath()
+            const rawAudioPath = path.join(tempDir, 'raw.wav')
+
             args.push(
+                // === AUDIO INPUT ===
                 '-f',
                 'pulse',
                 '-i',
                 'virtual_speaker.monitor',
-                '-itsoffset',
-                syncOffset.toString(),
-                '-acodec',
-                'pcm_s16le',
-                '-ac',
-                '1',
-                '-ar',
-                '16000',
-                '-f',
-                'wav',
-                '-y',
-                this.outputPath,
-            )
-        } else {
-            args.push(
-                // Video input - simplified and optimized
+
+                // === VIDEO INPUT FOR SCREENSHOTS ===
                 '-f',
                 'x11grab',
                 '-video_size',
@@ -244,52 +129,94 @@ export class ScreenRecorder extends EventEmitter {
                 '30',
                 '-i',
                 this.config.display,
-            )
 
-            // Audio input - auto-detect PulseAudio config
+                // === OUTPUT 1: RAW AUDIO ===
+                '-map',
+                '0:a:0',
+                '-acodec',
+                'pcm_s16le',
+                '-ac',
+                '1',
+                '-ar',
+                '16000',
+                '-avoid_negative_ts',
+                'make_zero',
+                '-f',
+                'wav',
+                '-y',
+                rawAudioPath,
+
+                // === OUTPUT 2: SCREENSHOTS (every 2 seconds) ===
+                '-map',
+                '1:v:0',
+                '-vf',
+                `fps=${1 / SCREENSHOT_PERIOD},crop=1280:720:0:160`,
+                '-f',
+                'image2',
+                '-y',
+                screenshotPattern,
+
+                // === OUTPUT 3: STREAMING AUDIO ===
+                '-map',
+                '0:a:0',
+                '-acodec',
+                'pcm_f32le',
+                '-ac',
+                '1',
+                '-ar',
+                STREAMING_SAMPLE_RATE.toString(),
+                '-f',
+                'f32le',
+                'pipe:1',
+            )
+        } else {
+            // Separate audio and video recording
+            const tempDir = PathManager.getInstance().getTempPath()
+            const rawVideoPath = path.join(tempDir, 'raw.mp4')
+            const rawAudioPath = path.join(tempDir, 'raw.wav')
+
             args.push(
+                // === VIDEO INPUT ===
+                '-f',
+                'x11grab',
+                '-video_size',
+                '1280x880',
+                '-framerate',
+                '30',
+                '-i',
+                this.config.display,
+
+                // === AUDIO INPUT ===
                 '-f',
                 'pulse',
-                '-itsoffset',
-                syncOffset.toString(),
                 '-i',
                 'virtual_speaker.monitor',
-            )
 
-            // **FIXED: Restore simultaneous MP4 + WAV multi-output (like working version)**
-            args.push(
-                // === OUTPUT 1: MP4 (video + audio) ===
+                // === OUTPUT 1: RAW VIDEO (no audio) ===
                 '-map',
                 '0:v:0',
-                '-map',
-                '1:a:0',
                 '-c:v',
                 'libx264',
                 '-preset',
-                'fast', // Optimized for real-time recording
+                'fast',
                 '-crf',
-                '23', // Slightly higher CRF for faster encoding
-                '-tune',
-                'zerolatency', // Optimize for low-latency streaming
+                '23',
+                '-profile:v',
+                'main',
+                '-level',
+                '4.0',
+                '-pix_fmt',
+                'yuv420p',
                 '-vf',
                 'crop=1280:720:0:160',
-                '-c:a',
-                'aac',
-                '-b:a',
-                '160k',
                 '-avoid_negative_ts',
                 'make_zero',
-                '-max_muxing_queue_size',
-                '1024',
-                '-async',
-                '1',
                 '-f',
                 'mp4',
-                '-movflags',
-                '+faststart+frag_keyframe+empty_moov', // Enhanced streaming support
-                this.outputPath,
+                '-y',
+                rawVideoPath,
 
-                // === OUTPUT 2: WAV (simultaneous audio for transcription) ===
+                // === OUTPUT 2: RAW AUDIO ===
                 '-map',
                 '1:a:0',
                 '-vn',
@@ -299,60 +226,35 @@ export class ScreenRecorder extends EventEmitter {
                 '1',
                 '-ar',
                 '16000',
-                '-async',
-                '1',
                 '-avoid_negative_ts',
                 'make_zero',
                 '-f',
                 'wav',
-                this.audioOutputPath,
-            )
+                '-y',
+                rawAudioPath,
 
-            // === OUTPUT 3: Real-time chunks (if enabled) ===
-            if (this.config.enableTranscriptionChunking) {
-                // Use audio_tmp directory and UUID-based naming like production
-                const chunksDir = this.pathManager
-                    ? this.pathManager.getAudioTmpPath()
-                    : path.join(path.dirname(this.outputPath), 'audio_tmp')
-                if (!fs.existsSync(chunksDir)) {
-                    fs.mkdirSync(chunksDir, { recursive: true })
-                }
+                // === OUTPUT 3: SCREENSHOTS (every 2 seconds) ===
+                '-map',
+                '0:v:0',
+                '-vf',
+                `fps=${1 / SCREENSHOT_PERIOD},crop=1280:720:0:160`,
+                '-f',
+                'image2',
+                '-y',
+                screenshotPattern,
 
-                // Use botUuid for chunk naming format: ${botUuid}-%d.wav
-                const botUuid = GLOBAL.get().bot_uuid
-                const chunkPattern = path.join(chunksDir, `${botUuid}-%d.wav`)
-
-                args.push(
-                    '-map',
-                    '1:a:0',
-                    '-vn',
-                    '-acodec',
-                    'pcm_s16le',
-                    '-ac',
-                    '1',
-                    '-ar',
-                    '16000',
-                    '-f',
-                    'segment',
-                    '-segment_time',
-                    (this.config.transcriptionChunkDuration || 3600).toString(),
-                    '-segment_format',
-                    'wav',
-                    chunkPattern,
-                )
-
-                this.startChunkMonitoring(chunksDir)
-                console.log(
-                    `🎯 Real-time chunks: ${this.config.transcriptionChunkDuration}s chunks enabled`,
-                )
-                console.log(`🎯 Chunk naming format: ${botUuid}-[index].wav`)
-            }
-
-            console.log(
-                `✅ FFmpeg itsoffset parameter: ${syncOffset.toFixed(3)}s`,
-            )
-            console.log(
-                `🎯 Simultaneous generation: MP4 + WAV during recording`,
+                // === OUTPUT 4: STREAMING AUDIO ===
+                '-map',
+                '1:a:0',
+                '-acodec',
+                'pcm_f32le',
+                '-ac',
+                '1',
+                '-ar',
+                STREAMING_SAMPLE_RATE.toString(),
+                '-f',
+                'f32le',
+                'pipe:1',
             )
         }
 
@@ -398,33 +300,11 @@ export class ScreenRecorder extends EventEmitter {
         })
     }
 
-    private startNativeAudioStreaming(): void {
-        if (!Streaming.instance) return
+    private setupStreamingAudio(): void {
+        if (!Streaming.instance || !this.ffmpegProcess) return
 
         try {
-            const STREAMING_SAMPLE_RATE = 24_000
-
-            this.streamingProcess = spawn(
-                'ffmpeg',
-                [
-                    '-f',
-                    'pulse',
-                    '-i',
-                    'virtual_speaker.monitor',
-                    '-acodec',
-                    'pcm_f32le',
-                    '-ac',
-                    '1',
-                    '-ar',
-                    STREAMING_SAMPLE_RATE.toString(),
-                    '-f',
-                    'f32le',
-                    'pipe:1',
-                ],
-                { stdio: ['pipe', 'pipe', 'pipe'] },
-            )
-
-            this.streamingProcess.stdout?.on('data', (data: Buffer) => {
+            this.ffmpegProcess.stdout?.on('data', (data: Buffer) => {
                 if (Streaming.instance) {
                     const float32Array = new Float32Array(
                         data.buffer,
@@ -434,281 +314,61 @@ export class ScreenRecorder extends EventEmitter {
                     Streaming.instance.processAudioChunk(float32Array)
                 }
             })
-
-            this.ffmpegProcess?.once('exit', () => {
-                if (this.streamingProcess && !this.streamingProcess.killed) {
-                    this.streamingProcess.kill('SIGINT')
-                }
-            })
         } catch (error) {
-            console.error('Failed to start native audio streaming:', error)
+            console.error('Failed to setup streaming audio:', error)
         }
     }
 
-    private startChunkMonitoring(chunksDir: string): void {
-        this.chunkWatcher = fs.watch(chunksDir, async (eventType, filename) => {
-            if (eventType === 'rename' && filename?.endsWith('.wav')) {
-                const chunkPath = path.join(chunksDir, filename)
-                setTimeout(
-                    () => this.verifyAndUploadChunk(chunkPath, filename),
-                    5000,
-                )
-            }
-        })
-    }
-
-    private async verifyAndUploadChunk(
-        chunkPath: string,
-        filename: string,
+    private async uploadAudioChunks(
+        chunksDir: string,
+        botUuid: string,
     ): Promise<void> {
-        if (!this.s3Uploader || !fs.existsSync(chunkPath)) {
-            console.warn(`Chunk file not found: ${chunkPath}`)
-            return
-        }
+        if (!S3Uploader.getInstance()) return
 
-        try {
-            // Verify the file has content before uploading
-            const stats = fs.statSync(chunkPath)
-            if (stats.size === 0) {
-                console.warn(`Chunk file is empty, waiting longer: ${filename}`)
-                // Wait additional time for FFmpeg to finish writing
-                setTimeout(
-                    () => this.verifyAndUploadChunk(chunkPath, filename),
-                    3000,
-                )
-                return
-            }
-
-            // Double-check file stability (size not changing)
-            await new Promise((resolve) => setTimeout(resolve, 1000))
-            const newStats = fs.statSync(chunkPath)
-            if (newStats.size !== stats.size) {
-                console.log(`Chunk still being written, waiting: ${filename}`)
-                setTimeout(
-                    () => this.verifyAndUploadChunk(chunkPath, filename),
-                    2000,
-                )
-                return
-            }
-
-            console.log(
-                `📤 Uploading complete chunk: ${filename} (${stats.size} bytes)`,
-            )
-
-            const botUuid = GLOBAL.get().bot_uuid || 'unknown'
-            const s3Key = `${botUuid}/${filename}`
-
-            await this.s3Uploader.uploadFile(
-                chunkPath,
-                GLOBAL.get().aws_s3_temporary_audio_bucket,
-                s3Key,
-                [],
-                true,
-            )
-
-            console.log(`✅ Chunk uploaded successfully: ${filename}`)
-        } catch (error) {
-            console.error(`Failed to upload chunk ${filename}:`, error)
-        }
-    }
-
-    private cleanupChunkMonitoring(): void {
-        if (this.chunkWatcher) {
-            this.chunkWatcher.close()
-            this.chunkWatcher = null
-        }
-    }
-
-    /**
-     * Post-process recordings to remove corrupted endings
-     * Creates trimmed copies and replaces originals
-     */
-    private async postProcessRecordings(): Promise<void> {
-        const trimSeconds = this.config.trimEndSeconds || 2
-        
-        console.log(
-            `🔧 Post-processing: trimming last ${trimSeconds}s to remove corruption`,
+        const files = fs.readdirSync(chunksDir)
+        const chunkFiles = files.filter(
+            (file) => file.startsWith(`${botUuid}-`) && file.endsWith('.wav'),
         )
 
-        try {
-            if (GLOBAL.get().recording_mode === 'audio_only') {
-                // Audio-only mode: trim WAV file
-                await this.trimAudioFile(this.audioOutputPath, trimSeconds)
-            } else {
-                // Video mode: trim both MP4 and WAV files
-                await Promise.all([
-                    this.trimVideoFile(this.outputPath, trimSeconds),
-                    this.trimAudioFile(this.audioOutputPath, trimSeconds),
-                ])
+        console.log(`📤 Uploading ${chunkFiles.length} audio chunks...`)
+
+        for (const filename of chunkFiles) {
+            const chunkPath = path.join(chunksDir, filename)
+
+            if (!fs.existsSync(chunkPath)) {
+                console.warn(`Chunk file not found: ${chunkPath}`)
+                continue
             }
 
-            console.log('✅ Post-processing completed - clean endings applied')
-        } catch (error) {
-            console.error(
-                '⚠️ Post-processing failed, keeping original files:',
-                error,
-            )
-        }
-    }
-
-    /**
-     * Trim end of MP4 video file using FFmpeg
-     */
-    private async trimVideoFile(
-        filePath: string,
-        trimSeconds: number,
-    ): Promise<void> {
-        if (!fs.existsSync(filePath)) {
-            console.warn(`Video file not found for trimming: ${filePath}`)
-            return
-        }
-
-        const tempPath = filePath + '.trimmed.mp4'
-
-        return new Promise((resolve, reject) => {
-            // Get video duration first, then calculate trim duration
-            const durationProcess = spawn('ffprobe', [
-                '-v',
-                'quiet',
-                '-show_entries',
-                'format=duration',
-                '-of',
-                'csv=p=0',
-                filePath,
-            ])
-
-            let durationOutput = ''
-            durationProcess.stdout?.on('data', (data) => {
-                durationOutput += data.toString()
-            })
-
-            durationProcess.on('close', (code) => {
-                if (code !== 0) {
-                    reject(new Error('Failed to get video duration'))
-                    return
+            try {
+                const stats = fs.statSync(chunkPath)
+                if (stats.size === 0) {
+                    console.warn(`Chunk file is empty: ${filename}`)
+                    continue
                 }
 
-                const duration = parseFloat(durationOutput.trim())
-                const trimmedDuration = Math.max(1, duration - trimSeconds) // Minimum 1 second
-
+                const s3Key = `${botUuid}/${filename}`
                 console.log(
-                    `📹 Trimming MP4: ${duration.toFixed(1)}s → ${trimmedDuration.toFixed(1)}s`,
+                    `📤 Uploading chunk: ${filename} (${stats.size} bytes)`,
                 )
 
-                // Trim the video
-                const trimProcess = spawn('ffmpeg', [
-                    '-i',
-                    filePath,
-                    '-t',
-                    trimmedDuration.toString(),
-                    '-c',
-                    'copy', // Copy streams without re-encoding for speed
-                    '-avoid_negative_ts',
-                    'make_zero',
-                    '-y',
-                    tempPath,
-                ])
+                await S3Uploader.getInstance().uploadFile(
+                    chunkPath,
+                    GLOBAL.get().aws_s3_temporary_audio_bucket,
+                    s3Key,
+                    [],
+                    true,
+                )
 
-                trimProcess.on('close', (trimCode) => {
-                    if (trimCode === 0 && fs.existsSync(tempPath)) {
-                        // Replace original with trimmed version
-                        fs.renameSync(tempPath, filePath)
-                        resolve()
-                    } else {
-                        // Cleanup temp file if it exists
-                        if (fs.existsSync(tempPath)) {
-                            fs.unlinkSync(tempPath)
-                        }
-                        reject(
-                            new Error(
-                                `FFmpeg trim failed with code ${trimCode}`,
-                            ),
-                        )
-                    }
-                })
-            })
-        })
-    }
-
-    /**
-     * Trim end of WAV audio file using FFmpeg
-     */
-    private async trimAudioFile(
-        filePath: string,
-        trimSeconds: number,
-    ): Promise<void> {
-        if (!fs.existsSync(filePath)) {
-            console.warn(`Audio file not found for trimming: ${filePath}`)
-            return
+                console.log(`✅ Chunk uploaded: ${filename}`)
+            } catch (error) {
+                console.error(`Failed to upload chunk ${filename}:`, error)
+            }
         }
-
-        const tempPath = filePath + '.trimmed.wav'
-
-        return new Promise((resolve, reject) => {
-            // Get audio duration first
-            const durationProcess = spawn('ffprobe', [
-                '-v',
-                'quiet',
-                '-show_entries',
-                'format=duration',
-                '-of',
-                'csv=p=0',
-                filePath,
-            ])
-
-            let durationOutput = ''
-            durationProcess.stdout?.on('data', (data) => {
-                durationOutput += data.toString()
-            })
-
-            durationProcess.on('close', (code) => {
-                if (code !== 0) {
-                    reject(new Error('Failed to get audio duration'))
-                    return
-                }
-
-                const duration = parseFloat(durationOutput.trim())
-                const trimmedDuration = Math.max(1, duration - trimSeconds) // Minimum 1 second
-
-                console.log(
-                    `🎵 Trimming WAV: ${duration.toFixed(1)}s → ${trimmedDuration.toFixed(1)}s`,
-                )
-
-                // Trim the audio
-                const trimProcess = spawn('ffmpeg', [
-                    '-i',
-                    filePath,
-                    '-t',
-                    trimmedDuration.toString(),
-                    '-c',
-                    'copy', // Copy stream without re-encoding
-                    '-y',
-                    tempPath,
-                ])
-
-                trimProcess.on('close', (trimCode) => {
-                    if (trimCode === 0 && fs.existsSync(tempPath)) {
-                        // Replace original with trimmed version
-                        fs.renameSync(tempPath, filePath)
-                        resolve()
-                    } else {
-                        // Cleanup temp file if it exists
-                        if (fs.existsSync(tempPath)) {
-                            fs.unlinkSync(tempPath)
-                        }
-                        reject(
-                            new Error(
-                                `FFmpeg audio trim failed with code ${trimCode}`,
-                            ),
-                        )
-                    }
-                })
-            })
-        })
     }
 
     public async uploadToS3(): Promise<void> {
-        if (this.filesUploaded || !this.s3Uploader) {
+        if (this.filesUploaded || !S3Uploader.getInstance()) {
             return
         }
 
@@ -718,7 +378,7 @@ export class ScreenRecorder extends EventEmitter {
             console.log(
                 `📤 Uploading WAV audio to video bucket: ${GLOBAL.get().remote?.aws_s3_video_bucket}`,
             )
-            await this.s3Uploader.uploadFile(
+            await S3Uploader.getInstance().uploadFile(
                 this.audioOutputPath,
                 GLOBAL.get().remote?.aws_s3_video_bucket!,
                 `${identifier}.wav`,
@@ -729,7 +389,7 @@ export class ScreenRecorder extends EventEmitter {
             console.log(
                 `📤 Uploading MP4 to video bucket: ${GLOBAL.get().remote?.aws_s3_video_bucket}`,
             )
-            await this.s3Uploader.uploadFile(
+            await S3Uploader.getInstance().uploadFile(
                 this.outputPath,
                 GLOBAL.get().remote?.aws_s3_video_bucket!,
                 `${identifier}.mp4`,
@@ -747,11 +407,11 @@ export class ScreenRecorder extends EventEmitter {
         console.log('🛑 Stop recording requested - starting grace period...')
         this.gracePeriodActive = true
 
-        const gracePeriodMs = (this.config.gracePeriodSeconds || 3) * 1000
+        const gracePeriodMs = GRACE_PERIOD_SECONDS * 1000
 
         // Wait for grace period to allow clean ending
         console.log(
-            `⏳ Grace period: ${this.config.gracePeriodSeconds}s for clean ending`,
+            `⏳ Grace period: ${GRACE_PERIOD_SECONDS}s for clean ending`,
         )
 
         await new Promise<void>((resolve) => {
@@ -790,15 +450,11 @@ export class ScreenRecorder extends EventEmitter {
 
     public getStatus(): {
         isRecording: boolean
-        isConfigured: boolean
-        filesUploaded: boolean
         gracePeriodActive: boolean
         recordingDurationMs: number
     } {
         return {
             isRecording: this.isRecording,
-            isConfigured: this.isConfigured,
-            filesUploaded: this.filesUploaded,
             gracePeriodActive: this.gracePeriodActive,
             recordingDurationMs:
                 this.recordingStartTime > 0
@@ -807,36 +463,11 @@ export class ScreenRecorder extends EventEmitter {
         }
     }
 
-    public getFilesUploaded(): boolean {
-        return this.filesUploaded
-    }
-
-    // Helper methods
-    private async getSystemLoad(): Promise<number> {
-        try {
-            const { exec } = require('child_process')
-            const { promisify } = require('util')
-            const execAsync = promisify(exec)
-
-            const { stdout } = await execAsync('uptime')
-            const loadMatch = stdout.match(/load average: ([\d.]+)/)
-            return loadMatch ? parseFloat(loadMatch[1]) : 0
-        } catch {
-            return 0
-        }
-    }
-
-    private estimateOffsetFromLoad(load: number): number {
-        if (load < 1.5) return -0.065
-        else if (load < 2.5) return 0.0
-        else return -0.05
-    }
-
     private async handleSuccessfulRecording(): Promise<void> {
         console.log('Native recording completed')
 
-        // Post-process files to remove corrupted endings
-        await this.postProcessRecordings()
+        // Sync and merge separate audio/video files
+        await this.syncAndMergeFiles()
 
         // Auto-upload if not serverless and wait for completion
         if (!GLOBAL.isServerless()) {
@@ -847,8 +478,270 @@ export class ScreenRecorder extends EventEmitter {
                 console.error('❌ Upload failed:', error)
             }
         }
+    }
 
-        this.cleanupChunkMonitoring()
+    private async syncAndMergeFiles(): Promise<void> {
+        if (GLOBAL.get().recording_mode === 'audio_only') {
+            // Audio-only mode: just copy raw audio to final output
+            const tempDir = PathManager.getInstance().getTempPath()
+            const rawAudioPath = path.join(tempDir, 'raw.wav')
+
+            console.log('🔄 Processing audio-only recording...')
+
+            if (fs.existsSync(rawAudioPath)) {
+                // Copy raw audio to final output location
+                fs.copyFileSync(rawAudioPath, this.audioOutputPath)
+                console.log(`✅ Audio copied to: ${this.audioOutputPath}`)
+
+                // Create audio chunks from the final audio file
+                await this.createAudioChunks(this.audioOutputPath)
+            } else {
+                console.error('❌ Raw audio file not found:', rawAudioPath)
+            }
+
+            console.log('✅ Audio-only processing completed')
+            return
+        }
+
+        // Video mode: full sync and merge process
+        const tempDir = PathManager.getInstance().getTempPath()
+        const rawVideoPath = path.join(tempDir, 'raw.mp4')
+        const rawAudioPath = path.join(tempDir, 'raw.wav')
+
+        console.log('🔄 Starting post-recording sync and merge...')
+
+        // 1. Calculate sync offset (using your existing calculation)
+        const syncResult = await calculateVideoOffset(
+            rawAudioPath,
+            rawVideoPath,
+        )
+        console.log(
+            `🎯 Calculated sync offset: ${syncResult.offsetSeconds.toFixed(3)}s`,
+        )
+
+        // 2. Trim video and audio with offset
+        const trimmedVideoPath = path.join(tempDir, 'trimmed.mp4')
+        const trimmedAudioPath = path.join(tempDir, 'trimmed.wav')
+
+        //DONT TUCH FOOD CLALCULATION
+        const calcOffsetVideo =
+            syncResult.videoTimestamp +
+            (this.meetingStartTime -
+                this.recordingStartTime -
+                FLASH_SCREEN_SLEEP_TIME) /
+                1000
+        const calcOffsetAudio =
+            syncResult.audioTimestamp +
+            (this.meetingStartTime -
+                this.recordingStartTime -
+                FLASH_SCREEN_SLEEP_TIME) /
+                1000
+
+        await this.trimFromOffset(
+            rawVideoPath,
+            trimmedVideoPath,
+            calcOffsetVideo,
+        )
+        await this.trimFromOffset(
+            rawAudioPath,
+            trimmedAudioPath,
+            calcOffsetAudio,
+        )
+
+        // 3. Get durations to find shortest
+        const videoDuration = await this.getDuration(trimmedVideoPath)
+        const audioDuration = await this.getDuration(trimmedAudioPath)
+        const shortestDuration = Math.min(videoDuration, audioDuration)
+
+        console.log(`📊 Video duration: ${videoDuration.toFixed(2)}s`)
+        console.log(`📊 Audio duration: ${audioDuration.toFixed(2)}s`)
+        console.log(
+            `📊 Using shortest duration: ${shortestDuration.toFixed(2)}s`,
+        )
+
+        // 4. Merge with shortest duration as reference
+        await this.mergeWithShortestDuration(
+            trimmedVideoPath,
+            trimmedAudioPath,
+            shortestDuration,
+        )
+
+        // 5. Copy trimmed audio to final output location
+        fs.copyFileSync(trimmedAudioPath, this.audioOutputPath)
+        console.log(`✅ Audio copied to: ${this.audioOutputPath}`)
+
+        // 6. Create audio chunks from trimmed audio (not final audio)
+        await this.createAudioChunks(trimmedAudioPath)
+
+        // 7. Cleanup temporary files (keep trimmed audio for chunks)
+        await this.cleanupTempFiles([
+            rawVideoPath,
+            rawAudioPath,
+            trimmedVideoPath,
+        ])
+
+        console.log('✅ Sync and merge completed successfully')
+    }
+
+    private async mergeWithShortestDuration(
+        videoPath: string,
+        audioPath: string,
+        duration: number,
+    ): Promise<void> {
+        const args = [
+            '-i',
+            videoPath,
+            '-i',
+            audioPath,
+            '-c:v',
+            'copy',
+            '-c:a',
+            'aac',
+            '-b:a',
+            '160k',
+            '-shortest',
+            '-t',
+            duration.toString(),
+            '-avoid_negative_ts',
+            'make_zero',
+            '-y',
+            this.outputPath,
+        ]
+
+        console.log(
+            `🎬 Merging video and audio (duration: ${duration.toFixed(2)}s)`,
+        )
+        await this.runFFmpeg(args)
+    }
+
+    private async createAudioChunks(audioPath: string): Promise<void> {
+        if (!GLOBAL.get().speech_to_text_provider) return
+
+        const chunksDir = PathManager.getInstance().getAudioTmpPath()
+        if (!fs.existsSync(chunksDir)) {
+            fs.mkdirSync(chunksDir, { recursive: true })
+        }
+
+        // Get audio duration
+        const duration = await this.getDuration(audioPath)
+        const botUuid = GLOBAL.get().bot_uuid
+
+        // Calculate chunk duration (max 1 hour = 3600 seconds)
+        const chunkDuration = Math.min(duration, TRANSCRIPTION_CHUNK_DURATION)
+        const chunkPattern = path.join(chunksDir, `${botUuid}-%d.wav`)
+
+        const args = [
+            '-i',
+            audioPath,
+            '-acodec',
+            'pcm_s16le',
+            '-ac',
+            '1',
+            '-ar',
+            '16000',
+            '-f',
+            'segment',
+            '-segment_time',
+            chunkDuration.toString(),
+            '-segment_format',
+            'wav',
+            '-y',
+            chunkPattern,
+        ]
+
+        console.log(
+            `🎵 Creating audio chunks (${chunkDuration}s each) from ${duration.toFixed(1)}s audio`,
+        )
+        await this.runFFmpeg(args)
+
+        // Upload created chunks
+        await this.uploadAudioChunks(chunksDir, botUuid)
+    }
+
+    private async getDuration(filePath: string): Promise<number> {
+        const args = [
+            '-v',
+            'quiet',
+            '-show_entries',
+            'format=duration',
+            '-of',
+            'csv=p=0',
+            filePath,
+        ]
+        const result = await this.runFFprobe(args)
+        return parseFloat(result.trim())
+    }
+
+    private async cleanupTempFiles(filePaths: string[]): Promise<void> {
+        // for (const filePath of filePaths) {
+        //     if (fs.existsSync(filePath)) {
+        //         fs.unlinkSync(filePath)
+        //         console.log(`🗑️ Cleaned up: ${path.basename(filePath)}`)
+        //     }
+        // }
+    }
+
+    private async runFFmpeg(args: string[]): Promise<void> {
+        return new Promise((resolve, reject) => {
+            const process = spawn('ffmpeg', args)
+
+            process.on('close', (code) => {
+                if (code === 0) {
+                    resolve()
+                } else {
+                    reject(new Error(`FFmpeg failed with code ${code}`))
+                }
+            })
+
+            process.on('error', (error) => {
+                reject(error)
+            })
+        })
+    }
+
+    private async runFFprobe(args: string[]): Promise<string> {
+        return new Promise((resolve, reject) => {
+            const process = spawn('ffprobe', args)
+            let output = ''
+
+            process.stdout?.on('data', (data) => {
+                output += data.toString()
+            })
+
+            process.on('close', (code) => {
+                if (code === 0) {
+                    resolve(output)
+                } else {
+                    reject(new Error(`FFprobe failed with code ${code}`))
+                }
+            })
+
+            process.on('error', (error) => {
+                reject(error)
+            })
+        })
+    }
+
+    private async trimFromOffset(
+        inputPath: string,
+        outputPath: string,
+        offset: number,
+    ): Promise<void> {
+        const args = [
+            '-i',
+            inputPath,
+            '-ss',
+            offset.toString(),
+            '-avoid_negative_ts',
+            'make_zero',
+            '-y',
+            outputPath,
+        ]
+
+        console.log(
+            `✂️ Trimming from offset ${offset.toFixed(3)}s: ${path.basename(inputPath)}`,
+        )
+        await this.runFFmpeg(args)
     }
 }
 
@@ -857,15 +750,7 @@ export class ScreenRecorderManager {
 
     public static getInstance(): ScreenRecorder {
         if (!ScreenRecorderManager.instance) {
-            ScreenRecorderManager.instance = new ScreenRecorder({
-                recordingMode: 'speaker_view',
-                enableTranscriptionChunking:
-                    GLOBAL.get().speech_to_text_provider !== null,
-                transcriptionChunkDuration: 3600,
-                // Clean endings by default
-                gracePeriodSeconds: 3,
-                trimEndSeconds: 2,
-            })
+            ScreenRecorderManager.instance = new ScreenRecorder()
         }
         return ScreenRecorderManager.instance
     }

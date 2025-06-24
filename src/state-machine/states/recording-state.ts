@@ -32,6 +32,11 @@ export class RecordingState extends BaseState {
 
             // Set a global timeout for the recording state
             const startTime = Date.now()
+            ScreenRecorderManager.getInstance().setMeetingStartTime(startTime)
+
+            // Uncomment this to test the recording synchronization
+            // await sleep(10000)
+            // await generateSyncSignal(this.context.playwrightPage)
 
             // Main loop
             while (this.isProcessing) {
@@ -84,30 +89,11 @@ export class RecordingState extends BaseState {
     private async initializeRecording(): Promise<void> {
         console.info('Initializing recording...')
 
-        // Start streaming seulement si RECORDING est activé
-        if (this.context.streamingService) {
-            console.info('Starting streaming service from recording state')
-            this.context.streamingService.start()
-
-            // Check that the instance is properly created
-            if (!Streaming.instance) {
-                console.warn(
-                    'Streaming service not properly initialized, trying fallback initialization',
-                )
-                // If the instance is not available after starting, we might have a problem
-                Streaming.instance = this.context.streamingService
-            }
-        } else {
-            console.warn('No streaming service available in context')
-        }
-
         // Log the context state
         console.info('Context state:', {
             hasPathManager: !!this.context.pathManager,
             hasStreamingService: !!this.context.streamingService,
             isStreamingInstanceAvailable: !!Streaming.instance,
-            isScreenRecorderConfigured:
-                ScreenRecorderManager.getInstance().getStatus().isConfigured,
         })
 
         // Configure listeners
