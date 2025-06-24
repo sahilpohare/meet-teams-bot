@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y \
     wget gnupg libnss3 libatk-bridge2.0-0 libdrm2 libxkbcommon0 \
     libxcomposite1 libxdamage1 libxrandr2 libgbm1 libxss1 libxshmfence1 \
     # Virtual display and audio
-    xvfb x11vnc fluxbox x11-utils pulseaudio pulseaudio-utils \
+    xvfb x11vnc x11-utils pulseaudio pulseaudio-utils \
     # Media processing
     ffmpeg imagemagick alsa-utils \
     # Utilities
