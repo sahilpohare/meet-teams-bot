@@ -737,21 +737,47 @@ export class ScreenRecorder extends EventEmitter {
         outputPath: string,
         offset: number,
     ): Promise<void> {
-        const args = [
-            '-i',
-            inputPath,
-            '-ss',
-            offset.toString(),
-            '-avoid_negative_ts',
-            'make_zero',
-            '-y',
-            outputPath,
-        ]
-
-        console.log(
-            `✂️ Trimming from offset ${offset.toFixed(3)}s: ${path.basename(inputPath)}`,
-        )
-        await this.runFFmpeg(args)
+        const isVideo = inputPath.endsWith('.mp4') || inputPath.endsWith('.avi') || inputPath.endsWith('.mov')
+        
+        if (isVideo) {
+            // For video: use precise seeking with stream copy
+            const args = [
+                '-ss',
+                offset.toString(),
+                '-i',
+                inputPath,
+                '-c:v',
+                'copy',
+                '-c:a',
+                'copy',
+                '-avoid_negative_ts',
+                'make_zero',
+                '-y',
+                outputPath,
+            ]
+            
+            console.log(
+                `✂️ Trimming video from offset ${offset.toFixed(3)}s: ${path.basename(inputPath)} (stream copy)`,
+            )
+            await this.runFFmpeg(args)
+        } else {
+            // For audio: standard approach
+            const args = [
+                '-i',
+                inputPath,
+                '-ss',
+                offset.toString(),
+                '-avoid_negative_ts',
+                'make_zero',
+                '-y',
+                outputPath,
+            ]
+            
+            console.log(
+                `✂️ Trimming audio from offset ${offset.toFixed(3)}s: ${path.basename(inputPath)} (re-encode)`,
+            )
+            await this.runFFmpeg(args)
+        }
     }
 }
 
