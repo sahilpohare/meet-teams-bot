@@ -47,8 +47,6 @@ export class WaitingRoomState extends BaseState {
                 this.context.playwrightPage,
             )
 
-            this.context.streamingService.start()
-
             // Start the dialog observer once the page is open
             this.startDialogObserver()
 
