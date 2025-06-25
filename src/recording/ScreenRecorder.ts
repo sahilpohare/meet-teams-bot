@@ -738,14 +738,18 @@ file '${absoluteInputPath}'`
             '-ss',
             trimSeconds.toString(),
             '-c:a',
-            'copy',
+            'pcm_s16le', // Re-encode instead of copy to ensure clean timestamps
+            '-ar',
+            AUDIO_SAMPLE_RATE.toString(),
+            '-ac',
+            '1',
             '-avoid_negative_ts',
             'make_zero',
             '-y',
             outputAudioPath,
         ]
 
-        console.log(`✂️ Trimming ${trimSeconds.toFixed(3)}s from audio start`)
+        console.log(`✂️ Trimming ${trimSeconds.toFixed(3)}s from audio start (re-encoding for clean timestamps)`)
         await this.runFFmpeg(args)
     }
 
