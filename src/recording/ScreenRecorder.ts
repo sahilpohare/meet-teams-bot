@@ -527,7 +527,9 @@ export class ScreenRecorder extends EventEmitter {
         const rawVideoPath = path.join(tempDir, 'raw.mp4')
         const rawAudioPath = path.join(tempDir, 'raw.wav')
 
-        console.log('🔄 Starting efficient sync and merge for long recording...')
+        console.log(
+            '🔄 Starting efficient sync and merge for long recording...',
+        )
 
         // 1. Calculate sync offset (using your existing calculation)
         const syncResult = await calculateVideoOffset(
@@ -540,38 +542,79 @@ export class ScreenRecorder extends EventEmitter {
         const hasMeetingStartTime = this.meetingStartTime > 0
 
         // 2. Check if meetingStartTime is properly set - if not, bot was removed too early
-
         if (!hasMeetingStartTime) {
-            console.error(`❌ Bot removed too early - meetingStartTime not set (${this.meetingStartTime})`)
-            throw new JoinError(JoinErrorCode.BotRemovedTooEarly)
+            console.error(
+                `❌ Bot removed too early - meetingStartTime not set (${this.meetingStartTime})`,
+            )
+            console.error(`📊 Timing debug:`)
+            console.error(`   recordingStartTime: ${this.recordingStartTime}`)
+            console.error(`   meetingStartTime: ${this.meetingStartTime}`)
+            console.error(`   Current time: ${Date.now()}`)
+            console.error(
+                `   Recording duration: ${Date.now() - this.recordingStartTime}ms`,
+            )
+
+            // Fallback: if we have a reasonable recording duration (>15s), set meetingStartTime to 5s before bot removal
+            const recordingDuration = Date.now() - this.recordingStartTime
+            if (recordingDuration > 10000) {
+                // 10 seconds minimum
+                console.warn(
+                    `⚠️ Setting meetingStartTime to 5s before bot removal to avoid showing pre-meeting phase`,
+                )
+                this.meetingStartTime = Date.now() - 5000 // Show only last 5 seconds
+            } else {
+                throw new JoinError(JoinErrorCode.BotRemovedTooEarly)
+            }
         }
 
         // 3. Calculate final trim points using meeting timing
-        const calcOffsetVideo = syncResult.videoTimestamp + 
-            (this.meetingStartTime - this.recordingStartTime - FLASH_SCREEN_SLEEP_TIME) / 1000
-            
+        const calcOffsetVideo =
+            syncResult.videoTimestamp +
+            (this.meetingStartTime -
+                this.recordingStartTime -
+                FLASH_SCREEN_SLEEP_TIME) /
+                1000
+
         console.log(`📊 Debug values:`)
-        console.log(`   syncResult.videoTimestamp: ${syncResult.videoTimestamp}s`)
-        console.log(`   syncResult.audioTimestamp: ${syncResult.audioTimestamp}s`)
+        console.log(
+            `   syncResult.videoTimestamp: ${syncResult.videoTimestamp}s`,
+        )
+        console.log(
+            `   syncResult.audioTimestamp: ${syncResult.audioTimestamp}s`,
+        )
         console.log(`   meetingStartTime: ${this.meetingStartTime}`)
         console.log(`   recordingStartTime: ${this.recordingStartTime}`)
         console.log(`   FLASH_SCREEN_SLEEP_TIME: ${FLASH_SCREEN_SLEEP_TIME}`)
-        console.log(`   Time diff: ${(this.meetingStartTime - this.recordingStartTime - FLASH_SCREEN_SLEEP_TIME) / 1000}s`)
-
+        console.log(
+            `   Time diff: ${(this.meetingStartTime - this.recordingStartTime - FLASH_SCREEN_SLEEP_TIME) / 1000}s`,
+        )
 
         // 4. Calculate audio padding needed (can be negative for trimming)
-        const audioPadding = syncResult.videoTimestamp - syncResult.audioTimestamp
-        
+        const audioPadding =
+            syncResult.videoTimestamp - syncResult.audioTimestamp
+
         console.log(`🔇 Audio padding needed: ${audioPadding.toFixed(3)}s`)
-        
+
         // 5. Prepare audio with padding or trimming if needed
         const processedAudioPath = path.join(tempDir, 'processed.wav')
         if (audioPadding > 0) {
-            console.log(`🔇 Adding ${audioPadding.toFixed(3)}s silence to audio start (video ahead)...`)
-            await this.addSilencePadding(rawAudioPath, processedAudioPath, audioPadding)
+            console.log(
+                `🔇 Adding ${audioPadding.toFixed(3)}s silence to audio start (video ahead)...`,
+            )
+            await this.addSilencePadding(
+                rawAudioPath,
+                processedAudioPath,
+                audioPadding,
+            )
         } else if (audioPadding < 0) {
-            console.log(`✂️ Trimming ${(audioPadding * -1).toFixed(3)}s from audio start (video behind)...`)
-            await this.trimAudioStart(rawAudioPath, processedAudioPath, (audioPadding * -1))
+            console.log(
+                `✂️ Trimming ${(audioPadding * -1).toFixed(3)}s from audio start (video behind)...`,
+            )
+            await this.trimAudioStart(
+                rawAudioPath,
+                processedAudioPath,
+                audioPadding * -1,
+            )
         } else {
             // No padding or trimming needed, just copy
             fs.copyFileSync(rawAudioPath, processedAudioPath)
@@ -579,22 +622,28 @@ export class ScreenRecorder extends EventEmitter {
 
         // 6. Merge video and audio (both files are now synchronized from start)
         const mergedPath = path.join(tempDir, 'merged.mp4')
-        await this.mergeWithSync(
-            rawVideoPath,
-            processedAudioPath,
-            mergedPath
-        )
+        await this.mergeWithSync(rawVideoPath, processedAudioPath, mergedPath)
 
         const videoDuration = await this.getDuration(rawVideoPath)
         const audioDuration = await this.getDuration(processedAudioPath)
-        const finalDuration = Math.min(videoDuration - calcOffsetVideo, audioDuration)
-        
+        const finalDuration = Math.min(
+            videoDuration - calcOffsetVideo,
+            audioDuration,
+        )
+
         console.log(`📊 Final duration: ${finalDuration.toFixed(2)}s`)
-        await this.finalTrimFromOffset(mergedPath, this.outputPath, calcOffsetVideo, finalDuration)
+        await this.finalTrimFromOffset(
+            mergedPath,
+            this.outputPath,
+            calcOffsetVideo,
+            finalDuration,
+        )
 
         // 7. Extract audio from the final trimmed video (ensures perfect sync)
         await this.extractAudioFromVideo(this.outputPath, this.audioOutputPath)
-        console.log(`✅ Audio extracted from final video: ${this.audioOutputPath}`)
+        console.log(
+            `✅ Audio extracted from final video: ${this.audioOutputPath}`,
+        )
 
         // 8. Create audio chunks from the extracted audio
         await this.createAudioChunks(this.audioOutputPath)
@@ -618,7 +667,7 @@ export class ScreenRecorder extends EventEmitter {
         const tempDir = PathManager.getInstance().getTempPath()
         const silenceFile = path.join(tempDir, 'silence.wav')
         const concatListFile = path.join(tempDir, 'concat_list.txt')
-        
+
         // Create silence file with exact same format as input
         const silenceArgs = [
             '-f',
@@ -634,22 +683,22 @@ export class ScreenRecorder extends EventEmitter {
             '-y',
             silenceFile,
         ]
-        
+
         console.log(`🔇 Creating ${paddingSeconds.toFixed(3)}s silence file`)
         await this.runFFmpeg(silenceArgs)
-        
+
         // Create concat list with absolute paths (no escaping needed)
         const absoluteSilencePath = path.resolve(silenceFile)
         const absoluteInputPath = path.resolve(inputAudioPath)
-        
+
         const concatContent = `file '${absoluteSilencePath}'
 file '${absoluteInputPath}'`
-        
+
         fs.writeFileSync(concatListFile, concatContent, 'utf8')
         console.log(`📝 Created concat list:`)
         console.log(`   - ${absoluteSilencePath}`)
         console.log(`   - ${absoluteInputPath}`)
-        
+
         // Concatenate using concat demuxer with stream copy
         const concatArgs = [
             '-f',
@@ -664,9 +713,11 @@ file '${absoluteInputPath}'`
             outputAudioPath,
         ]
 
-        console.log(`🔇 Concatenating with demuxer (stream copy - no re-encoding)`)
+        console.log(
+            `🔇 Concatenating with demuxer (stream copy - no re-encoding)`,
+        )
         await this.runFFmpeg(concatArgs)
-        
+
         // Cleanup temp files
         if (fs.existsSync(silenceFile)) {
             fs.unlinkSync(silenceFile)
@@ -721,9 +772,7 @@ file '${absoluteInputPath}'`
             outputPath,
         ]
 
-        console.log(
-            `🎬 Merging video and synchronized audio`,
-        )
+        console.log(`🎬 Merging video and synchronized audio`)
         await this.runFFmpeg(args)
     }
 
@@ -754,7 +803,7 @@ file '${absoluteInputPath}'`
         // Get the actual video start time to compensate for timestamp offset
         const videoStartTime = await this.getVideoStartTime(inputPath)
         const adjustedOffset = calcOffset + videoStartTime
-        
+
         // Simple solution: re-encode the entire trim with ultrafast for frame-perfect cutting
         const args = [
             '-i',
@@ -781,11 +830,16 @@ file '${absoluteInputPath}'`
             outputPath,
         ]
 
-        console.log(`✂️ Final trim: re-encoding ${duration.toFixed(2)}s from ${adjustedOffset.toFixed(3)}s (ultrafast)`)
+        console.log(
+            `✂️ Final trim: re-encoding ${duration.toFixed(2)}s from ${adjustedOffset.toFixed(3)}s (ultrafast)`,
+        )
         await this.runFFmpeg(args)
     }
 
-    private async extractAudioFromVideo(videoPath: string, audioPath: string): Promise<void> {
+    private async extractAudioFromVideo(
+        videoPath: string,
+        audioPath: string,
+    ): Promise<void> {
         const args = [
             '-i',
             videoPath,
@@ -800,7 +854,9 @@ file '${absoluteInputPath}'`
             audioPath,
         ]
 
-        console.log('🎵 Extracting audio from video (converting to WAV PCM 16kHz mono)')
+        console.log(
+            '🎵 Extracting audio from video (converting to WAV PCM 16kHz mono)',
+        )
         await this.runFFmpeg(args)
     }
 

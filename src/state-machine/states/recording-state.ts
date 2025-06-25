@@ -10,7 +10,6 @@ import {
 import { BaseState } from './base-state'
 
 import { ScreenRecorderManager } from '../../recording/ScreenRecorder'
-import { generateSyncSignal } from '../../utils/SyncSignal'
 import { sleep } from '../../utils/sleep'
 
 // Sound level threshold for considering activity (0-100)
@@ -38,8 +37,8 @@ export class RecordingState extends BaseState {
             ScreenRecorderManager.getInstance().setMeetingStartTime(startTime)
 
             // Uncomment this to test the recording synchronization
-            await sleep(10000)
-            await generateSyncSignal(this.context.playwrightPage)
+            // await sleep(10000)
+            // await generateSyncSignal(this.context.playwrightPage)
 
             // Main loop
             while (this.isProcessing) {
