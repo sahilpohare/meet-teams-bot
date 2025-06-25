@@ -71,7 +71,7 @@ export class RecordingState extends BaseState {
                     return this.transition(MeetingStateType.Paused)
                 }
 
-                await this.sleep(this.CHECK_INTERVAL)
+                await sleep(this.CHECK_INTERVAL)
             }
 
             // Stop the observer before transitioning to Cleanup state
@@ -211,7 +211,7 @@ export class RecordingState extends BaseState {
             await Events.callEnded()
 
             console.info('Setting isProcessing to false to end recording loop')
-            await this.sleep(2000)
+            await sleep(2000)
         } catch (error) {
             console.error('Error during meeting end handling:', error)
         } finally {
@@ -340,9 +340,5 @@ export class RecordingState extends BaseState {
         }
 
         return shouldEnd
-    }
-
-    private sleep(ms: number): Promise<void> {
-        return new Promise((resolve) => setTimeout(resolve, ms))
     }
 }

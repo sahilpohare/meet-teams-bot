@@ -2,9 +2,9 @@ import { BrowserContext, Page } from '@playwright/test'
 
 import { JoinError, JoinErrorCode, MeetingProviderInterface } from '../types'
 
+import { GLOBAL } from '../singleton'
 import { parseMeetingUrlFromJoinInfos } from '../urlParser/teamsUrlParser'
 import { sleep } from '../utils/sleep'
-import { GLOBAL } from '../singleton'
 
 export class TeamsProvider implements MeetingProviderInterface {
     constructor() {}
@@ -100,7 +100,7 @@ export class TeamsProvider implements MeetingProviderInterface {
         cancelCheck: () => boolean,
         onJoinSuccess: () => void,
     ): Promise<void> {
-        console.log('joining meeting', cancelCheck)
+        console.log('joining meeting')
 
         try {
             await ensurePageLoaded(page)

@@ -16,6 +16,8 @@ import { generateSyncSignal } from '../utils/SyncSignal'
 const TRANSCRIPTION_CHUNK_DURATION = 3600
 const GRACE_PERIOD_SECONDS = 3
 const STREAMING_SAMPLE_RATE = 24_000
+const AUDIO_SAMPLE_RATE = 44_100 // Improved audio quality
+const AUDIO_BITRATE = '192k' // Improved audio bitrate
 const FLASH_SCREEN_SLEEP_TIME = 4200
 const SCREENSHOT_PERIOD = 5 // every 5 seconds instead of 2
 const SCREENSHOT_WIDTH = 640 // reduced from 1280
@@ -141,7 +143,7 @@ export class ScreenRecorder extends EventEmitter {
                 '-ac',
                 '1',
                 '-ar',
-                '16000',
+                AUDIO_SAMPLE_RATE.toString(),
                 '-avoid_negative_ts',
                 'make_zero',
                 '-f',
@@ -234,7 +236,7 @@ export class ScreenRecorder extends EventEmitter {
                 '-ac',
                 '1',
                 '-ar',
-                '16000',
+                AUDIO_SAMPLE_RATE.toString(),
                 '-avoid_negative_ts',
                 'make_zero',
                 '-f',
@@ -622,11 +624,11 @@ export class ScreenRecorder extends EventEmitter {
             '-f',
             'lavfi',
             '-i',
-            `anullsrc=channel_layout=mono:sample_rate=16000:duration=${paddingSeconds}`,
+            `anullsrc=channel_layout=mono:sample_rate=${AUDIO_SAMPLE_RATE}:duration=${paddingSeconds}`,
             '-c:a',
             'pcm_s16le',
             '-ar',
-            '16000',
+            AUDIO_SAMPLE_RATE.toString(),
             '-ac',
             '1',
             '-y',
@@ -711,7 +713,7 @@ file '${absoluteInputPath}'`
             '-c:a',
             'aac',
             '-b:a',
-            '160k',
+            AUDIO_BITRATE,
             '-shortest',
             '-avoid_negative_ts',
             'make_zero',
@@ -770,7 +772,7 @@ file '${absoluteInputPath}'`
             '-c:a',
             'aac',
             '-b:a',
-            '160k',
+            AUDIO_BITRATE,
             '-movflags',
             '+faststart',
             '-avoid_negative_ts',
@@ -791,7 +793,7 @@ file '${absoluteInputPath}'`
             '-c:a',
             'pcm_s16le',
             '-ar',
-            '16000',
+            AUDIO_SAMPLE_RATE.toString(),
             '-ac',
             '1',
             '-y',
@@ -826,7 +828,7 @@ file '${absoluteInputPath}'`
             '-ac',
             '1',
             '-ar',
-            '16000',
+            AUDIO_SAMPLE_RATE.toString(),
             '-f',
             'segment',
             '-segment_time',

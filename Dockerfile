@@ -71,12 +71,18 @@ if ! pactl info >/dev/null 2>&1; then\n\
     sleep 3\n\
 fi\n\
 \n# Create virtual audio devices\n\
-pactl load-module module-null-sink sink_name=virtual_speaker \\\n    sink_properties=device.description=Virtual_Speaker\n\
+pactl load-module module-null-sink sink_name=virtual_speaker \\\n\
+    sink_properties=device.description=Virtual_Speaker,device.class=sound\n\
 pactl load-module module-virtual-source source_name=virtual_mic\n\
 pactl set-default-sink virtual_speaker\n\
-\n# Optimize audio latency\n\
+\n\
+# Optimize audio quality and latency\n\
+pactl set-sink-volume virtual_speaker 100%\n\
 pactl set-sink-latency-offset virtual_speaker 0 2>/dev/null || true\n\
 pactl set-source-latency-offset virtual_speaker.monitor 0 2>/dev/null || true\n\
+\n\
+# Set high quality audio parameters\n\
+pactl set-sink-resample-method virtual_speaker speex-float-10 2>/dev/null || true\n\
 \n# Verify critical audio device exists\n\
 if ! pactl list sources short | grep -q "virtual_speaker.monitor"; then\n\
     echo "❌ virtual_speaker.monitor not found - audio setup failed"\n\
