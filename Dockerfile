@@ -1,13 +1,18 @@
 # Meeting Bot - Docker Image for Screen Recording
-FROM node:20-bullseye
+FROM ubuntu:24.04
+
+# Install Node.js 20.x
+RUN apt-get update && apt-get install -y curl ca-certificates gnupg
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+RUN apt-get install -y nodejs
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     # Core browser dependencies
-    wget gnupg libnss3 libatk-bridge2.0-0 libdrm2 libxkbcommon0 \
+    wget libnss3 libatk-bridge2.0-0 libdrm2 libxkbcommon0 \
     libxcomposite1 libxdamage1 libxrandr2 libgbm1 libxss1 libxshmfence1 \
     # Virtual display and audio
-    xvfb x11vnc x11-utils pulseaudio pulseaudio-utils \
+    xvfb x11vnc x11-utils pulseaudio pulseaudio-utils unclutter \
     # Media processing
     ffmpeg imagemagick alsa-utils \
     # Utilities
@@ -39,28 +44,25 @@ ENV XDG_RUNTIME_DIR=/tmp/pulse
 # Create optimized startup script
 RUN echo '#!/bin/bash\n\
 set -e\n\
-\n\
-echo "🖥️ Starting virtual display and audio..."\n\
+\necho "🖥️ Starting virtual display and audio..."\n\
 export DISPLAY=:99\n\
 export PULSE_RUNTIME_PATH=/tmp/pulse\n\
 export XDG_RUNTIME_DIR=/tmp/pulse\n\
 mkdir -p $PULSE_RUNTIME_PATH\n\
-\n\
-# Start virtual display\n\
-Xvfb :99 -screen 0 1280x880x24 -ac +extension GLX +render -noreset &\n\
+\n# Start virtual display with enhanced cursor hiding\n\
+Xvfb :99 -screen 0 1280x880x24 -ac +extension GLX +render -noreset -nocursor -nolisten tcp &\n\
 XVFB_PID=$!\n\
-\n\
-# Start VNC server for debugging\n\
-x11vnc -display :99 -forever -passwd debug -listen 0.0.0.0 -rfbport 5900 \\\n\
-    -shared -noxdamage -noxfixes -noscr -fixscreen 3 -bg -o /tmp/x11vnc.log &\n\
+\n# Hide cursor completely at X11 level\n\
+sleep 2\n\
+unclutter -display :99 -idle 0 -root &\n\
+\n# Start VNC server for debugging with cursor disabled\n\
+x11vnc -display :99 -forever -passwd debug -listen 0.0.0.0 -rfbport 5900 \\\n    -shared -noxdamage -noxfixes -noscr -fixscreen 3 -bg -o /tmp/x11vnc.log \\\n    -nocursor -noxfixes -nomodtweak &\n\
 VNC_PID=$!\n\
-\n\
-# Initialize PulseAudio\n\
+\n# Initialize PulseAudio\n\
 pulseaudio --start --log-target=stderr --log-level=notice &\n\
 PULSE_PID=$!\n\
 sleep 4\n\
-\n\
-# Ensure PulseAudio is ready\n\
+\n# Ensure PulseAudio is ready\n\
 if ! pactl info >/dev/null 2>&1; then\n\
     pulseaudio --kill || true\n\
     sleep 2\n\
@@ -68,33 +70,19 @@ if ! pactl info >/dev/null 2>&1; then\n\
     PULSE_PID=$!\n\
     sleep 3\n\
 fi\n\
-\n\
-# Create virtual audio devices\n\
-pactl load-module module-null-sink sink_name=virtual_speaker \\\n\
-    sink_properties=device.description=Virtual_Speaker\n\
+\n# Create virtual audio devices\n\
+pactl load-module module-null-sink sink_name=virtual_speaker \\\n    sink_properties=device.description=Virtual_Speaker\n\
 pactl load-module module-virtual-source source_name=virtual_mic\n\
 pactl set-default-sink virtual_speaker\n\
-\n\
-# Optimize audio latency\n\
+\n# Optimize audio latency\n\
 pactl set-sink-latency-offset virtual_speaker 0 2>/dev/null || true\n\
 pactl set-source-latency-offset virtual_speaker.monitor 0 2>/dev/null || true\n\
-\n\
-# Verify critical audio device exists\n\
+\n# Verify critical audio device exists\n\
 if ! pactl list sources short | grep -q "virtual_speaker.monitor"; then\n\
     echo "❌ virtual_speaker.monitor not found - audio setup failed"\n\
     exit 1\n\
 fi\n\
-\n\
-echo "✅ Virtual display and audio ready"\n\
-echo "🔍 VNC available at localhost:5900 (password: debug)"\n\
-\n\
-# Start application\n\
-cd /app/\n\
-node build/src/main.js\n\
-\n\
-# Cleanup on exit\n\
-trap "kill $PULSE_PID $VNC_PID $XVFB_PID 2>/dev/null || true" EXIT\n\
-' > /start.sh && chmod +x /start.sh
+\necho "✅ Virtual display and audio ready"\n\necho "🔍 VNC available at localhost:5900 (password: debug)"\n\n# Start application\ncd /app/\nnode build/src/main.js\n\n# Cleanup on exit\ntrap "kill $PULSE_PID $VNC_PID $XVFB_PID 2>/dev/null || true" EXIT\n' > /start.sh && chmod +x /start.sh
 
 # Expose VNC port for debugging
 EXPOSE 5900
