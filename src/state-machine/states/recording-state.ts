@@ -34,6 +34,7 @@ export class RecordingState extends BaseState {
 
             // Set a global timeout for the recording state
             const startTime = Date.now()
+            this.context.startTime = startTime // Assign to context so getStartTime() works
             ScreenRecorderManager.getInstance().setMeetingStartTime(startTime)
 
             // Uncomment this to test the recording synchronization

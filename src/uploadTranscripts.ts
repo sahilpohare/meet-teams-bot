@@ -54,6 +54,13 @@ async function upload(speaker: SpeakerData, end: boolean) {
         console.info('Transcriber is stoped')
         return
     }
+    const meetingStartTime = MeetingHandle.instance.getStartTime()
+    if (meetingStartTime == null || meetingStartTime == undefined) {
+        console.warn(
+            'Meeting start time not available for posting transcript - skipping',
+        )
+        return
+    }
 
     try {
         const api = Api.instance
@@ -61,10 +68,7 @@ async function upload(speaker: SpeakerData, end: boolean) {
             try {
                 await api.patchTranscript({
                     id: LAST_TRANSRIPT.id,
-                    end_time:
-                        (speaker.timestamp -
-                            MeetingHandle.instance.getStartTime()) /
-                        1000,
+                    end_time: (speaker.timestamp - meetingStartTime) / 1000,
                 } as ApiTypes.ChangeableTranscript)
             } catch (e) {
                 console.error(
@@ -81,12 +85,17 @@ async function upload(speaker: SpeakerData, end: boolean) {
             return
         } else {
             try {
+                const meetingStartTime = MeetingHandle.instance.getStartTime()
+                if (meetingStartTime == null || meetingStartTime == undefined) {
+                    console.warn(
+                        'Meeting start time not available for posting transcript - skipping',
+                    )
+                    return
+                }
+
                 LAST_TRANSRIPT = await api.postTranscript({
                     speaker: speaker.name,
-                    start_time:
-                        (speaker.timestamp -
-                            MeetingHandle.instance.getStartTime()) /
-                        1000,
+                    start_time: (speaker.timestamp - meetingStartTime) / 1000,
                 } as ApiTypes.PostableTranscript)
             } catch (e) {
                 console.error(
