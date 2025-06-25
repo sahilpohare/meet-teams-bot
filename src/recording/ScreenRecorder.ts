@@ -764,7 +764,7 @@ file '${absoluteInputPath}'`
         console.log(`   - ${absoluteSilencePath}`)
         console.log(`   - ${absoluteInputPath}`)
 
-        // Concatenate using concat demuxer with stream copy
+        // Concatenate using concat demuxer with re-encoding for clean timestamps
         const concatArgs = [
             '-f',
             'concat',
@@ -772,14 +772,18 @@ file '${absoluteInputPath}'`
             '0',
             '-i',
             concatListFile,
-            '-c',
-            'copy',
+            '-c:a',
+            'pcm_s16le', // Re-encode instead of copy to ensure clean timestamps
+            '-ar',
+            AUDIO_SAMPLE_RATE.toString(),
+            '-ac',
+            '1',
             '-y',
             outputAudioPath,
         ]
 
         console.log(
-            `🔇 Concatenating with demuxer (stream copy - no re-encoding)`,
+            `🔇 Concatenating with demuxer (re-encoding for clean timestamps)`,
         )
         await this.runFFmpeg(concatArgs)
 
