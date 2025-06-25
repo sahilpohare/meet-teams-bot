@@ -550,7 +550,6 @@ export class ScreenRecorder extends EventEmitter {
         console.log(`   recordingStartTime: ${this.recordingStartTime}`)
         console.log(`   FLASH_SCREEN_SLEEP_TIME: ${FLASH_SCREEN_SLEEP_TIME}`)
         console.log(`   Time diff: ${(this.meetingStartTime - this.recordingStartTime - FLASH_SCREEN_SLEEP_TIME) / 1000}s`)
-        console.log(`📊 Video trim point: ${calcOffsetVideo.toFixed(3)}s`)
         console.log(`📊 Audio trim point: ${calcOffsetAudio.toFixed(3)}s`)
 
         // Safety check for unreasonable values
@@ -566,8 +565,8 @@ export class ScreenRecorder extends EventEmitter {
             console.log(`✅ Using safe audio offset: ${safeOffsetAudio}s`)
         }
 
-        // 3. Calculate audio padding needed (if video starts before audio)
-        const audioPadding = Math.max(0, syncResult.videoTimestamp - syncResult.audioTimestamp)
+        // 3. Calculate audio padding needed (can be negative for trimming)
+        const audioPadding = syncResult.videoTimestamp - syncResult.audioTimestamp
         
         console.log(`🔇 Audio padding needed: ${audioPadding.toFixed(3)}s`)
         
@@ -577,8 +576,8 @@ export class ScreenRecorder extends EventEmitter {
             console.log(`🔇 Adding ${audioPadding.toFixed(3)}s silence to audio start (video ahead)...`)
             await this.addSilencePadding(rawAudioPath, processedAudioPath, audioPadding)
         } else if (audioPadding < 0) {
-            console.log(`✂️ Trimming ${(audioPadding* -1).toFixed(3)}s from audio start (video behind)...`)
-            await this.trimAudioStart(rawAudioPath, processedAudioPath, (audioPadding* -1))
+            console.log(`✂️ Trimming ${(audioPadding * -1).toFixed(3)}s from audio start (video behind)...`)
+            await this.trimAudioStart(rawAudioPath, processedAudioPath, (audioPadding * -1))
         } else {
             // No padding or trimming needed, just copy
             fs.copyFileSync(rawAudioPath, processedAudioPath)
@@ -791,7 +790,7 @@ file '${absoluteInputPath}'`
             outputPath,
         ]
 
-        console.log(`✂️ Final trim: re-encoding ${duration.toFixed(2)}s from ${adjustedOffset.toFixed(3)}s (ultrafast, no freeze guaranteed)`)
+        console.log(`✂️ Final trim: re-encoding ${duration.toFixed(2)}s from ${adjustedOffset.toFixed(3)}s (ultrafast)`)
         await this.runFFmpeg(args)
     }
 
