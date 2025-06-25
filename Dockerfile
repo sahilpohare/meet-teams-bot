@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y \
     # Virtual display and audio
     xvfb x11vnc x11-utils pulseaudio pulseaudio-utils unclutter \
     # Media processing
-    ffmpeg imagemagick alsa-utils \
+    ffmpeg \
     # Utilities
     curl unzip \
     && rm -rf /var/lib/apt/lists/*
