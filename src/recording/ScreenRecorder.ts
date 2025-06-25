@@ -71,6 +71,9 @@ export class ScreenRecorder extends EventEmitter {
         this.generateOutputPaths()
 
         try {
+            // Wait for audio devices to be ready before starting FFmpeg
+            await this.waitForAudioDevices()
+
             const ffmpegArgs = this.buildNativeFFmpegArgs()
 
             this.ffmpegProcess = spawn('ffmpeg', ffmpegArgs, {
@@ -97,6 +100,68 @@ export class ScreenRecorder extends EventEmitter {
             this.emit('error', { type: 'startError', error })
             throw error
         }
+    }
+
+    private async waitForAudioDevices(): Promise<void> {
+        const maxAttempts = 15
+        const delayMs = 1000
+
+        console.log('🔍 Waiting for audio devices to be ready...')
+
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                // Check if virtual_speaker.monitor exists
+                const { spawn } = await import('child_process')
+                const checkProcess = spawn('pactl', ['list', 'sources', 'short'])
+                
+                let output = ''
+                checkProcess.stdout?.on('data', (data) => {
+                    output += data.toString()
+                })
+
+                const exitCode = await new Promise<number>((resolve) => {
+                    checkProcess.on('close', resolve)
+                })
+
+                if (exitCode === 0 && output.includes('virtual_speaker.monitor')) {
+                    console.log(`✅ Audio device ready after ${attempt} attempt(s)`)
+                    return
+                }
+
+                console.log(`⏳ Attempt ${attempt}/${maxAttempts}: audio device not ready, waiting ${delayMs}ms...`)
+                await sleep(delayMs)
+
+            } catch (error) {
+                console.warn(`⚠️ Attempt ${attempt}/${maxAttempts}: Error checking audio device:`, error)
+                await sleep(delayMs)
+            }
+        }
+
+        // If we get here, devices are still not ready - try a quick FFmpeg test
+        console.warn(`⚠️ Audio devices not confirmed ready after ${maxAttempts} attempts, testing with FFmpeg...`)
+        
+        try {
+            const testProcess = spawn('ffmpeg', [
+                '-f', 'pulse',
+                '-i', 'virtual_speaker.monitor',
+                '-t', '0.1',
+                '-f', 'null',
+                '-'
+            ])
+
+            const testExitCode = await new Promise<number>((resolve) => {
+                testProcess.on('close', resolve)
+            })
+
+            if (testExitCode === 0) {
+                console.log('✅ FFmpeg audio test successful - devices are ready')
+                return
+            }
+        } catch (error) {
+            console.error('❌ FFmpeg audio test failed:', error)
+        }
+
+        throw new Error('Audio devices not ready after maximum wait time - virtual_speaker.monitor unavailable')
     }
 
     private buildNativeFFmpegArgs(): string[] {
