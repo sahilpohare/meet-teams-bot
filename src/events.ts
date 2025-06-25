@@ -1,5 +1,4 @@
 import axios from 'axios'
-import { MeetingParams } from './types'
 import { GLOBAL } from './singleton'
 
 export class Events {
@@ -59,6 +58,10 @@ export class Events {
 
     static async botRemoved() {
         return Events.EVENTS?.sendOnce('bot_removed')
+    }
+
+    static async botRemovedTooEarly() {
+        return Events.EVENTS?.sendOnce('bot_removed_too_early')
     }
 
     static async waitingRoomTimeout() {

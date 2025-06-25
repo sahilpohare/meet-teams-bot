@@ -86,6 +86,9 @@ export class ErrorState extends BaseState {
                         case JoinErrorCode.BotRemoved:
                             await Events.botRemoved()
                             break
+                        case JoinErrorCode.BotRemovedTooEarly:
+                            await Events.botRemovedTooEarly()
+                            break
                         case JoinErrorCode.TimeoutWaitingToStart:
                             await Events.waitingRoomTimeout()
                             break

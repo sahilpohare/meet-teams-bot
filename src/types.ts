@@ -144,6 +144,7 @@ export enum JoinErrorCode {
     CannotJoinMeeting = 'CannotJoinMeeting',
     BotNotAccepted = 'BotNotAccepted',
     BotRemoved = 'BotRemoved',
+    BotRemovedTooEarly = 'BotRemovedTooEarly',
     ApiRequest = 'ApiRequest',
     TimeoutWaitingToStart = 'TimeoutWaitingToStart',
     Internal = 'InternalError classic',

@@ -6,6 +6,7 @@ import { Streaming } from '../streaming'
 
 import { Page } from 'playwright'
 import { GLOBAL } from '../singleton'
+import { JoinError, JoinErrorCode } from '../types'
 import { calculateVideoOffset } from '../utils/CalculVideoOffset'
 import { PathManager } from '../utils/PathManager'
 import { S3Uploader } from '../utils/S3Uploader'
@@ -476,17 +477,23 @@ export class ScreenRecorder extends EventEmitter {
     private async handleSuccessfulRecording(): Promise<void> {
         console.log('Native recording completed')
 
-        // Sync and merge separate audio/video files
-        await this.syncAndMergeFiles()
+        try {
+            // Sync and merge separate audio/video files
+            await this.syncAndMergeFiles()
 
-        // Auto-upload if not serverless and wait for completion
-        if (!GLOBAL.isServerless()) {
-            try {
-                await this.uploadToS3()
-                console.log('✅ Upload completed successfully')
-            } catch (error) {
-                console.error('❌ Upload failed:', error)
+            // Auto-upload if not serverless and wait for completion
+            if (!GLOBAL.isServerless()) {
+                try {
+                    await this.uploadToS3()
+                    console.log('✅ Upload completed successfully')
+                } catch (error) {
+                    console.error('❌ Upload failed:', error)
+                }
             }
+        } catch (error) {
+            console.error('❌ Error during recording processing:', error)
+            // Emit the error so the state machine can handle it
+            this.emit('error', error)
         }
     }
 
@@ -528,21 +535,19 @@ export class ScreenRecorder extends EventEmitter {
         console.log(
             `🎯 Calculated sync offset: ${syncResult.offsetSeconds.toFixed(3)}s`,
         )
+        const hasMeetingStartTime = this.meetingStartTime > 0
 
-        // 2. Calculate final trim points
-        const calcOffsetVideo =
-            syncResult.videoTimestamp +
-            (this.meetingStartTime -
-                this.recordingStartTime -
-                FLASH_SCREEN_SLEEP_TIME) /
-                1000
-        const calcOffsetAudio =
-            syncResult.audioTimestamp +
-            (this.meetingStartTime -
-                this.recordingStartTime -
-                FLASH_SCREEN_SLEEP_TIME) /
-                1000
+        // 2. Check if meetingStartTime is properly set - if not, bot was removed too early
 
+        if (!hasMeetingStartTime) {
+            console.error(`❌ Bot removed too early - meetingStartTime not set (${this.meetingStartTime})`)
+            throw new JoinError(JoinErrorCode.BotRemovedTooEarly)
+        }
+
+        // 3. Calculate final trim points using meeting timing
+        const calcOffsetVideo = syncResult.videoTimestamp + 
+            (this.meetingStartTime - this.recordingStartTime - FLASH_SCREEN_SLEEP_TIME) / 1000
+            
         console.log(`📊 Debug values:`)
         console.log(`   syncResult.videoTimestamp: ${syncResult.videoTimestamp}s`)
         console.log(`   syncResult.audioTimestamp: ${syncResult.audioTimestamp}s`)
@@ -550,27 +555,14 @@ export class ScreenRecorder extends EventEmitter {
         console.log(`   recordingStartTime: ${this.recordingStartTime}`)
         console.log(`   FLASH_SCREEN_SLEEP_TIME: ${FLASH_SCREEN_SLEEP_TIME}`)
         console.log(`   Time diff: ${(this.meetingStartTime - this.recordingStartTime - FLASH_SCREEN_SLEEP_TIME) / 1000}s`)
-        console.log(`📊 Audio trim point: ${calcOffsetAudio.toFixed(3)}s`)
 
-        // Safety check for unreasonable values
-        if (calcOffsetVideo < 0 || calcOffsetVideo > 86400) { // 0s to 24h
-            console.error(`❌ Invalid calcOffsetVideo: ${calcOffsetVideo}s - using syncResult.videoTimestamp instead`)
-            const safeOffsetVideo = Math.max(0, syncResult.videoTimestamp)
-            console.log(`✅ Using safe video offset: ${safeOffsetVideo}s`)
-        }
 
-        if (calcOffsetAudio < 0 || calcOffsetAudio > 86400) { // 0s to 24h  
-            console.error(`❌ Invalid calcOffsetAudio: ${calcOffsetAudio}s - using syncResult.audioTimestamp instead`)
-            const safeOffsetAudio = Math.max(0, syncResult.audioTimestamp)
-            console.log(`✅ Using safe audio offset: ${safeOffsetAudio}s`)
-        }
-
-        // 3. Calculate audio padding needed (can be negative for trimming)
+        // 4. Calculate audio padding needed (can be negative for trimming)
         const audioPadding = syncResult.videoTimestamp - syncResult.audioTimestamp
         
         console.log(`🔇 Audio padding needed: ${audioPadding.toFixed(3)}s`)
         
-        // 4. Prepare audio with padding or trimming if needed
+        // 5. Prepare audio with padding or trimming if needed
         const processedAudioPath = path.join(tempDir, 'processed.wav')
         if (audioPadding > 0) {
             console.log(`🔇 Adding ${audioPadding.toFixed(3)}s silence to audio start (video ahead)...`)
@@ -583,7 +575,7 @@ export class ScreenRecorder extends EventEmitter {
             fs.copyFileSync(rawAudioPath, processedAudioPath)
         }
 
-        // 5. Merge video and audio (both files are now synchronized from start)
+        // 6. Merge video and audio (both files are now synchronized from start)
         const mergedPath = path.join(tempDir, 'merged.mp4')
         await this.mergeWithSync(
             rawVideoPath,
@@ -591,14 +583,11 @@ export class ScreenRecorder extends EventEmitter {
             mergedPath
         )
 
-        // 6. Final trim to remove content before the actual start and after the end
         const videoDuration = await this.getDuration(rawVideoPath)
         const audioDuration = await this.getDuration(processedAudioPath)
         const finalDuration = Math.min(videoDuration - calcOffsetVideo, audioDuration)
         
         console.log(`📊 Final duration: ${finalDuration.toFixed(2)}s`)
-        
-        // Trim from calcOffsetVideo to remove the pre-meeting content
         await this.finalTrimFromOffset(mergedPath, this.outputPath, calcOffsetVideo, finalDuration)
 
         // 7. Extract audio from the final trimmed video (ensures perfect sync)
