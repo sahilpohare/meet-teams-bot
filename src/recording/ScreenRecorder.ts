@@ -18,7 +18,7 @@ const GRACE_PERIOD_SECONDS = 3
 const STREAMING_SAMPLE_RATE = 24_000
 const AUDIO_SAMPLE_RATE = 44_100 // Improved audio quality
 const AUDIO_BITRATE = '192k' // Improved audio bitrate
-const FLASH_SCREEN_SLEEP_TIME = 4200
+const FLASH_SCREEN_SLEEP_TIME = 6000 // Increased from 4200 for better stability in prod
 const SCREENSHOT_PERIOD = 5 // every 5 seconds instead of 2
 const SCREENSHOT_WIDTH = 640 // reduced from 1280
 const SCREENSHOT_HEIGHT = 360 // reduced from 720
@@ -87,7 +87,11 @@ export class ScreenRecorder extends EventEmitter {
             this.setupStreamingAudio()
 
             await sleep(FLASH_SCREEN_SLEEP_TIME)
-            await generateSyncSignal(page)
+            await generateSyncSignal(page, {
+                duration: 800,     // Much longer signal for reliable detection
+                frequency: 1000,   // Keep 1000Hz for consistency
+                volume: 0.95       // Higher volume for better detection
+            })
 
             console.log('Native recording started successfully')
             this.emit('started', {
@@ -835,9 +839,11 @@ file '${absoluteInputPath}'`
             '-c:v',
             'copy',
             '-c:a',
-            'aac',
-            '-b:a',
-            AUDIO_BITRATE,
+            'pcm_s16le', // Keep audio as PCM to avoid AAC encoding delays
+            '-ar',
+            AUDIO_SAMPLE_RATE.toString(),
+            '-ac',
+            '1',
             '-shortest',
             '-avoid_negative_ts',
             'make_zero',
@@ -845,7 +851,7 @@ file '${absoluteInputPath}'`
             outputPath,
         ]
 
-        console.log(`🎬 Merging video and synchronized audio`)
+        console.log(`🎬 Merging video and audio (keeping audio as PCM to avoid encoding delays)`)
         await this.runFFmpeg(args)
     }
 
@@ -873,16 +879,13 @@ file '${absoluteInputPath}'`
         calcOffset: number,
         duration: number,
     ): Promise<void> {
-        // Get the actual video start time to compensate for timestamp offset
-        const videoStartTime = await this.getVideoStartTime(inputPath)
-        const adjustedOffset = calcOffset + videoStartTime
-
-        // Simple solution: re-encode the entire trim with ultrafast for frame-perfect cutting
+        // Use calcOffset directly - no need for videoStartTime compensation 
+        // since audio and video are already synchronized after merge
         const args = [
             '-i',
             inputPath,
             '-ss',
-            adjustedOffset.toString(),
+            calcOffset.toString(),
             '-t',
             duration.toString(),
             '-c:v',
@@ -904,7 +907,7 @@ file '${absoluteInputPath}'`
         ]
 
         console.log(
-            `✂️ Final trim: re-encoding ${duration.toFixed(2)}s from ${adjustedOffset.toFixed(3)}s (ultrafast)`,
+            `✂️ Final trim: re-encoding ${duration.toFixed(2)}s from ${calcOffset.toFixed(3)}s (ultrafast, no timestamp compensation)`,
         )
         await this.runFFmpeg(args)
     }
