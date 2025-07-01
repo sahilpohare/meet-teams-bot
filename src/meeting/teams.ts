@@ -572,8 +572,8 @@ async function isRemovedFromTheMeeting(page: Page): Promise<boolean> {
         )
         const buttonExists = (await raiseButton.count()) > 0
 
-        console.log('raiseButton', JSON.stringify(raiseButton))
-        console.log('buttonExists', JSON.stringify(buttonExists))
+        // console.log('raiseButton', JSON.stringify(raiseButton))
+        // console.log('buttonExists', JSON.stringify(buttonExists))
         if (!buttonExists) {
             console.log('no raise button found, Bot removed from the meeting')
             return true
