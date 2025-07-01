@@ -73,7 +73,6 @@ export class InitializationState extends BaseState {
                 // Définir le type de retour attendu de openBrowser
                 type BrowserResult = {
                     browser: any
-                    backgroundPage: any
                 }
 
                 // Augmenter le timeout pour les environnements plus lents
