@@ -197,28 +197,69 @@ async function detectAudioBeep(audioPath: string): Promise<number> {
 }
 
 /**
- * Detect green flash in video file using FFmpeg frame analysis
+ * Detect green flash in video file using color analysis
+ * Much more reliable than scene detection for the specific green flash
  */
 async function detectVideoFlash(videoPath: string): Promise<number> {
     console.log(
-        `💡 Detecting green flash in video (first ${ANALYSIS_WINDOW}s)...`,
+        `💚 Detecting green flash using color analysis (first ${ANALYSIS_WINDOW}s)...`,
     )
 
     try {
-        // Method 1: Use scene detection to find significant frame changes
-        const sceneCmd = `ffmpeg -i "${videoPath}" -vf "select='gt(scene,0.05)',showinfo" -f null -t ${ANALYSIS_WINDOW} - 2>&1 | grep "pts_time"`
+        // Use scene detection but filter by color characteristics
+        const sceneColorCmd = `ffmpeg -i "${videoPath}" -vf "select='gt(scene,0.02)',showinfo" -vsync 0 -f null -t ${ANALYSIS_WINDOW} - 2>&1 | grep -E "(pts_time|mean:)"`
 
         try {
+            const { stdout: sceneColorOutput } = await execAsync(sceneColorCmd)
+            const lines = sceneColorOutput.split('\n')
+            
+            let currentTime = 0
+            let currentMean = ''
+            
+            for (const line of lines) {
+                const timeMatch = line.match(/pts_time:([0-9.]+)/)
+                const meanMatch = line.match(/mean:\[([0-9. ]+)\]/)
+                
+                if (timeMatch) {
+                    currentTime = parseFloat(timeMatch[1])
+                }
+                if (meanMatch) {
+                    currentMean = meanMatch[1]
+                    
+                    // Parse YUV values: mean:[Y U V]
+                    const values = currentMean.trim().split(/\s+/).map(v => parseFloat(v))
+                    if (values.length >= 3) {
+                        const [Y, U, V] = values
+                        
+                        // Check if this looks like a green flash:
+                        // Y (luminance) should be lower than normal (~140-150 vs ~220)
+                        // U (red chrominance) should be lower than normal (~63 vs ~128)
+                        // V (blue chrominance) should be much lower than normal (~46 vs ~128)
+                        if (Y < 160 && U < 80 && V < 60 && currentTime > 1.0 && currentTime < ANALYSIS_WINDOW) {
+                            console.log(`   Found green flash at ${currentTime.toFixed(3)}s (color analysis)`)
+                            console.log(`   YUV values: [${Y.toFixed(1)} ${U.toFixed(1)} ${V.toFixed(1)}]`)
+                            return currentTime
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            console.log(`   Color analysis failed: ${e instanceof Error ? e.message : 'Unknown error'}`)
+        }
+
+        // Fallback: Use traditional scene detection if color analysis fails
+        try {
+            const sceneCmd = `ffmpeg -i "${videoPath}" -vf "select='gt(scene,0.05)',showinfo" -f null -t ${ANALYSIS_WINDOW} - 2>&1 | grep "pts_time"`
+
             const { stdout: sceneResult } = await execAsync(sceneCmd)
             const lines = sceneResult
                 .split('\n')
                 .filter((line) => line.includes('pts_time'))
 
             console.log(
-                `   Found ${lines.length} scene changes in first ${ANALYSIS_WINDOW}s`,
+                `   Fallback: Found ${lines.length} scene changes in first ${ANALYSIS_WINDOW}s`,
             )
 
-            // Look for the most significant scene change after 0.5s (ignore very early scene changes)
             let bestFlashTime = 0
             let bestSceneValue = 0
 
@@ -230,7 +271,7 @@ async function detectVideoFlash(videoPath: string): Promise<number> {
                     const time = parseFloat(timeMatch[1])
                     const sceneValue = parseFloat(sceneMatch[1])
 
-                    // Ignore very early scene changes (before 0.5s) and look for significant changes
+                    // Look for significant changes after 0.5s
                     if (
                         time > 0.5 &&
                         time < ANALYSIS_WINDOW &&
@@ -244,73 +285,17 @@ async function detectVideoFlash(videoPath: string): Promise<number> {
 
             if (bestFlashTime > 0) {
                 console.log(
-                    `   Found significant scene change (likely flash) at ${bestFlashTime.toFixed(3)}s (scene value: ${bestSceneValue.toFixed(3)})`,
+                    `   Fallback: Found scene change at ${bestFlashTime.toFixed(3)}s (scene value: ${bestSceneValue.toFixed(3)})`,
                 )
                 return bestFlashTime
             }
         } catch (e) {
             console.log(
-                `   Scene detection failed: ${e instanceof Error ? e.message : 'Unknown error'}`,
+                `   Fallback scene detection failed: ${e instanceof Error ? e.message : 'Unknown error'}`,
             )
         }
 
-        // Method 2: Use frame difference analysis with higher threshold
-        try {
-            const frameCmd = `ffmpeg -i "${videoPath}" -vf "select='gt(scene,0.08)',showinfo" -vsync 0 -f null -t ${ANALYSIS_WINDOW} - 2>&1 | grep "pts_time"`
-
-            const { stdout: frameResult } = await execAsync(frameCmd)
-            const frameLines = frameResult
-                .split('\n')
-                .filter((line) => line.includes('pts_time'))
-
-            if (frameLines.length > 0) {
-                // Take the first significant frame change after 0.5s
-                for (const line of frameLines) {
-                    const match = line.match(/pts_time:([0-9.]+)/)
-                    if (match) {
-                        const flashTime = parseFloat(match[1])
-                        if (flashTime > 0.5 && flashTime < ANALYSIS_WINDOW) {
-                            console.log(
-                                `   Found frame change at ${flashTime.toFixed(3)}s (likely flash)`,
-                            )
-                            return flashTime
-                        }
-                    }
-                }
-            }
-        } catch (e) {
-            console.log(
-                `   Frame analysis failed: ${e instanceof Error ? e.message : 'Unknown error'}`,
-            )
-        }
-
-        // Method 3: Look specifically in the 1-4s range where we know the flash is
-        try {
-            const rangeCmd = `ffmpeg -i "${videoPath}" -vf "select='between(t,1,4)*gt(scene,0.03)',showinfo" -vsync 0 -f null - 2>&1 | grep "pts_time"`
-
-            const { stdout: rangeResult } = await execAsync(rangeCmd)
-            const rangeLines = rangeResult
-                .split('\n')
-                .filter((line) => line.includes('pts_time'))
-
-            if (rangeLines.length > 0) {
-                // Take the first frame change in the 1-4s range
-                const match = rangeLines[0].match(/pts_time:([0-9.]+)/)
-                if (match) {
-                    const flashTime = parseFloat(match[1])
-                    console.log(
-                        `   Found frame change in 1-4s range at ${flashTime.toFixed(3)}s (likely flash)`,
-                    )
-                    return flashTime
-                }
-            }
-        } catch (e) {
-            console.log(
-                `   Range analysis failed: ${e instanceof Error ? e.message : 'Unknown error'}`,
-            )
-        }
-
-        console.log(`   No video flash detected in first ${ANALYSIS_WINDOW}s`)
+        console.log(`   No green flash detected in first ${ANALYSIS_WINDOW}s`)
         return 0
     } catch (error) {
         console.warn(`⚠️ Video analysis failed: ${error}`)
@@ -328,4 +313,125 @@ export async function testWithSampleFiles(): Promise<SyncOffset> {
         '/Users/philippedrion/OutOfIcloud/meeting-baas/meeting_bot/recording_server/recordings/test/output.mp4'
 
     return calculateVideoOffset(audioPath, videoPath)
+}
+
+/**
+ * Test function for the specific problematic video file
+ * Uses color-based detection instead of scene detection
+ */
+export async function testGreenFlashDetection(): Promise<SyncOffset> {
+    const videoPath = '/Users/philippedrion/Documents/meeting-baas/meeting_bot/recording_server/recordings/47FED07F-401A-4E78-A810-044F4CE469BA/temp/raw.mp4'
+    
+    console.log('🧪 Testing green flash detection on specific video file...')
+    console.log(`   Video: ${videoPath}`)
+    
+    try {
+        // Use color-based detection instead of scene detection
+        const videoTimestamp = await detectGreenFlashByColor(videoPath)
+        
+        const result: SyncOffset = {
+            audioTimestamp: 0, // Not testing audio
+            videoTimestamp,
+            offsetSeconds: 0,
+            confidence: videoTimestamp > 0 ? 0.95 : 0.1,
+        }
+        
+        console.log(`✅ Green flash detection result:`)
+        console.log(`   Video flash at: ${videoTimestamp.toFixed(3)}s`)
+        console.log(`   Confidence: ${(result.confidence * 100).toFixed(1)}%`)
+        
+        return result
+    } catch (error) {
+        console.error('❌ Green flash detection failed:', error)
+        return {
+            audioTimestamp: 0,
+            videoTimestamp: 0,
+            offsetSeconds: 0,
+            confidence: 0.05,
+        }
+    }
+}
+
+/**
+ * Detect green flash using color analysis instead of scene detection
+ * Looks for frames with specific YUV color characteristics of the green flash
+ */
+async function detectGreenFlashByColor(videoPath: string): Promise<number> {
+    console.log(`💚 Detecting green flash using color analysis (first ${ANALYSIS_WINDOW}s)...`)
+
+    try {
+        // Method 1: Look for frames with low Y (luminance) and low V (blue chrominance)
+        // Green flash has: Y ~140-150, U ~63, V ~46 (vs normal Y ~220, U ~128, V ~128)
+        const colorCmd = `ffmpeg -i "${videoPath}" -vf "select='lt(YAVG,0.6)*lt(VAVG,0.4)',showinfo" -vsync 0 -f null -t ${ANALYSIS_WINDOW} - 2>&1 | grep "pts_time"`
+
+        try {
+            const { stdout: colorOutput } = await execAsync(colorCmd)
+            const lines = colorOutput
+                .split('\n')
+                .filter((line) => line.includes('pts_time'))
+
+            console.log(`   Found ${lines.length} potential green flash frames`)
+
+            // Look for the first significant green flash after 1s
+            for (const line of lines) {
+                const match = line.match(/pts_time:([0-9.]+)/)
+                if (match) {
+                    const time = parseFloat(match[1])
+                    if (time > 1.0 && time < ANALYSIS_WINDOW) {
+                        console.log(`   Found green flash at ${time.toFixed(3)}s (color-based detection)`)
+                        return time
+                    }
+                }
+            }
+        } catch (e) {
+            console.log(`   Color detection failed: ${e instanceof Error ? e.message : 'Unknown error'}`)
+        }
+
+        // Method 2: Use scene detection but filter by color characteristics
+        const sceneColorCmd = `ffmpeg -i "${videoPath}" -vf "select='gt(scene,0.02)',showinfo" -vsync 0 -f null -t ${ANALYSIS_WINDOW} - 2>&1 | grep -E "(pts_time|mean:)"`
+
+        try {
+            const { stdout: sceneColorOutput } = await execAsync(sceneColorCmd)
+            const lines = sceneColorOutput.split('\n')
+            
+            let currentTime = 0
+            let currentMean = ''
+            
+            for (const line of lines) {
+                const timeMatch = line.match(/pts_time:([0-9.]+)/)
+                const meanMatch = line.match(/mean:\[([0-9. ]+)\]/)
+                
+                if (timeMatch) {
+                    currentTime = parseFloat(timeMatch[1])
+                }
+                if (meanMatch) {
+                    currentMean = meanMatch[1]
+                    
+                    // Parse YUV values: mean:[Y U V]
+                    const values = currentMean.trim().split(/\s+/).map(v => parseFloat(v))
+                    if (values.length >= 3) {
+                        const [Y, U, V] = values
+                        
+                        // Check if this looks like a green flash:
+                        // Y (luminance) should be lower than normal (~140-150 vs ~220)
+                        // U (red chrominance) should be lower than normal (~63 vs ~128)
+                        // V (blue chrominance) should be much lower than normal (~46 vs ~128)
+                        if (Y < 160 && U < 80 && V < 60 && currentTime > 1.0 && currentTime < ANALYSIS_WINDOW) {
+                            console.log(`   Found green flash at ${currentTime.toFixed(3)}s (scene+color analysis)`)
+                            console.log(`   YUV values: [${Y.toFixed(1)} ${U.toFixed(1)} ${V.toFixed(1)}]`)
+                            return currentTime
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            console.log(`   Scene+color analysis failed: ${e instanceof Error ? e.message : 'Unknown error'}`)
+        }
+
+        console.log(`   No green flash detected in first ${ANALYSIS_WINDOW}s`)
+        return 0
+    } catch (error) {
+        console.warn(`⚠️ Green flash color analysis failed: ${error}`)
+        return 0
+    }
 }

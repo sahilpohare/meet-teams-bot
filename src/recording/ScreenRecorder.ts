@@ -839,11 +839,9 @@ file '${absoluteInputPath}'`
             '-c:v',
             'copy',
             '-c:a',
-            'pcm_s16le', // Keep audio as PCM to avoid AAC encoding delays
-            '-ar',
-            AUDIO_SAMPLE_RATE.toString(),
-            '-ac',
-            '1',
+            'aac', // Convert to AAC during merge to avoid re-encoding later
+            '-b:a',
+            AUDIO_BITRATE,
             '-shortest',
             '-avoid_negative_ts',
             'make_zero',
@@ -851,7 +849,7 @@ file '${absoluteInputPath}'`
             outputPath,
         ]
 
-        console.log(`🎬 Merging video and audio (keeping audio as PCM to avoid encoding delays)`)
+        console.log(`🎬 Merging video and audio (converting audio to AAC during merge)`)
         await this.runFFmpeg(args)
     }
 
@@ -889,15 +887,9 @@ file '${absoluteInputPath}'`
             '-t',
             duration.toString(),
             '-c:v',
-            'libx264',
-            '-preset',
-            'ultrafast',
-            '-crf',
-            '18',
+            'copy', // Copy video stream without re-encoding for speed
             '-c:a',
-            'aac',
-            '-b:a',
-            AUDIO_BITRATE,
+            'copy', // Copy audio stream without re-encoding since it's already AAC
             '-movflags',
             '+faststart',
             '-avoid_negative_ts',
@@ -907,7 +899,7 @@ file '${absoluteInputPath}'`
         ]
 
         console.log(
-            `✂️ Final trim: re-encoding ${duration.toFixed(2)}s from ${calcOffset.toFixed(3)}s (ultrafast, no timestamp compensation)`,
+            `✂️ Final trim: copying video + copying audio ${duration.toFixed(2)}s from ${calcOffset.toFixed(3)}s (ultra-fast copy mode)`,
         )
         await this.runFFmpeg(args)
     }
