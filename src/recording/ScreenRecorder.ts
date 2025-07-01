@@ -20,8 +20,8 @@ const AUDIO_SAMPLE_RATE = 44_100 // Improved audio quality
 const AUDIO_BITRATE = '192k' // Improved audio bitrate
 const FLASH_SCREEN_SLEEP_TIME = 6000 // Increased from 4200 for better stability in prod
 const SCREENSHOT_PERIOD = 5 // every 5 seconds instead of 2
-const SCREENSHOT_WIDTH = 640 // reduced from 1280
-const SCREENSHOT_HEIGHT = 360 // reduced from 720
+const SCREENSHOT_WIDTH = 480 // reduced for smaller file size
+const SCREENSHOT_HEIGHT = 270 // reduced for smaller file size (16:9 ratio)
 interface ScreenRecordingConfig {
     display: string
     audioDevice?: string
@@ -224,7 +224,7 @@ export class ScreenRecorder extends EventEmitter {
                 '-map',
                 '1:v:0',
                 '-vf',
-                `fps=${1 / SCREENSHOT_PERIOD},crop=${SCREENSHOT_WIDTH}:${SCREENSHOT_HEIGHT}:0:160,scale=${SCREENSHOT_WIDTH}:${SCREENSHOT_HEIGHT}`,
+                `fps=${1 / SCREENSHOT_PERIOD},crop=1280:720:0:160,scale=${SCREENSHOT_WIDTH}:${SCREENSHOT_HEIGHT}`,
                 '-q:v',
                 '3', // High quality JPEG compression
                 '-f',
@@ -317,7 +317,7 @@ export class ScreenRecorder extends EventEmitter {
                 '-map',
                 '0:v:0',
                 '-vf',
-                `fps=${1 / SCREENSHOT_PERIOD},crop=${SCREENSHOT_WIDTH}:${SCREENSHOT_HEIGHT}:0:160,scale=${SCREENSHOT_WIDTH}:${SCREENSHOT_HEIGHT}`,
+                `fps=${1 / SCREENSHOT_PERIOD},crop=1280:720:0:160,scale=${SCREENSHOT_WIDTH}:${SCREENSHOT_HEIGHT}`,
                 '-q:v',
                 '3', // High quality JPEG compression
                 '-f',
