@@ -1,32 +1,10 @@
 import { BrowserContext, chromium, Page } from '@playwright/test'
 
-type Resolution = {
-    width: number
-    height: number
-}
-
-const P480: Resolution = {
-    width: 854,
-    height: 480,
-}
-
-const P720: Resolution = {
-    width: 1280,
-    height: 720,
-}
-
-var RESOLUTION: Resolution = P720
-
 export async function openBrowser(
-    lowResolution: boolean,
     slowMo: boolean = false,
-): Promise<{ browser: BrowserContext}> {
-    if (lowResolution) {
-        RESOLUTION = P480
-    }
-
-    const width = RESOLUTION.width
-    const height = RESOLUTION.height
+): Promise<{ browser: BrowserContext }> {
+    const width = 1280 // 640
+    const height = 720 // 480
 
     try {
         console.log('Launching persistent context with exact extension args...')
@@ -35,17 +13,15 @@ export async function openBrowser(
             headless: false,
             viewport: { width, height },
             args: [
-                // Security configurations
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
-
-                // WebRTC optimizations (required for meeting audio/video capture)
                 '--no-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
                 '--disable-rtc-smoothness-algorithm',
                 '--disable-webrtc-hw-decoding',
                 '--disable-webrtc-hw-encoding',
                 '--disable-blink-features=AutomationControlled',
-                '--disable-setuid-sandbox',
                 '--autoplay-policy=no-user-gesture-required',
                 '--disable-background-timer-throttling',
                 '--enable-features=SharedArrayBuffer',
@@ -55,24 +31,16 @@ export async function openBrowser(
                 '--disable-features=TrustedScriptTypes',
                 '--disable-features=TrustedHTML',
                 '--use-fake-device-for-media-stream',
-                // `--use-file-for-fake-video-capture=${botCameraDevice}`,
             ],
             slowMo: slowMo ? 100 : undefined,
             permissions: ['microphone', 'camera'],
             ignoreHTTPSErrors: true,
             acceptDownloads: true,
             bypassCSP: true,
-            timeout: 120000, // 2 minutes
+            timeout: 120000,
         })
 
-        console.log('Creating main page for meeting interaction...')
-
-        // Create a main page for meeting interaction
-        const mainPage = await context.newPage()
-
-        console.log('Browser launched successfully')
-
-        return { browser: context}
+        return { browser: context }
     } catch (error) {
         console.error('Failed to open browser:', error)
         throw error
