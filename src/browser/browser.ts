@@ -1,4 +1,4 @@
-import { BrowserContext, chromium, Page } from '@playwright/test'
+import { BrowserContext, chromium } from '@playwright/test'
 
 export async function openBrowser(
     slowMo: boolean = false,
@@ -13,24 +13,38 @@ export async function openBrowser(
             headless: false,
             viewport: { width, height },
             args: [
+                // Security configurations
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
-                '--no-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-gpu',
+                
+                // WebRTC optimizations (required for meeting audio/video capture)
                 '--disable-rtc-smoothness-algorithm',
                 '--disable-webrtc-hw-decoding',
                 '--disable-webrtc-hw-encoding',
-                '--disable-blink-features=AutomationControlled',
                 '--autoplay-policy=no-user-gesture-required',
+                
+                // Performance and resource management optimizations
+                '--disable-blink-features=AutomationControlled',
                 '--disable-background-timer-throttling',
                 '--enable-features=SharedArrayBuffer',
+                '--memory-pressure-off',              // Disable memory pressure handling for consistent performance
+                '--max_old_space_size=4096',          // Increase V8 heap size to 4GB for large meetings
+                '--disable-background-networking',    // Reduce background network activity
+                '--disable-features=TranslateUI',     // Disable translation features to save resources
+                '--disable-features=AutofillServerCommunication', // Disable autofill to reduce network usage
+                '--disable-component-extensions-with-background-pages', // Reduce background extension overhead
+                '--disable-default-apps',             // Disable default Chrome apps
+                '--renderer-process-limit=4',         // Limit renderer processes to prevent resource exhaustion
+                '--disable-ipc-flooding-protection',  // Improve IPC performance for high-frequency operations
+                '--aggressive-cache-discard',         // Enable aggressive cache management for memory efficiency
+                '--disable-features=MediaRouter',     // Disable media router for reduced overhead
+                
+                // Certificate and security optimizations for meeting platforms
                 '--ignore-certificate-errors',
                 '--allow-insecure-localhost',
                 '--disable-blink-features=TrustedDOMTypes',
                 '--disable-features=TrustedScriptTypes',
                 '--disable-features=TrustedHTML',
-                '--use-fake-device-for-media-stream',
             ],
             slowMo: slowMo ? 100 : undefined,
             permissions: ['microphone', 'camera'],

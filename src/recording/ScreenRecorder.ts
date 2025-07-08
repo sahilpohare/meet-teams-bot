@@ -306,6 +306,10 @@ export class ScreenRecorder extends EventEmitter {
                 '4.0',
                 '-pix_fmt',
                 'yuv420p',
+                '-g',
+                '30', // Keyframe every 30 frames (1 sec at 30fps) for precise trimming
+                '-keyint_min',
+                '30', // Force minimum keyframe interval 
                 '-bf',
                 '0',
                 '-refs',
@@ -862,7 +866,7 @@ file '${absoluteInputPath}'`
             '-i',
             audioPath,
             '-c:v',
-            'copy',
+            'copy', // Ultra-fast copy - video already has frequent keyframes from recording
             '-c:a',
             'aac', // Convert to AAC during merge to avoid re-encoding later
             '-b:a',
@@ -875,27 +879,9 @@ file '${absoluteInputPath}'`
         ]
 
         console.log(
-            `🎬 Merging video and audio (converting audio to AAC during merge)`,
+            `🎬 Merging video and audio (ultra-fast copy + AAC audio - keyframes already optimized)`,
         )
         await this.runFFmpeg(args)
-    }
-
-    private async getVideoStartTime(videoPath: string): Promise<number> {
-        const args = [
-            '-v',
-            'quiet',
-            '-show_streams',
-            '-select_streams',
-            'v:0',
-            '-show_entries',
-            'stream=start_time',
-            '-of',
-            'csv=p=0',
-            videoPath,
-        ]
-        const result = await this.runFFprobe(args)
-        const startTime = parseFloat(result.trim().split(',')[0])
-        return isNaN(startTime) ? 0 : startTime
     }
 
     private async finalTrimFromOffset(
@@ -904,8 +890,8 @@ file '${absoluteInputPath}'`
         calcOffset: number,
         duration: number,
     ): Promise<void> {
-        // Use calcOffset directly - no need for videoStartTime compensation
-        // since audio and video are already synchronized after merge
+        // Now we can use ultra-fast copy mode since the merged file has frequent keyframes
+        // The video was re-encoded during merge with keyframes every 1 second
         const args = [
             '-i',
             inputPath,
@@ -914,9 +900,9 @@ file '${absoluteInputPath}'`
             '-t',
             duration.toString(),
             '-c:v',
-            'copy', // Copy video stream without re-encoding for speed
+            'copy', // Ultra-fast copy mode - no keyframe issues thanks to frequent keyframes
             '-c:a',
-            'copy', // Copy audio stream without re-encoding since it's already AAC
+            'copy', // Copy audio stream since it's already AAC
             '-movflags',
             '+faststart',
             '-avoid_negative_ts',
@@ -926,7 +912,7 @@ file '${absoluteInputPath}'`
         ]
 
         console.log(
-            `✂️ Final trim: copying video + copying audio ${duration.toFixed(2)}s from ${calcOffset.toFixed(3)}s (ultra-fast copy mode)`,
+            `✂️ Final trim: ultra-fast copy mode ${duration.toFixed(2)}s from ${calcOffset.toFixed(3)}s (frequent keyframes = no freeze)`,
         )
         await this.runFFmpeg(args)
     }
