@@ -12,6 +12,7 @@ export async function openBrowser(
         const context = await chromium.launchPersistentContext('', {
             headless: false,
             viewport: { width, height },
+            executablePath: '/usr/bin/chromium-browser',
             args: [
                 // Security configurations
                 '--no-sandbox',
