@@ -27,7 +27,10 @@ RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
-RUN npx playwright install --with-deps chromium
+
+# Install Playwright's Chromium + create symlink for browser.ts compatibility
+RUN npx playwright install chromium && \
+    find /root/.cache/ms-playwright -name chrome -type f -executable | head -1 | xargs -I {} ln -sf {} /usr/bin/google-chrome
 
 # Build application
 COPY . .

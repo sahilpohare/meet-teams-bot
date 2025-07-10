@@ -97,6 +97,15 @@ cd ./recordings
 
 * 📘 [Full Developer Guide →](https://docs.meetingbaas.com/)
 
+## Known Limitations
+
+### Video Participants on Teams (Docker)
+
+⚠️ **Current Docker Limitation**: When running the bot in Docker, you may not see video streams of other participants in Microsoft Teams meetings. This is due to browser compatibility (chromium) issues in the containerized environment.
+
+✅ **Production Workaround**: For full video support, deploy the bot on a **real Ubuntu server with Google Chrome** installed. This provides optimal compatibility and performance.
+
+🙋‍♂️ **Community Contribution Welcome**: We'd love a community PR that properly integrates Google Chrome into our Docker image!
 
 ## Dive Deeper
 
