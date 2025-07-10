@@ -20,13 +20,6 @@ export abstract class BaseState {
                 `Setup logger for main page in state ${this.stateType}`,
             )
         }
-
-        if (this.context.backgroundPage) {
-            // listenPage(this.context.backgroundPage);
-            console.info(
-                `Setup logger for background page in state ${this.stateType}`,
-            )
-        }
     }
 
     protected async setupNewPage(page: Page, pageName: string): Promise<void> {
@@ -50,10 +43,6 @@ export abstract class BaseState {
         return this.transition(MeetingStateType.Error)
     }
 
-    /**
-     * Start an observer that watches for dialogs such as "Got it"
-     * and handles them automatically in the background
-     */
     protected startDialogObserver() {
         // Use the global observer instead of creating a local one
         if (this.context.startGlobalDialogObserver) {
@@ -68,9 +57,6 @@ export abstract class BaseState {
         }
     }
 
-    /**
-     * Stop the dialog observer
-     */
     protected stopDialogObserver() {
         // This method is kept for compatibility but no longer does anything
         // The global observer will be stopped at the state machine level

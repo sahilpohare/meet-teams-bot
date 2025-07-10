@@ -1,4 +1,3 @@
-import { LOCAL_RECORDING_SERVER_LOCATION } from './instance'
 import { MeetingParams, MeetingProviderInterface } from './types'
 
 // import { Browser as PuppeteerBrowser, Page as PuppeteerPage } from 'puppeteer'
@@ -10,41 +9,30 @@ import {
     ParticipantState,
     RecordingEndReason,
 } from './state-machine/types'
+import { GLOBAL } from './singleton'
 
 export class MeetingHandle {
     static instance: MeetingHandle = null
     public stateMachine: MeetingStateMachine
-    private param: MeetingParams
     private provider: MeetingProviderInterface
 
-    static init(meetingParams: MeetingParams) {
+    static init() {
         if (MeetingHandle.instance == null) {
-            this.instance = new MeetingHandle(meetingParams)
+            this.instance = new MeetingHandle()
             console.log(
                 '*** INIT MeetingHandle.instance',
-                meetingParams.meeting_url,
+                GLOBAL.get().meeting_url,
             )
         }
     }
 
-    constructor(meetingParams: MeetingParams) {
-        this.param = meetingParams
+    constructor() {
         this.provider =
-            meetingParams.meetingProvider === 'Teams'
+            GLOBAL.get().meetingProvider === 'Teams'
                 ? new TeamsProvider()
                 : new MeetProvider()
-
-        // Configuration initiale
-        this.param.local_recording_server_location =
-            LOCAL_RECORDING_SERVER_LOCATION
-        this.param.recording_mode =
-            this.param.recording_mode === 'gallery_view'
-                ? 'speaker_view'
-                : this.param.recording_mode
-
         // Initialisation de la machine à états
         this.stateMachine = new MeetingStateMachine({
-            params: this.param,
             provider: this.provider,
             meetingHandle: this,
         })
@@ -52,14 +40,6 @@ export class MeetingHandle {
 
     public getStartTime(): number {
         return this.stateMachine.getStartTime()
-    }
-
-    static getUserId(): number | null {
-        return MeetingHandle.instance.param.user_id
-    }
-
-    static getBotId(): string {
-        return MeetingHandle.instance.param.bot_uuid
     }
 
     public getState(): MeetingStateType {
@@ -98,14 +78,6 @@ export class MeetingHandle {
 
     public async stopMeeting(reason: RecordingEndReason): Promise<void> {
         await this.stateMachine.requestStop(reason)
-    }
-
-    public getProvider(): MeetingProviderInterface {
-        return this.provider
-    }
-
-    public getParams(): MeetingParams {
-        return this.param
     }
 
     public wasRecordingSuccessful(): boolean {

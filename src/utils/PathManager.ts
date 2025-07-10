@@ -1,5 +1,6 @@
 import * as fs from 'fs/promises'
 import * as path from 'path'
+import { GLOBAL } from '../singleton'
 
 const EFS_MOUNT_POINT = process.env.EFS_MOUNT_POINT || '/mnt/efs'
 
@@ -11,65 +12,41 @@ export class PathManager {
     private isServerless: boolean
 
     private constructor() {
-        this.environment = process.env.ENVIRON || 'dev'
-        this.isServerless = process.env.SERVERLESS === 'true' || false
-        this.botUuid = null
-        this.secret = null
-        console.log('ENVIRON:', this.environment)
+        let global = GLOBAL.get()
+        this.environment = global.environ
+        this.isServerless = GLOBAL.isServerless()
+        this.botUuid = global.bot_uuid
+        this.secret = global.secret
     }
 
-    public static getInstance(botUuid?: string, secret?: string): PathManager {
+    public static getInstance(): PathManager {
         if (!PathManager.instance) {
             PathManager.instance = new PathManager()
-        }
-        if (botUuid) {
-            PathManager.instance.setBotUuid(botUuid)
-        }
-        if (secret) {
-            PathManager.instance.setSecret(secret)
         }
         return PathManager.instance
     }
 
-    public setBotUuid(botUuid: string): void {
-        this.botUuid = botUuid
-    }
-
-    public setSecret(secret: string): void {
-        this.secret = secret
-    }
-
-    private ensureBotUuid(): void {
-        if (!this.botUuid) {
-            throw new Error(
-                'botUuid must be set before using PathManager methods',
-            )
-        }
-    }
-
-    private ensureSecret(): void {
-        if (!this.secret) {
-            throw new Error(
-                'secret must be set before using PathManager methods',
-            )
-        }
-    }
-
     public async initializePaths(): Promise<void> {
-        const basePath = this.getBasePath()
-        await fs.mkdir(basePath, { recursive: true }).catch((e) => {
-            console.error('Unable to create base directory:', e)
-            throw e
-        })
-    }
+        const paths = [
+            this.getBasePath(),
+            path.dirname(this.getOutputPath()),
+            this.getTempPath(),
+            this.getAudioTmpPath(),
+            this.getScreenshotsPath(),
+        ]
 
-    public getBotUuid(): string {
-        return this.botUuid
+        for (const p of paths) {
+            try {
+                await fs.mkdir(p, { recursive: true })
+                console.log(`Created directory: ${p}`)
+            } catch (error) {
+                console.error(`Failed to create directory ${p}:`, error)
+                throw error
+            }
+        }
     }
 
     public getIdentifier(): string {
-        this.ensureBotUuid()
-        this.ensureSecret()
         return `${this.secret}-${this.botUuid}`
     }
 
@@ -77,27 +54,14 @@ export class PathManager {
         if (this.isServerless) {
             return path.join('./data', this.botUuid)
         }
-        const identifier = this.botUuid
         switch (this.environment) {
             case 'prod':
-                return path.join(EFS_MOUNT_POINT, 'prod', identifier)
+                return path.join(EFS_MOUNT_POINT, 'prod', this.botUuid)
             case 'preprod':
-                return path.join(EFS_MOUNT_POINT, 'preprod', identifier)
+                return path.join(EFS_MOUNT_POINT, 'preprod', this.botUuid)
             default:
-                return path.join('./data', identifier)
+                return path.join('./data', this.botUuid)
         }
-    }
-
-    public getWebmPath(): string {
-        const basePath = path.join(this.getBasePath(), 'temp')
-        const filePath = path.join(basePath, 'output.webm')
-
-        console.log('Generated WebM path:', {
-            basePath,
-            filePath,
-        })
-
-        return filePath
     }
 
     public getOutputPath(): string {
@@ -108,12 +72,8 @@ export class PathManager {
         return path.join(this.getBasePath(), 'audio_tmp')
     }
 
-    public getLogPath(): string {
-        return path.join(this.getBasePath(), 'logs.log')
-    }
-
     public getSpeakerLogPath(): string {
-        return path.join(this.getBasePath(), 'SeparationSpeaker.log')
+        return path.join(this.getBasePath(), 'speaker_separation.log')
     }
 
     public getSoundLogPath(): string {
@@ -124,50 +84,11 @@ export class PathManager {
         return path.join(this.getBasePath(), 'temp')
     }
 
-    public async ensureDirectories(): Promise<void> {
-        const paths = [
-            this.getBasePath(),
-            path.dirname(this.getOutputPath()),
-            this.getTempPath(),
-            this.getAudioTmpPath(),
-        ]
-
-        for (const p of paths) {
-            await fs.mkdir(p, { recursive: true })
-            console.log(`Created directory: ${p}`)
-        }
-    }
-
-    public async moveFile(sourcePath: string, destPath: string): Promise<void> {
-        try {
-            // Ensure the source file exists
-            await fs.access(sourcePath)
-
-            // Create the destination folder if needed
-            await fs.mkdir(path.dirname(destPath), { recursive: true })
-
-            // Remove destination file if it already exists
-            try {
-                await fs.unlink(destPath)
-            } catch (e) {
-                // Ignore if the file does not exist
-            }
-
-            // Move the file
-            await fs.rename(sourcePath, destPath)
-
-            console.log(
-                `File moved successfully from ${sourcePath} to ${destPath}`,
-            )
-        } catch (error) {
-            console.error('Error moving file:', error)
-            throw new Error(`Failed to move file: ${(error as Error).message}`)
-        }
+    public getScreenshotsPath(): string {
+        return path.join(this.getBasePath(), 'screenshots')
     }
 
     public getS3Paths(): { bucketName: string; s3Path: string } {
-        this.ensureBotUuid()
-        this.ensureSecret()
         const identifier = this.getIdentifier()
         return {
             bucketName: process.env.AWS_S3_VIDEO_BUCKET || '',

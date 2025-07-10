@@ -7,6 +7,7 @@ import {
 
 import { getStateInstance } from './states'
 import { MeetingContext } from './types'
+import { GLOBAL } from '../singleton'
 
 export class MeetingStateMachine {
     private currentState: MeetingStateType
@@ -31,9 +32,9 @@ export class MeetingStateMachine {
         // Fonction pour gérer l'observateur de dialogues globalement
         this.context.startGlobalDialogObserver = () => {
             // Only start observer for Google Meet
-            if (this.context.params.meetingProvider !== 'Meet') {
+            if (GLOBAL.get().meetingProvider !== 'Meet') {
                 console.info(
-                    `Global dialog observer not started: provider is not Google Meet (${this.context.params.meetingProvider})`,
+                    `Global dialog observer not started: provider is not Google Meet (${GLOBAL.get().meetingProvider})`,
                 )
                 return
             }
@@ -166,7 +167,6 @@ export class MeetingStateMachine {
             this.context.startGlobalDialogObserver?.()
 
             while (
-                this.currentState !== MeetingStateType.Cleanup &&
                 this.currentState !== MeetingStateType.Terminated &&
                 !this.forceStop
             ) {

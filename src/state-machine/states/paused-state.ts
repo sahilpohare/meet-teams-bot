@@ -1,5 +1,4 @@
 import { Events } from '../../events'
-import { TRANSCODER } from '../../recording/Transcoder'
 
 import { MEETING_CONSTANTS } from '../constants'
 import { MeetingStateType, StateExecuteResult } from '../types'
@@ -68,18 +67,18 @@ export class PausedState extends BaseState {
 
     private async pauseRecording(): Promise<void> {
         const pausePromise = async () => {
-            // Pause the MediaRecorder in the browser
-            await this.context.backgroundPage?.evaluate(() => {
-                const w = window as any
-                return w.pauseMediaRecorder?.()
-            })
+            // TODO: PAUSE SCREEN RECORDER
 
-            // Pause du Transcoder
-            await TRANSCODER.pause()
-
-            // Pause du streaming
+            // Streaming service paused
             if (this.context.streamingService) {
                 this.context.streamingService.pause()
+                console.log('Streaming service paused successfully')
+            }
+
+            // Speakers observation paused
+            if (this.context.speakersObserver) {
+                this.context.speakersObserver.stopObserving()
+                console.log('Speakers observation paused')
             }
 
             console.log('Recording paused successfully')

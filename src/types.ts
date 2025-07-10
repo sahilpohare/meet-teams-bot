@@ -1,13 +1,6 @@
-import { Browser, BrowserContext, Page } from '@playwright/test'
+import { BrowserContext, Page } from '@playwright/test'
 
-export type Meeting = {
-    page: Page
-    backgroundPage: Page
-    browser: Browser
-    meetingTimeoutInterval: NodeJS.Timeout
-}
-
-export type SpeechToTextProvider = 'Default' | 'Gladia' | 'RunPod'
+type SpeechToTextProvider = 'Default' | 'Gladia' | 'RunPod'
 export type RecordingMode = 'speaker_view' | 'gallery_view' | 'audio_only'
 
 export interface MeetingProviderInterface {
@@ -19,14 +12,9 @@ export interface MeetingProviderInterface {
     joinMeeting(
         page: Page,
         cancelCheck: () => boolean,
-        meetingParams: MeetingParams,
         onJoinSuccess: () => void,
     ): Promise<void>
-    findEndMeeting(
-        meetingParams: MeetingParams,
-        page: Page,
-        // cancellationToken: CancellationToken,
-    ): Promise<boolean>
+    findEndMeeting(page: Page): Promise<boolean>
     parseMeetingUrl(
         meeting_url: string,
     ): Promise<{ meetingId: string; password: string }>
@@ -52,8 +40,6 @@ export type MeetingParams = {
     meetingProvider: MeetingProvider
     event?: { id: number }
     agenda?: any
-    bot_branding: boolean
-    has_installed_extension: boolean
     custom_branding_bot_path?: string
     vocabulary: string[]
     force_lang: boolean
@@ -84,38 +70,25 @@ export type MeetingParams = {
         // recording_permission_denied_timeout?: number
     }
     mp4_s3_path: string
+    // ----------------- TODO -------------------- SECTION RAJOUTEE
+    environ: string // local, prod or preprod
+    aws_s3_temporary_audio_bucket: string
+    remote: {
+        s3_args: string[]
+        api_server_baseurl: string
+        aws_s3_video_bucket: string
+        aws_s3_log_bucket: string
+    } | null
+    // -----------------------------------------------------------
     secret: string
     extra?: any
     zoom_sdk_id?: string
     zoom_sdk_pwd?: string
 }
 
-export class CancellationToken {
-    isCancellationRequested: boolean
-    timeInSec: number
-    timeout: NodeJS.Timeout
-    constructor(timeInSec: number) {
-        this.isCancellationRequested = false
-        this.timeInSec = timeInSec
-        this.timeout = setTimeout(() => this.cancel(), this.timeInSec * 1000)
-    }
-    cancel() {
-        this.isCancellationRequested = true
-    }
-    reset() {
-        clearTimeout(this.timeout)
-        this.timeout = setTimeout(() => this.cancel(), this.timeInSec * 1000)
-    }
-}
-
 export type StopRecordParams = {
     meeting_url: string
     user_id: number
-}
-
-export type MessageToBroadcast = {
-    message_type: string
-    data: object
 }
 
 export type SpeakerData = {
@@ -124,17 +97,7 @@ export type SpeakerData = {
     timestamp: number
     isSpeaking: boolean
 }
-
-export interface MessageData {
-    msg: SpeakerData[]
-}
 export type MeetingProvider = 'Meet' | 'Teams' | 'Zoom'
-
-export enum RecordingApprovalState {
-    WAITING = 'WAITING',
-    ENABLE = 'ENABLE',
-    DISABLE = 'DISABLE',
-}
 
 export class JoinError extends Error {
     details?: any
@@ -150,6 +113,7 @@ export enum JoinErrorCode {
     CannotJoinMeeting = 'CannotJoinMeeting',
     BotNotAccepted = 'BotNotAccepted',
     BotRemoved = 'BotRemoved',
+    BotRemovedTooEarly = 'BotRemovedTooEarly',
     ApiRequest = 'ApiRequest',
     TimeoutWaitingToStart = 'TimeoutWaitingToStart',
     Internal = 'InternalError classic',

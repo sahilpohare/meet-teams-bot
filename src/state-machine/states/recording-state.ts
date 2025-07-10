@@ -9,15 +9,14 @@ import {
 } from '../types'
 import { BaseState } from './base-state'
 
-import { TRANSCODER } from '../../recording/Transcoder'
-import { PathManager } from '../../utils/PathManager'
+import { ScreenRecorderManager } from '../../recording/ScreenRecorder'
+import { sleep } from '../../utils/sleep'
 
 // Sound level threshold for considering activity (0-100)
 const SOUND_LEVEL_ACTIVITY_THRESHOLD = 5
 
 export class RecordingState extends BaseState {
     private isProcessing: boolean = true
-    private pathManager: PathManager
     private readonly CHECK_INTERVAL = 250
     private noAttendeesWithSilenceStartTime: number = 0
     private readonly SILENCE_CONFIRMATION_MS = 45000 // 45 seconds of silence before confirming no attendees
@@ -29,17 +28,17 @@ export class RecordingState extends BaseState {
             // Start the dialog observer when entering this state
             this.startDialogObserver()
 
-            // Initialize PathManager
-            this.pathManager = PathManager.getInstance(
-                this.context.params.bot_uuid,
-            )
-            await this.pathManager.initializePaths()
-
             // Initialize recording
             await this.initializeRecording()
 
             // Set a global timeout for the recording state
             const startTime = Date.now()
+            this.context.startTime = startTime // Assign to context so getStartTime() works
+            ScreenRecorderManager.getInstance().setMeetingStartTime(startTime)
+
+            // Uncomment this to test the recording synchronization
+            // await sleep(10000)
+            // await generateSyncSignal(this.context.playwrightPage)
 
             // Main loop
             while (this.isProcessing) {
@@ -71,17 +70,20 @@ export class RecordingState extends BaseState {
                     return this.transition(MeetingStateType.Paused)
                 }
 
-                await this.sleep(this.CHECK_INTERVAL)
+                await sleep(this.CHECK_INTERVAL)
             }
 
             // Stop the observer before transitioning to Cleanup state
-            this.stopDialogObserver()
+            console.info(
+                '🔄 Recording state loop ended, transitioning to cleanup state',
+            )
             return this.transition(MeetingStateType.Cleanup)
         } catch (error) {
             // Stop the observer in case of error
             this.stopDialogObserver()
 
-            console.error('Error in recording state:', error)
+            console.error('❌ Error in recording state:', error)
+            console.error('❌ Error stack:', (error as Error).stack)
             return this.handleError(error as Error)
         }
     }
@@ -89,29 +91,11 @@ export class RecordingState extends BaseState {
     private async initializeRecording(): Promise<void> {
         console.info('Initializing recording...')
 
-        // Start streaming if available
-        if (this.context.streamingService) {
-            console.info('Starting streaming service from recording state')
-            this.context.streamingService.start()
-
-            // Check that the instance is properly created
-            if (!Streaming.instance) {
-                console.warn(
-                    'Streaming service not properly initialized, trying fallback initialization',
-                )
-                // If the instance is not available after starting, we might have a problem
-                Streaming.instance = this.context.streamingService
-            }
-        } else {
-            console.warn('No streaming service available in context')
-        }
-
         // Log the context state
         console.info('Context state:', {
             hasPathManager: !!this.context.pathManager,
             hasStreamingService: !!this.context.streamingService,
             isStreamingInstanceAvailable: !!Streaming.instance,
-            isTranscoderConfigured: TRANSCODER.getStatus().isConfigured,
         })
 
         // Configure listeners
@@ -122,20 +106,9 @@ export class RecordingState extends BaseState {
     private async setupEventListeners(): Promise<void> {
         console.info('Setting up event listeners...')
 
-        TRANSCODER.on('chunkProcessed', async (chunkInfo) => {
-            try {
-                console.info('Received chunk for transcription:', {
-                    startTime: chunkInfo.startTime,
-                    endTime: chunkInfo.endTime,
-                    hasAudioUrl: !!chunkInfo.audioUrl,
-                })
-            } catch (error) {
-                console.error('Error during transcription:', error)
-            }
-        })
-
-        TRANSCODER.on('error', async (error) => {
-            console.error('Recording error:', error)
+        // Configure event listeners for screen recorder
+        ScreenRecorderManager.getInstance().on('error', async (error) => {
+            console.error('ScreenRecorder error:', error)
             this.context.error = error
             this.isProcessing = false
         })
@@ -213,9 +186,6 @@ export class RecordingState extends BaseState {
         this.context.endReason = reason
 
         try {
-            // Stop the dialog observer
-            this.stopDialogObserver()
-
             // Try to close the meeting but don't let an error here affect the rest
             try {
                 // If the reason is bot_removed, we know the meeting is already effectively closed
@@ -239,142 +209,14 @@ export class RecordingState extends BaseState {
             console.info('Triggering call ended event')
             await Events.callEnded()
 
-            console.info('Stopping video recording')
-            await this.stopVideoRecording().catch((err) => {
-                console.error(
-                    'Error stopping video recording, continuing:',
-                    err,
-                )
-            })
-
-            console.info('Stopping audio streaming')
-            await this.stopAudioStreaming().catch((err) => {
-                console.error(
-                    'Error stopping audio streaming, continuing:',
-                    err,
-                )
-            })
-
-            console.info('Stopping transcoder')
-            try {
-                await TRANSCODER.stop()
-            } catch (error) {
-                console.error(
-                    'Error stopping transcoder, continuing cleanup:',
-                    error,
-                )
-            }
-
             console.info('Setting isProcessing to false to end recording loop')
-            await this.sleep(2000)
+            await sleep(2000)
         } catch (error) {
             console.error('Error during meeting end handling:', error)
         } finally {
             // Always ensure this flag is set to stop the processing loop
             this.isProcessing = false
             console.info('Meeting end handling completed')
-        }
-    }
-
-    private async stopVideoRecording(): Promise<void> {
-        if (!this.context.backgroundPage) {
-            console.error(
-                'Background page not available for stopping video recording',
-            )
-            return
-        }
-
-        try {
-            // Check if the function exists first
-            const functionExists = await this.context.backgroundPage.evaluate(
-                () => {
-                    const w = window as any
-                    return {
-                        stopMediaRecorderExists:
-                            typeof w.stopMediaRecorder === 'function',
-                        recordExists: typeof w.record !== 'undefined',
-                        recordStopExists:
-                            w.record && typeof w.record.stop === 'function',
-                    }
-                },
-            )
-
-            console.log('Stop functions status:', functionExists)
-
-            if (functionExists.stopMediaRecorderExists) {
-                // 1. Stop media recording with detailed diagnostics
-                await this.context.backgroundPage.evaluate(() => {
-                    const w = window as any
-                    try {
-                        console.log('Calling stopMediaRecorder...')
-                        const result = w.stopMediaRecorder()
-                        console.log(
-                            'stopMediaRecorder called successfully, result:',
-                            result,
-                        )
-                        return result
-                    } catch (error) {
-                        console.error('Error in stopMediaRecorder:', error)
-                        // Try to display more details about the error
-                        console.error(
-                            'Error details:',
-                            JSON.stringify(
-                                error,
-                                Object.getOwnPropertyNames(error),
-                            ),
-                        )
-                        throw error
-                    }
-                })
-            } else {
-                console.warn(
-                    'stopMediaRecorder function not found in window object',
-                )
-
-                // Direct workaround attempt with MediaRecorder if available
-                try {
-                    await this.context.backgroundPage.evaluate(() => {
-                        const w = window as any
-                        if (
-                            w.MEDIA_RECORDER &&
-                            w.MEDIA_RECORDER.state !== 'inactive'
-                        ) {
-                            console.log(
-                                'Attempting direct stop of MEDIA_RECORDER',
-                            )
-                            w.MEDIA_RECORDER.stop()
-                            return true
-                        }
-                        return false
-                    })
-                } catch (directStopError) {
-                    console.error(
-                        'Failed direct stop attempt:',
-                        directStopError,
-                    )
-                }
-            }
-        } catch (error) {
-            console.error('Failed to stop video recording:', error)
-            throw error
-        }
-    }
-
-    private async stopAudioStreaming(): Promise<void> {
-        if (!this.context.backgroundPage) {
-            console.error('Background page not available for stopping audio')
-            return
-        }
-
-        try {
-            await this.context.backgroundPage.evaluate(() => {
-                const w = window as any
-                return w.stopAudioStreaming()
-            })
-            console.info('Audio streaming stopped successfully')
-        } catch (error) {
-            console.error('Failed to stop audio streaming:', error)
-            throw error
         }
     }
 
@@ -386,7 +228,6 @@ export class RecordingState extends BaseState {
 
         try {
             return await this.context.provider.findEndMeeting(
-                this.context.params,
                 this.context.playwrightPage,
             )
         } catch (error) {
@@ -498,9 +339,5 @@ export class RecordingState extends BaseState {
         }
 
         return shouldEnd
-    }
-
-    private sleep(ms: number): Promise<void> {
-        return new Promise((resolve) => setTimeout(resolve, ms))
     }
 }

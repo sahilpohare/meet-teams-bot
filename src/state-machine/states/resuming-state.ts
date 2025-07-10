@@ -1,8 +1,9 @@
 import { Events } from '../../events'
-import { TRANSCODER } from '../../recording/Transcoder'
+import { SpeakerManager } from '../../speaker-manager'
 
 import { MeetingStateType, StateExecuteResult } from '../types'
 import { BaseState } from './base-state'
+import { GLOBAL } from '../../singleton'
 
 export class ResumingState extends BaseState {
     async execute(): StateExecuteResult {
@@ -41,18 +42,35 @@ export class ResumingState extends BaseState {
 
     private async resumeRecording(): Promise<void> {
         const resumePromise = async () => {
-            // Resume the MediaRecorder in the browser
-            await this.context.backgroundPage?.evaluate(() => {
-                const w = window as any
-                return w.resumeMediaRecorder?.()
-            })
-
-            // Reprendre le Transcoder
-            await TRANSCODER.resume()
+            // TODO: RESUME SCREEN RECORDER
 
             // Reprendre le streaming
             if (this.context.streamingService) {
                 this.context.streamingService.resume()
+                console.log('Streaming service resumed successfully')
+            }
+
+            // Resume speakers observation if it was paused
+            if (this.context.speakersObserver && this.context.playwrightPage) {
+                console.log('Resuming speakers observation...')
+
+                const onSpeakersChange = async (speakers: any[]) => {
+                    try {
+                        await SpeakerManager.getInstance().handleSpeakerUpdate(
+                            speakers,
+                        )
+                    } catch (error) {
+                        console.error('Error handling speaker update:', error)
+                    }
+                }
+
+                await this.context.speakersObserver.startObserving(
+                    this.context.playwrightPage,
+                    GLOBAL.get().recording_mode,
+                    GLOBAL.get().bot_name,
+                    onSpeakersChange,
+                )
+                console.log('Speakers observation resumed')
             }
 
             console.log('Recording resumed successfully')

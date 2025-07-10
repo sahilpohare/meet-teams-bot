@@ -29,10 +29,26 @@ export class SpeakerManager {
 
     public async handleSpeakerUpdate(speakers: SpeakerData[]): Promise<void> {
         try {
-            // Envoyer l'état des speakers au streaming
-            Streaming.instance?.send_speaker_state(speakers)
+            console.log(
+                `[SpeakerManager] 🎯 RECEIVED SPEAKER UPDATE: ${speakers.length} speakers`,
+            )
+
+            // Log each speaker state
+            speakers.forEach((speaker) => {
+                console.log(
+                    `[SpeakerManager] 🔸 ${speaker.name} → speaking: ${speaker.isSpeaking}`,
+                )
+            })
+
+            // Envoyer l'état des speakers au streaming seulement si RECORDING est activé
+            if (Streaming.instance) {
+                Streaming.instance.send_speaker_state(speakers)
+            }
 
             // console les speakers
+            console.log(
+                `[SpeakerManager] 📊 Calling console.table for speakers`,
+            )
             await this.logSpeakers(speakers)
 
             // Compter les speakers actifs
@@ -43,8 +59,13 @@ export class SpeakerManager {
 
             // Gérer les transcriptions
             await this.handleSpeakersTranscription(speakers, speakersCount)
+
+            console.log(`[SpeakerManager] ✅ Speaker update completed`)
         } catch (error) {
-            console.error('Error handling speaker update:', error)
+            console.error(
+                '[SpeakerManager] ❌ Error handling speaker update:',
+                error,
+            )
             throw error
         }
     }

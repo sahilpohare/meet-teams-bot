@@ -1,6 +1,7 @@
 import { Api } from './api/methods'
 import { ApiTypes } from './api/types'
 import { MeetingHandle } from './meeting'
+import { GLOBAL } from './singleton'
 
 import { SpeakerData } from './types'
 
@@ -27,7 +28,7 @@ export async function uploadTranscriptTask(
     speaker: SpeakerData,
     end: boolean,
 ): Promise<void> {
-    if (process.env.SERVERLESS === 'true') {
+    if (GLOBAL.isServerless()) {
         console.log('Skipping transcript upload - serverless mode')
         return
     }
@@ -53,21 +54,22 @@ async function upload(speaker: SpeakerData, end: boolean) {
         console.info('Transcriber is stoped')
         return
     }
+    const meetingStartTime = MeetingHandle.instance.getStartTime()
+    if (meetingStartTime == null || meetingStartTime == undefined) {
+        console.warn(
+            'Meeting start time not available for posting transcript - skipping',
+        )
+        return
+    }
 
     try {
         const api = Api.instance
         if (LAST_TRANSRIPT) {
             try {
-                await api.patchTranscript(
-                    {
-                        id: LAST_TRANSRIPT.id,
-                        end_time:
-                            (speaker.timestamp -
-                                MeetingHandle.instance.getStartTime()) /
-                            1000,
-                    } as ApiTypes.ChangeableTranscript,
-                    api.bot_uuid,
-                )
+                await api.patchTranscript({
+                    id: LAST_TRANSRIPT.id,
+                    end_time: (speaker.timestamp - meetingStartTime) / 1000,
+                } as ApiTypes.ChangeableTranscript)
             } catch (e) {
                 console.error(
                     'Failed to patch transcript, continuing execution:',
@@ -83,16 +85,18 @@ async function upload(speaker: SpeakerData, end: boolean) {
             return
         } else {
             try {
-                LAST_TRANSRIPT = await api.postTranscript(
-                    {
-                        speaker: speaker.name,
-                        start_time:
-                            (speaker.timestamp -
-                                MeetingHandle.instance.getStartTime()) /
-                            1000,
-                    } as ApiTypes.PostableTranscript,
-                    api.bot_uuid,
-                )
+                const meetingStartTime = MeetingHandle.instance.getStartTime()
+                if (meetingStartTime == null || meetingStartTime == undefined) {
+                    console.warn(
+                        'Meeting start time not available for posting transcript - skipping',
+                    )
+                    return
+                }
+
+                LAST_TRANSRIPT = await api.postTranscript({
+                    speaker: speaker.name,
+                    start_time: (speaker.timestamp - meetingStartTime) / 1000,
+                } as ApiTypes.PostableTranscript)
             } catch (e) {
                 console.error(
                     'Failed to post transcript, continuing execution:',

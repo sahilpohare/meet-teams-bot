@@ -3,25 +3,23 @@ import * as rax from 'retry-axios'
 
 import { ApiTypes } from './types'
 
-import { MeetingParams } from '../types'
+import { GLOBAL } from '../singleton'
 
 export class Api {
     public static instance: Api | null = null // Singleton class
 
-    public bot_uuid: string
-
-    constructor(params: MeetingParams) {
+    constructor() {
         if (Api.instance instanceof Api) {
             console.error(
                 'Class is singleton, constructor cannot be called multiple times.',
             )
             return Api.instance
         }
-        axios.defaults.baseURL = process.env.API_SERVER_BASEURL
+        axios.defaults.baseURL = GLOBAL.get().remote.api_server_baseurl
         axios.defaults.withCredentials = true
-        const isServerless = process.env.SERVERLESS === 'true'
-        if (!isServerless && params.user_token) {
-            axios.defaults.headers.common['Authorization'] = params.user_token
+        if (!GLOBAL.isServerless() && GLOBAL.get().user_token) {
+            axios.defaults.headers.common['Authorization'] =
+                GLOBAL.get().user_token
         }
         axios.defaults.raxConfig = {
             instance: axios,
@@ -45,7 +43,6 @@ export class Api {
             onRetryAttempt: this.onRetryAttempt,
         }
         rax.attach()
-        this.bot_uuid = params.bot_uuid
         Api.instance = this
     }
 
@@ -75,7 +72,7 @@ export class Api {
             method: 'POST',
             url: '/bots/end_meeting_trampoline',
             params: {
-                bot_uuid: this.bot_uuid,
+                bot_uuid: GLOBAL.get().bot_uuid,
             },
             data: {
                 diarization_v2: false,
@@ -87,12 +84,11 @@ export class Api {
     // Post transcript to server
     public async postTranscript(
         transcript: ApiTypes.PostableTranscript,
-        bot_uuid: string,
     ): Promise<ApiTypes.QueryableTranscript> {
         return (
             await axios({
                 method: 'POST',
-                url: `/bots/transcripts/${bot_uuid}/diarization`,
+                url: `/bots/transcripts/${GLOBAL.get().bot_uuid}/diarization`,
                 data: transcript,
             })
         ).data
@@ -101,14 +97,56 @@ export class Api {
     // Patch existing transcript
     public async patchTranscript(
         transcript: ApiTypes.ChangeableTranscript,
-        bot_uuid: string,
     ): Promise<ApiTypes.QueryableTranscript> {
         return (
             await axios({
                 method: 'PATCH',
-                url: `/bots/transcripts/${bot_uuid}/diarization`,
+                url: `/bots/transcripts/${GLOBAL.get().bot_uuid}/diarization`,
                 data: transcript,
             })
         ).data
+    }
+
+    // Notify backend of recording failure
+    public async notifyRecordingFailure(
+        meetingUrl: string,
+        message: string,
+        botUuid?: string,
+    ): Promise<void> {
+        try {
+            await axios({
+                method: 'POST',
+                url: `/bots/start_record_failed`,
+                timeout: 10000,
+                data: { meeting_url: meetingUrl, message },
+                params: { bot_uuid: botUuid || GLOBAL.get().bot_uuid },
+            })
+            console.log('Successfully notified backend of recording failure')
+        } catch (error) {
+            console.warn(
+                'Unable to notify recording failure (continuing execution):',
+                error instanceof Error ? error.message : error,
+            )
+            // Don't throw - continue execution even if notification fails
+        }
+    }
+
+    // Handle end meeting with retry logic
+    public async handleEndMeetingWithRetry(): Promise<void> {
+        if (GLOBAL.isServerless()) {
+            console.log('Skipping endMeetingTrampoline - serverless mode')
+            return
+        }
+
+        try {
+            await this.endMeetingTrampoline()
+            console.log('API call to endMeetingTrampoline succeeded')
+        } catch (error) {
+            console.warn(
+                'API call to endMeetingTrampoline failed (continuing execution):',
+                error instanceof Error ? error.message : error,
+            )
+            // Don't throw - continue execution even if API call fails
+        }
     }
 }

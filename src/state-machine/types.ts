@@ -3,6 +3,7 @@ import { MeetingParams } from '../types'
 import { BrowserContext, Page } from '@playwright/test'
 import { BrandingHandle } from '../branding'
 import { MeetingHandle } from '../meeting'
+import { ScreenRecorder } from '../recording/ScreenRecorder'
 import { Streaming } from '../streaming'
 import { MeetingProviderInterface } from '../types'
 import { PathManager } from '../utils/PathManager'
@@ -31,12 +32,10 @@ export enum RecordingEndReason {
 export interface MeetingContext {
     // Références aux objets principaux
     meetingHandle: MeetingHandle
-    params: MeetingParams
     provider: MeetingProviderInterface
 
     // Pages et contexte du navigateur
     playwrightPage?: Page
-    backgroundPage?: Page
     browserContext?: BrowserContext
 
     // Timers et intervalles
@@ -79,6 +78,15 @@ export interface MeetingContext {
 
     // Streaming
     streamingService?: Streaming
+
+    // Screen recording
+    screenRecorder?: ScreenRecorder
+
+    // Speakers observation
+    speakersObserver?: import('../meeting/speakersObserver').SpeakersObserver
+
+    // HTML cleanup
+    htmlCleaner?: import('../meeting/htmlCleaner').HtmlCleaner
 
     errorTime?: number
     hasResumed?: boolean

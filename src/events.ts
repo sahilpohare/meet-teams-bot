@@ -1,74 +1,92 @@
 import axios from 'axios'
-import { MeetingParams } from './types'
+import { GLOBAL } from './singleton'
 
 export class Events {
     private static EVENTS: Events | null = null
+    private sentEvents: Set<string> = new Set()
 
-    static init(params: MeetingParams) {
-        if (params.bot_uuid == null) return
-        if (params.bots_api_key == null) return
-        if (params.bots_webhook_url == null) return
+    static init() {
+        if (GLOBAL.get().bot_uuid == null) return
+        if (GLOBAL.get().bots_api_key == null) return
+        if (GLOBAL.get().bots_webhook_url == null) return
 
         Events.EVENTS = new Events(
-            params.bot_uuid,
-            params.bots_api_key,
-            params.bots_webhook_url,
+            GLOBAL.get().bot_uuid,
+            GLOBAL.get().bots_api_key,
+            GLOBAL.get().bots_webhook_url,
         )
     }
 
     static async apiRequestStop() {
-        return Events.EVENTS?.send('api_request_stop')
+        return Events.EVENTS?.sendOnce('api_request_stop')
     }
 
     static async joiningCall() {
-        return Events.EVENTS?.send('joining_call')
+        return Events.EVENTS?.sendOnce('joining_call')
     }
 
     static async inWaitingRoom() {
-        return Events.EVENTS?.send('in_waiting_room')
+        return Events.EVENTS?.sendOnce('in_waiting_room')
     }
 
     static async inCallNotRecording() {
-        return Events.EVENTS?.send('in_call_not_recording')
+        return Events.EVENTS?.sendOnce('in_call_not_recording')
     }
 
     static async inCallRecording(data: { start_time: number }) {
-        return Events.EVENTS?.send('in_call_recording', data)
+        return Events.EVENTS?.sendOnce('in_call_recording', data)
     }
 
     static async recordingPaused() {
-        return Events.EVENTS?.send('recording_paused')
+        // Send webhook in parallel - don't wait for completion
+        Events.EVENTS?.send('recording_paused')
     }
 
     static async recordingResumed() {
-        return Events.EVENTS?.send('recording_resumed')
+        // Send webhook in parallel - don't wait for completion
+        Events.EVENTS?.send('recording_resumed')
     }
 
     static async callEnded() {
-        return Events.EVENTS?.send('call_ended')
+        return Events.EVENTS?.sendOnce('call_ended')
     }
 
     // Nouveaux événements pour les erreurs
     static async botRejected() {
-        return Events.EVENTS?.send('bot_rejected')
+        return Events.EVENTS?.sendOnce('bot_rejected')
     }
 
     static async botRemoved() {
-        return Events.EVENTS?.send('bot_removed')
+        return Events.EVENTS?.sendOnce('bot_removed')
+    }
+
+    static async botRemovedTooEarly() {
+        return Events.EVENTS?.sendOnce('bot_removed_too_early')
     }
 
     static async waitingRoomTimeout() {
-        return Events.EVENTS?.send('waiting_room_timeout')
+        return Events.EVENTS?.sendOnce('waiting_room_timeout')
     }
 
     static async invalidMeetingUrl() {
-        return Events.EVENTS?.send('invalid_meeting_url')
+        return Events.EVENTS?.sendOnce('invalid_meeting_url')
     }
 
     static async meetingError(error: Error) {
-        return Events.EVENTS?.send('meeting_error', {
+        return Events.EVENTS?.sendOnce('meeting_error', {
             error_message: error.message,
             error_type: error.constructor.name,
+        })
+    }
+
+    // Final webhook events (replacing sendWebhookOnce)
+    static async recordingSucceeded() {
+        return Events.EVENTS?.sendOnce('recording_succeeded')
+    }
+
+    static async recordingFailed(errorMessage: string) {
+        return Events.EVENTS?.sendOnce('recording_failed', {
+            error_message: errorMessage,
         })
     }
 
@@ -77,6 +95,24 @@ export class Events {
         private apiKey: string,
         private webhookUrl: string,
     ) {}
+
+    /**
+     * Send an event only once - prevents duplicate webhooks
+     * Used for all events to ensure each event is sent exactly once
+     */
+    private async sendOnce(
+        code: string,
+        additionalData: Record<string, any> = {},
+    ): Promise<void> {
+        if (this.sentEvents.has(code)) {
+            console.log(`Event ${code} already sent, skipping...`)
+            return
+        }
+
+        this.sentEvents.add(code)
+        // Send webhook in parallel - don't wait for completion
+        this.send(code, additionalData)
+    }
 
     private async send(
         code: string,
