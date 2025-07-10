@@ -24,7 +24,6 @@ export async function openBrowser(
                 '--use-pulseaudio',                    // Force Chromium to use PulseAudio
                 '--enable-audio-service-sandbox=false', // Disable audio service sandbox for virtual devices
                 '--audio-buffer-size=2048',            // Set buffer size for better audio handling
-                '--disable-audio-output',              // Disable hardware audio output (we only need capture)
                 '--disable-features=AudioServiceSandbox', // Additional sandbox disable
                 '--autoplay-policy=no-user-gesture-required', // Allow autoplay for meeting platforms
                 
