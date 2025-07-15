@@ -5,7 +5,7 @@ import {
     StateTransition,
 } from './types'
 
-import { DialogObserver } from '../services/dialog-observer'
+import { DialogObserver } from '../services/dialog-observer/dialog-observer'
 import { getStateInstance } from './states'
 import { MeetingContext } from './types'
 

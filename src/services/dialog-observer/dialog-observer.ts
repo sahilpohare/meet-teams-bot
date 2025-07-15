@@ -4,6 +4,8 @@ import { MeetingContext } from '../../state-machine/types'
 import { DialogObserverResult } from './types'
 import { tryPatternsWithSmartButtonSearch } from './utils'
 
+const MAX_RETRIES = 5
+
 /**
  * Ultra-resilient service for detecting and handling blocking modals in Google Meet
  * Supports multiple languages, detection methods, and fallback strategies
@@ -11,6 +13,7 @@ import { tryPatternsWithSmartButtonSearch } from './utils'
 export class DialogObserver {
     protected context: MeetingContext
     protected dialogObserverInterval?: NodeJS.Timeout
+    protected retries = 0
 
     constructor(context: MeetingContext) {
         this.context = context
@@ -82,23 +85,67 @@ export class DialogObserver {
         }
     }
 
+    async retryCheckAndDismissModals() {
+        this.retries++
+
+        console.info(
+            `[GlobalDialogObserver] Stopping observer and retrying button click. Retries: ${this.retries}`,
+        )
+        this.stopGlobalDialogObserver()
+
+        if (this.retries > MAX_RETRIES) {
+            console.info(
+                `[GlobalDialogObserver] Max retries reached for button click`,
+            )
+            return
+        }
+
+        try {
+            await this.checkAndDismissModals(this.context.playwrightPage, 10000)
+            this.startGlobalDialogObserver()
+            this.retries = 0
+        } catch (error) {
+            console.error(
+                `[GlobalDialogObserver] Error clicking button: ${error}`,
+            )
+            this.retryCheckAndDismissModals()
+        }
+    }
+
     /**
      * Enhanced modal detection with multiple strategies prioritizing resilience
      */
     protected async checkAndDismissModals(
         page: Page,
+        customTimeout: number = 0,
     ): Promise<DialogObserverResult> {
         try {
-            console.log(
-                '[GlobalDialogObserver] DEBUG - Starting modal detection sweep...',
-            )
-
             // Try detection methods in order of reliability
             const detectionMethods = [
-                () => this.detectSemanticModals(page),
-                () => this.detectBehavioralModals(page),
-                () => this.detectContentBasedModals(page),
-                () => this.detectStructuralModals(page),
+                () =>
+                    this.detectSemanticModals(
+                        page,
+                        customTimeout,
+                        this.retryCheckAndDismissModals,
+                    ),
+                () =>
+                    this.detectBehavioralModals(
+                        page,
+                        customTimeout,
+                        this.retryCheckAndDismissModals,
+                    ),
+                () =>
+                    this.detectContentBasedModals(
+                        page,
+                        customTimeout,
+                        this.retryCheckAndDismissModals,
+                    ),
+                () =>
+                    this.detectStructuralModals(
+                        page,
+                        customTimeout,
+                        this.retryCheckAndDismissModals,
+                    ),
             ]
 
             for (const detectMethod of detectionMethods) {
@@ -141,6 +188,9 @@ export class DialogObserver {
      */
     protected async detectSemanticModals(
         page: Page,
+        customTimeout: number = 0,
+        retryCheckAndDismissModals: () => Promise<void> = () =>
+            Promise.resolve(),
     ): Promise<DialogObserverResult> {
         const ariaPatterns = [
             {
@@ -165,7 +215,12 @@ export class DialogObserver {
             },
         ]
 
-        return await tryPatternsWithSmartButtonSearch(page, ariaPatterns)
+        return await tryPatternsWithSmartButtonSearch(
+            page,
+            ariaPatterns,
+            customTimeout,
+            retryCheckAndDismissModals,
+        )
     }
 
     /**
@@ -173,6 +228,9 @@ export class DialogObserver {
      */
     protected async detectBehavioralModals(
         page: Page,
+        customTimeout: number = 0,
+        retryCheckAndDismissModals: () => Promise<void> = () =>
+            Promise.resolve(),
     ): Promise<DialogObserverResult> {
         const behavioralPatterns = [
             {
@@ -199,7 +257,12 @@ export class DialogObserver {
             },
         ]
 
-        return await tryPatternsWithSmartButtonSearch(page, behavioralPatterns)
+        return await tryPatternsWithSmartButtonSearch(
+            page,
+            behavioralPatterns,
+            customTimeout,
+            retryCheckAndDismissModals,
+        )
     }
 
     /**
@@ -207,6 +270,9 @@ export class DialogObserver {
      */
     protected async detectContentBasedModals(
         page: Page,
+        customTimeout: number = 0,
+        retryCheckAndDismissModals: () => Promise<void> = () =>
+            Promise.resolve(),
     ): Promise<DialogObserverResult> {
         const contentPatterns = [
             // Video privacy patterns (multi-language)
@@ -245,7 +311,12 @@ export class DialogObserver {
             selector: `${pattern.selector}:has(button), ${pattern.selector} + div:has(button), ${pattern.selector} ~ div:has(button)`,
         }))
 
-        return await tryPatternsWithSmartButtonSearch(page, enhancedPatterns)
+        return await tryPatternsWithSmartButtonSearch(
+            page,
+            enhancedPatterns,
+            customTimeout,
+            retryCheckAndDismissModals,
+        )
     }
 
     /**
@@ -253,6 +324,9 @@ export class DialogObserver {
      */
     protected async detectStructuralModals(
         page: Page,
+        customTimeout: number = 0,
+        retryCheckAndDismissModals: () => Promise<void> = () =>
+            Promise.resolve(),
     ): Promise<DialogObserverResult> {
         const patterns = [
             // Modal with header image and text content
@@ -277,6 +351,11 @@ export class DialogObserver {
             },
         ]
 
-        return await tryPatternsWithSmartButtonSearch(page, patterns)
+        return await tryPatternsWithSmartButtonSearch(
+            page,
+            patterns,
+            customTimeout,
+            retryCheckAndDismissModals,
+        )
     }
 }

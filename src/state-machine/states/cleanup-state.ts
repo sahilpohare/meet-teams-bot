@@ -218,12 +218,12 @@ export class CleanupState extends BaseState {
     private stopDialogObserver() {
         if (this.context.dialogObserver) {
             console.info(
-                `[BaseState] Stopping global dialog observer in state ${this.constructor.name}`,
+                `Stopping global dialog observer in state ${this.constructor.name}`,
             )
             this.context.dialogObserver.stopGlobalDialogObserver()
         } else {
             console.warn(
-                `[BaseState] Global dialog observer not available in state ${this.constructor.name}`,
+                `Global dialog observer not available in state ${this.constructor.name}`,
             )
         }
     }

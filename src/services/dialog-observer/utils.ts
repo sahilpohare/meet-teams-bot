@@ -2,9 +2,12 @@ import { Page } from '@playwright/test'
 import { DialogObserverResult } from './types'
 import { LanguagePatterns } from './language-patterns'
 
-const TIMEOUT = 300
-const PAGE_TIMEOUT = 1000
-const LOCATOR_TIMEOUT = 500
+const TIMEOUTS = {
+    VISIBLE_TIMEOUT: 300,
+    CLICK_TIMEOUT: 500,
+    PAGE_TIMEOUT: 1000,
+    LOCATOR_TIMEOUT: 500,
+}
 
 /**
  * Smart button search - tries multiple scopes and patterns
@@ -12,33 +15,47 @@ const LOCATOR_TIMEOUT = 500
 export async function tryPatternsWithSmartButtonSearch(
     page: Page,
     patterns: Array<{ name: string; selector: string; method: string }>,
+    customTimeout: number = 0,
+    retryCheckAndDismissModals: () => Promise<void> = () => Promise.resolve(),
 ): Promise<DialogObserverResult> {
+    const timeouts =
+        customTimeout === 0
+            ? TIMEOUTS
+            : {
+                  VISIBLE_TIMEOUT: customTimeout,
+                  CLICK_TIMEOUT: customTimeout,
+                  PAGE_TIMEOUT: customTimeout,
+                  LOCATOR_TIMEOUT: customTimeout,
+              }
+
     for (const pattern of patterns) {
         try {
             const modal = page.locator(pattern.selector)
-            const isVisible = await modal.isVisible({ timeout: TIMEOUT })
+            const isVisible = await modal.isVisible({
+                timeout: timeouts.VISIBLE_TIMEOUT,
+            })
 
             if (isVisible) {
                 console.info(
-                    `[GlobalDialogObserver] Found modal via ${pattern.method}: ${pattern.name}`,
+                    `[GlobalDialogObserverUtils] Found modal via ${pattern.method}: ${pattern.name}`,
                 )
 
                 // Log modal text content for debugging
                 try {
                     const modalFullText =
                         (await modal.textContent({
-                            timeout: LOCATOR_TIMEOUT,
+                            timeout: timeouts.LOCATOR_TIMEOUT,
                         })) || ''
                     const cleanText = modalFullText
                         .trim()
                         .replace(/\s+/g, ' ')
                         .substring(0, 250)
                     console.log(
-                        `[GlobalDialogObserver] Modal text: "${cleanText}${modalFullText.length > 250 ? '...' : ''}"`,
+                        `[GlobalDialogObserverUtils] Modal text: "${cleanText}${modalFullText.length > 250 ? '...' : ''}"`,
                     )
                 } catch (textError) {
                     console.warn(
-                        `[GlobalDialogObserver] Could not retrieve modal text content: ${textError}`,
+                        `[GlobalDialogObserverUtils] Could not retrieve modal text content: ${textError}`,
                     )
                 }
 
@@ -63,6 +80,8 @@ export async function tryPatternsWithSmartButtonSearch(
                             searchStrategy.scope,
                             pattern.name,
                             searchStrategy.name,
+                            customTimeout,
+                            retryCheckAndDismissModals,
                         )
                         if (result.dismissed) {
                             return {
@@ -72,7 +91,7 @@ export async function tryPatternsWithSmartButtonSearch(
                         }
                     } catch (searchError) {
                         console.warn(
-                            `[GlobalDialogObserver] Search strategy "${searchStrategy.name}" failed: ${searchError}`,
+                            `[GlobalDialogObserverUtils] Search strategy "${searchStrategy.name}" failed: ${searchError}`,
                         )
                         continue
                     }
@@ -101,7 +120,19 @@ export async function dismissWithUniversalButtonSearch(
     searchScope: any,
     modalType: string,
     scopeName: string,
+    customTimeout: number = 0,
+    retryCheckAndDismissModals: () => Promise<void> = () => Promise.resolve(),
 ): Promise<DialogObserverResult> {
+    const timeouts =
+        customTimeout === 0
+            ? TIMEOUTS
+            : {
+                  VISIBLE_TIMEOUT: customTimeout,
+                  CLICK_TIMEOUT: customTimeout,
+                  PAGE_TIMEOUT: customTimeout,
+                  LOCATOR_TIMEOUT: customTimeout,
+              }
+
     console.info(
         `[GlobalDialogObserver] Trying universal button search in: ${scopeName}`,
     )
@@ -135,17 +166,25 @@ export async function dismissWithUniversalButtonSearch(
                     try {
                         const button = buttons.nth(i)
                         const isVisible = await button.isVisible({
-                            timeout: TIMEOUT,
+                            timeout: timeouts.VISIBLE_TIMEOUT,
                         })
 
                         if (isVisible) {
                             // Check if button looks like a dismiss button
                             const buttonText = await button
-                                .textContent({ timeout: LOCATOR_TIMEOUT })
-                                .catch(() => '')
+                                .textContent({
+                                    timeout: timeouts.LOCATOR_TIMEOUT,
+                                })
+                                .catch(() => {
+                                    // The button is visible but we couldn't get the text, retry
+                                    retryCheckAndDismissModals()
+                                })
                             const ariaLabel = await button
                                 .getAttribute('aria-label')
-                                .catch(() => '')
+                                .catch(() => {
+                                    // The button is visible but we couldn't get the aria-label, retry
+                                    retryCheckAndDismissModals()
+                                })
 
                             const dismissIndicators = [
                                 'ok',
@@ -176,8 +215,10 @@ export async function dismissWithUniversalButtonSearch(
                                 console.info(
                                     `[GlobalDialogObserver] Attempting click on button: "${buttonText}" (${ariaLabel})`,
                                 )
-                                await button.click({ timeout: TIMEOUT })
-                                await page.waitForTimeout(PAGE_TIMEOUT)
+                                await button.click({
+                                    timeout: timeouts.VISIBLE_TIMEOUT,
+                                })
+                                await page.waitForTimeout(timeouts.PAGE_TIMEOUT)
 
                                 return {
                                     found: true,
@@ -201,7 +242,13 @@ export async function dismissWithUniversalButtonSearch(
     }
 
     // Fallback to text-based search
-    return await dismissWithTextButtons(page, searchScope, modalType)
+    return await dismissWithTextButtons(
+        page,
+        searchScope,
+        modalType,
+        customTimeout,
+        retryCheckAndDismissModals,
+    )
 }
 
 /**
@@ -211,7 +258,19 @@ export async function dismissWithTextButtons(
     page: Page,
     modal: any,
     modalType: string,
+    customTimeout: number = 0,
+    retryCheckAndDismissModals: () => Promise<void> = () => Promise.resolve(),
 ): Promise<DialogObserverResult> {
+    const timeouts =
+        customTimeout === 0
+            ? TIMEOUTS
+            : {
+                  VISIBLE_TIMEOUT: customTimeout,
+                  CLICK_TIMEOUT: customTimeout,
+                  PAGE_TIMEOUT: customTimeout,
+                  LOCATOR_TIMEOUT: customTimeout,
+              }
+
     const buttonTexts = LanguagePatterns.getAllButtonTexts()
 
     // Try each button text pattern
@@ -223,13 +282,23 @@ export async function dismissWithTextButtons(
 
             if (
                 buttonCount > 0 &&
-                (await button.first().isVisible({ timeout: TIMEOUT }))
+                (await button
+                    .first()
+                    .isVisible({ timeout: timeouts.VISIBLE_TIMEOUT }))
             ) {
                 console.info(
                     `[GlobalDialogObserver] DEBUG - Attempting click on exact text button: "${buttonText}"`,
                 )
-                await button.first().click({ timeout: TIMEOUT })
-                await page.waitForTimeout(PAGE_TIMEOUT)
+                await button
+                    .first()
+                    .click({
+                        timeout: timeouts.CLICK_TIMEOUT,
+                    })
+                    .catch(() => {
+                        // The button is visible but we couldn't click it, retry
+                        retryCheckAndDismissModals()
+                    })
+                await page.waitForTimeout(timeouts.PAGE_TIMEOUT)
                 console.info(
                     `[GlobalDialogObserver] DEBUG - Successfully dismissed ${modalType} with exact text: "${buttonText}"`,
                 )
@@ -249,13 +318,23 @@ export async function dismissWithTextButtons(
 
             if (
                 buttonCount > 0 &&
-                (await button.first().isVisible({ timeout: TIMEOUT }))
+                (await button
+                    .first()
+                    .isVisible({ timeout: timeouts.VISIBLE_TIMEOUT }))
             ) {
                 console.info(
                     `[GlobalDialogObserver] DEBUG - Attempting click on partial text button: "${buttonText}"`,
                 )
-                await button.first().click({ timeout: TIMEOUT })
-                await page.waitForTimeout(PAGE_TIMEOUT)
+                await button
+                    .first()
+                    .click({
+                        timeout: timeouts.CLICK_TIMEOUT,
+                    })
+                    .catch(() => {
+                        // The button is visible but we couldn't click it, retry
+                        retryCheckAndDismissModals()
+                    })
+                await page.waitForTimeout(timeouts.PAGE_TIMEOUT)
                 console.info(
                     `[GlobalDialogObserver] DEBUG - Successfully dismissed ${modalType} with partial text: "${buttonText}"`,
                 )
@@ -273,13 +352,21 @@ export async function dismissWithTextButtons(
 
             if (
                 buttonCount > 0 &&
-                (await button.first().isVisible({ timeout: TIMEOUT }))
+                (await button
+                    .first()
+                    .isVisible({ timeout: timeouts.VISIBLE_TIMEOUT }))
             ) {
                 console.info(
                     `[GlobalDialogObserver] DEBUG - Attempting click on span text button: "${buttonText}"`,
                 )
-                await button.first().click({ timeout: 2000 })
-                await page.waitForTimeout(PAGE_TIMEOUT)
+                await button
+                    .first()
+                    .click({ timeout: timeouts.CLICK_TIMEOUT })
+                    .catch(() => {
+                        // The button is visible but we couldn't click it, retry
+                        retryCheckAndDismissModals()
+                    })
+                await page.waitForTimeout(timeouts.PAGE_TIMEOUT)
                 console.info(
                     `[GlobalDialogObserver] DEBUG - Successfully dismissed ${modalType} with span text: "${buttonText}"`,
                 )
