@@ -59,9 +59,6 @@ export class WaitingRoomState extends BaseState {
             // If everything is fine, move to the InCall state
             return this.transition(MeetingStateType.InCall)
         } catch (error) {
-            // Arrêter l'observateur en cas d'erreur
-            this.stopDialogObserver()
-
             console.error('Error in waiting room state:', error)
 
             if (error instanceof JoinError) {
@@ -178,5 +175,20 @@ export class WaitingRoomState extends BaseState {
                     reject(error)
                 })
         })
+    }
+
+    private startDialogObserver() {
+        // Use the global observer instead of creating a local one
+        // Stopping the dialog observer is done in the cleanup state
+        if (this.context.dialogObserver) {
+            console.info(
+                `[BaseState] Starting global dialog observer in state ${this.constructor.name}`,
+            )
+            this.context.dialogObserver.setupGlobalDialogObserver()
+        } else {
+            console.warn(
+                `[BaseState] Global dialog observer not available in state ${this.constructor.name}`,
+            )
+        }
     }
 }

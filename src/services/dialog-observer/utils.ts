@@ -214,10 +214,6 @@ export async function dismissWithTextButtons(
 ): Promise<DialogObserverResult> {
     const buttonTexts = LanguagePatterns.getAllButtonTexts()
 
-    console.log(
-        `[GlobalDialogObserver] DEBUG - Starting text-based button dismissal for ${modalType}. Will try ${buttonTexts.length} button text patterns`,
-    )
-
     // Try each button text pattern
     for (const buttonText of buttonTexts) {
         try {
@@ -274,9 +270,6 @@ export async function dismissWithTextButtons(
             // Try by span content (for Material Design buttons)
             button = modal.locator(`button span:has-text("${buttonText}")`)
             buttonCount = await button.count()
-            console.info(
-                `[GlobalDialogObserver] DEBUG - Span text "${buttonText}": found ${buttonCount} buttons`,
-            )
 
             if (
                 buttonCount > 0 &&

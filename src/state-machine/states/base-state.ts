@@ -42,31 +42,4 @@ export abstract class BaseState {
         this.context.errorTime = Date.now()
         return this.transition(MeetingStateType.Error)
     }
-
-    protected startDialogObserver() {
-        // Use the global observer instead of creating a local one
-        if (this.context.dialogObserver) {
-            console.info(
-                `[BaseState] Starting global dialog observer in state ${this.constructor.name}`,
-            )
-            this.context.dialogObserver.setupGlobalDialogObserver()
-        } else {
-            console.warn(
-                `[BaseState] Global dialog observer not available in state ${this.constructor.name}`,
-            )
-        }
-    }
-
-    protected stopDialogObserver() {
-        if (this.context.dialogObserver) {
-            console.info(
-                `[BaseState] Stopping global dialog observer in state ${this.constructor.name}`,
-            )
-            this.context.dialogObserver.stopGlobalDialogObserver()
-        } else {
-            console.warn(
-                `[BaseState] Global dialog observer not available in state ${this.constructor.name}`,
-            )
-        }
-    }
 }

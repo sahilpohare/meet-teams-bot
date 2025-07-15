@@ -39,6 +39,12 @@ export class CleanupState extends BaseState {
 
     private async performCleanup(): Promise<void> {
         try {
+            // 0. Stop the dialog observer
+            this.stopDialogObserver()
+            console.info(
+                '🧹 Step 0/5: Stopping dialog observer. It would not block the cleanup',
+            )
+
             // 🎬 PRIORITY 1: Stop video recording immediately to avoid data loss
             console.info('🧹 Step 1/5: Stopping ScreenRecorder (PRIORITY)')
             await this.stopScreenRecorder()
@@ -48,10 +54,6 @@ export class CleanupState extends BaseState {
                 '🧹 Steps 2-4: Running parallel cleanup (streaming + speakers + HTML)',
             )
             await Promise.allSettled([
-                (async () => {
-                    console.info('🧹 Step 1.5/5: Stopping dialog observer')
-                    this.stopDialogObserver()
-                })(),
                 // 2. Stop the streaming (fast, no await needed)
                 (async () => {
                     console.info('🧹 Step 2/5: Stopping streaming service')
@@ -210,6 +212,19 @@ export class CleanupState extends BaseState {
             }
         } catch (error) {
             console.error('Failed to cleanup browser resources:', error)
+        }
+    }
+
+    private stopDialogObserver() {
+        if (this.context.dialogObserver) {
+            console.info(
+                `[BaseState] Stopping global dialog observer in state ${this.constructor.name}`,
+            )
+            this.context.dialogObserver.stopGlobalDialogObserver()
+        } else {
+            console.warn(
+                `[BaseState] Global dialog observer not available in state ${this.constructor.name}`,
+            )
         }
     }
 }
