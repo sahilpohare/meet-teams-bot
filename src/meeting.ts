@@ -1,15 +1,15 @@
-import { MeetingParams, MeetingProviderInterface } from './types'
+import { MeetingProviderInterface } from './types'
 
 // import { Browser as PuppeteerBrowser, Page as PuppeteerPage } from 'puppeteer'
 import { MeetProvider } from './meeting/meet'
 import { TeamsProvider } from './meeting/teams'
+import { GLOBAL } from './singleton'
 import { MeetingStateMachine } from './state-machine/machine'
 import {
     MeetingStateType,
     ParticipantState,
     RecordingEndReason,
 } from './state-machine/types'
-import { GLOBAL } from './singleton'
 
 export class MeetingHandle {
     static instance: MeetingHandle = null
