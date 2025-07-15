@@ -7,6 +7,7 @@ import { ScreenRecorder } from '../recording/ScreenRecorder'
 import { Streaming } from '../streaming'
 import { MeetingProviderInterface } from '../types'
 import { PathManager } from '../utils/PathManager'
+import { DialogObserver } from '../services/dialog-observer'
 
 export enum MeetingStateType {
     Initialization = 'initialization',
@@ -91,16 +92,13 @@ export interface MeetingContext {
     errorTime?: number
     hasResumed?: boolean
     speakers?: string[]
-    dialogObserverInterval?: NodeJS.Timeout
-    dialogObserverHeartbeat?: NodeJS.Timeout
     lastActivityTime?: number
     lastFrameTime?: number
 
-    // Méthodes pour la gestion globale des observateurs
-    startGlobalDialogObserver?: () => void
-    stopGlobalDialogObserver?: () => void
-
     meetingUrl?: string
+
+    // Dialog observer
+    dialogObserver?: DialogObserver
 }
 
 export interface StateTransition {

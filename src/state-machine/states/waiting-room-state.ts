@@ -15,7 +15,6 @@ export class WaitingRoomState extends BaseState {
     async execute(): StateExecuteResult {
         try {
             console.info('Entering waiting room state')
-            Events.inWaitingRoom()
 
             // Get meeting information
             const { meetingId, password } = await this.getMeetingInfo()
@@ -33,6 +32,9 @@ export class WaitingRoomState extends BaseState {
                 GLOBAL.get().enter_message,
             )
 
+            // Start the dialog observer before opening the page
+            this.startDialogObserver()
+
             // Open the meeting page
             await this.openMeetingPage(meetingLink)
 
@@ -47,8 +49,8 @@ export class WaitingRoomState extends BaseState {
                 this.context.playwrightPage,
             )
 
-            // Start the dialog observer once the page is open
-            this.startDialogObserver()
+            // Send waiting room event after the page is open
+            Events.inWaitingRoom()
 
             // Wait for acceptance into the meeting
             await this.waitForAcceptance()

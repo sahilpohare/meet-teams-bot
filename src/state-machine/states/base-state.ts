@@ -45,23 +45,28 @@ export abstract class BaseState {
 
     protected startDialogObserver() {
         // Use the global observer instead of creating a local one
-        if (this.context.startGlobalDialogObserver) {
-            this.context.startGlobalDialogObserver()
+        if (this.context.dialogObserver) {
             console.info(
-                `Requested global dialog observer from state ${this.constructor.name}`,
+                `[BaseState] Starting global dialog observer in state ${this.constructor.name}`,
             )
+            this.context.dialogObserver.setupGlobalDialogObserver()
         } else {
             console.warn(
-                `Global dialog observer not available in state ${this.constructor.name}`,
+                `[BaseState] Global dialog observer not available in state ${this.constructor.name}`,
             )
         }
     }
 
     protected stopDialogObserver() {
-        // This method is kept for compatibility but no longer does anything
-        // The global observer will be stopped at the state machine level
-        console.info(
-            `Dialog observer stop requested from state ${this.constructor.name} (ignored - using global observer)`,
-        )
+        if (this.context.dialogObserver) {
+            console.info(
+                `[BaseState] Stopping global dialog observer in state ${this.constructor.name}`,
+            )
+            this.context.dialogObserver.stopGlobalDialogObserver()
+        } else {
+            console.warn(
+                `[BaseState] Global dialog observer not available in state ${this.constructor.name}`,
+            )
+        }
     }
 }

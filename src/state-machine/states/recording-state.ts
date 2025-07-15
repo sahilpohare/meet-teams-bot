@@ -25,9 +25,6 @@ export class RecordingState extends BaseState {
         try {
             console.info('Starting recording state')
 
-            // Start the dialog observer when entering this state
-            this.startDialogObserver()
-
             // Initialize recording
             await this.initializeRecording()
 
@@ -79,9 +76,6 @@ export class RecordingState extends BaseState {
             )
             return this.transition(MeetingStateType.Cleanup)
         } catch (error) {
-            // Stop the observer in case of error
-            this.stopDialogObserver()
-
             console.error('❌ Error in recording state:', error)
             console.error('❌ Error stack:', (error as Error).stack)
             return this.handleError(error as Error)
