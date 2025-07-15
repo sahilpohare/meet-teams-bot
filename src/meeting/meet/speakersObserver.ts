@@ -44,10 +44,10 @@ export class MeetSpeakersObserver {
             async (speakers: SpeakerData[]) => {
                 try {
                     console.log(
-                        `[Meet] 📞 CALLBACK RECEIVED: ${speakers.length} speakers from browser`,
+                        `[Meet] 🗣️ CALLBACK RECEIVED: ${speakers.length} speakers from browser`,
                     )
                     this.onSpeakersChange(speakers)
-                    console.log(`[Meet] ✅ onSpeakersChange callback completed`)
+                    // console.log(`[Meet] ✅ onSpeakersChange callback completed`)
                 } catch (error) {
                     console.error(
                         '[Meet] ❌ Error in speakers callback:',
