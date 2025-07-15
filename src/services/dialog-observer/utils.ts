@@ -15,8 +15,8 @@ const TIMEOUTS = {
 export async function tryPatternsWithSmartButtonSearch(
     page: Page,
     patterns: Array<{ name: string; selector: string; method: string }>,
+    retryCheckAndDismissModals: () => Promise<void>,
     customTimeout: number = 0,
-    retryCheckAndDismissModals: () => Promise<void> = () => Promise.resolve(),
 ): Promise<DialogObserverResult> {
     const timeouts =
         customTimeout === 0
@@ -80,8 +80,8 @@ export async function tryPatternsWithSmartButtonSearch(
                             searchStrategy.scope,
                             pattern.name,
                             searchStrategy.name,
-                            customTimeout,
                             retryCheckAndDismissModals,
+                            customTimeout,
                         )
                         if (result.dismissed) {
                             return {
@@ -120,8 +120,8 @@ export async function dismissWithUniversalButtonSearch(
     searchScope: any,
     modalType: string,
     scopeName: string,
+    retryCheckAndDismissModals: () => Promise<void>,
     customTimeout: number = 0,
-    retryCheckAndDismissModals: () => Promise<void> = () => Promise.resolve(),
 ): Promise<DialogObserverResult> {
     const timeouts =
         customTimeout === 0
@@ -246,8 +246,8 @@ export async function dismissWithUniversalButtonSearch(
         page,
         searchScope,
         modalType,
-        customTimeout,
         retryCheckAndDismissModals,
+        customTimeout,
     )
 }
 
@@ -258,8 +258,8 @@ export async function dismissWithTextButtons(
     page: Page,
     modal: any,
     modalType: string,
+    retryCheckAndDismissModals: () => Promise<void>,
     customTimeout: number = 0,
-    retryCheckAndDismissModals: () => Promise<void> = () => Promise.resolve(),
 ): Promise<DialogObserverResult> {
     const timeouts =
         customTimeout === 0

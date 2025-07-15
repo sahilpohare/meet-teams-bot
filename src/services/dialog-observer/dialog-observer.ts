@@ -122,30 +122,10 @@ export class DialogObserver {
         try {
             // Try detection methods in order of reliability
             const detectionMethods = [
-                () =>
-                    this.detectSemanticModals(
-                        page,
-                        customTimeout,
-                        this.retryCheckAndDismissModals,
-                    ),
-                () =>
-                    this.detectBehavioralModals(
-                        page,
-                        customTimeout,
-                        this.retryCheckAndDismissModals,
-                    ),
-                () =>
-                    this.detectContentBasedModals(
-                        page,
-                        customTimeout,
-                        this.retryCheckAndDismissModals,
-                    ),
-                () =>
-                    this.detectStructuralModals(
-                        page,
-                        customTimeout,
-                        this.retryCheckAndDismissModals,
-                    ),
+                () => this.detectSemanticModals(page, customTimeout),
+                () => this.detectBehavioralModals(page, customTimeout),
+                () => this.detectContentBasedModals(page, customTimeout),
+                () => this.detectStructuralModals(page, customTimeout),
             ]
 
             for (const detectMethod of detectionMethods) {
@@ -189,8 +169,6 @@ export class DialogObserver {
     protected async detectSemanticModals(
         page: Page,
         customTimeout: number = 0,
-        retryCheckAndDismissModals: () => Promise<void> = () =>
-            Promise.resolve(),
     ): Promise<DialogObserverResult> {
         const ariaPatterns = [
             {
@@ -218,8 +196,8 @@ export class DialogObserver {
         return await tryPatternsWithSmartButtonSearch(
             page,
             ariaPatterns,
+            this.retryCheckAndDismissModals.bind(this),
             customTimeout,
-            retryCheckAndDismissModals,
         )
     }
 
@@ -229,8 +207,6 @@ export class DialogObserver {
     protected async detectBehavioralModals(
         page: Page,
         customTimeout: number = 0,
-        retryCheckAndDismissModals: () => Promise<void> = () =>
-            Promise.resolve(),
     ): Promise<DialogObserverResult> {
         const behavioralPatterns = [
             {
@@ -260,8 +236,8 @@ export class DialogObserver {
         return await tryPatternsWithSmartButtonSearch(
             page,
             behavioralPatterns,
+            this.retryCheckAndDismissModals.bind(this),
             customTimeout,
-            retryCheckAndDismissModals,
         )
     }
 
@@ -271,8 +247,6 @@ export class DialogObserver {
     protected async detectContentBasedModals(
         page: Page,
         customTimeout: number = 0,
-        retryCheckAndDismissModals: () => Promise<void> = () =>
-            Promise.resolve(),
     ): Promise<DialogObserverResult> {
         const contentPatterns = [
             // Video privacy patterns (multi-language)
@@ -314,8 +288,8 @@ export class DialogObserver {
         return await tryPatternsWithSmartButtonSearch(
             page,
             enhancedPatterns,
+            this.retryCheckAndDismissModals.bind(this),
             customTimeout,
-            retryCheckAndDismissModals,
         )
     }
 
@@ -325,8 +299,6 @@ export class DialogObserver {
     protected async detectStructuralModals(
         page: Page,
         customTimeout: number = 0,
-        retryCheckAndDismissModals: () => Promise<void> = () =>
-            Promise.resolve(),
     ): Promise<DialogObserverResult> {
         const patterns = [
             // Modal with header image and text content
@@ -354,8 +326,8 @@ export class DialogObserver {
         return await tryPatternsWithSmartButtonSearch(
             page,
             patterns,
+            this.retryCheckAndDismissModals.bind(this),
             customTimeout,
-            retryCheckAndDismissModals,
         )
     }
 }
