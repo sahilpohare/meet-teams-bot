@@ -14,8 +14,6 @@ export class DialogObserver {
 
     constructor(context: MeetingContext) {
         this.context = context
-
-        this.setupGlobalDialogObserver()
     }
 
     setupGlobalDialogObserver() {

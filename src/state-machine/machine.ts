@@ -5,10 +5,9 @@ import {
     StateTransition,
 } from './types'
 
-import { GLOBAL } from '../singleton'
+import { DialogObserver } from '../services/dialog-observer'
 import { getStateInstance } from './states'
 import { MeetingContext } from './types'
-import { DialogObserver } from '../services/dialog-observer'
 
 export class MeetingStateMachine {
     private currentState: MeetingStateType
@@ -17,7 +16,6 @@ export class MeetingStateMachine {
     private forceStop: boolean = false
     private wasInRecordingState: boolean = false
     private normalTermination: boolean = false
-    public dialogObserver: DialogObserver
 
     constructor(initialContext: Partial<MeetingContext>) {
         this.currentState = MeetingStateType.Initialization
@@ -26,7 +24,7 @@ export class MeetingStateMachine {
             error: null,
         } as MeetingContext
 
-        this.dialogObserver = new DialogObserver(this.context)
+        this.context.dialogObserver = new DialogObserver(this.context)
     }
 
     public async start(): Promise<void> {
@@ -133,13 +131,13 @@ export class MeetingStateMachine {
             this.context.lastSpeakerTime = state.lastSpeakerTime
             this.context.noSpeakerDetectedTime = state.noSpeakerDetectedTime
 
-            console.info('Updated participant state:', {
-                attendeesCount: state.attendeesCount,
-                firstUserJoined: this.context.firstUserJoined,
-                lastSpeakerTime: state.lastSpeakerTime,
-                noSpeakerDetectedTime: state.noSpeakerDetectedTime,
-                state: this.currentState,
-            })
+            // console.info('Updated participant state:', {
+            //     attendeesCount: state.attendeesCount,
+            //     firstUserJoined: this.context.firstUserJoined,
+            //     lastSpeakerTime: state.lastSpeakerTime,
+            //     noSpeakerDetectedTime: state.noSpeakerDetectedTime,
+            //     state: this.currentState,
+            // })
         }
     }
 
