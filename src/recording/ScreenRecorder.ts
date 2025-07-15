@@ -309,7 +309,7 @@ export class ScreenRecorder extends EventEmitter {
                 '-g',
                 '30', // Keyframe every 30 frames (1 sec at 30fps) for precise trimming
                 '-keyint_min',
-                '30', // Force minimum keyframe interval 
+                '30', // Force minimum keyframe interval
                 '-bf',
                 '0',
                 '-refs',
@@ -390,7 +390,15 @@ export class ScreenRecorder extends EventEmitter {
 
             if (isSuccessful) {
                 console.log('✅ Recording considered successful, uploading...')
-                await this.handleSuccessfulRecording()
+                try {
+                    await this.handleSuccessfulRecording()
+                } catch (error) {
+                    console.error(
+                        '❌ Error in handleSuccessfulRecording:',
+                        error,
+                    )
+                    this.emit('error', error)
+                }
             } else {
                 console.warn(
                     `⚠️ Recording failed - unexpected exit code: ${code}`,
@@ -590,8 +598,8 @@ export class ScreenRecorder extends EventEmitter {
             }
         } catch (error) {
             console.error('❌ Error during recording processing:', error)
-            // Emit the error so the state machine can handle it
-            this.emit('error', error)
+            // Re-throw the error so it propagates to the caller
+            throw error
         }
     }
 

@@ -5,9 +5,9 @@ import {
     StateTransition,
 } from './types'
 
+import { GLOBAL } from '../singleton'
 import { getStateInstance } from './states'
 import { MeetingContext } from './types'
-import { GLOBAL } from '../singleton'
 
 export class MeetingStateMachine {
     private currentState: MeetingStateType
@@ -179,8 +179,6 @@ export class MeetingStateMachine {
                 if (this.forceStop) {
                     this.context.endReason =
                         this.context.endReason || RecordingEndReason.ApiRequest
-                    await this.transitionToCleanup()
-                    break
                 }
 
                 const state = getStateInstance(this.currentState, this.context)
@@ -234,23 +232,9 @@ export class MeetingStateMachine {
     }
 
     private async handleError(error: Error): Promise<void> {
-        try {
-            console.error('Error in state machine:', error)
-            this.error = error
-            this.context.error = error
-
-            // Passer à l'état d'erreur
-            const errorState = getStateInstance(
-                MeetingStateType.Error,
-                this.context,
-            )
-            await errorState.execute()
-        } catch (secondaryError) {
-            console.error('Error handling error:', secondaryError)
-        } finally {
-            // Dans tous les cas, on termine par le nettoyage
-            await this.transitionToCleanup()
-        }
+        console.error('Error in state machine:', error)
+        this.error = error
+        this.context.error = error
     }
 
     public async pauseRecording(): Promise<void> {
@@ -300,15 +284,6 @@ export class MeetingStateMachine {
         }
     }
 
-    private async transitionToCleanup(): Promise<void> {
-        this.currentState = MeetingStateType.Cleanup
-        const cleanupState = getStateInstance(
-            MeetingStateType.Cleanup,
-            this.context,
-        )
-        await cleanupState.execute()
-    }
-
     public getContext(): MeetingContext {
         return this.context
     }
@@ -319,9 +294,5 @@ export class MeetingStateMachine {
 
     public getWasInRecordingState(): boolean {
         return this.wasInRecordingState
-    }
-
-    public getNormalTermination(): boolean {
-        return this.normalTermination
     }
 }
