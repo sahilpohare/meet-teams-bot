@@ -1,15 +1,15 @@
-import { MeetingHandle } from './meeting'
 import { Api } from './api/methods'
 import { Events } from './events'
+import { server } from './server'
 import { GLOBAL } from './singleton'
-import { PathManager } from './utils/PathManager'
+import { MeetingStateMachine } from './state-machine/machine'
 import { detectMeetingProvider } from './utils/detectMeetingProvider' //TODO: RENAME
 import {
-    uploadLogsToS3,
-    setupExitHandler,
     setupConsoleLogger,
+    setupExitHandler,
+    uploadLogsToS3,
 } from './utils/Logger'
-import { server } from './server'
+import { PathManager } from './utils/PathManager'
 
 import { JoinError, MeetingParams } from './types'
 
@@ -75,7 +75,7 @@ async function handleSuccessfulRecording(): Promise<void> {
 
     // Log the end reason for debugging
     console.log(
-        `Recording ended normally with reason: ${MeetingHandle.instance.getEndReason()}`,
+        `Recording ended normally with reason: ${MeetingStateMachine.instance.getEndReason()}`,
     )
 
     // Handle API endpoint call with built-in retry logic
@@ -94,7 +94,7 @@ async function handleFailedRecording(): Promise<void> {
     console.error('Recording did not complete successfully')
 
     // Log the end reason for debugging
-    const endReason = MeetingHandle.instance.getEndReason()
+    const endReason = MeetingStateMachine.instance.getEndReason()
     console.log(`Recording failed with reason: ${endReason || 'Unknown'}`)
 
     // Send failure webhook
@@ -147,7 +147,7 @@ async function handleFailedRecording(): Promise<void> {
         console.log('Server started successfully')
 
         // Initialize components
-        MeetingHandle.init()
+        MeetingStateMachine.init()
         Events.init()
         Events.joiningCall()
 
@@ -157,10 +157,10 @@ async function handleFailedRecording(): Promise<void> {
         }
 
         // Start the meeting recording
-        await MeetingHandle.instance.startRecordMeeting()
+        await MeetingStateMachine.instance.startRecordMeeting()
 
         // Handle recording result
-        if (MeetingHandle.instance.wasRecordingSuccessful()) {
+        if (MeetingStateMachine.instance.wasRecordingSuccessful()) {
             await handleSuccessfulRecording()
         } else {
             await handleFailedRecording()

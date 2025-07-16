@@ -204,7 +204,6 @@ export class RecordingState extends BaseState {
             await Events.callEnded()
 
             console.info('Setting isProcessing to false to end recording loop')
-            await sleep(2000)
         } catch (error) {
             console.error('Error during meeting end handling:', error)
         } finally {

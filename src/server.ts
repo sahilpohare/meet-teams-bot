@@ -1,13 +1,13 @@
-import express from 'express'
-import { writeFile, unlink } from 'fs/promises'
-import { unlinkSync } from 'fs'
 import { execSync } from 'child_process'
+import express from 'express'
+import { unlinkSync } from 'fs'
+import { writeFile } from 'fs/promises'
 import * as path from 'path'
 
 import { SoundContext, VideoContext } from './media_context'
-import { StopRecordParams } from './types'
-import { MeetingHandle } from './meeting'
+import { MeetingStateMachine } from './state-machine/machine'
 import { RecordingEndReason } from './state-machine/types'
+import { StopRecordParams } from './types'
 
 import axios from 'axios'
 
@@ -73,8 +73,8 @@ export async function server() {
         console.log('end meeting from api server :', data)
 
         // Mettre à jour immédiatement le contexte de la machine à états
-        if (MeetingHandle.instance) {
-            MeetingHandle.instance.stateMachine.context.endReason =
+        if (MeetingStateMachine.instance) {
+            MeetingStateMachine.instance.context.endReason =
                 RecordingEndReason.ApiRequest
         }
 
@@ -83,7 +83,7 @@ export async function server() {
 
     async function stop_record(res: any, reason: RecordingEndReason) {
         try {
-            const meetingHandle = MeetingHandle.instance
+            const meetingHandle = MeetingStateMachine.instance
 
             if (!meetingHandle) {
                 return res.status(404).json({

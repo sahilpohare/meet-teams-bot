@@ -1,9 +1,9 @@
 import { generateBranding, playBranding } from '../../branding'
 import { openBrowser } from '../../browser/browser'
-import { MeetingHandle } from '../../meeting'
 import { GLOBAL } from '../../singleton'
 import { JoinError, JoinErrorCode } from '../../types'
 import { PathManager } from '../../utils/PathManager'
+import { MeetingStateMachine } from '../machine'
 import { MeetingStateType, StateExecuteResult } from '../types'
 import { BaseState } from './base-state'
 
@@ -17,7 +17,7 @@ export class InitializationState extends BaseState {
 
             // Initialize meeting handle if not exists
             if (!this.context.meetingHandle) {
-                this.context.meetingHandle = new MeetingHandle()
+                this.context.meetingHandle = new MeetingStateMachine()
             }
 
             // Setup path manager first (important for logs)

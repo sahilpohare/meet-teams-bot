@@ -1,26 +1,39 @@
-import {
-    MeetingStateType,
-    ParticipantState,
-    RecordingEndReason,
-    StateTransition,
-} from './types'
+import { MeetingStateType, ParticipantState, RecordingEndReason } from './types'
 
+import { MeetProvider } from '../meeting/meet'
+import { TeamsProvider } from '../meeting/teams'
+import { SimpleDialogObserver } from '../services/dialog-observer/simple-dialog-observer'
+import { GLOBAL } from '../singleton'
+import { MeetingProviderInterface } from '../types'
 import { getStateInstance } from './states'
 import { MeetingContext } from './types'
-import { SimpleDialogObserver } from '../services/dialog-observer/simple-dialog-observer'
 
 export class MeetingStateMachine {
+    static instance: MeetingStateMachine = null
     private currentState: MeetingStateType
     public context: MeetingContext
-    private error: Error | null = null
-    private forceStop: boolean = false
-    private wasInRecordingState: boolean = false
-    private normalTermination: boolean = false
+    private provider: MeetingProviderInterface
 
-    constructor(initialContext: Partial<MeetingContext>) {
+    static init() {
+        if (MeetingStateMachine.instance == null) {
+            this.instance = new MeetingStateMachine()
+            console.log(
+                '*** INIT MeetingStateMachine.instance',
+                GLOBAL.get().meeting_url,
+            )
+        }
+    }
+
+    constructor() {
         this.currentState = MeetingStateType.Initialization
+        this.provider =
+            GLOBAL.get().meetingProvider === 'Teams'
+                ? new TeamsProvider()
+                : new MeetProvider()
+
         this.context = {
-            ...initialContext,
+            provider: this.provider,
+            meetingHandle: this as any, // Type assertion to avoid circular reference
             error: null,
         } as MeetingContext
 
@@ -29,50 +42,30 @@ export class MeetingStateMachine {
 
     public async start(): Promise<void> {
         try {
-            while (
-                this.currentState !== MeetingStateType.Terminated &&
-                !this.forceStop
-            ) {
+            while (this.currentState !== MeetingStateType.Terminated) {
                 console.info(`Current state: ${this.currentState}`)
 
+                // Track recording state for success determination
                 if (this.currentState === MeetingStateType.Recording) {
-                    this.wasInRecordingState = true
+                    // We're in recording state
                 }
 
-                if (this.forceStop) {
-                    this.context.endReason =
-                        this.context.endReason || RecordingEndReason.ApiRequest
-                }
-
+                // Execute current state and transition to next
                 const state = getStateInstance(this.currentState, this.context)
-                const transition: StateTransition = await state.execute()
+                const transition = await state.execute()
 
                 this.currentState = transition.nextState
                 this.context = transition.context
             }
 
-            if (this.wasInRecordingState && this.context.endReason) {
-                const normalReasons = [
-                    RecordingEndReason.ApiRequest,
-                    RecordingEndReason.BotRemoved,
-                    RecordingEndReason.ManualStop,
-                    RecordingEndReason.NoAttendees,
-                    RecordingEndReason.NoSpeaker,
-                    RecordingEndReason.RecordingTimeout,
-                ]
-                this.normalTermination = normalReasons.includes(
-                    this.context.endReason,
-                )
-            }
+            // State machine completed
         } catch (error) {
-            this.error = error as Error
             await this.handleError(error as Error)
         }
     }
 
     public async requestStop(reason: RecordingEndReason): Promise<void> {
         console.info(`Stop requested with reason: ${reason}`)
-        this.forceStop = true
         this.context.endReason = reason
     }
 
@@ -81,7 +74,7 @@ export class MeetingStateMachine {
     }
 
     public getError(): Error | null {
-        return this.error
+        return this.context.error || null
     }
 
     public getStartTime(): number {
@@ -90,7 +83,6 @@ export class MeetingStateMachine {
 
     private async handleError(error: Error): Promise<void> {
         console.error('Error in state machine:', error)
-        this.error = error
         this.context.error = error
     }
 
@@ -145,11 +137,48 @@ export class MeetingStateMachine {
         return this.context
     }
 
-    public wasRecordingSuccessful(): boolean {
-        return this.wasInRecordingState && this.normalTermination && !this.error
+    // Methods from MeetingHandle
+    public async startRecordMeeting(): Promise<void> {
+        try {
+            await this.start()
+
+            // Check if an error occurred during execution
+            if (
+                this.getError() ||
+                this.currentState === MeetingStateType.Error
+            ) {
+                throw (
+                    this.getError() || new Error('Recording failed to complete')
+                )
+            }
+        } catch (error) {
+            console.error('Error in startRecordMeeting:', error)
+            throw error
+        }
     }
 
-    public getWasInRecordingState(): boolean {
-        return this.wasInRecordingState
+    public async stopMeeting(reason: RecordingEndReason): Promise<void> {
+        await this.requestStop(reason)
+    }
+
+    public wasRecordingSuccessful(): boolean {
+        if (!this.context.endReason || this.context.error) {
+            return false
+        }
+
+        const normalReasons = [
+            RecordingEndReason.ApiRequest,
+            RecordingEndReason.BotRemoved,
+            RecordingEndReason.ManualStop,
+            RecordingEndReason.NoAttendees,
+            RecordingEndReason.NoSpeaker,
+            RecordingEndReason.RecordingTimeout,
+        ]
+
+        return normalReasons.includes(this.context.endReason)
+    }
+
+    public getEndReason(): RecordingEndReason | undefined {
+        return this.context.endReason
     }
 }

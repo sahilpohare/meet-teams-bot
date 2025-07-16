@@ -1,11 +1,11 @@
 import { BrowserContext, Page } from '@playwright/test'
 import { BrandingHandle } from '../branding'
-import { MeetingHandle } from '../meeting'
 import { ScreenRecorder } from '../recording/ScreenRecorder'
+import { SimpleDialogObserver } from '../services/dialog-observer/simple-dialog-observer'
 import { Streaming } from '../streaming'
 import { MeetingProviderInterface } from '../types'
 import { PathManager } from '../utils/PathManager'
-import { SimpleDialogObserver } from '../services/dialog-observer/simple-dialog-observer'
+import { MeetingStateMachine } from './machine'
 
 export enum MeetingStateType {
     Initialization = 'initialization',
@@ -30,7 +30,7 @@ export enum RecordingEndReason {
 
 export interface MeetingContext {
     // Références aux objets principaux
-    meetingHandle: MeetingHandle
+    meetingHandle: MeetingStateMachine
     provider: MeetingProviderInterface
 
     // Pages et contexte du navigateur

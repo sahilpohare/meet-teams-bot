@@ -1,6 +1,6 @@
 import * as fs from 'fs'
 
-import { MeetingHandle } from './meeting'
+import { MeetingStateMachine } from './state-machine/machine'
 import { Streaming } from './streaming'
 
 import { ParticipantState } from './state-machine/types'
@@ -77,7 +77,7 @@ export class SpeakerManager {
         speakers: SpeakerData[],
         speakersCount: number,
     ): void {
-        if (!MeetingHandle.instance) {
+        if (!MeetingStateMachine.instance) {
             return
         }
 
@@ -92,7 +92,7 @@ export class SpeakerManager {
             noSpeakerDetectedTime: speakersCount === 0 ? Date.now() : null,
         }
 
-        MeetingHandle.instance.updateParticipantState(participantState)
+        MeetingStateMachine.instance.updateParticipantState(participantState)
     }
 
     private async handleSpeakersTranscription(
