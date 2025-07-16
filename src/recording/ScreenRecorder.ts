@@ -102,7 +102,6 @@ export class ScreenRecorder extends EventEmitter {
             console.error('Failed to start native recording:', error)
             this.isRecording = false
             this.emit('error', { type: 'startError', error })
-            throw error
         }
     }
 
@@ -397,7 +396,7 @@ export class ScreenRecorder extends EventEmitter {
                         '❌ Error in handleSuccessfulRecording:',
                         error,
                     )
-                    this.emit('error', error)
+                    throw error
                 }
             } else {
                 console.warn(
@@ -1030,6 +1029,11 @@ file '${absoluteInputPath}'`
 
             process.on('error', (error) => {
                 reject(error)
+            })
+
+            process.on('exit', (code) => {
+                console.log(`FFmpeg process exited with code ${code}`)
+                resolve()
             })
         })
     }

@@ -5,7 +5,7 @@ import { ScreenRecorder } from '../recording/ScreenRecorder'
 import { Streaming } from '../streaming'
 import { MeetingProviderInterface } from '../types'
 import { PathManager } from '../utils/PathManager'
-import { DialogObserver } from '../services/dialog-observer/dialog-observer'
+import { SimpleDialogObserver } from '../services/dialog-observer/simple-dialog-observer'
 
 export enum MeetingStateType {
     Initialization = 'initialization',
@@ -96,7 +96,7 @@ export interface MeetingContext {
     meetingUrl?: string
 
     // Dialog observer
-    dialogObserver?: DialogObserver
+    dialogObserver?: SimpleDialogObserver
 }
 
 export interface StateTransition {

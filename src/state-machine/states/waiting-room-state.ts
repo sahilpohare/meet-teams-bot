@@ -182,12 +182,12 @@ export class WaitingRoomState extends BaseState {
         // Stopping the dialog observer is done in the cleanup state
         if (this.context.dialogObserver) {
             console.info(
-                `[BaseState] Starting global dialog observer in state ${this.constructor.name}`,
+                `Starting global dialog observer in state ${this.constructor.name}`,
             )
             this.context.dialogObserver.setupGlobalDialogObserver()
         } else {
             console.warn(
-                `[BaseState] Global dialog observer not available in state ${this.constructor.name}`,
+                `Global dialog observer not available in state ${this.constructor.name}`,
             )
         }
     }

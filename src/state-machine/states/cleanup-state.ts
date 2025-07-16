@@ -40,10 +40,10 @@ export class CleanupState extends BaseState {
     private async performCleanup(): Promise<void> {
         try {
             // 0. Stop the dialog observer
-            this.stopDialogObserver()
             console.info(
                 '🧹 Step 0/5: Stopping dialog observer. It would not block the cleanup',
             )
+            this.stopDialogObserver()
 
             // 🎬 PRIORITY 1: Stop video recording immediately to avoid data loss
             console.info('🧹 Step 1/5: Stopping ScreenRecorder (PRIORITY)')

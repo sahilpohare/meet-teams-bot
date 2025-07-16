@@ -5,9 +5,9 @@ import {
     StateTransition,
 } from './types'
 
-import { DialogObserver } from '../services/dialog-observer/dialog-observer'
 import { getStateInstance } from './states'
 import { MeetingContext } from './types'
+import { SimpleDialogObserver } from '../services/dialog-observer/simple-dialog-observer'
 
 export class MeetingStateMachine {
     private currentState: MeetingStateType
@@ -24,7 +24,7 @@ export class MeetingStateMachine {
             error: null,
         } as MeetingContext
 
-        this.context.dialogObserver = new DialogObserver(this.context)
+        this.context.dialogObserver = new SimpleDialogObserver(this.context)
     }
 
     public async start(): Promise<void> {
