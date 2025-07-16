@@ -152,7 +152,10 @@ export class MeetingStateMachine {
                 )
             }
         } catch (error) {
-            console.error('Error in startRecordMeeting:', error)
+            console.error(
+                'Error in startRecordMeeting:',
+                error instanceof Error ? error.message : error,
+            )
             throw error
         }
     }

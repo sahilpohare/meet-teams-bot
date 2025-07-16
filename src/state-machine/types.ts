@@ -22,6 +22,8 @@ export enum MeetingStateType {
 export enum RecordingEndReason {
     ManualStop = 'manual_stop',
     BotRemoved = 'bot_removed',
+    BotRemovedTooEarly = 'bot_removed_too_early',
+    BotNotAccepted = 'bot_not_accepted',
     NoAttendees = 'no_attendees',
     NoSpeaker = 'no_speaker',
     RecordingTimeout = 'recording_timeout',

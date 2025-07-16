@@ -3,7 +3,7 @@ import { Events } from './events'
 import { server } from './server'
 import { GLOBAL } from './singleton'
 import { MeetingStateMachine } from './state-machine/machine'
-import { detectMeetingProvider } from './utils/detectMeetingProvider' //TODO: RENAME
+import { detectMeetingProvider } from './utils/detectMeetingProvider'
 import {
     setupConsoleLogger,
     setupExitHandler,
@@ -47,7 +47,6 @@ async function readFromStdin(): Promise<MeetingParams> {
         })
 
         process.stdin.on('end', () => {
-            console.log('Raw data received from stdin:', JSON.stringify(data))
             try {
                 const params = JSON.parse(data) as MeetingParams
 
@@ -124,7 +123,6 @@ async function handleFailedRecording(): Promise<void> {
         const logParams = { ...meetingParams }
 
         // Mask sensitive data for security
-        if (logParams.secret) logParams.secret = '***MASKED***'
         if (logParams.user_token) logParams.user_token = '***MASKED***'
         if (logParams.bots_api_key) logParams.bots_api_key = '***MASKED***'
         if (logParams.speech_to_text_api_key)
@@ -167,7 +165,10 @@ async function handleFailedRecording(): Promise<void> {
         }
     } catch (error) {
         // Handle explicit errors from state machine
-        console.error('Meeting failed:', error)
+        console.error(
+            'Meeting failed:',
+            error instanceof Error ? error.message : error,
+        )
 
         const errorMessage =
             error instanceof JoinError

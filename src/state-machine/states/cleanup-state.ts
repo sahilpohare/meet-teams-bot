@@ -1,8 +1,12 @@
 import { SoundContext, VideoContext } from '../../media_context'
 import { ScreenRecorderManager } from '../../recording/ScreenRecorder'
+import { JoinError } from '../../types'
 import { MEETING_CONSTANTS } from '../constants'
-
-import { MeetingStateType, StateExecuteResult } from '../types'
+import {
+    MeetingStateType,
+    RecordingEndReason,
+    StateExecuteResult,
+} from '../types'
 import { BaseState } from './base-state'
 
 export class CleanupState extends BaseState {
@@ -85,6 +89,8 @@ export class CleanupState extends BaseState {
         } catch (error) {
             console.error('🧹 Cleanup error:', error)
             // Continue even if an error occurs
+            // Don't re-throw - errors are already handled
+            return
         }
     }
 
@@ -174,7 +180,22 @@ export class CleanupState extends BaseState {
                 console.log('ScreenRecorder not recording, nothing to stop')
             }
         } catch (error) {
-            console.error('Error stopping ScreenRecorder:', error)
+            console.error(
+                'Error stopping ScreenRecorder:',
+                error instanceof Error ? error.message : error,
+            )
+
+            if (error instanceof JoinError) {
+                // Allow errors to override each other - last error wins
+                // Check error message to determine the type
+                if (error.message.includes('BotNotAccepted')) {
+                    this.context.endReason = RecordingEndReason.BotNotAccepted
+                } else {
+                    this.context.endReason =
+                        RecordingEndReason.BotRemovedTooEarly
+                }
+            }
+
             // Don't throw error if recording was already stopped
             if (
                 error instanceof Error &&
@@ -184,6 +205,8 @@ export class CleanupState extends BaseState {
                 console.log(
                     'ScreenRecorder was already stopped, continuing cleanup',
                 )
+            } else if (error instanceof JoinError) {
+                // Don't re-throw JoinError to avoid noisy logs
             } else {
                 throw error
             }

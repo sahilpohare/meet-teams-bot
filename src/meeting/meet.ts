@@ -500,11 +500,6 @@ async function clickWithInnerText(
         try {
             // Dump the page content to log for analysis
             if (i === 0) {
-                console.log(
-                    'Page content preview:',
-                    await page.content().then((c) => c.slice(0, 500) + '...'),
-                )
-
                 // Log visible buttons for debugging
                 const visibleButtons = await page.evaluate(() => {
                     return Array.from(

@@ -394,9 +394,10 @@ export class ScreenRecorder extends EventEmitter {
                 } catch (error) {
                     console.error(
                         '❌ Error in handleSuccessfulRecording:',
-                        error,
+                        error instanceof Error ? error.message : error,
                     )
-                    throw error
+                    this.emit('error', error)
+                    return
                 }
             } else {
                 console.warn(
@@ -539,12 +540,22 @@ export class ScreenRecorder extends EventEmitter {
             }, gracePeriodMs)
         })
 
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
             // Wait for the 'stopped' event instead of 'exit' to ensure upload is complete
             this.once('stopped', () => {
                 this.gracePeriodActive = false
                 this.ffmpegProcess = null
                 resolve()
+            })
+
+            this.once('error', (error) => {
+                console.error(
+                    'ScreenRecorder error during stop:',
+                    error instanceof Error ? error.message : error,
+                )
+                this.gracePeriodActive = false
+                this.ffmpegProcess = null
+                reject(error)
             })
 
             // Send graceful termination signal
@@ -597,6 +608,19 @@ export class ScreenRecorder extends EventEmitter {
             }
         } catch (error) {
             console.error('❌ Error during recording processing:', error)
+
+            if (error instanceof Error) {
+                if (
+                    error.message.includes('FFprobe failed') ||
+                    error.message.includes('FFmpeg failed')
+                ) {
+                    console.log(
+                        'Converting FFprobe/FFmpeg error to BotRemovedTooEarly',
+                    )
+                    throw new JoinError(JoinErrorCode.BotRemovedTooEarly)
+                }
+            }
+
             // Re-throw the error so it propagates to the caller
             throw error
         }
@@ -644,10 +668,10 @@ export class ScreenRecorder extends EventEmitter {
         )
         const hasMeetingStartTime = this.meetingStartTime > 0
 
-        // 2. Check if meetingStartTime is properly set - if not, bot was removed too early
+        // 2. Check if meetingStartTime is properly set - if not, bot was not accepted
         if (!hasMeetingStartTime) {
             console.error(
-                `❌ Bot removed too early - meetingStartTime not set (${this.meetingStartTime})`,
+                `❌ Bot not accepted - meetingStartTime not set (${this.meetingStartTime})`,
             )
             console.error(`📊 Timing debug:`)
             console.error(`   recordingStartTime: ${this.recordingStartTime}`)
@@ -657,7 +681,7 @@ export class ScreenRecorder extends EventEmitter {
                 `   Recording duration: ${Date.now() - this.recordingStartTime}ms`,
             )
 
-            // Fallback: if we have a reasonable recording duration (>15s), set meetingStartTime to 5s before bot removal
+            // Fallback: if we have a reasonable recording duration (>10s), set meetingStartTime to 5s before bot removal
             const recordingDuration = Date.now() - this.recordingStartTime
             if (recordingDuration > 10000) {
                 // 10 seconds minimum
@@ -666,7 +690,7 @@ export class ScreenRecorder extends EventEmitter {
                 )
                 this.meetingStartTime = Date.now() - 5000 // Show only last 5 seconds
             } else {
-                throw new JoinError(JoinErrorCode.BotRemovedTooEarly)
+                throw new JoinError(JoinErrorCode.BotNotAccepted)
             }
         }
 
