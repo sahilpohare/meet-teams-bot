@@ -93,13 +93,24 @@ async function handleFailedRecording(): Promise<void> {
     console.error('Recording did not complete successfully')
 
     // Log the end reason for debugging
-    const endReason = MeetingStateMachine.instance.getEndReason()
+    const endReason = GLOBAL.getEndReason()
     console.log(`Recording failed with reason: ${endReason || 'Unknown'}`)
 
-    // Send failure webhook
-    await Events.recordingFailed(
-        String(endReason) || 'Recording did not complete successfully',
-    )
+    const errorMessage =
+        String(endReason) || 'Recording did not complete successfully'
+    console.log(`📤 Sending error to backend: ${errorMessage}`)
+
+    // Notify backend of recording failure
+    if (!GLOBAL.isServerless() && Api.instance) {
+        await Api.instance.notifyRecordingFailure(
+            GLOBAL.get().meeting_url,
+            errorMessage
+        )
+    }
+
+    // Send failure webhook to user
+    await Events.recordingFailed(errorMessage)
+    console.log(`✅ Error sent to backend successfully`)
 }
 
 // ========================================
@@ -170,12 +181,25 @@ async function handleFailedRecording(): Promise<void> {
             error instanceof Error ? error.message : error,
         )
 
-        const errorMessage =
-            error instanceof JoinError
-                ? error.message
-                : 'Recording failed to complete'
+        // Use global error if available, otherwise fallback to error message
+        const errorMessage = GLOBAL.hasError()
+            ? GLOBAL.getError()!.message
+            : error instanceof JoinError
+              ? error.message
+              : 'Recording failed to complete'
 
+        console.log(`📤 Sending error to backend: ${errorMessage}`)
+        
+        // Notify backend of recording failure
+        if (!GLOBAL.isServerless() && Api.instance) {
+            await Api.instance.notifyRecordingFailure(
+                GLOBAL.get().meeting_url,
+                errorMessage
+            )
+        }
+        
         await Events.recordingFailed(errorMessage)
+        console.log(`✅ Error sent to backend successfully`)
     } finally {
         if (!GLOBAL.isServerless()) {
             try {

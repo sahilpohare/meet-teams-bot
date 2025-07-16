@@ -1,6 +1,7 @@
 import { BrowserContext, Page } from '@playwright/test'
 
-import { JoinError, JoinErrorCode, MeetingProviderInterface } from '../types'
+import { MeetingEndReason } from '../state-machine/types'
+import { JoinError, MeetingProviderInterface } from '../types'
 
 import { GLOBAL } from '../singleton'
 import { parseMeetingUrlFromJoinInfos } from '../urlParser/meetUrlParser'
@@ -170,14 +171,18 @@ export class MeetProvider implements MeetingProviderInterface {
             }
 
             if (!askToJoinClicked) {
-                throw new JoinError(JoinErrorCode.CannotJoinMeeting)
+                const error = new JoinError(MeetingEndReason.CannotJoinMeeting)
+                GLOBAL.setError(error)
+                throw error
             }
 
             // Wait to be in the meeting with regular cancelCheck verification
             console.log('Waiting to confirm meeting join...')
             while (true) {
                 if (cancelCheck()) {
-                    throw new JoinError(JoinErrorCode.ApiRequest)
+                    const error = new JoinError(MeetingEndReason.ApiRequest)
+                    GLOBAL.setError(error)
+                    throw error
                 }
 
                 if (await isInMeeting(page)) {
@@ -187,7 +192,9 @@ export class MeetProvider implements MeetingProviderInterface {
                 }
 
                 if (await notAcceptedInMeeting(page)) {
-                    throw new JoinError(JoinErrorCode.BotNotAccepted)
+                    const error = new JoinError(MeetingEndReason.BotNotAccepted)
+                    GLOBAL.setError(error)
+                    throw error
                 }
 
                 await sleep(1000)
@@ -330,12 +337,18 @@ async function findShowEveryOne(
             }
 
             if (cancelCheck()) {
-                throw new JoinError(JoinErrorCode.TimeoutWaitingToStart)
+                const error = new JoinError(
+                    MeetingEndReason.TimeoutWaitingToStart,
+                )
+                GLOBAL.setError(error)
+                throw error
             }
 
             if (await notAcceptedInMeeting(page)) {
                 console.log('Bot not accepted, exiting meeting')
-                throw new JoinError(JoinErrorCode.BotNotAccepted)
+                const error = new JoinError(MeetingEndReason.BotNotAccepted)
+                GLOBAL.setError(error)
+                throw error
             }
 
             if (!showEveryOneFound && !inMeetingConfirmed) {
@@ -344,6 +357,8 @@ async function findShowEveryOne(
             i++
         } catch (error) {
             if (error instanceof JoinError) {
+                // Store error in global singleton
+                GLOBAL.setError(error)
                 throw error
             }
             console.error('Error in findShowEveryOne:', error)
@@ -453,13 +468,17 @@ async function notAcceptedInMeeting(page: Page): Promise<boolean> {
             const element = page.locator(`text=${text}`)
             if ((await element.count()) > 0) {
                 console.log('XXXXXXXXXXXXXXXXXX User has denied entry')
-                throw new JoinError(JoinErrorCode.BotNotAccepted)
+                const error = new JoinError(MeetingEndReason.BotNotAccepted)
+                GLOBAL.setError(error)
+                throw error
             }
         }
 
         return false
     } catch (error) {
         if (error instanceof JoinError) {
+            // Store error in global singleton
+            GLOBAL.setError(error)
             throw error
         }
         console.error('Error in notAcceptedInMeeting:', error)
@@ -498,7 +517,6 @@ async function clickWithInnerText(
     // First, take a screenshot to see what the page looks like
     for (let i = 0; i < maxAttempts; i++) {
         try {
-            // Dump the page content to log for analysis
             if (i === 0) {
                 // Log visible buttons for debugging
                 const visibleButtons = await page.evaluate(() => {

@@ -1,4 +1,6 @@
-import { JoinError, JoinErrorCode } from '../types'
+import { GLOBAL } from '../singleton'
+import { MeetingEndReason } from '../state-machine/types'
+import { JoinError } from '../types'
 
 interface MeetUrlComponents {
     meetingId: string
@@ -23,12 +25,16 @@ export async function parseMeetingUrlFromJoinInfos(
     try {
         const meetUrl = urlSplitted.find((s) => s.includes('meet.google.com'))
         if (!meetUrl) {
-            throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
+            const error = new JoinError(MeetingEndReason.InvalidMeetingUrl)
+            GLOBAL.setError(error)
+            throw error
         }
 
         const match = meetUrl.match(meetCodeRegex)
         if (!match) {
-            throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
+            const error = new JoinError(MeetingEndReason.InvalidMeetingUrl)
+            GLOBAL.setError(error)
+            throw error
         }
 
         // Reconstruct the URL in standard format
@@ -40,6 +46,8 @@ export async function parseMeetingUrlFromJoinInfos(
             password: '',
         }
     } catch (error) {
-        throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
+        const joinError = new JoinError(MeetingEndReason.InvalidMeetingUrl)
+        GLOBAL.setError(joinError)
+        throw joinError
     }
 }

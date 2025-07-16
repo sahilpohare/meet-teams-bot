@@ -65,7 +65,6 @@ export class S3Uploader {
 
                 awsProcess.stdout.on('data', (data) => {
                     output += data.toString()
-                    console.log('S3 upload progress:', data.toString().trim())
                 })
 
                 awsProcess.stderr.on('data', (data) => {
@@ -160,7 +159,6 @@ export class S3Uploader {
 
                 awsProcess.stdout.on('data', (data) => {
                     output += data.toString()
-                    console.log('S3 sync progress:', data.toString().trim())
                 })
 
                 awsProcess.stderr.on('data', (data) => {

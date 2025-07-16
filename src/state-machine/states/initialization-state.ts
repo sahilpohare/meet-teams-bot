@@ -1,10 +1,14 @@
 import { generateBranding, playBranding } from '../../branding'
 import { openBrowser } from '../../browser/browser'
 import { GLOBAL } from '../../singleton'
-import { JoinError, JoinErrorCode } from '../../types'
+import { JoinError } from '../../types'
 import { PathManager } from '../../utils/PathManager'
 import { MeetingStateMachine } from '../machine'
-import { MeetingStateType, StateExecuteResult } from '../types'
+import {
+    MeetingEndReason,
+    MeetingStateType,
+    StateExecuteResult,
+} from '../types'
 import { BaseState } from './base-state'
 
 export class InitializationState extends BaseState {
@@ -12,7 +16,9 @@ export class InitializationState extends BaseState {
         try {
             // Validate parameters
             if (!GLOBAL.get().meeting_url) {
-                throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
+                const error = new JoinError(MeetingEndReason.InvalidMeetingUrl)
+                GLOBAL.setError(error)
+                throw error
             }
 
             // Initialize meeting handle if not exists

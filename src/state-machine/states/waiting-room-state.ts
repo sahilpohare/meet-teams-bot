@@ -2,11 +2,11 @@ import { Events } from '../../events'
 import { ScreenRecorderManager } from '../../recording/ScreenRecorder'
 import { GLOBAL } from '../../singleton'
 import { Streaming } from '../../streaming'
-import { JoinError, JoinErrorCode } from '../../types'
+import { JoinError } from '../../types'
 
 import {
+    MeetingEndReason,
     MeetingStateType,
-    RecordingEndReason,
     StateExecuteResult,
 } from '../types'
 import { BaseState } from './base-state'
@@ -62,11 +62,14 @@ export class WaitingRoomState extends BaseState {
             console.error('Error in waiting room state:', error)
 
             if (error instanceof JoinError) {
-                switch (error.message) {
-                    case JoinErrorCode.BotNotAccepted:
+                // Store error in global singleton
+                GLOBAL.setError(error)
+
+                switch (error.reason) {
+                    case MeetingEndReason.BotNotAccepted:
                         Events.botRejected()
                         return this.handleError(error)
-                    case JoinErrorCode.TimeoutWaitingToStart:
+                    case MeetingEndReason.TimeoutWaitingToStart:
                         Events.waitingRoomTimeout()
                         return this.handleError(error)
                 }
@@ -87,7 +90,9 @@ export class WaitingRoomState extends BaseState {
             )
         } catch (error) {
             console.error('Failed to parse meeting URL:', error)
-            throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
+            const joinError = new JoinError(MeetingEndReason.InvalidMeetingUrl)
+            GLOBAL.setError(joinError)
+            throw joinError
         }
     }
 
@@ -137,27 +142,28 @@ export class WaitingRoomState extends BaseState {
                 if (!joinSuccessful) {
                     // Trigger the timeout only if we are not in the meeting
                     const timeoutError = new JoinError(
-                        JoinErrorCode.TimeoutWaitingToStart,
+                        MeetingEndReason.TimeoutWaitingToStart,
                     )
+                    GLOBAL.setError(timeoutError)
                     console.error('Waiting room timeout reached', timeoutError)
                     reject(timeoutError)
                 }
             }, timeoutMs)
 
             const checkStopSignal = setInterval(() => {
-                if (this.context.endReason === RecordingEndReason.ApiRequest) {
+                if (GLOBAL.getEndReason() === MeetingEndReason.ApiRequest) {
                     clearInterval(checkStopSignal)
                     clearTimeout(timeout)
-                    reject(new JoinError(JoinErrorCode.ApiRequest))
+                    const apiError = new JoinError(MeetingEndReason.ApiRequest)
+                    GLOBAL.setError(apiError)
+                    reject(apiError)
                 }
             }, 1000)
 
             this.context.provider
                 .joinMeeting(
                     this.context.playwrightPage,
-                    () =>
-                        this.context.endReason ===
-                        RecordingEndReason.ApiRequest,
+                    () => GLOBAL.getEndReason() === MeetingEndReason.ApiRequest,
                     // Add a callback to notify that the join succeeded
                     () => {
                         joinSuccessful = true

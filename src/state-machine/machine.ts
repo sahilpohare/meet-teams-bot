@@ -1,4 +1,4 @@
-import { MeetingStateType, ParticipantState, RecordingEndReason } from './types'
+import { MeetingEndReason, MeetingStateType, ParticipantState } from './types'
 
 import { MeetProvider } from '../meeting/meet'
 import { TeamsProvider } from '../meeting/teams'
@@ -64,9 +64,9 @@ export class MeetingStateMachine {
         }
     }
 
-    public async requestStop(reason: RecordingEndReason): Promise<void> {
+    public async requestStop(reason: MeetingEndReason): Promise<void> {
         console.info(`Stop requested with reason: ${reason}`)
-        this.context.endReason = reason
+        GLOBAL.setEndReason(reason)
     }
 
     public getCurrentState(): MeetingStateType {
@@ -74,7 +74,7 @@ export class MeetingStateMachine {
     }
 
     public getError(): Error | null {
-        return this.context.error || null
+        return GLOBAL.getError()
     }
 
     public getStartTime(): number {
@@ -83,7 +83,7 @@ export class MeetingStateMachine {
 
     private async handleError(error: Error): Promise<void> {
         console.error('Error in state machine:', error)
-        this.context.error = error
+        // Use singleton for error handling instead of context
     }
 
     public async pauseRecording(): Promise<void> {
@@ -160,28 +160,29 @@ export class MeetingStateMachine {
         }
     }
 
-    public async stopMeeting(reason: RecordingEndReason): Promise<void> {
-        await this.requestStop(reason)
+    public async stopMeeting(reason: MeetingEndReason): Promise<void> {
+        console.info(`Stop meeting requested with reason: ${reason}`)
+        GLOBAL.setEndReason(reason)
     }
 
     public wasRecordingSuccessful(): boolean {
-        if (!this.context.endReason || this.context.error) {
+        if (!GLOBAL.getEndReason() || GLOBAL.hasError()) {
             return false
         }
 
         const normalReasons = [
-            RecordingEndReason.ApiRequest,
-            RecordingEndReason.BotRemoved,
-            RecordingEndReason.ManualStop,
-            RecordingEndReason.NoAttendees,
-            RecordingEndReason.NoSpeaker,
-            RecordingEndReason.RecordingTimeout,
+            MeetingEndReason.ApiRequest,
+            MeetingEndReason.BotRemoved,
+            MeetingEndReason.ManualStop,
+            MeetingEndReason.NoAttendees,
+            MeetingEndReason.NoSpeaker,
+            MeetingEndReason.RecordingTimeout,
         ]
 
-        return normalReasons.includes(this.context.endReason)
+        return normalReasons.includes(GLOBAL.getEndReason() as MeetingEndReason)
     }
 
-    public getEndReason(): RecordingEndReason | undefined {
-        return this.context.endReason
+    public getEndReason(): MeetingEndReason | undefined {
+        return GLOBAL.getEndReason() || undefined
     }
 }

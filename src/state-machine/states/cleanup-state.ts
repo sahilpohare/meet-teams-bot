@@ -1,12 +1,9 @@
 import { SoundContext, VideoContext } from '../../media_context'
 import { ScreenRecorderManager } from '../../recording/ScreenRecorder'
+import { GLOBAL } from '../../singleton'
 import { JoinError } from '../../types'
 import { MEETING_CONSTANTS } from '../constants'
-import {
-    MeetingStateType,
-    RecordingEndReason,
-    StateExecuteResult,
-} from '../types'
+import { MeetingStateType, StateExecuteResult } from '../types'
 import { BaseState } from './base-state'
 
 export class CleanupState extends BaseState {
@@ -186,14 +183,10 @@ export class CleanupState extends BaseState {
             )
 
             if (error instanceof JoinError) {
-                // Allow errors to override each other - last error wins
-                // Check error message to determine the type
-                if (error.message.includes('BotNotAccepted')) {
-                    this.context.endReason = RecordingEndReason.BotNotAccepted
-                } else {
-                    this.context.endReason =
-                        RecordingEndReason.BotRemovedTooEarly
-                }
+                // Store error in global singleton - last error wins
+                GLOBAL.setError(error)
+                // Re-throw JoinError so it propagates to main.ts for backend notification
+                throw error
             }
 
             // Don't throw error if recording was already stopped
@@ -205,8 +198,6 @@ export class CleanupState extends BaseState {
                 console.log(
                     'ScreenRecorder was already stopped, continuing cleanup',
                 )
-            } else if (error instanceof JoinError) {
-                // Don't re-throw JoinError to avoid noisy logs
             } else {
                 throw error
             }

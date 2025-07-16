@@ -38,7 +38,7 @@ export abstract class BaseState {
 
     protected async handleError(error: Error): StateExecuteResult {
         console.error(`Error in state ${this.stateType}:`, error)
-        this.context.error = error
+        // Use singleton for error handling instead of context
         this.context.errorTime = Date.now()
         return this.transition(MeetingStateType.Error)
     }

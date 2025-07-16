@@ -19,15 +19,23 @@ export enum MeetingStateType {
     Terminated = 'terminated',
 }
 
-export enum RecordingEndReason {
+export enum MeetingEndReason {
+    // Normal end reasons
     ManualStop = 'manual_stop',
     BotRemoved = 'bot_removed',
-    BotRemovedTooEarly = 'bot_removed_too_early',
-    BotNotAccepted = 'bot_not_accepted',
     NoAttendees = 'no_attendees',
     NoSpeaker = 'no_speaker',
     RecordingTimeout = 'recording_timeout',
     ApiRequest = 'api_request',
+
+    // Error end reasons
+    BotRemovedTooEarly = 'bot_removed_too_early',
+    BotNotAccepted = 'bot_not_accepted',
+    CannotJoinMeeting = 'cannot_join_meeting',
+    TimeoutWaitingToStart = 'timeout_waiting_to_start',
+    InvalidMeetingUrl = 'invalid_meeting_url',
+    StreamingSetupFailed = 'streaming_setup_failed',
+    Internal = 'internal_error',
 }
 
 export interface MeetingContext {
@@ -54,8 +62,6 @@ export interface MeetingContext {
     mediaRecorderActive?: boolean
 
     // Gestion des erreurs et statut
-    error?: Error
-    endReason?: RecordingEndReason
     retryCount?: number
 
     // Identifiants et tokens

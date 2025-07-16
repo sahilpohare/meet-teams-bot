@@ -6,7 +6,8 @@ import { Streaming } from '../streaming'
 
 import { Page } from 'playwright'
 import { GLOBAL } from '../singleton'
-import { JoinError, JoinErrorCode } from '../types'
+import { MeetingEndReason } from '../state-machine/types'
+import { JoinError } from '../types'
 import { calculateVideoOffset } from '../utils/CalculVideoOffset'
 import { PathManager } from '../utils/PathManager'
 import { S3Uploader } from '../utils/S3Uploader'
@@ -617,7 +618,11 @@ export class ScreenRecorder extends EventEmitter {
                     console.log(
                         'Converting FFprobe/FFmpeg error to BotRemovedTooEarly',
                     )
-                    throw new JoinError(JoinErrorCode.BotRemovedTooEarly)
+                    const error = new JoinError(
+                        MeetingEndReason.BotRemovedTooEarly,
+                    )
+                    GLOBAL.setError(error)
+                    throw error
                 }
             }
 
@@ -690,7 +695,9 @@ export class ScreenRecorder extends EventEmitter {
                 )
                 this.meetingStartTime = Date.now() - 5000 // Show only last 5 seconds
             } else {
-                throw new JoinError(JoinErrorCode.BotNotAccepted)
+                const error = new JoinError(MeetingEndReason.BotNotAccepted)
+                GLOBAL.setError(error)
+                throw error
             }
         }
 

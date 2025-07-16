@@ -1,7 +1,11 @@
 import { Events } from '../../events'
 import { GLOBAL } from '../../singleton'
-import { JoinError, JoinErrorCode } from '../../types'
-import { MeetingStateType, StateExecuteResult } from '../types'
+import { JoinError } from '../../types'
+import {
+    MeetingEndReason,
+    MeetingStateType,
+    StateExecuteResult,
+} from '../types'
 import { BaseState } from './base-state'
 
 export class ErrorState extends BaseState {
@@ -26,11 +30,16 @@ export class ErrorState extends BaseState {
     }
 
     private async logError(): Promise<void> {
-        const error = this.context.error
+        const error = GLOBAL.getError()
 
         if (!error) {
             console.error('Unknown error occurred')
             return
+        }
+
+        // Store error in global singleton if it's a JoinError
+        if (error instanceof JoinError) {
+            GLOBAL.setError(error)
         }
 
         // Create a detailed error object
@@ -39,7 +48,7 @@ export class ErrorState extends BaseState {
             stack: error.stack,
             type: error.constructor.name,
             isJoinError: error instanceof JoinError,
-            code: error instanceof JoinError ? error.message : undefined,
+            reason: error instanceof JoinError ? error.reason : undefined,
             details: error instanceof JoinError ? error.details : undefined,
             state: this.stateType,
             meetingUrl: GLOBAL.get().meeting_url,
@@ -54,10 +63,10 @@ export class ErrorState extends BaseState {
 
     private async notifyError(): Promise<void> {
         const notifyPromise = async (): Promise<void> => {
-            const error = this.context.error
+            const error = GLOBAL.getError()
 
             if (!error) {
-                console.warn('No error found in context')
+                console.warn('No error found in global singleton')
                 return
             }
 
@@ -66,43 +75,41 @@ export class ErrorState extends BaseState {
                 isJoinError: error instanceof JoinError,
                 name: error.name,
                 message: error.message,
-                code:
+                reason:
                     error instanceof JoinError
-                        ? error.message
+                        ? error.reason
                         : 'not a JoinError',
                 stack: error.stack?.substring(0, 200), // Limite la taille du stack
             })
 
             try {
                 if (error instanceof JoinError) {
-                    // Additional check on the error code
-                    const errorCode = error.message
-                    console.log('JoinError code:', errorCode)
+                    // Use the reason directly from JoinError
+                    const reason = error.reason
+                    console.log('JoinError reason:', reason)
 
-                    switch (errorCode) {
-                        case JoinErrorCode.BotNotAccepted:
+                    switch (reason) {
+                        case MeetingEndReason.BotNotAccepted:
                             await Events.botRejected()
                             break
-                        case JoinErrorCode.BotRemoved:
+                        case MeetingEndReason.BotRemoved:
                             await Events.botRemoved()
                             break
-                        case JoinErrorCode.BotRemovedTooEarly:
+                        case MeetingEndReason.BotRemovedTooEarly:
                             await Events.botRemovedTooEarly()
                             break
-                        case JoinErrorCode.TimeoutWaitingToStart:
+                        case MeetingEndReason.TimeoutWaitingToStart:
                             await Events.waitingRoomTimeout()
                             break
-                        case JoinErrorCode.InvalidMeetingUrl:
+                        case MeetingEndReason.InvalidMeetingUrl:
                             await Events.invalidMeetingUrl()
                             break
-                        case JoinErrorCode.ApiRequest:
+                        case MeetingEndReason.ApiRequest:
                             console.log('Notifying API request stop')
                             await Events.apiRequestStop()
                             break
                         default:
-                            console.log(
-                                `Unhandled JoinError code: ${errorCode}`,
-                            )
+                            console.log(`Unhandled JoinError reason: ${reason}`)
                             await Events.meetingError(error)
                     }
                 } else {
@@ -131,12 +138,12 @@ export class ErrorState extends BaseState {
     }
 
     private updateMetrics(): void {
-        const error = this.context.error
+        const error = GLOBAL.getError()
 
         const metrics = {
             errorType:
                 error instanceof JoinError ? 'JoinError' : 'UnknownError',
-            errorCode: error instanceof JoinError ? error.message : 'Internal',
+            errorReason: error instanceof JoinError ? error.reason : 'Internal',
             timestamp: Date.now(),
             meetingDuration: this.context.startTime
                 ? Date.now() - this.context.startTime
