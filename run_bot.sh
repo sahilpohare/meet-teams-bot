@@ -590,6 +590,151 @@ test_recording() {
     fi
 }
 
+# Test API request stop functionality
+test_api_request() {
+    print_info "🧪 Testing API request stop functionality"
+    print_info "🛑 Will send API stop request after 2 minutes"
+    
+    # Check if Docker is available
+    check_docker
+    
+    # Check if bot.config.json exists
+    if [ ! -f "bot.config.json" ]; then
+        print_error "bot.config.json not found!"
+        print_info "Please create bot.config.json with your meeting configuration"
+        return 1
+    fi
+    
+    # Build image if necessary
+    if ! docker images | grep -q meet-teams-bot; then
+        print_info "Docker image not found, building..."
+        build_image
+    fi
+    
+    local output_dir=$(create_output_dir)
+    local config_json=$(cat "bot.config.json")
+    local processed_config=$(process_config "$config_json")
+    
+    # Extract bot_uuid for API call
+    local bot_uuid
+    if command -v jq &> /dev/null; then
+        bot_uuid=$(echo "$processed_config" | jq -r '.bot_uuid // empty')
+    fi
+    
+    if [ -z "$bot_uuid" ]; then
+        print_error "Could not extract bot_uuid from configuration"
+        return 1
+    fi
+    
+    print_info "🤖 Bot UUID: ${bot_uuid:0:8}..."
+    print_info "🚀 Starting bot..."
+    
+    # Start the bot and capture logs
+    local log_file="/tmp/api-test-$(date +%s).log"
+    echo "$processed_config" | docker run -i \
+        -p 8080:8080 \
+        -e RECORDING=true \
+        -v "$(pwd)/$output_dir:/app/data" \
+        meet-teams-bot 2>&1 | tee "$log_file" &
+    
+    local docker_pid=$!
+    
+    # Wait 2 minutes before sending API stop request
+    print_info "⏰ Waiting 2 minutes before sending API stop request..."
+    sleep 120
+    
+    # Send API stop request
+    print_info "🛑 Sending API stop request..."
+    local api_response
+    api_response=$(docker exec $(docker ps -q --filter ancestor=meet-teams-bot) curl -s -X POST http://localhost:8080/stop_record \
+        -H "Content-Type: application/json" \
+        -d "{\"bot_id\": \"$bot_uuid\"}")
+    
+    print_info "📡 API Response: $api_response"
+    
+    # Wait for cleanup to complete (up to 5 minutes)
+    print_info "⏳ Waiting for cleanup to complete (up to 5 minutes)..."
+    local cleanup_timeout=300
+    local cleanup_start=$(date +%s)
+    
+    while [ $(($(date +%s) - cleanup_start)) -lt $cleanup_timeout ]; do
+        if ! kill -0 $docker_pid 2>/dev/null; then
+            print_success "✅ Bot stopped successfully"
+            break
+        fi
+        sleep 5
+    done
+    
+    # Check if process is still running
+    if kill -0 $docker_pid 2>/dev/null; then
+        print_warning "⚠️ Bot still running after 5 minutes - merge/trim might still be in progress"
+        print_info "📊 Checking logs for merge progress..."
+        
+        # Show recent logs
+        print_info "🔍 Recent logs:"
+        tail -20 "$log_file" | while IFS= read -r line; do
+            if [[ $line == *"ScreenRecorder"* ]] || [[ $line == *"merge"* ]] || [[ $line == *"trim"* ]] || [[ $line == *"cleanup"* ]]; then
+                echo "  $line"
+            fi
+        done
+        
+        # Force stop after showing logs
+        print_info "🧹 Force stopping bot..."
+        kill -9 $docker_pid 2>/dev/null
+    else
+        print_success "✅ Bot stopped within expected time"
+    fi
+    
+    # Analyze results
+    print_info "📊 Analyzing test results..."
+    
+    # Check for merge/trim logs
+    if grep -q "Efficient sync and merge completed successfully" "$log_file"; then
+        print_success "✅ ScreenRecorder merge/trim completed successfully"
+    else
+        print_warning "⚠️ No merge/trim completion log found"
+    fi
+    
+    # Check for cleanup logs
+    if grep -q "Cleanup completed successfully" "$log_file"; then
+        print_success "✅ Cleanup completed successfully"
+    else
+        print_warning "⚠️ No cleanup completion log found"
+    fi
+    
+    # Check for API request handling
+    if grep -q "end meeting from api server" "$log_file"; then
+        print_success "✅ API request received and handled"
+    else
+        print_warning "⚠️ No API request handling log found"
+    fi
+    
+    # Check for generated files
+    local bot_files_dir="$output_dir/$bot_uuid"
+    if [ -d "$bot_files_dir" ] && [ "$(find $bot_files_dir -name "*.mp4" -o -name "*.wav" | wc -l)" -gt 0 ]; then
+        print_success "✅ Recording files were generated"
+    elif [ -d "$output_dir" ] && [ "$(find $output_dir -name "*.mp4" -o -name "*.wav" | wc -l)" -gt 0 ]; then
+        print_success "✅ Recording files were generated"
+    else
+        print_info "ℹ️ No recording files (normal for short test)"
+    fi
+    
+    print_success "🎯 API request test completed"
+    
+    # Show useful paths for the user
+    if [ -n "$bot_uuid" ]; then
+        echo -e "\n${GREEN} ✅ done, check out your recording and metadata for bot UUID in $bot_uuid${NC}"
+        echo
+        echo "./recordings/$bot_uuid/output.mp4"
+        echo "./recordings/$bot_uuid/"  # folder for metadata and all files
+    fi
+    
+    print_info "Full log available at: $log_file"
+    
+    # Cleanup
+    rm -f "$log_file"
+}
+
 # Show help
 show_help() {
     echo -e "${BLUE}Meet Teams Bot - Serverless Runner${NC}"
@@ -600,6 +745,7 @@ show_help() {
     echo "  $0 debug <config_file> [url] - Run bot in DEBUG mode (speakers logs + VNC enabled)"
     echo "  $0 run-json '<json>'         - Run bot with JSON configuration"
     echo "  $0 test [duration]           - Test screen recording system (duration in seconds)"
+    echo "  $0 test-api-request              - Test API request stop functionality (2 minutes)"
     echo "  $0 clean                     - Clean recordings directory"
     echo "  $0 help                      - Show this help message"
     echo
@@ -623,6 +769,7 @@ show_help() {
     echo "  DEBUG=true $0 run-json '{...}'      # Run JSON config with VNC debug"
     echo "  $0 test 60  # Test screen recording for 60 seconds"
     echo "  DEBUG=true $0 test 60              # Test with VNC debug access"
+    echo "  $0 test-api-request     # Test API request stop after 2 minutes"
     echo "  $0 clean"
     echo
     echo "Recording Modes:"
@@ -692,6 +839,9 @@ main() {
             ;;
         "test")
             test_recording "${2:-30}"
+            ;;
+        "test-api-request")
+            test_api_request
             ;;
         "clean")
             clean_recordings
