@@ -21,21 +21,53 @@ export enum MeetingStateType {
 
 export enum MeetingEndReason {
     // Normal end reasons
-    ManualStop = 'manual_stop',
-    BotRemoved = 'bot_removed',
-    NoAttendees = 'no_attendees',
-    NoSpeaker = 'no_speaker',
-    RecordingTimeout = 'recording_timeout',
-    ApiRequest = 'api_request',
+    BotRemoved = 'botRemoved',
+    NoAttendees = 'noAttendees',
+    NoSpeaker = 'noSpeaker',
+    RecordingTimeout = 'recordingTimeout',
+    ApiRequest = 'apiRequest',
 
     // Error end reasons
-    BotRemovedTooEarly = 'bot_removed_too_early',
-    BotNotAccepted = 'bot_not_accepted',
-    CannotJoinMeeting = 'cannot_join_meeting',
-    TimeoutWaitingToStart = 'timeout_waiting_to_start',
-    InvalidMeetingUrl = 'invalid_meeting_url',
-    StreamingSetupFailed = 'streaming_setup_failed',
-    Internal = 'internal_error',
+    BotRemovedTooEarly = 'botRemovedTooEarly',
+    BotNotAccepted = 'botNotAccepted',
+    CannotJoinMeeting = 'cannotJoinMeeting',
+    TimeoutWaitingToStart = 'timeoutWaitingToStart',
+    InvalidMeetingUrl = 'invalidMeetingUrl',
+    StreamingSetupFailed = 'streamingSetupFailed',
+    Internal = 'internalError',
+}
+
+// Map MeetingEndReason enum values to descriptive error messages (like Zoom bot)
+export function mapEndReasonToMessage(endReason: MeetingEndReason): string {
+    switch (endReason) {
+        // Normal end reasons - these should be treated as success
+        case MeetingEndReason.BotRemoved:
+            return 'Bot was removed from the meeting.'
+        case MeetingEndReason.NoAttendees:
+            return 'Bot left because there were no more attendees.'
+        case MeetingEndReason.NoSpeaker:
+            return 'Bot left because no speakers were detected for too long.'
+        case MeetingEndReason.RecordingTimeout:
+            return 'Recording timeout reached.'
+        case MeetingEndReason.ApiRequest:
+            return 'Recording stopped via API request.'
+
+        // Error end reasons - these should be treated as failures
+        case MeetingEndReason.BotRemovedTooEarly:
+            return 'Bot was removed from the meeting too early; the video is too short.'
+        case MeetingEndReason.BotNotAccepted:
+            return 'Bot was not accepted into the meeting.'
+        case MeetingEndReason.CannotJoinMeeting:
+            return 'Cannot join meeting - meeting is not reachable.'
+        case MeetingEndReason.TimeoutWaitingToStart:
+            return 'Timeout waiting to start recording.'
+        case MeetingEndReason.InvalidMeetingUrl:
+            return 'Invalid meeting URL provided.'
+        case MeetingEndReason.StreamingSetupFailed:
+            return 'Failed to set up streaming audio.'
+        case MeetingEndReason.Internal:
+            return 'Internal error occurred during recording.'
+    }
 }
 
 export interface MeetingContext {

@@ -118,65 +118,54 @@ export class RecordingState extends BaseState {
         shouldEnd: boolean
         reason?: MeetingEndReason
     }> {
-        const checkPromise = async () => {
+        try {
             const now = Date.now()
 
-            try {
-                // Check if stop was requested via state machine
-                if (GLOBAL.getEndReason()) {
-                    return { shouldEnd: true, reason: GLOBAL.getEndReason() }
-                }
-
-                // Check if bot was removed
-                if (await this.checkBotRemoved()) {
-                    return {
-                        shouldEnd: true,
-                        reason: MeetingEndReason.BotRemoved,
-                    }
-                }
-
-                // Check participants
-                if (await this.checkNoAttendees(now)) {
-                    return {
-                        shouldEnd: true,
-                        reason: MeetingEndReason.NoAttendees,
-                    }
-                }
-
-                // Check audio activity
-                if (await this.checkNoSpeaker(now)) {
-                    return {
-                        shouldEnd: true,
-                        reason: MeetingEndReason.NoSpeaker,
-                    }
-                }
-
-                return { shouldEnd: false }
-            } catch (error) {
-                console.error('Error checking end conditions:', error)
-                return {
-                    shouldEnd: true,
-                    reason: MeetingEndReason.BotRemoved,
-                }
+            // Check if stop was requested via state machine
+            if (GLOBAL.getEndReason()) {
+                return { shouldEnd: true, reason: GLOBAL.getEndReason() }
             }
-        }
 
-        const timeoutPromise = new Promise<{
-            shouldEnd: boolean
-            reason?: MeetingEndReason
-        }>((_, reject) =>
-            setTimeout(
-                () => reject(new Error('Check end conditions timeout')),
-                5000,
-            ),
-        )
+            // Check if bot was removed (with timeout protection)
+            const botRemovedResult = await Promise.race([
+                this.checkBotRemoved(),
+                new Promise<boolean>((_, reject) =>
+                    setTimeout(() => reject(new Error('Bot removed check timeout')), 10000)
+                )
+            ])
+            
+            if (botRemovedResult) {
+                return this.getBotRemovedReason()
+            }
 
-        try {
-            return await Promise.race([checkPromise(), timeoutPromise])
+            // Check participants and audio activity
+            if (await this.checkNoAttendees(now)) {
+                return { shouldEnd: true, reason: MeetingEndReason.NoAttendees }
+            }
+
+            if (await this.checkNoSpeaker(now)) {
+                return { shouldEnd: true, reason: MeetingEndReason.NoSpeaker }
+            }
+
+            return { shouldEnd: false }
         } catch (error) {
-            console.error('Error or timeout in checkEndConditions:', error)
-            return { shouldEnd: true, reason: MeetingEndReason.BotRemoved }
+            console.error('Error checking end conditions:', error)
+            return this.getBotRemovedReason()
         }
+    }
+
+    /**
+     * Helper method to determine the correct reason when bot is removed
+     * Prioritizes BotRemovedTooEarly over BotRemoved if it exists in global state
+     */
+    private getBotRemovedReason(): { shouldEnd: true; reason: MeetingEndReason } {
+        // Check if we already have a BotRemovedTooEarly error from ScreenRecorder
+        if (GLOBAL.hasError() && GLOBAL.getError()?.reason === MeetingEndReason.BotRemovedTooEarly) {
+            console.log('Using existing BotRemovedTooEarly error instead of BotRemoved')
+            return { shouldEnd: true, reason: MeetingEndReason.BotRemovedTooEarly }
+        }
+        
+        return { shouldEnd: true, reason: MeetingEndReason.BotRemoved }
     }
 
     private async handleMeetingEnd(reason: MeetingEndReason): Promise<void> {

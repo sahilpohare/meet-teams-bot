@@ -173,7 +173,6 @@ export class MeetingStateMachine {
         const normalReasons = [
             MeetingEndReason.ApiRequest,
             MeetingEndReason.BotRemoved,
-            MeetingEndReason.ManualStop,
             MeetingEndReason.NoAttendees,
             MeetingEndReason.NoSpeaker,
             MeetingEndReason.RecordingTimeout,

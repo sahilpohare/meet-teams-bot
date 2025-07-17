@@ -11,6 +11,7 @@ import {
 } from './utils/Logger'
 import { PathManager } from './utils/PathManager'
 
+import { mapEndReasonToMessage } from './state-machine/types'
 import { JoinError, MeetingParams } from './types'
 
 import { exit } from 'process'
@@ -96,8 +97,11 @@ async function handleFailedRecording(): Promise<void> {
     const endReason = GLOBAL.getEndReason()
     console.log(`Recording failed with reason: ${endReason || 'Unknown'}`)
 
-    const errorMessage =
-        String(endReason) || 'Recording did not complete successfully'
+    // Map the end reason to a descriptive message (like Zoom bot)
+    const errorMessage = endReason 
+        ? mapEndReasonToMessage(endReason)
+        : 'Recording did not complete successfully'
+    
     console.log(`📤 Sending error to backend: ${errorMessage}`)
 
     // Notify backend of recording failure
@@ -185,7 +189,7 @@ async function handleFailedRecording(): Promise<void> {
         const errorMessage = GLOBAL.hasError()
             ? GLOBAL.getError()!.message
             : error instanceof JoinError
-              ? error.message
+              ? mapEndReasonToMessage(error.reason)
               : 'Recording failed to complete'
 
         console.log(`📤 Sending error to backend: ${errorMessage}`)
