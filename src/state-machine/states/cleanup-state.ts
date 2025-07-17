@@ -1,7 +1,6 @@
 import { SoundContext, VideoContext } from '../../media_context'
 import { ScreenRecorderManager } from '../../recording/ScreenRecorder'
-import { GLOBAL } from '../../singleton'
-import { JoinError } from '../../types'
+
 import { MEETING_CONSTANTS } from '../constants'
 import { MeetingStateType, StateExecuteResult } from '../types'
 import { BaseState } from './base-state'
@@ -182,12 +181,7 @@ export class CleanupState extends BaseState {
                 error instanceof Error ? error.message : error,
             )
 
-            if (error instanceof JoinError) {
-                // Store error in global singleton - last error wins
-                GLOBAL.setError(error)
-                // Re-throw JoinError so it propagates to main.ts for backend notification
-                throw error
-            }
+            // Don't re-throw - errors are already handled
 
             // Don't throw error if recording was already stopped
             if (
@@ -219,11 +213,6 @@ export class CleanupState extends BaseState {
                 this.context.playwrightPage?.close().catch(() => {}),
                 this.context.browserContext?.close().catch(() => {}),
             ])
-
-            // 4. Clear timeouts
-            if (this.context.meetingTimeoutInterval) {
-                clearTimeout(this.context.meetingTimeoutInterval)
-            }
         } catch (error) {
             console.error('Failed to cleanup browser resources:', error)
         }

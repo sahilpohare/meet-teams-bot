@@ -12,7 +12,7 @@ import {
 import { PathManager } from './utils/PathManager'
 
 import { mapEndReasonToMessage } from './state-machine/types'
-import { JoinError, MeetingParams } from './types'
+import { MeetingParams } from './types'
 
 import { exit } from 'process'
 
@@ -187,9 +187,9 @@ async function handleFailedRecording(): Promise<void> {
 
         // Use global error if available, otherwise fallback to error message
         const errorMessage = GLOBAL.hasError()
-            ? GLOBAL.getError()!.message
-            : error instanceof JoinError
-              ? mapEndReasonToMessage(error.reason)
+            ? GLOBAL.getErrorMessage() || 'Unknown error'
+            : error instanceof Error
+              ? error.message
               : 'Recording failed to complete'
 
         console.log(`📤 Sending error to backend: ${errorMessage}`)

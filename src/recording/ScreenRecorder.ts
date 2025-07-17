@@ -7,7 +7,7 @@ import { Streaming } from '../streaming'
 import { Page } from 'playwright'
 import { GLOBAL } from '../singleton'
 import { MeetingEndReason } from '../state-machine/types'
-import { JoinError } from '../types'
+
 import { calculateVideoOffset } from '../utils/CalculVideoOffset'
 import { PathManager } from '../utils/PathManager'
 import { S3Uploader } from '../utils/S3Uploader'
@@ -618,7 +618,7 @@ export class ScreenRecorder extends EventEmitter {
                     // Check if we already have a BotNotAccepted error (higher priority)
                     if (
                         GLOBAL.hasError() &&
-                        GLOBAL.getError()?.reason ===
+                        GLOBAL.getEndReason() ===
                             MeetingEndReason.BotNotAccepted
                     ) {
                         console.log(
@@ -630,11 +630,8 @@ export class ScreenRecorder extends EventEmitter {
                     console.log(
                         'Converting FFprobe/FFmpeg error to BotRemovedTooEarly',
                     )
-                    const botRemovedTooEarlyError = new JoinError(
-                        MeetingEndReason.BotRemovedTooEarly,
-                    )
-                    GLOBAL.setError(botRemovedTooEarlyError)
-                    throw botRemovedTooEarlyError
+                    GLOBAL.setError(MeetingEndReason.BotRemovedTooEarly)
+                    throw new Error('Bot removed too early')
                 }
             }
 
@@ -707,9 +704,8 @@ export class ScreenRecorder extends EventEmitter {
                 )
                 this.meetingStartTime = Date.now() - 5000 // Show only last 5 seconds
             } else {
-                const error = new JoinError(MeetingEndReason.BotNotAccepted)
-                GLOBAL.setError(error)
-                throw error
+                GLOBAL.setError(MeetingEndReason.BotNotAccepted)
+                throw new Error('Bot not accepted into meeting')
             }
         }
 

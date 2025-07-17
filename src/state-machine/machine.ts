@@ -1,4 +1,3 @@
-import { JoinError } from '../types'
 import { MeetingEndReason, MeetingStateType, ParticipantState } from './types'
 
 import { MeetProvider } from '../meeting/meet'
@@ -75,7 +74,9 @@ export class MeetingStateMachine {
     }
 
     public getError(): Error | null {
-        return GLOBAL.getError()
+        return GLOBAL.hasError()
+            ? new Error(GLOBAL.getErrorMessage() || 'Unknown error')
+            : null
     }
 
     public getStartTime(): number {
@@ -83,13 +84,8 @@ export class MeetingStateMachine {
     }
 
     private async handleError(error: Error): Promise<void> {
-        // Convert to JoinError if needed
-        const joinError =
-            error instanceof JoinError
-                ? error
-                : new JoinError(MeetingEndReason.Internal, error.message)
-
-        GLOBAL.setError(joinError)
+        // Set error in global singleton
+        GLOBAL.setError(MeetingEndReason.Internal, error.message)
 
         // Transition to error state - the main loop will handle the rest
         this.currentState = MeetingStateType.Error

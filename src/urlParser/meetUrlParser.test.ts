@@ -1,4 +1,3 @@
-import { JoinError } from '../types'
 import { parseMeetingUrlFromJoinInfos } from './meetUrlParser'
 
 describe('Meet URL Parser', () => {
@@ -126,7 +125,7 @@ describe('Meet URL Parser', () => {
 
         test.each(invalidUrls)('should reject $name', async ({ url }) => {
             await expect(parseMeetingUrlFromJoinInfos(url)).rejects.toThrow(
-                JoinError,
+                'Invalid Google Meet URL format',
             )
         })
     })

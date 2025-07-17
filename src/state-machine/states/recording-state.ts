@@ -167,22 +167,22 @@ export class RecordingState extends BaseState {
     } {
         // Check if we already have an error from ScreenRecorder or other sources
         if (GLOBAL.hasError()) {
-            const existingError = GLOBAL.getError()
-            if (!existingError) {
+            const existingReason = GLOBAL.getEndReason()
+            if (!existingReason) {
                 // This shouldn't happen, but handle gracefully
                 return { shouldEnd: true, reason: MeetingEndReason.BotRemoved }
             }
             console.log(
-                `Using existing error instead of BotRemoved: ${existingError.reason}`,
+                `Using existing error instead of BotRemoved: ${existingReason}`,
             )
-            return { shouldEnd: true, reason: existingError.reason }
+            return { shouldEnd: true, reason: existingReason }
         }
 
         return { shouldEnd: true, reason: MeetingEndReason.BotRemoved }
     }
     private async handleMeetingEnd(reason: MeetingEndReason): Promise<void> {
         console.info(`Handling meeting end with reason: ${reason}`)
-        // Do not call GLOBAL.setError here, as it expects a JoinError
+        // Do not call GLOBAL.setError here, as errors are handled by the caller
         try {
             // Try to close the meeting but don't let an error here affect the rest
             try {

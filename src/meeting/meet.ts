@@ -1,7 +1,7 @@
 import { BrowserContext, Page } from '@playwright/test'
 
 import { MeetingEndReason } from '../state-machine/types'
-import { JoinError, MeetingProviderInterface } from '../types'
+import { MeetingProviderInterface } from '../types'
 
 import { GLOBAL } from '../singleton'
 import { parseMeetingUrlFromJoinInfos } from '../urlParser/meetUrlParser'
@@ -171,18 +171,16 @@ export class MeetProvider implements MeetingProviderInterface {
             }
 
             if (!askToJoinClicked) {
-                const error = new JoinError(MeetingEndReason.CannotJoinMeeting)
-                GLOBAL.setError(error)
-                throw error
+                GLOBAL.setError(MeetingEndReason.CannotJoinMeeting)
+                throw new Error('Cannot join meeting')
             }
 
             // Wait to be in the meeting with regular cancelCheck verification
             console.log('Waiting to confirm meeting join...')
             while (true) {
                 if (cancelCheck()) {
-                    const error = new JoinError(MeetingEndReason.ApiRequest)
-                    GLOBAL.setError(error)
-                    throw error
+                    GLOBAL.setError(MeetingEndReason.ApiRequest)
+                    throw new Error('API request to stop recording')
                 }
 
                 if (await isInMeeting(page)) {
@@ -192,9 +190,8 @@ export class MeetProvider implements MeetingProviderInterface {
                 }
 
                 if (await notAcceptedInMeeting(page)) {
-                    const error = new JoinError(MeetingEndReason.BotNotAccepted)
-                    GLOBAL.setError(error)
-                    throw error
+                    GLOBAL.setError(MeetingEndReason.BotNotAccepted)
+                    throw new Error('Bot not accepted into meeting')
                 }
 
                 await sleep(1000)
@@ -337,18 +334,14 @@ async function findShowEveryOne(
             }
 
             if (cancelCheck()) {
-                const error = new JoinError(
-                    MeetingEndReason.TimeoutWaitingToStart,
-                )
-                GLOBAL.setError(error)
-                throw error
+                GLOBAL.setError(MeetingEndReason.TimeoutWaitingToStart)
+                throw new Error('Timeout waiting to start')
             }
 
             if (await notAcceptedInMeeting(page)) {
                 console.log('Bot not accepted, exiting meeting')
-                const error = new JoinError(MeetingEndReason.BotNotAccepted)
-                GLOBAL.setError(error)
-                throw error
+                GLOBAL.setError(MeetingEndReason.BotNotAccepted)
+                throw new Error('Bot not accepted into meeting')
             }
 
             if (!showEveryOneFound && !inMeetingConfirmed) {
@@ -356,11 +349,6 @@ async function findShowEveryOne(
             }
             i++
         } catch (error) {
-            if (error instanceof JoinError) {
-                // Store error in global singleton
-                GLOBAL.setError(error)
-                throw error
-            }
             console.error('Error in findShowEveryOne:', error)
             await sleep(1000)
         }
@@ -468,19 +456,13 @@ async function notAcceptedInMeeting(page: Page): Promise<boolean> {
             const element = page.locator(`text=${text}`)
             if ((await element.count()) > 0) {
                 console.log('XXXXXXXXXXXXXXXXXX User has denied entry')
-                const error = new JoinError(MeetingEndReason.BotNotAccepted)
-                GLOBAL.setError(error)
-                throw error
+                GLOBAL.setError(MeetingEndReason.BotNotAccepted)
+                throw new Error('Bot not accepted into meeting')
             }
         }
 
         return false
     } catch (error) {
-        if (error instanceof JoinError) {
-            // Store error in global singleton
-            GLOBAL.setError(error)
-            throw error
-        }
         console.error('Error in notAcceptedInMeeting:', error)
         return false
     }

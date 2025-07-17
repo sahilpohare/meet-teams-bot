@@ -1,11 +1,10 @@
-import { MeetingEndReason } from './state-machine/types'
-import { JoinError, MeetingParams } from './types'
+import { mapEndReasonToMessage, MeetingEndReason } from './state-machine/types'
+import { MeetingParams } from './types'
 
 class Global {
-    private static instance: Global
     private meetingParams: MeetingParams | null = null
-    private currentError: JoinError | null = null
     private endReason: MeetingEndReason | null = null
+    private errorMessage: string | null = null
     public constructor() {}
 
     public set(meetingParams: MeetingParams) {
@@ -44,10 +43,10 @@ class Global {
         return this.meetingParams.remote === null
     }
 
-    public setError(error: JoinError): void {
-        console.log(`🔴 Setting global error: ${error.reason}`)
-        this.currentError = error
-        this.endReason = error.reason
+    public setError(reason: MeetingEndReason, message?: string): void {
+        console.log(`🔴 Setting global error: ${reason}`)
+        this.endReason = reason
+        this.errorMessage = message || mapEndReasonToMessage(reason)
         console.log(`🔴 End reason set to: ${this.endReason}`)
     }
 
@@ -56,21 +55,21 @@ class Global {
         this.endReason = reason
     }
 
-    public getError(): JoinError | null {
-        return this.currentError
-    }
-
     public getEndReason(): MeetingEndReason | null {
         return this.endReason
     }
 
+    public getErrorMessage(): string | null {
+        return this.errorMessage
+    }
+
     public hasError(): boolean {
-        return this.currentError !== null
+        return this.endReason !== null
     }
 
     public clearError(): void {
-        this.currentError = null
         this.endReason = null
+        this.errorMessage = null
     }
 }
 

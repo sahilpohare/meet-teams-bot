@@ -1,6 +1,5 @@
 import { BrowserContext, Page } from '@playwright/test'
 import { BrandingHandle } from '../branding'
-import { ScreenRecorder } from '../recording/ScreenRecorder'
 import { SimpleDialogObserver } from '../services/dialog-observer/simple-dialog-observer'
 import { Streaming } from '../streaming'
 import { MeetingProviderInterface } from '../types'
@@ -80,7 +79,6 @@ export interface MeetingContext {
     browserContext?: BrowserContext
 
     // Timers et intervalles
-    meetingTimeoutInterval?: NodeJS.Timeout
     startTime?: number
     lastSpeakerTime?: number
     noSpeakerDetectedTime?: number
@@ -91,15 +89,6 @@ export interface MeetingContext {
 
     // Processus et ressources
     brandingProcess?: BrandingHandle
-    mediaRecorderActive?: boolean
-
-    // Gestion des erreurs et statut
-    retryCount?: number
-
-    // Identifiants et tokens
-    extensionId?: string
-    meetingId?: string
-    meetingPassword?: string
 
     // PathManager
     pathManager?: PathManager
@@ -118,22 +107,11 @@ export interface MeetingContext {
     // Streaming
     streamingService?: Streaming
 
-    // Screen recording
-    screenRecorder?: ScreenRecorder
-
     // Speakers observation
     speakersObserver?: import('../meeting/speakersObserver').SpeakersObserver
 
     // HTML cleanup
     htmlCleaner?: import('../meeting/htmlCleaner').HtmlCleaner
-
-    errorTime?: number
-    hasResumed?: boolean
-    speakers?: string[]
-    lastActivityTime?: number
-    lastFrameTime?: number
-
-    meetingUrl?: string
 
     // Dialog observer
     dialogObserver?: SimpleDialogObserver

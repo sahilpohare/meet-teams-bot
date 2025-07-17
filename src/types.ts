@@ -1,5 +1,4 @@
 import { BrowserContext, Page } from '@playwright/test'
-import { MeetingEndReason } from './state-machine/types'
 
 type SpeechToTextProvider = 'Default' | 'Gladia' | 'RunPod'
 export type RecordingMode = 'speaker_view' | 'gallery_view' | 'audio_only'
@@ -99,15 +98,3 @@ export type SpeakerData = {
     isSpeaking: boolean
 }
 export type MeetingProvider = 'Meet' | 'Teams' | 'Zoom'
-
-export class JoinError extends Error {
-    reason: MeetingEndReason
-    details?: any
-
-    constructor(reason: MeetingEndReason, message?: string, details?: any) {
-        super(message || reason)
-        this.name = 'JoinError'
-        this.reason = reason
-        this.details = details
-    }
-}

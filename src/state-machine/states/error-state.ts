@@ -1,6 +1,6 @@
 import { Events } from '../../events'
 import { GLOBAL } from '../../singleton'
-import { JoinError } from '../../types'
+
 import {
     MeetingEndReason,
     MeetingStateType,
@@ -30,26 +30,18 @@ export class ErrorState extends BaseState {
     }
 
     private async logError(): Promise<void> {
-        const error = GLOBAL.getError()
+        const errorMessage = GLOBAL.getErrorMessage()
+        const endReason = GLOBAL.getEndReason()
 
-        if (!error) {
+        if (!endReason) {
             console.error('Unknown error occurred')
             return
         }
 
-        // Store error in global singleton if it's a JoinError
-        if (error instanceof JoinError) {
-            GLOBAL.setError(error)
-        }
-
         // Create a detailed error object
         const errorDetails = {
-            message: error.message,
-            stack: error.stack,
-            type: error.constructor.name,
-            isJoinError: error instanceof JoinError,
-            reason: error instanceof JoinError ? error.reason : undefined,
-            details: error instanceof JoinError ? error.details : undefined,
+            message: errorMessage || 'Unknown error',
+            reason: endReason,
             state: this.stateType,
             meetingUrl: GLOBAL.get().meeting_url,
             botName: GLOBAL.get().bot_name,
@@ -63,57 +55,46 @@ export class ErrorState extends BaseState {
 
     private async notifyError(): Promise<void> {
         const notifyPromise = async (): Promise<void> => {
-            const error = GLOBAL.getError()
+            const endReason = GLOBAL.getEndReason()
+            const errorMessage = GLOBAL.getErrorMessage()
 
-            if (!error) {
-                console.warn('No error found in global singleton')
+            if (!endReason) {
+                console.warn('No error reason found in global singleton')
                 return
             }
 
             // Full log for debugging
             console.log('Error in notifyError:', {
-                isJoinError: error instanceof JoinError,
-                name: error.name,
-                message: error.message,
-                reason:
-                    error instanceof JoinError
-                        ? error.reason
-                        : 'not a JoinError',
-                stack: error.stack?.substring(0, 200), // Limite la taille du stack
+                reason: endReason,
+                message: errorMessage,
             })
 
             try {
-                if (error instanceof JoinError) {
-                    // Use the reason directly from JoinError
-                    const reason = error.reason
-                    console.log('JoinError reason:', reason)
-
-                    switch (reason) {
-                        case MeetingEndReason.BotNotAccepted:
-                            await Events.botRejected()
-                            break
-                        case MeetingEndReason.BotRemoved:
-                            await Events.botRemoved()
-                            break
-                        case MeetingEndReason.BotRemovedTooEarly:
-                            await Events.botRemovedTooEarly()
-                            break
-                        case MeetingEndReason.TimeoutWaitingToStart:
-                            await Events.waitingRoomTimeout()
-                            break
-                        case MeetingEndReason.InvalidMeetingUrl:
-                            await Events.invalidMeetingUrl()
-                            break
-                        case MeetingEndReason.ApiRequest:
-                            console.log('Notifying API request stop')
-                            await Events.apiRequestStop()
-                            break
-                        default:
-                            console.log(`Unhandled JoinError reason: ${reason}`)
-                            await Events.meetingError(error)
-                    }
-                } else {
-                    await Events.meetingError(error)
+                switch (endReason) {
+                    case MeetingEndReason.BotNotAccepted:
+                        await Events.botRejected()
+                        break
+                    case MeetingEndReason.BotRemoved:
+                        await Events.botRemoved()
+                        break
+                    case MeetingEndReason.BotRemovedTooEarly:
+                        await Events.botRemovedTooEarly()
+                        break
+                    case MeetingEndReason.TimeoutWaitingToStart:
+                        await Events.waitingRoomTimeout()
+                        break
+                    case MeetingEndReason.InvalidMeetingUrl:
+                        await Events.invalidMeetingUrl()
+                        break
+                    case MeetingEndReason.ApiRequest:
+                        console.log('Notifying API request stop')
+                        await Events.apiRequestStop()
+                        break
+                    default:
+                        console.log(`Unhandled error reason: ${endReason}`)
+                        await Events.meetingError(
+                            new Error(errorMessage || 'Unknown error'),
+                        )
                 }
             } catch (eventError) {
                 console.error('Failed to send event notification:', eventError)
@@ -138,12 +119,13 @@ export class ErrorState extends BaseState {
     }
 
     private updateMetrics(): void {
-        const error = GLOBAL.getError()
+        const endReason = GLOBAL.getEndReason()
+        const errorMessage = GLOBAL.getErrorMessage()
 
         const metrics = {
-            errorType:
-                error instanceof JoinError ? 'JoinError' : 'UnknownError',
-            errorReason: error instanceof JoinError ? error.reason : 'Internal',
+            errorType: 'MeetingError',
+            errorReason: endReason || 'Internal',
+            errorMessage: errorMessage || 'Unknown error',
             timestamp: Date.now(),
             meetingDuration: this.context.startTime
                 ? Date.now() - this.context.startTime

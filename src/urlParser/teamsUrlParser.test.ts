@@ -1,4 +1,3 @@
-import { JoinError } from '../types'
 import { parseMeetingUrlFromJoinInfos } from './teamsUrlParser'
 
 describe('Teams URL Parser', () => {
@@ -132,7 +131,7 @@ describe('Teams URL Parser', () => {
         test.each(invalidUrls)('should reject invalid URL: %s', (url) => {
             expect(() => {
                 parseMeetingUrlFromJoinInfos(url)
-            }).toThrow(JoinError)
+            }).toThrow('Invalid Teams URL')
         })
     })
 
