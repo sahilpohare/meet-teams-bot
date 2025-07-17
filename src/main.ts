@@ -11,7 +11,7 @@ import {
 } from './utils/Logger'
 import { PathManager } from './utils/PathManager'
 
-import { mapEndReasonToMessage } from './state-machine/types'
+import { getErrorMessageFromCode } from './state-machine/types'
 import { MeetingParams } from './types'
 
 import { exit } from 'process'
@@ -97,22 +97,17 @@ async function handleFailedRecording(): Promise<void> {
     const endReason = GLOBAL.getEndReason()
     console.log(`Recording failed with reason: ${endReason || 'Unknown'}`)
 
-    // Map the end reason to a descriptive message (like Zoom bot)
-    const errorMessage = endReason
-        ? mapEndReasonToMessage(endReason)
-        : 'Recording did not complete successfully'
+    console.log(`📤 Sending error to backend`)
 
-    console.log(`📤 Sending error to backend: ${errorMessage}`)
-
-    // Notify backend of recording failure
+    // Notify backend of recording failure (function deduces errorCode and message automatically)
     if (!GLOBAL.isServerless() && Api.instance) {
-        await Api.instance.notifyRecordingFailure(
-            GLOBAL.get().meeting_url,
-            errorMessage,
-        )
+        await Api.instance.notifyRecordingFailure()
     }
 
     // Send failure webhook to user
+    const errorMessage = endReason
+        ? getErrorMessageFromCode(endReason)
+        : 'Recording did not complete successfully'
     await Events.recordingFailed(errorMessage)
     console.log(`✅ Error sent to backend successfully`)
 }
@@ -196,10 +191,7 @@ async function handleFailedRecording(): Promise<void> {
 
         // Notify backend of recording failure
         if (!GLOBAL.isServerless() && Api.instance) {
-            await Api.instance.notifyRecordingFailure(
-                GLOBAL.get().meeting_url,
-                errorMessage,
-            )
+            await Api.instance.notifyRecordingFailure()
         }
 
         await Events.recordingFailed(errorMessage)

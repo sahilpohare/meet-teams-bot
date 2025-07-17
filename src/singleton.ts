@@ -1,4 +1,7 @@
-import { mapEndReasonToMessage, MeetingEndReason } from './state-machine/types'
+import {
+    getErrorMessageFromCode,
+    MeetingEndReason,
+} from './state-machine/types'
 import { MeetingParams } from './types'
 
 class Global {
@@ -46,7 +49,7 @@ class Global {
     public setError(reason: MeetingEndReason, message?: string): void {
         console.log(`🔴 Setting global error: ${reason}`)
         this.endReason = reason
-        this.errorMessage = message || mapEndReasonToMessage(reason)
+        this.errorMessage = message || getErrorMessageFromCode(reason)
         console.log(`🔴 End reason set to: ${this.endReason}`)
     }
 

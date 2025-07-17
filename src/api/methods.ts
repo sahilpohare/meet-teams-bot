@@ -1,6 +1,7 @@
 import axios from 'axios'
 import * as rax from 'retry-axios'
 
+import { getErrorMessageFromCode } from '../state-machine/types'
 import { ApiTypes } from './types'
 
 import { GLOBAL } from '../singleton'
@@ -107,19 +108,24 @@ export class Api {
         ).data
     }
 
-    // Notify backend of recording failure
     public async notifyRecordingFailure(
-        meetingUrl: string,
-        message: string,
-        botUuid?: string,
+        message?: string,
+        errorCode?: string,
     ): Promise<void> {
+        const code = errorCode || GLOBAL.getEndReason?.()
+        const msg = message || (code ? getErrorMessageFromCode(code) : 'Unknown error')
+
         try {
             await axios({
                 method: 'POST',
                 url: `/bots/start_record_failed`,
                 timeout: 10000,
-                data: { meeting_url: meetingUrl, message },
-                params: { bot_uuid: botUuid || GLOBAL.get().bot_uuid },
+                data: {
+                    meeting_url: GLOBAL.get().meeting_url,
+                    message: msg,
+                    ...(code && { error_code: code }),
+                },
+                params: { bot_uuid: GLOBAL.get().bot_uuid },
             })
             console.log('Successfully notified backend of recording failure')
         } catch (error) {
@@ -127,7 +133,6 @@ export class Api {
                 'Unable to notify recording failure (continuing execution):',
                 error instanceof Error ? error.message : error,
             )
-            // Don't throw - continue execution even if notification fails
         }
     }
 

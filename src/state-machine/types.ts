@@ -36,36 +36,35 @@ export enum MeetingEndReason {
     Internal = 'internalError',
 }
 
-// Map MeetingEndReason enum values to descriptive error messages (like Zoom bot)
-export function mapEndReasonToMessage(endReason: MeetingEndReason): string {
-    switch (endReason) {
-        // Normal end reasons - these should be treated as success
-        case MeetingEndReason.BotRemoved:
+// Get human-readable error message from error code
+export function getErrorMessageFromCode(errorCode: string): string {
+    switch (errorCode) {
+        case 'botRemoved':
             return 'Bot was removed from the meeting.'
-        case MeetingEndReason.NoAttendees:
-            return 'Bot left because there were no more attendees.'
-        case MeetingEndReason.NoSpeaker:
-            return 'Bot left because no speakers were detected for too long.'
-        case MeetingEndReason.RecordingTimeout:
+        case 'noAttendees':
+            return 'No attendees joined the meeting.'
+        case 'noSpeaker':
+            return 'No speakers detected during recording.'
+        case 'recordingTimeout':
             return 'Recording timeout reached.'
-        case MeetingEndReason.ApiRequest:
+        case 'apiRequest':
             return 'Recording stopped via API request.'
-
-        // Error end reasons - these should be treated as failures
-        case MeetingEndReason.BotRemovedTooEarly:
-            return 'Bot was removed from the meeting too early; the video is too short.'
-        case MeetingEndReason.BotNotAccepted:
+        case 'botRemovedTooEarly':
+            return 'Bot was removed too early; the video is too short.'
+        case 'botNotAccepted':
             return 'Bot was not accepted into the meeting.'
-        case MeetingEndReason.CannotJoinMeeting:
+        case 'cannotJoinMeeting':
             return 'Cannot join meeting - meeting is not reachable.'
-        case MeetingEndReason.TimeoutWaitingToStart:
+        case 'timeoutWaitingToStart':
             return 'Timeout waiting to start recording.'
-        case MeetingEndReason.InvalidMeetingUrl:
+        case 'invalidMeetingUrl':
             return 'Invalid meeting URL provided.'
-        case MeetingEndReason.StreamingSetupFailed:
+        case 'streamingSetupFailed':
             return 'Failed to set up streaming audio.'
-        case MeetingEndReason.Internal:
+        case 'internalError':
             return 'Internal error occurred during recording.'
+        default:
+            return 'An error occurred during recording.'
     }
 }
 
