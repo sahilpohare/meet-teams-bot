@@ -9,7 +9,7 @@ import { getStateInstance } from './states'
 import { MeetingContext } from './types'
 
 export class MeetingStateMachine {
-    static instance: MeetingStateMachine = null
+    static instance: MeetingStateMachine | null = null
     private currentState: MeetingStateType
     public context: MeetingContext
     private provider: MeetingProviderInterface
