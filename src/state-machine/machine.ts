@@ -1,3 +1,4 @@
+import { JoinError } from '../types'
 import { MeetingEndReason, MeetingStateType, ParticipantState } from './types'
 
 import { MeetProvider } from '../meeting/meet'
@@ -82,8 +83,16 @@ export class MeetingStateMachine {
     }
 
     private async handleError(error: Error): Promise<void> {
-        console.error('Error in state machine:', error)
-        // Use singleton for error handling instead of context
+        // Convert to JoinError if needed
+        const joinError =
+            error instanceof JoinError
+                ? error
+                : new JoinError(MeetingEndReason.Internal, error.message)
+
+        GLOBAL.setError(joinError)
+
+        // Transition to error state - the main loop will handle the rest
+        this.currentState = MeetingStateType.Error
     }
 
     public async pauseRecording(): Promise<void> {
@@ -122,14 +131,6 @@ export class MeetingStateMachine {
             }
             this.context.lastSpeakerTime = state.lastSpeakerTime
             this.context.noSpeakerDetectedTime = state.noSpeakerDetectedTime
-
-            // console.info('Updated participant state:', {
-            //     attendeesCount: state.attendeesCount,
-            //     firstUserJoined: this.context.firstUserJoined,
-            //     lastSpeakerTime: state.lastSpeakerTime,
-            //     noSpeakerDetectedTime: state.noSpeakerDetectedTime,
-            //     state: this.currentState,
-            // })
         }
     }
 
