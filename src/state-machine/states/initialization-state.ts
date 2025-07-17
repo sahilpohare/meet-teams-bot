@@ -3,7 +3,6 @@ import { openBrowser } from '../../browser/browser'
 import { GLOBAL } from '../../singleton'
 
 import { PathManager } from '../../utils/PathManager'
-import { MeetingStateMachine } from '../machine'
 import {
     MeetingEndReason,
     MeetingStateType,
@@ -18,11 +17,6 @@ export class InitializationState extends BaseState {
             if (!GLOBAL.get().meeting_url) {
                 GLOBAL.setError(MeetingEndReason.InvalidMeetingUrl)
                 throw new Error('Invalid meeting URL')
-            }
-
-            // Initialize meeting handle if not exists
-            if (!this.context.meetingHandle) {
-                this.context.meetingHandle = new MeetingStateMachine()
             }
 
             // Setup path manager first (important for logs)

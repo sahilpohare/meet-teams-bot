@@ -43,7 +43,14 @@ export class CleanupState extends BaseState {
             console.info(
                 '🧹 Step 0/5: Stopping dialog observer. It would not block the cleanup',
             )
-            this.stopDialogObserver()
+            try {
+                this.stopDialogObserver()
+            } catch (error) {
+                console.warn(
+                    '🧹 Dialog observer stop failed, continuing cleanup:',
+                    error,
+                )
+            }
 
             // 🎬 PRIORITY 1: Stop video recording immediately to avoid data loss
             console.info('🧹 Step 1/5: Stopping ScreenRecorder (PRIORITY)')

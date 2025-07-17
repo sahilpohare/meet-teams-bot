@@ -1,7 +1,10 @@
 import axios from 'axios'
 import * as rax from 'retry-axios'
 
-import { getErrorMessageFromCode } from '../state-machine/types'
+import {
+    getErrorMessageFromCode,
+    MeetingEndReason,
+} from '../state-machine/types'
 import { ApiTypes } from './types'
 
 import { GLOBAL } from '../singleton'
@@ -113,7 +116,11 @@ export class Api {
         errorCode?: string,
     ): Promise<void> {
         const code = errorCode || GLOBAL.getEndReason?.()
-        const msg = message || (code ? getErrorMessageFromCode(code) : 'Unknown error')
+        const msg =
+            message ||
+            (code
+                ? getErrorMessageFromCode(code as MeetingEndReason)
+                : 'Unknown error')
 
         try {
             await axios({

@@ -4,7 +4,6 @@ import { SimpleDialogObserver } from '../services/dialog-observer/simple-dialog-
 import { Streaming } from '../streaming'
 import { MeetingProviderInterface } from '../types'
 import { PathManager } from '../utils/PathManager'
-import { MeetingStateMachine } from './machine'
 
 export enum MeetingStateType {
     Initialization = 'initialization',
@@ -37,31 +36,31 @@ export enum MeetingEndReason {
 }
 
 // Get human-readable error message from error code
-export function getErrorMessageFromCode(errorCode: MeetingEndReason | string): string {
+export function getErrorMessageFromCode(errorCode: MeetingEndReason): string {
     switch (errorCode) {
-        case 'botRemoved':
+        case MeetingEndReason.BotRemoved:
             return 'Bot was removed from the meeting.'
-        case 'noAttendees':
+        case MeetingEndReason.NoAttendees:
             return 'No attendees joined the meeting.'
-        case 'noSpeaker':
+        case MeetingEndReason.NoSpeaker:
             return 'No speakers detected during recording.'
-        case 'recordingTimeout':
+        case MeetingEndReason.RecordingTimeout:
             return 'Recording timeout reached.'
-        case 'apiRequest':
+        case MeetingEndReason.ApiRequest:
             return 'Recording stopped via API request.'
-        case 'botRemovedTooEarly':
+        case MeetingEndReason.BotRemovedTooEarly:
             return 'Bot was removed too early; the video is too short.'
-        case 'botNotAccepted':
+        case MeetingEndReason.BotNotAccepted:
             return 'Bot was not accepted into the meeting.'
-        case 'cannotJoinMeeting':
+        case MeetingEndReason.CannotJoinMeeting:
             return 'Cannot join meeting - meeting is not reachable.'
-        case 'timeoutWaitingToStart':
+        case MeetingEndReason.TimeoutWaitingToStart:
             return 'Timeout waiting to start recording.'
-        case 'invalidMeetingUrl':
+        case MeetingEndReason.InvalidMeetingUrl:
             return 'Invalid meeting URL provided.'
-        case 'streamingSetupFailed':
+        case MeetingEndReason.StreamingSetupFailed:
             return 'Failed to set up streaming audio.'
-        case 'internalError':
+        case MeetingEndReason.Internal:
             return 'Internal error occurred during recording.'
         default:
             return 'An error occurred during recording.'
@@ -69,8 +68,7 @@ export function getErrorMessageFromCode(errorCode: MeetingEndReason | string): s
 }
 
 export interface MeetingContext {
-    // Références aux objets principaux
-    meetingHandle: MeetingStateMachine
+    // Main object references
     provider: MeetingProviderInterface
 
     // Pages et contexte du navigateur

@@ -444,28 +444,23 @@ async function sendEntryMessage(
 }
 
 async function notAcceptedInMeeting(page: Page): Promise<boolean> {
-    try {
-        const deniedTexts = [
-            'denied',
-            "You've been removed",
-            'we encountered a problem joining',
-            "You can't join",
-        ]
+    const deniedTexts = [
+        'denied',
+        "You've been removed",
+        'we encountered a problem joining',
+        "You can't join",
+    ]
 
-        for (const text of deniedTexts) {
-            const element = page.locator(`text=${text}`)
-            if ((await element.count()) > 0) {
-                console.log('XXXXXXXXXXXXXXXXXX User has denied entry')
-                GLOBAL.setError(MeetingEndReason.BotNotAccepted)
-                throw new Error('Bot not accepted into meeting')
-            }
+    for (const text of deniedTexts) {
+        const element = page.locator(`text=${text}`)
+        if ((await element.count()) > 0) {
+            console.log('XXXXXXXXXXXXXXXXXX User has denied entry')
+            GLOBAL.setError(MeetingEndReason.BotNotAccepted)
+            return true
         }
-
-        return false
-    } catch (error) {
-        console.error('Error in notAcceptedInMeeting:', error)
-        return false
     }
+
+    return false
 }
 
 async function clickDismiss(page: Page): Promise<boolean> {

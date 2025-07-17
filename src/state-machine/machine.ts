@@ -33,7 +33,6 @@ export class MeetingStateMachine {
 
         this.context = {
             provider: this.provider,
-            meetingHandle: this as any, // Type assertion to avoid circular reference
             error: null,
         } as MeetingContext
 
@@ -44,11 +43,6 @@ export class MeetingStateMachine {
         try {
             while (this.currentState !== MeetingStateType.Terminated) {
                 console.info(`Current state: ${this.currentState}`)
-
-                // Track recording state for success determination
-                if (this.currentState === MeetingStateType.Recording) {
-                    // We're in recording state
-                }
 
                 // Execute current state and transition to next
                 const state = getStateInstance(this.currentState, this.context)
@@ -80,7 +74,7 @@ export class MeetingStateMachine {
     }
 
     public getStartTime(): number {
-        return this.context.startTime!
+        return this.context.startTime ?? 0
     }
 
     private async handleError(error: Error): Promise<void> {
@@ -163,7 +157,8 @@ export class MeetingStateMachine {
     }
 
     public wasRecordingSuccessful(): boolean {
-        if (!GLOBAL.getEndReason() || GLOBAL.hasError()) {
+        const endReason = GLOBAL.getEndReason()
+        if (!endReason || GLOBAL.hasError()) {
             return false
         }
 
@@ -175,7 +170,7 @@ export class MeetingStateMachine {
             MeetingEndReason.RecordingTimeout,
         ]
 
-        return normalReasons.includes(GLOBAL.getEndReason() as MeetingEndReason)
+        return normalReasons.includes(endReason)
     }
 
     public getEndReason(): MeetingEndReason | undefined {

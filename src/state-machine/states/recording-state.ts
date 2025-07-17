@@ -107,7 +107,10 @@ export class RecordingState extends BaseState {
         // Configure event listeners for screen recorder
         ScreenRecorderManager.getInstance().on('error', async (error) => {
             console.error('ScreenRecorder error:', error)
-            // Use singleton for error handling instead of context
+            GLOBAL.setError(
+                MeetingEndReason.StreamingSetupFailed,
+                error.message,
+            )
             this.isProcessing = false
         })
 
@@ -168,8 +171,11 @@ export class RecordingState extends BaseState {
         // Check if we already have an error from ScreenRecorder or other sources
         if (GLOBAL.hasError()) {
             const existingReason = GLOBAL.getEndReason()
-            if (!existingReason) {
-                // This shouldn't happen, but handle gracefully
+            // Defensive null check: handle null, undefined, or any falsy values
+            if (existingReason === null || existingReason === undefined) {
+                console.warn(
+                    'GLOBAL.getEndReason() returned null/undefined despite hasError() being true, using default reason',
+                )
                 return { shouldEnd: true, reason: MeetingEndReason.BotRemoved }
             }
             console.log(
@@ -182,7 +188,6 @@ export class RecordingState extends BaseState {
     }
     private async handleMeetingEnd(reason: MeetingEndReason): Promise<void> {
         console.info(`Handling meeting end with reason: ${reason}`)
-        // Do not call GLOBAL.setError here, as errors are handled by the caller
         try {
             // Try to close the meeting but don't let an error here affect the rest
             try {

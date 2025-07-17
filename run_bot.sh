@@ -711,9 +711,9 @@ test_api_request() {
     
     # Check for generated files
     local bot_files_dir="$output_dir/$bot_uuid"
-    if [ -d "$bot_files_dir" ] && [ "$(find $bot_files_dir -name "*.mp4" -o -name "*.wav" | wc -l)" -gt 0 ]; then
+    if [ -d "$bot_files_dir" ] && [ "$(find "$bot_files_dir" -name "*.mp4" -o -name "*.wav" | wc -l)" -gt 0 ]; then
         print_success "✅ Recording files were generated"
-    elif [ -d "$output_dir" ] && [ "$(find $output_dir -name "*.mp4" -o -name "*.wav" | wc -l)" -gt 0 ]; then
+    elif [ -d "$output_dir" ] && [ "$(find "$output_dir" -name "*.mp4" -o -name "*.wav" | wc -l)" -gt 0 ]; then
         print_success "✅ Recording files were generated"
     else
         print_info "ℹ️ No recording files (normal for short test)"
