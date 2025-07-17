@@ -615,14 +615,26 @@ export class ScreenRecorder extends EventEmitter {
                     error.message.includes('FFprobe failed') ||
                     error.message.includes('FFmpeg failed')
                 ) {
+                    // Check if we already have a BotNotAccepted error (higher priority)
+                    if (
+                        GLOBAL.hasError() &&
+                        GLOBAL.getError()?.reason ===
+                            MeetingEndReason.BotNotAccepted
+                    ) {
+                        console.log(
+                            'Preserving existing BotNotAccepted error instead of creating BotRemovedTooEarly',
+                        )
+                        throw error // Re-throw the original error to preserve BotNotAccepted
+                    }
+
                     console.log(
                         'Converting FFprobe/FFmpeg error to BotRemovedTooEarly',
                     )
-                    const error = new JoinError(
+                    const botRemovedTooEarlyError = new JoinError(
                         MeetingEndReason.BotRemovedTooEarly,
                     )
-                    GLOBAL.setError(error)
-                    throw error
+                    GLOBAL.setError(botRemovedTooEarlyError)
+                    throw botRemovedTooEarlyError
                 }
             }
 

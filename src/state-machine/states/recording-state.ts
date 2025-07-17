@@ -130,10 +130,13 @@ export class RecordingState extends BaseState {
             const botRemovedResult = await Promise.race([
                 this.checkBotRemoved(),
                 new Promise<boolean>((_, reject) =>
-                    setTimeout(() => reject(new Error('Bot removed check timeout')), 10000)
-                )
+                    setTimeout(
+                        () => reject(new Error('Bot removed check timeout')),
+                        10000,
+                    ),
+                ),
             ])
-            
+
             if (botRemovedResult) {
                 return this.getBotRemovedReason()
             }
@@ -156,15 +159,21 @@ export class RecordingState extends BaseState {
 
     /**
      * Helper method to determine the correct reason when bot is removed
-     * Prioritizes BotRemovedTooEarly over BotRemoved if it exists in global state
+     * Uses existing error from ScreenRecorder if available, otherwise BotRemoved
      */
-    private getBotRemovedReason(): { shouldEnd: true; reason: MeetingEndReason } {
-        // Check if we already have a BotRemovedTooEarly error from ScreenRecorder
-        if (GLOBAL.hasError() && GLOBAL.getError()?.reason === MeetingEndReason.BotRemovedTooEarly) {
-            console.log('Using existing BotRemovedTooEarly error instead of BotRemoved')
-            return { shouldEnd: true, reason: MeetingEndReason.BotRemovedTooEarly }
+    private getBotRemovedReason(): {
+        shouldEnd: true
+        reason: MeetingEndReason
+    } {
+        // Check if we already have an error from ScreenRecorder or other sources
+        if (GLOBAL.hasError()) {
+            const existingError = GLOBAL.getError()!
+            console.log(
+                `Using existing error instead of BotRemoved: ${existingError.reason}`,
+            )
+            return { shouldEnd: true, reason: existingError.reason }
         }
-        
+
         return { shouldEnd: true, reason: MeetingEndReason.BotRemoved }
     }
 

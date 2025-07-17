@@ -98,17 +98,17 @@ async function handleFailedRecording(): Promise<void> {
     console.log(`Recording failed with reason: ${endReason || 'Unknown'}`)
 
     // Map the end reason to a descriptive message (like Zoom bot)
-    const errorMessage = endReason 
+    const errorMessage = endReason
         ? mapEndReasonToMessage(endReason)
         : 'Recording did not complete successfully'
-    
+
     console.log(`📤 Sending error to backend: ${errorMessage}`)
 
     // Notify backend of recording failure
     if (!GLOBAL.isServerless() && Api.instance) {
         await Api.instance.notifyRecordingFailure(
             GLOBAL.get().meeting_url,
-            errorMessage
+            errorMessage,
         )
     }
 
@@ -193,15 +193,15 @@ async function handleFailedRecording(): Promise<void> {
               : 'Recording failed to complete'
 
         console.log(`📤 Sending error to backend: ${errorMessage}`)
-        
+
         // Notify backend of recording failure
         if (!GLOBAL.isServerless() && Api.instance) {
             await Api.instance.notifyRecordingFailure(
                 GLOBAL.get().meeting_url,
-                errorMessage
+                errorMessage,
             )
         }
-        
+
         await Events.recordingFailed(errorMessage)
         console.log(`✅ Error sent to backend successfully`)
     } finally {
