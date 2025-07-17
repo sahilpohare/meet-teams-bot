@@ -1,9 +1,15 @@
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import { GLOBAL } from '../../singleton'
 import { MeetingContext } from '../../state-machine/types'
 import { DialogObserverResult } from './types'
 
-const TIMEOUTS = {
+interface DismissTimeouts {
+    VISIBLE_TIMEOUT: number
+    CLICK_TIMEOUT: number
+    PAGE_TIMEOUT: number
+}
+
+const TIMEOUTS: DismissTimeouts = {
     VISIBLE_TIMEOUT: 500,
     CLICK_TIMEOUT: 1000,
     PAGE_TIMEOUT: 2000,
@@ -44,7 +50,7 @@ export class SimpleDialogObserver {
 
     protected startGlobalDialogObserver() {
         console.info(`[SimpleDialogObserver] Starting dialog observer`)
-        // Check every 5 seconds instead of 2 seconds
+        // Check every 5 seconds
         this.dialogObserverInterval = setInterval(this.observer, 5000)
     }
 
@@ -198,7 +204,6 @@ export class SimpleDialogObserver {
                     console.warn(
                         `[SimpleDialogObserver] Error with pattern ${pattern.name}: ${error}`,
                     )
-                    continue
                 }
             }
 
@@ -220,9 +225,9 @@ export class SimpleDialogObserver {
      * Try to dismiss a modal by clicking appropriate buttons within the modal
      */
     private async tryDismissModal(
-        modal: any,
+        modal: Locator,
         buttonTexts: string[],
-        timeouts: any,
+        timeouts: DismissTimeouts,
     ): Promise<boolean> {
         // Only search within the modal, not the entire page
         for (const buttonText of buttonTexts) {
@@ -289,7 +294,6 @@ export class SimpleDialogObserver {
                 console.warn(
                     `[SimpleDialogObserver] Error trying button "${buttonText}": ${error}`,
                 )
-                continue
             }
         }
 

@@ -1073,11 +1073,6 @@ file '${absoluteInputPath}'`
             process.on('error', (error) => {
                 reject(error)
             })
-
-            process.on('exit', (code) => {
-                console.log(`FFmpeg process exited with code ${code}`)
-                resolve()
-            })
         })
     }
 

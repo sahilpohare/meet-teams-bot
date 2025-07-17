@@ -84,8 +84,6 @@ async function upload(speaker: SpeakerData, end: boolean) {
             return
         } else {
             try {
-                const meetingStartTime =
-                    MeetingStateMachine.instance.getStartTime()
                 if (meetingStartTime == null || meetingStartTime == undefined) {
                     console.warn(
                         'Meeting start time not available for posting transcript - skipping',
