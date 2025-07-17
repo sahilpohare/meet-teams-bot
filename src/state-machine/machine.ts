@@ -17,7 +17,7 @@ export class MeetingStateMachine {
 
     static init() {
         if (MeetingStateMachine.instance == null) {
-            this.instance = new MeetingStateMachine()
+            MeetingStateMachine.instance = new MeetingStateMachine()
             console.log(
                 '*** INIT MeetingStateMachine.instance',
                 GLOBAL.get().meeting_url,
