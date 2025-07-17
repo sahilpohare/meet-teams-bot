@@ -646,7 +646,7 @@ test_api_request() {
     # Send API stop request
     print_info "🛑 Sending API stop request..."
     local api_response
-    api_response=$(docker exec $(docker ps -q --filter ancestor=meet-teams-bot) curl -s -X POST http://localhost:8080/stop_record \
+    api_response=$(docker exec "$(docker ps -q --filter ancestor=meet-teams-bot)" curl -s -X POST http://localhost:8080/stop_record \
         -H "Content-Type: application/json" \
         -d "{\"bot_id\": \"$bot_uuid\"}")
     
