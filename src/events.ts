@@ -85,6 +85,7 @@ export class Events {
     }
 
     static async recordingFailed(errorMessage: string) {
+        console.log(`📤 Events.recordingFailed called with: ${errorMessage}`)
         return Events.EVENTS?.sendOnce('recording_failed', {
             error_message: errorMessage,
         })

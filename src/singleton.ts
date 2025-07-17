@@ -1,8 +1,13 @@
+import {
+    getErrorMessageFromCode,
+    MeetingEndReason,
+} from './state-machine/types'
 import { MeetingParams } from './types'
 
 class Global {
-    private static instance: Global
     private meetingParams: MeetingParams | null = null
+    private endReason: MeetingEndReason | null = null
+    private errorMessage: string | null = null
     public constructor() {}
 
     public set(meetingParams: MeetingParams) {
@@ -39,6 +44,35 @@ class Global {
             throw new Error('Meeting params are not set')
         }
         return this.meetingParams.remote === null
+    }
+
+    public setError(reason: MeetingEndReason, message?: string): void {
+        console.log(`🔴 Setting global error: ${reason}`)
+        this.endReason = reason
+        this.errorMessage = message || getErrorMessageFromCode(reason)
+        console.log(`🔴 End reason set to: ${this.endReason}`)
+    }
+
+    public setEndReason(reason: MeetingEndReason): void {
+        console.log(`🔵 Setting global end reason: ${reason}`)
+        this.endReason = reason
+    }
+
+    public getEndReason(): MeetingEndReason | null {
+        return this.endReason
+    }
+
+    public getErrorMessage(): string | null {
+        return this.errorMessage
+    }
+
+    public hasError(): boolean {
+        return this.endReason !== null
+    }
+
+    public clearError(): void {
+        this.endReason = null
+        this.errorMessage = null
     }
 }
 

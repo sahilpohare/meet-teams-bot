@@ -1,4 +1,5 @@
-import { JoinError, JoinErrorCode } from '../types'
+import { GLOBAL } from '../singleton'
+import { MeetingEndReason } from '../state-machine/types'
 
 interface TeamsUrlComponents {
     meetingId: string
@@ -8,7 +9,8 @@ interface TeamsUrlComponents {
 function convertLightMeetingToStandard(url: URL): string {
     const coords = url.searchParams.get('coords')
     if (!coords) {
-        throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
+        GLOBAL.setError(MeetingEndReason.InvalidMeetingUrl)
+        throw new Error('Missing coordinates in Teams URL')
     }
 
     try {
@@ -16,7 +18,8 @@ function convertLightMeetingToStandard(url: URL): string {
         const { conversationId, tenantId, messageId, organizerId } =
             decodedCoords
         if (!conversationId || !tenantId || !messageId) {
-            throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
+            GLOBAL.setError(MeetingEndReason.InvalidMeetingUrl)
+            throw new Error('Invalid Teams URL structure')
         }
 
         // Build the working link format directly instead of standard format
@@ -28,7 +31,8 @@ function convertLightMeetingToStandard(url: URL): string {
         return `https://teams.microsoft.com/v2/?meetingjoin=true#/l/meetup-join/${conversationId}/${messageId}?context=${encodeURIComponent(JSON.stringify(context))}&anon=true`
     } catch (e) {
         console.error('🥕❌ Error converting light meeting URL:', e)
-        throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
+        GLOBAL.setError(MeetingEndReason.InvalidMeetingUrl)
+        throw new Error('Failed to convert Teams light meeting URL')
     }
 }
 
@@ -73,7 +77,8 @@ export function parseMeetingUrlFromJoinInfos(
 ): TeamsUrlComponents {
     try {
         if (!meeting_url) {
-            throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
+            GLOBAL.setError(MeetingEndReason.InvalidMeetingUrl)
+            throw new Error('No meeting URL provided')
         }
 
         console.log('Parsing meeting URL:', meeting_url)
@@ -95,7 +100,8 @@ export function parseMeetingUrlFromJoinInfos(
         if (url.hostname.includes('teams.live.com')) {
             const meetPath = url.pathname.split('/meet/')[1]
             if (!meetPath) {
-                throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
+                GLOBAL.setError(MeetingEndReason.InvalidMeetingUrl)
+                throw new Error('Invalid Teams live URL format')
             }
             return {
                 meetingId: meeting_url,
@@ -117,9 +123,11 @@ export function parseMeetingUrlFromJoinInfos(
             }
         }
 
-        throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
+        GLOBAL.setError(MeetingEndReason.InvalidMeetingUrl)
+        throw new Error('Invalid Teams URL')
     } catch (error) {
-        throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
+        GLOBAL.setError(MeetingEndReason.InvalidMeetingUrl)
+        throw error
     }
 }
 

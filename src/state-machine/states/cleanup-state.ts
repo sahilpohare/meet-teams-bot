@@ -1,7 +1,7 @@
 import { SoundContext, VideoContext } from '../../media_context'
 import { ScreenRecorderManager } from '../../recording/ScreenRecorder'
-import { MEETING_CONSTANTS } from '../constants'
 
+import { MEETING_CONSTANTS } from '../constants'
 import { MeetingStateType, StateExecuteResult } from '../types'
 import { BaseState } from './base-state'
 
@@ -39,6 +39,19 @@ export class CleanupState extends BaseState {
 
     private async performCleanup(): Promise<void> {
         try {
+            // 0. Stop the dialog observer
+            console.info(
+                '🧹 Step 0/5: Stopping dialog observer. It would not block the cleanup',
+            )
+            try {
+                this.stopDialogObserver()
+            } catch (error) {
+                console.warn(
+                    '🧹 Dialog observer stop failed, continuing cleanup:',
+                    error,
+                )
+            }
+
             // 🎬 PRIORITY 1: Stop video recording immediately to avoid data loss
             console.info('🧹 Step 1/5: Stopping ScreenRecorder (PRIORITY)')
             await this.stopScreenRecorder()
@@ -48,10 +61,6 @@ export class CleanupState extends BaseState {
                 '🧹 Steps 2-4: Running parallel cleanup (streaming + speakers + HTML)',
             )
             await Promise.allSettled([
-                (async () => {
-                    console.info('🧹 Step 1.5/5: Stopping dialog observer')
-                    this.stopDialogObserver()
-                })(),
                 // 2. Stop the streaming (fast, no await needed)
                 (async () => {
                     console.info('🧹 Step 2/5: Stopping streaming service')
@@ -83,6 +92,8 @@ export class CleanupState extends BaseState {
         } catch (error) {
             console.error('🧹 Cleanup error:', error)
             // Continue even if an error occurs
+            // Don't re-throw - errors are already handled
+            return
         }
     }
 
@@ -172,7 +183,13 @@ export class CleanupState extends BaseState {
                 console.log('ScreenRecorder not recording, nothing to stop')
             }
         } catch (error) {
-            console.error('Error stopping ScreenRecorder:', error)
+            console.error(
+                'Error stopping ScreenRecorder:',
+                error instanceof Error ? error.message : error,
+            )
+
+            // Don't re-throw - errors are already handled
+
             // Don't throw error if recording was already stopped
             if (
                 error instanceof Error &&
@@ -203,13 +220,21 @@ export class CleanupState extends BaseState {
                 this.context.playwrightPage?.close().catch(() => {}),
                 this.context.browserContext?.close().catch(() => {}),
             ])
-
-            // 4. Clear timeouts
-            if (this.context.meetingTimeoutInterval) {
-                clearTimeout(this.context.meetingTimeoutInterval)
-            }
         } catch (error) {
             console.error('Failed to cleanup browser resources:', error)
+        }
+    }
+
+    private stopDialogObserver() {
+        if (this.context.dialogObserver) {
+            console.info(
+                `Stopping global dialog observer in state ${this.constructor.name}`,
+            )
+            this.context.dialogObserver.stopGlobalDialogObserver()
+        } else {
+            console.warn(
+                `Global dialog observer not available in state ${this.constructor.name}`,
+            )
         }
     }
 }

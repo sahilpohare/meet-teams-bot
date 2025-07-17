@@ -2,11 +2,10 @@ import { Events } from '../../events'
 import { ScreenRecorderManager } from '../../recording/ScreenRecorder'
 import { GLOBAL } from '../../singleton'
 import { Streaming } from '../../streaming'
-import { JoinError, JoinErrorCode } from '../../types'
 
 import {
+    MeetingEndReason,
     MeetingStateType,
-    RecordingEndReason,
     StateExecuteResult,
 } from '../types'
 import { BaseState } from './base-state'
@@ -15,7 +14,6 @@ export class WaitingRoomState extends BaseState {
     async execute(): StateExecuteResult {
         try {
             console.info('Entering waiting room state')
-            Events.inWaitingRoom()
 
             // Get meeting information
             const { meetingId, password } = await this.getMeetingInfo()
@@ -33,6 +31,9 @@ export class WaitingRoomState extends BaseState {
                 GLOBAL.get().enter_message,
             )
 
+            // Start the dialog observer before opening the page
+            this.startDialogObserver()
+
             // Open the meeting page
             await this.openMeetingPage(meetingLink)
 
@@ -47,8 +48,8 @@ export class WaitingRoomState extends BaseState {
                 this.context.playwrightPage,
             )
 
-            // Start the dialog observer once the page is open
-            this.startDialogObserver()
+            // Send waiting room event after the page is open
+            Events.inWaitingRoom()
 
             // Wait for acceptance into the meeting
             await this.waitForAcceptance()
@@ -57,19 +58,21 @@ export class WaitingRoomState extends BaseState {
             // If everything is fine, move to the InCall state
             return this.transition(MeetingStateType.InCall)
         } catch (error) {
-            // Arrêter l'observateur en cas d'erreur
-            this.stopDialogObserver()
-
             console.error('Error in waiting room state:', error)
 
-            if (error instanceof JoinError) {
-                switch (error.message) {
-                    case JoinErrorCode.BotNotAccepted:
+            // Handle specific error types based on MeetingEndReason
+            const endReason = GLOBAL.getEndReason()
+            if (endReason) {
+                switch (endReason) {
+                    case MeetingEndReason.BotNotAccepted:
                         Events.botRejected()
-                        return this.handleError(error)
-                    case JoinErrorCode.TimeoutWaitingToStart:
+                        return this.handleError(error as Error)
+                    case MeetingEndReason.TimeoutWaitingToStart:
                         Events.waitingRoomTimeout()
-                        return this.handleError(error)
+                        return this.handleError(error as Error)
+                    case MeetingEndReason.ApiRequest:
+                        Events.apiRequestStop()
+                        return this.handleError(error as Error)
                 }
             }
 
@@ -88,7 +91,8 @@ export class WaitingRoomState extends BaseState {
             )
         } catch (error) {
             console.error('Failed to parse meeting URL:', error)
-            throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
+            GLOBAL.setError(MeetingEndReason.InvalidMeetingUrl)
+            throw new Error('Failed to parse meeting URL')
         }
     }
 
@@ -137,8 +141,9 @@ export class WaitingRoomState extends BaseState {
             const timeout = setTimeout(() => {
                 if (!joinSuccessful) {
                     // Trigger the timeout only if we are not in the meeting
-                    const timeoutError = new JoinError(
-                        JoinErrorCode.TimeoutWaitingToStart,
+                    GLOBAL.setError(MeetingEndReason.TimeoutWaitingToStart)
+                    const timeoutError = new Error(
+                        'Waiting room timeout reached',
                     )
                     console.error('Waiting room timeout reached', timeoutError)
                     reject(timeoutError)
@@ -146,19 +151,19 @@ export class WaitingRoomState extends BaseState {
             }, timeoutMs)
 
             const checkStopSignal = setInterval(() => {
-                if (this.context.endReason === RecordingEndReason.ApiRequest) {
+                if (GLOBAL.getEndReason() === MeetingEndReason.ApiRequest) {
                     clearInterval(checkStopSignal)
                     clearTimeout(timeout)
-                    reject(new JoinError(JoinErrorCode.ApiRequest))
+                    GLOBAL.setError(MeetingEndReason.ApiRequest)
+                    const apiError = new Error('API request to stop recording')
+                    reject(apiError)
                 }
             }, 1000)
 
             this.context.provider
                 .joinMeeting(
                     this.context.playwrightPage,
-                    () =>
-                        this.context.endReason ===
-                        RecordingEndReason.ApiRequest,
+                    () => GLOBAL.getEndReason() === MeetingEndReason.ApiRequest,
                     // Add a callback to notify that the join succeeded
                     () => {
                         joinSuccessful = true
@@ -176,5 +181,20 @@ export class WaitingRoomState extends BaseState {
                     reject(error)
                 })
         })
+    }
+
+    private startDialogObserver() {
+        // Use the global observer instead of creating a local one
+        // Stopping the dialog observer is done in the cleanup state
+        if (this.context.dialogObserver) {
+            console.info(
+                `Starting global dialog observer in state ${this.constructor.name}`,
+            )
+            this.context.dialogObserver.setupGlobalDialogObserver()
+        } else {
+            console.warn(
+                `Global dialog observer not available in state ${this.constructor.name}`,
+            )
+        }
     }
 }

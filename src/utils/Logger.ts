@@ -288,5 +288,7 @@ export function setupExitHandler() {
                 )
             }
         }
+        // Force exit to avoid hanging processes
+        process.exit(1)
     })
 }

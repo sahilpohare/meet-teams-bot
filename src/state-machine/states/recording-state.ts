@@ -3,13 +3,14 @@ import { Streaming } from '../../streaming'
 import { MEETING_CONSTANTS } from '../constants'
 
 import {
+    MeetingEndReason,
     MeetingStateType,
-    RecordingEndReason,
     StateExecuteResult,
 } from '../types'
 import { BaseState } from './base-state'
 
 import { ScreenRecorderManager } from '../../recording/ScreenRecorder'
+import { GLOBAL } from '../../singleton'
 import { sleep } from '../../utils/sleep'
 
 // Sound level threshold for considering activity (0-100)
@@ -24,9 +25,6 @@ export class RecordingState extends BaseState {
     async execute(): StateExecuteResult {
         try {
             console.info('Starting recording state')
-
-            // Start the dialog observer when entering this state
-            this.startDialogObserver()
 
             // Initialize recording
             await this.initializeRecording()
@@ -50,8 +48,9 @@ export class RecordingState extends BaseState {
                     console.warn(
                         'Global recording state timeout reached, forcing end',
                     )
+                    GLOBAL.setEndReason(MeetingEndReason.RecordingTimeout)
                     await this.handleMeetingEnd(
-                        RecordingEndReason.RecordingTimeout,
+                        MeetingEndReason.RecordingTimeout,
                     )
                     break
                 }
@@ -61,6 +60,8 @@ export class RecordingState extends BaseState {
 
                 if (shouldEnd) {
                     console.info(`Meeting end condition met: ${reason}`)
+                    // Set the end reason in the global singleton
+                    GLOBAL.setEndReason(reason)
                     await this.handleMeetingEnd(reason)
                     break
                 }
@@ -79,9 +80,6 @@ export class RecordingState extends BaseState {
             )
             return this.transition(MeetingStateType.Cleanup)
         } catch (error) {
-            // Stop the observer in case of error
-            this.stopDialogObserver()
-
             console.error('❌ Error in recording state:', error)
             console.error('❌ Error stack:', (error as Error).stack)
             return this.handleError(error as Error)
@@ -109,7 +107,10 @@ export class RecordingState extends BaseState {
         // Configure event listeners for screen recorder
         ScreenRecorderManager.getInstance().on('error', async (error) => {
             console.error('ScreenRecorder error:', error)
-            this.context.error = error
+            GLOBAL.setError(
+                MeetingEndReason.StreamingSetupFailed,
+                error.message,
+            )
             this.isProcessing = false
         })
 
@@ -118,78 +119,80 @@ export class RecordingState extends BaseState {
 
     private async checkEndConditions(): Promise<{
         shouldEnd: boolean
-        reason?: RecordingEndReason
+        reason?: MeetingEndReason
     }> {
-        const checkPromise = async () => {
+        try {
             const now = Date.now()
 
-            try {
-                // Check if stop was requested via state machine
-                if (this.context.endReason) {
-                    return { shouldEnd: true, reason: this.context.endReason }
-                }
-
-                // Check if bot was removed
-                if (await this.checkBotRemoved()) {
-                    return {
-                        shouldEnd: true,
-                        reason: RecordingEndReason.BotRemoved,
-                    }
-                }
-
-                // Check participants
-                if (await this.checkNoAttendees(now)) {
-                    return {
-                        shouldEnd: true,
-                        reason: RecordingEndReason.NoAttendees,
-                    }
-                }
-
-                // Check audio activity
-                if (await this.checkNoSpeaker(now)) {
-                    return {
-                        shouldEnd: true,
-                        reason: RecordingEndReason.NoSpeaker,
-                    }
-                }
-
-                return { shouldEnd: false }
-            } catch (error) {
-                console.error('Error checking end conditions:', error)
-                return {
-                    shouldEnd: true,
-                    reason: RecordingEndReason.BotRemoved,
-                }
+            // Check if stop was requested via state machine
+            if (GLOBAL.getEndReason()) {
+                return { shouldEnd: true, reason: GLOBAL.getEndReason() }
             }
-        }
 
-        const timeoutPromise = new Promise<{
-            shouldEnd: boolean
-            reason?: RecordingEndReason
-        }>((_, reject) =>
-            setTimeout(
-                () => reject(new Error('Check end conditions timeout')),
-                5000,
-            ),
-        )
+            // Check if bot was removed (with timeout protection)
+            const botRemovedResult = await Promise.race([
+                this.checkBotRemoved(),
+                new Promise<boolean>((_, reject) =>
+                    setTimeout(
+                        () => reject(new Error('Bot removed check timeout')),
+                        10000,
+                    ),
+                ),
+            ])
 
-        try {
-            return await Promise.race([checkPromise(), timeoutPromise])
+            if (botRemovedResult) {
+                return this.getBotRemovedReason()
+            }
+
+            // Check participants and audio activity
+            if (await this.checkNoAttendees(now)) {
+                return { shouldEnd: true, reason: MeetingEndReason.NoAttendees }
+            }
+
+            if (await this.checkNoSpeaker(now)) {
+                return { shouldEnd: true, reason: MeetingEndReason.NoSpeaker }
+            }
+
+            return { shouldEnd: false }
         } catch (error) {
-            console.error('Error or timeout in checkEndConditions:', error)
-            return { shouldEnd: true, reason: RecordingEndReason.BotRemoved }
+            console.error('Error checking end conditions:', error)
+            return this.getBotRemovedReason()
         }
     }
 
-    private async handleMeetingEnd(reason: RecordingEndReason): Promise<void> {
-        console.info(`Handling meeting end with reason: ${reason}`)
-        this.context.endReason = reason
+    /**
+     * Helper method to determine the correct reason when bot is removed
+     * Uses existing error from ScreenRecorder if available, otherwise BotRemoved
+     */
+    private getBotRemovedReason(): {
+        shouldEnd: true
+        reason: MeetingEndReason
+    } {
+        // Check if we already have an error from ScreenRecorder or other sources
+        if (GLOBAL.hasError()) {
+            const existingReason = GLOBAL.getEndReason()
+            // Defensive null check: handle null, undefined, or any falsy values
+            if (existingReason === null || existingReason === undefined) {
+                console.warn(
+                    'GLOBAL.getEndReason() returned null/undefined despite hasError() being true, using default reason',
+                )
+                return { shouldEnd: true, reason: MeetingEndReason.BotRemoved }
+            }
+            console.log(
+                `Using existing error instead of BotRemoved: ${existingReason}`,
+            )
+            return { shouldEnd: true, reason: existingReason }
+        }
 
+        return { shouldEnd: true, reason: MeetingEndReason.BotRemoved }
+    }
+    private async handleMeetingEnd(reason: MeetingEndReason): Promise<void> {
+        console.info(`Handling meeting end with reason: ${reason}`)
         try {
             // Try to close the meeting but don't let an error here affect the rest
             try {
                 // If the reason is bot_removed, we know the meeting is already effectively closed
-                if (reason === RecordingEndReason.BotRemoved) {
+                if (reason === MeetingEndReason.BotRemoved) {
                     console.info(
                         'Bot was removed from meeting, skipping active closure step',
                     )
@@ -210,7 +213,6 @@ export class RecordingState extends BaseState {
             await Events.callEnded()
 
             console.info('Setting isProcessing to false to end recording loop')
-            await sleep(2000)
         } catch (error) {
             console.error('Error during meeting end handling:', error)
         } finally {

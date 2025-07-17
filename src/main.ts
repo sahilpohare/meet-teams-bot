@@ -1,17 +1,18 @@
-import { MeetingHandle } from './meeting'
 import { Api } from './api/methods'
 import { Events } from './events'
-import { GLOBAL } from './singleton'
-import { PathManager } from './utils/PathManager'
-import { detectMeetingProvider } from './utils/detectMeetingProvider' //TODO: RENAME
-import {
-    uploadLogsToS3,
-    setupExitHandler,
-    setupConsoleLogger,
-} from './utils/Logger'
 import { server } from './server'
+import { GLOBAL } from './singleton'
+import { MeetingStateMachine } from './state-machine/machine'
+import { detectMeetingProvider } from './utils/detectMeetingProvider'
+import {
+    setupConsoleLogger,
+    setupExitHandler,
+    uploadLogsToS3,
+} from './utils/Logger'
+import { PathManager } from './utils/PathManager'
 
-import { JoinError, MeetingParams } from './types'
+import { getErrorMessageFromCode } from './state-machine/types'
+import { MeetingParams } from './types'
 
 import { exit } from 'process'
 
@@ -47,7 +48,6 @@ async function readFromStdin(): Promise<MeetingParams> {
         })
 
         process.stdin.on('end', () => {
-            console.log('Raw data received from stdin:', JSON.stringify(data))
             try {
                 const params = JSON.parse(data) as MeetingParams
 
@@ -75,7 +75,7 @@ async function handleSuccessfulRecording(): Promise<void> {
 
     // Log the end reason for debugging
     console.log(
-        `Recording ended normally with reason: ${MeetingHandle.instance.getEndReason()}`,
+        `Recording ended normally with reason: ${MeetingStateMachine.instance.getEndReason()}`,
     )
 
     // Handle API endpoint call with built-in retry logic
@@ -94,13 +94,22 @@ async function handleFailedRecording(): Promise<void> {
     console.error('Recording did not complete successfully')
 
     // Log the end reason for debugging
-    const endReason = MeetingHandle.instance.getEndReason()
+    const endReason = GLOBAL.getEndReason()
     console.log(`Recording failed with reason: ${endReason || 'Unknown'}`)
 
-    // Send failure webhook
-    await Events.recordingFailed(
-        String(endReason) || 'Recording did not complete successfully',
-    )
+    console.log(`📤 Sending error to backend`)
+
+    // Notify backend of recording failure (function deduces errorCode and message automatically)
+    if (!GLOBAL.isServerless() && Api.instance) {
+        await Api.instance.notifyRecordingFailure()
+    }
+
+    // Send failure webhook to user
+    const errorMessage = endReason
+        ? getErrorMessageFromCode(endReason)
+        : 'Recording did not complete successfully'
+    await Events.recordingFailed(errorMessage)
+    console.log(`✅ Error sent to backend successfully`)
 }
 
 // ========================================
@@ -124,7 +133,6 @@ async function handleFailedRecording(): Promise<void> {
         const logParams = { ...meetingParams }
 
         // Mask sensitive data for security
-        if (logParams.secret) logParams.secret = '***MASKED***'
         if (logParams.user_token) logParams.user_token = '***MASKED***'
         if (logParams.bots_api_key) logParams.bots_api_key = '***MASKED***'
         if (logParams.speech_to_text_api_key)
@@ -147,7 +155,7 @@ async function handleFailedRecording(): Promise<void> {
         console.log('Server started successfully')
 
         // Initialize components
-        MeetingHandle.init()
+        MeetingStateMachine.init()
         Events.init()
         Events.joiningCall()
 
@@ -157,24 +165,37 @@ async function handleFailedRecording(): Promise<void> {
         }
 
         // Start the meeting recording
-        await MeetingHandle.instance.startRecordMeeting()
+        await MeetingStateMachine.instance.startRecordMeeting()
 
         // Handle recording result
-        if (MeetingHandle.instance.wasRecordingSuccessful()) {
+        if (MeetingStateMachine.instance.wasRecordingSuccessful()) {
             await handleSuccessfulRecording()
         } else {
             await handleFailedRecording()
         }
     } catch (error) {
         // Handle explicit errors from state machine
-        console.error('Meeting failed:', error)
+        console.error(
+            'Meeting failed:',
+            error instanceof Error ? error.message : error,
+        )
 
-        const errorMessage =
-            error instanceof JoinError
-                ? error.message
-                : 'Recording failed to complete'
+        // Use global error if available, otherwise fallback to error message
+        const errorMessage = GLOBAL.hasError()
+            ? GLOBAL.getErrorMessage() || 'Unknown error'
+            : error instanceof Error
+              ? error.message
+              : 'Recording failed to complete'
+
+        console.log(`📤 Sending error to backend: ${errorMessage}`)
+
+        // Notify backend of recording failure
+        if (!GLOBAL.isServerless() && Api.instance) {
+            await Api.instance.notifyRecordingFailure()
+        }
 
         await Events.recordingFailed(errorMessage)
+        console.log(`✅ Error sent to backend successfully`)
     } finally {
         if (!GLOBAL.isServerless()) {
             try {

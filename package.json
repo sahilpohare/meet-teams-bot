@@ -9,7 +9,6 @@
         "automation",
         "google-meet",
         "teams",
-        "zoom",
         "playwright"
     ],
     "engines": {

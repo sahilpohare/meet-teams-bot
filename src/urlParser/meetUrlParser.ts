@@ -1,4 +1,5 @@
-import { JoinError, JoinErrorCode } from '../types'
+import { GLOBAL } from '../singleton'
+import { MeetingEndReason } from '../state-machine/types'
 
 interface MeetUrlComponents {
     meetingId: string
@@ -23,12 +24,14 @@ export async function parseMeetingUrlFromJoinInfos(
     try {
         const meetUrl = urlSplitted.find((s) => s.includes('meet.google.com'))
         if (!meetUrl) {
-            throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
+            GLOBAL.setError(MeetingEndReason.InvalidMeetingUrl)
+            throw new Error('No Google Meet URL found')
         }
 
         const match = meetUrl.match(meetCodeRegex)
         if (!match) {
-            throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
+            GLOBAL.setError(MeetingEndReason.InvalidMeetingUrl)
+            throw new Error('Invalid Google Meet URL format')
         }
 
         // Reconstruct the URL in standard format
@@ -40,6 +43,7 @@ export async function parseMeetingUrlFromJoinInfos(
             password: '',
         }
     } catch (error) {
-        throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
+        GLOBAL.setError(MeetingEndReason.InvalidMeetingUrl)
+        throw error
     }
 }

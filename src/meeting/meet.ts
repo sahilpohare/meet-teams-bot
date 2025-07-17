@@ -1,6 +1,7 @@
 import { BrowserContext, Page } from '@playwright/test'
 
-import { JoinError, JoinErrorCode, MeetingProviderInterface } from '../types'
+import { MeetingEndReason } from '../state-machine/types'
+import { MeetingProviderInterface } from '../types'
 
 import { GLOBAL } from '../singleton'
 import { parseMeetingUrlFromJoinInfos } from '../urlParser/meetUrlParser'
@@ -170,14 +171,16 @@ export class MeetProvider implements MeetingProviderInterface {
             }
 
             if (!askToJoinClicked) {
-                throw new JoinError(JoinErrorCode.CannotJoinMeeting)
+                GLOBAL.setError(MeetingEndReason.CannotJoinMeeting)
+                throw new Error('Cannot join meeting')
             }
 
             // Wait to be in the meeting with regular cancelCheck verification
             console.log('Waiting to confirm meeting join...')
             while (true) {
                 if (cancelCheck()) {
-                    throw new JoinError(JoinErrorCode.ApiRequest)
+                    GLOBAL.setError(MeetingEndReason.ApiRequest)
+                    throw new Error('API request to stop recording')
                 }
 
                 if (await isInMeeting(page)) {
@@ -187,7 +190,8 @@ export class MeetProvider implements MeetingProviderInterface {
                 }
 
                 if (await notAcceptedInMeeting(page)) {
-                    throw new JoinError(JoinErrorCode.BotNotAccepted)
+                    GLOBAL.setError(MeetingEndReason.BotNotAccepted)
+                    throw new Error('Bot not accepted into meeting')
                 }
 
                 await sleep(1000)
@@ -330,12 +334,14 @@ async function findShowEveryOne(
             }
 
             if (cancelCheck()) {
-                throw new JoinError(JoinErrorCode.TimeoutWaitingToStart)
+                GLOBAL.setError(MeetingEndReason.TimeoutWaitingToStart)
+                throw new Error('Timeout waiting to start')
             }
 
             if (await notAcceptedInMeeting(page)) {
                 console.log('Bot not accepted, exiting meeting')
-                throw new JoinError(JoinErrorCode.BotNotAccepted)
+                GLOBAL.setError(MeetingEndReason.BotNotAccepted)
+                throw new Error('Bot not accepted into meeting')
             }
 
             if (!showEveryOneFound && !inMeetingConfirmed) {
@@ -343,9 +349,6 @@ async function findShowEveryOne(
             }
             i++
         } catch (error) {
-            if (error instanceof JoinError) {
-                throw error
-            }
             console.error('Error in findShowEveryOne:', error)
             await sleep(1000)
         }
@@ -441,30 +444,23 @@ async function sendEntryMessage(
 }
 
 async function notAcceptedInMeeting(page: Page): Promise<boolean> {
-    try {
-        const deniedTexts = [
-            'denied',
-            "You've been removed",
-            'we encountered a problem joining',
-            "You can't join",
-        ]
+    const deniedTexts = [
+        'denied',
+        "You've been removed",
+        'we encountered a problem joining',
+        "You can't join",
+    ]
 
-        for (const text of deniedTexts) {
-            const element = page.locator(`text=${text}`)
-            if ((await element.count()) > 0) {
-                console.log('XXXXXXXXXXXXXXXXXX User has denied entry')
-                throw new JoinError(JoinErrorCode.BotNotAccepted)
-            }
+    for (const text of deniedTexts) {
+        const element = page.locator(`text=${text}`)
+        if ((await element.count()) > 0) {
+            console.log('XXXXXXXXXXXXXXXXXX User has denied entry')
+            GLOBAL.setError(MeetingEndReason.BotNotAccepted)
+            return true
         }
-
-        return false
-    } catch (error) {
-        if (error instanceof JoinError) {
-            throw error
-        }
-        console.error('Error in notAcceptedInMeeting:', error)
-        return false
     }
+
+    return false
 }
 
 async function clickDismiss(page: Page): Promise<boolean> {
@@ -498,13 +494,7 @@ async function clickWithInnerText(
     // First, take a screenshot to see what the page looks like
     for (let i = 0; i < maxAttempts; i++) {
         try {
-            // Dump the page content to log for analysis
             if (i === 0) {
-                console.log(
-                    'Page content preview:',
-                    await page.content().then((c) => c.slice(0, 500) + '...'),
-                )
-
                 // Log visible buttons for debugging
                 const visibleButtons = await page.evaluate(() => {
                     return Array.from(

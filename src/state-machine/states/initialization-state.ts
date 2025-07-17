@@ -1,10 +1,13 @@
 import { generateBranding, playBranding } from '../../branding'
 import { openBrowser } from '../../browser/browser'
-import { MeetingHandle } from '../../meeting'
 import { GLOBAL } from '../../singleton'
-import { JoinError, JoinErrorCode } from '../../types'
+
 import { PathManager } from '../../utils/PathManager'
-import { MeetingStateType, StateExecuteResult } from '../types'
+import {
+    MeetingEndReason,
+    MeetingStateType,
+    StateExecuteResult,
+} from '../types'
 import { BaseState } from './base-state'
 
 export class InitializationState extends BaseState {
@@ -12,12 +15,8 @@ export class InitializationState extends BaseState {
         try {
             // Validate parameters
             if (!GLOBAL.get().meeting_url) {
-                throw new JoinError(JoinErrorCode.InvalidMeetingUrl)
-            }
-
-            // Initialize meeting handle if not exists
-            if (!this.context.meetingHandle) {
-                this.context.meetingHandle = new MeetingHandle()
+                GLOBAL.setError(MeetingEndReason.InvalidMeetingUrl)
+                throw new Error('Invalid meeting URL')
             }
 
             // Setup path manager first (important for logs)

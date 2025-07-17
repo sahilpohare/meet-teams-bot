@@ -1,5 +1,6 @@
 import { Events } from '../../events'
 
+import { GLOBAL } from '../../singleton'
 import { MEETING_CONSTANTS } from '../constants'
 import { MeetingStateType, StateExecuteResult } from '../types'
 import { BaseState } from './base-state'
@@ -34,7 +35,7 @@ export class PausedState extends BaseState {
                 await new Promise((resolve) => setTimeout(resolve, 100))
 
                 // Check if we should stop completely
-                if (this.context.endReason) {
+                if (GLOBAL.getEndReason()) {
                     return this.transition(MeetingStateType.Cleanup)
                 }
 

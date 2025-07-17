@@ -98,25 +98,3 @@ export type SpeakerData = {
     isSpeaking: boolean
 }
 export type MeetingProvider = 'Meet' | 'Teams' | 'Zoom'
-
-export class JoinError extends Error {
-    details?: any
-
-    constructor(message: string, details?: any) {
-        super(message)
-        this.name = 'JoinError'
-        this.details = details
-    }
-}
-
-export enum JoinErrorCode {
-    CannotJoinMeeting = 'CannotJoinMeeting',
-    BotNotAccepted = 'BotNotAccepted',
-    BotRemoved = 'BotRemoved',
-    BotRemovedTooEarly = 'BotRemovedTooEarly',
-    ApiRequest = 'ApiRequest',
-    TimeoutWaitingToStart = 'TimeoutWaitingToStart',
-    Internal = 'InternalError classic',
-    InvalidMeetingUrl = 'InvalidMeetingUrl',
-    StreamingSetupFailed = 'StreamingSetupFailed',
-}

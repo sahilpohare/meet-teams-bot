@@ -1,9 +1,6 @@
-import { MeetingParams } from '../types'
-
 import { BrowserContext, Page } from '@playwright/test'
 import { BrandingHandle } from '../branding'
-import { MeetingHandle } from '../meeting'
-import { ScreenRecorder } from '../recording/ScreenRecorder'
+import { SimpleDialogObserver } from '../services/dialog-observer/simple-dialog-observer'
 import { Streaming } from '../streaming'
 import { MeetingProviderInterface } from '../types'
 import { PathManager } from '../utils/PathManager'
@@ -20,18 +17,58 @@ export enum MeetingStateType {
     Terminated = 'terminated',
 }
 
-export enum RecordingEndReason {
-    ManualStop = 'manual_stop',
-    BotRemoved = 'bot_removed',
-    NoAttendees = 'no_attendees',
-    NoSpeaker = 'no_speaker',
-    RecordingTimeout = 'recording_timeout',
-    ApiRequest = 'api_request',
+export enum MeetingEndReason {
+    // Normal end reasons
+    BotRemoved = 'botRemoved',
+    NoAttendees = 'noAttendees',
+    NoSpeaker = 'noSpeaker',
+    RecordingTimeout = 'recordingTimeout',
+    ApiRequest = 'apiRequest',
+
+    // Error end reasons
+    BotRemovedTooEarly = 'botRemovedTooEarly',
+    BotNotAccepted = 'botNotAccepted',
+    CannotJoinMeeting = 'cannotJoinMeeting',
+    TimeoutWaitingToStart = 'timeoutWaitingToStart',
+    InvalidMeetingUrl = 'invalidMeetingUrl',
+    StreamingSetupFailed = 'streamingSetupFailed',
+    Internal = 'internalError',
+}
+
+// Get human-readable error message from error code
+export function getErrorMessageFromCode(errorCode: MeetingEndReason): string {
+    switch (errorCode) {
+        case MeetingEndReason.BotRemoved:
+            return 'Bot was removed from the meeting.'
+        case MeetingEndReason.NoAttendees:
+            return 'No attendees joined the meeting.'
+        case MeetingEndReason.NoSpeaker:
+            return 'No speakers detected during recording.'
+        case MeetingEndReason.RecordingTimeout:
+            return 'Recording timeout reached.'
+        case MeetingEndReason.ApiRequest:
+            return 'Recording stopped via API request.'
+        case MeetingEndReason.BotRemovedTooEarly:
+            return 'Bot was removed too early; the video is too short.'
+        case MeetingEndReason.BotNotAccepted:
+            return 'Bot was not accepted into the meeting.'
+        case MeetingEndReason.CannotJoinMeeting:
+            return 'Cannot join meeting - meeting is not reachable.'
+        case MeetingEndReason.TimeoutWaitingToStart:
+            return 'Timeout waiting to start recording.'
+        case MeetingEndReason.InvalidMeetingUrl:
+            return 'Invalid meeting URL provided.'
+        case MeetingEndReason.StreamingSetupFailed:
+            return 'Failed to set up streaming audio.'
+        case MeetingEndReason.Internal:
+            return 'Internal error occurred during recording.'
+        default:
+            return 'An error occurred during recording.'
+    }
 }
 
 export interface MeetingContext {
-    // Références aux objets principaux
-    meetingHandle: MeetingHandle
+    // Main object references
     provider: MeetingProviderInterface
 
     // Pages et contexte du navigateur
@@ -39,7 +76,6 @@ export interface MeetingContext {
     browserContext?: BrowserContext
 
     // Timers et intervalles
-    meetingTimeoutInterval?: NodeJS.Timeout
     startTime?: number
     lastSpeakerTime?: number
     noSpeakerDetectedTime?: number
@@ -50,17 +86,6 @@ export interface MeetingContext {
 
     // Processus et ressources
     brandingProcess?: BrandingHandle
-    mediaRecorderActive?: boolean
-
-    // Gestion des erreurs et statut
-    error?: Error
-    endReason?: RecordingEndReason
-    retryCount?: number
-
-    // Identifiants et tokens
-    extensionId?: string
-    meetingId?: string
-    meetingPassword?: string
 
     // PathManager
     pathManager?: PathManager
@@ -79,28 +104,14 @@ export interface MeetingContext {
     // Streaming
     streamingService?: Streaming
 
-    // Screen recording
-    screenRecorder?: ScreenRecorder
-
     // Speakers observation
     speakersObserver?: import('../meeting/speakersObserver').SpeakersObserver
 
     // HTML cleanup
     htmlCleaner?: import('../meeting/htmlCleaner').HtmlCleaner
 
-    errorTime?: number
-    hasResumed?: boolean
-    speakers?: string[]
-    dialogObserverInterval?: NodeJS.Timeout
-    dialogObserverHeartbeat?: NodeJS.Timeout
-    lastActivityTime?: number
-    lastFrameTime?: number
-
-    // Méthodes pour la gestion globale des observateurs
-    startGlobalDialogObserver?: () => void
-    stopGlobalDialogObserver?: () => void
-
-    meetingUrl?: string
+    // Dialog observer
+    dialogObserver?: SimpleDialogObserver
 }
 
 export interface StateTransition {

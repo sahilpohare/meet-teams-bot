@@ -1,8 +1,7 @@
 import { Api } from './api/methods'
 import { ApiTypes } from './api/types'
-import { MeetingHandle } from './meeting'
 import { GLOBAL } from './singleton'
-
+import { MeetingStateMachine } from './state-machine/machine'
 import { SpeakerData } from './types'
 
 import * as asyncLib from 'async'
@@ -54,7 +53,7 @@ async function upload(speaker: SpeakerData, end: boolean) {
         console.info('Transcriber is stoped')
         return
     }
-    const meetingStartTime = MeetingHandle.instance.getStartTime()
+    const meetingStartTime = MeetingStateMachine.instance.getStartTime()
     if (meetingStartTime == null || meetingStartTime == undefined) {
         console.warn(
             'Meeting start time not available for posting transcript - skipping',
@@ -85,7 +84,6 @@ async function upload(speaker: SpeakerData, end: boolean) {
             return
         } else {
             try {
-                const meetingStartTime = MeetingHandle.instance.getStartTime()
                 if (meetingStartTime == null || meetingStartTime == undefined) {
                     console.warn(
                         'Meeting start time not available for posting transcript - skipping',

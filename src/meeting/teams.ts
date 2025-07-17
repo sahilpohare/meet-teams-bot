@@ -1,6 +1,7 @@
 import { BrowserContext, Page } from '@playwright/test'
 
-import { JoinError, JoinErrorCode, MeetingProviderInterface } from '../types'
+import { MeetingEndReason } from '../state-machine/types'
+import { MeetingProviderInterface } from '../types'
 
 import { GLOBAL } from '../singleton'
 import { parseMeetingUrlFromJoinInfos } from '../urlParser/teamsUrlParser'
@@ -307,12 +308,14 @@ export class TeamsProvider implements MeetingProviderInterface {
             // Check if we have been refused
             const botNotAccepted = await isBotNotAccepted(page)
             if (botNotAccepted) {
-                throw new JoinError(JoinErrorCode.BotNotAccepted)
+                GLOBAL.setError(MeetingEndReason.BotNotAccepted)
+                throw new Error('Bot not accepted into Teams meeting')
             }
 
             // Check if we should cancel
             if (cancelCheck()) {
-                throw new JoinError(JoinErrorCode.ApiRequest)
+                GLOBAL.setError(MeetingEndReason.ApiRequest)
+                throw new Error('API request to stop Teams recording')
             }
 
             // Check if we are in the meeting (multiple indicators)
