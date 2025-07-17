@@ -46,8 +46,14 @@ export async function parseMeetingUrlFromJoinInfos(
             password: '',
         }
     } catch (error) {
-        const joinError = new JoinError(MeetingEndReason.InvalidMeetingUrl)
-        GLOBAL.setError(joinError)
-        throw joinError
+} catch (error) {
+    const joinError = new JoinError(
+        MeetingEndReason.InvalidMeetingUrl,
+        `Failed to parse meeting URL: ${error instanceof Error ? error.message : error}`,
+        error
+    )
+    GLOBAL.setError(joinError)
+    throw joinError
+}
     }
 }
