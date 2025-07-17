@@ -37,7 +37,7 @@ export enum MeetingEndReason {
 }
 
 // Get human-readable error message from error code
-export function getErrorMessageFromCode(errorCode: string): string {
+export function getErrorMessageFromCode(errorCode: MeetingEndReason | string): string {
     switch (errorCode) {
         case 'botRemoved':
             return 'Bot was removed from the meeting.'
