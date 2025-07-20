@@ -23,6 +23,8 @@ const FLASH_SCREEN_SLEEP_TIME = 4500 // Increased from 4200 for better stability
 const SCREENSHOT_PERIOD = 5 // every 5 seconds instead of 2
 const SCREENSHOT_WIDTH = 480 // reduced for smaller file size
 const SCREENSHOT_HEIGHT = 270 // reduced for smaller file size (16:9 ratio)
+const DISPLAY = process.env.DISPLAY || ':99'
+const VIRTUAL_SPEAKER_MONITOR = process.env.VIRTUAL_SPEAKER_MONITOR || 'virtual_speaker.monitor'
 interface ScreenRecordingConfig {
     display: string
     audioDevice?: string
@@ -43,7 +45,7 @@ export class ScreenRecorder extends EventEmitter {
         super()
 
         this.config = {
-            display: ':99',
+            display: DISPLAY,
             audioDevice: 'pulse',
             ...config,
         }
@@ -114,7 +116,9 @@ export class ScreenRecorder extends EventEmitter {
 
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
-                // Check if virtual_speaker.monitor exists
+                // Get the assigned virtual speaker monitor from environment
+                
+                // Check if the assigned virtual speaker monitor exists
                 const { spawn } = await import('child_process')
                 const checkProcess = spawn('pactl', [
                     'list',
@@ -133,7 +137,7 @@ export class ScreenRecorder extends EventEmitter {
 
                 if (
                     exitCode === 0 &&
-                    output.includes('virtual_speaker.monitor')
+                    output.includes(VIRTUAL_SPEAKER_MONITOR)
                 ) {
                     console.log(
                         `✅ Audio device ready after ${attempt} attempt(s)`,
@@ -164,7 +168,7 @@ export class ScreenRecorder extends EventEmitter {
                 '-f',
                 'pulse',
                 '-i',
-                'virtual_speaker.monitor',
+                VIRTUAL_SPEAKER_MONITOR,
                 '-t',
                 '0.1',
                 '-f',
@@ -187,7 +191,7 @@ export class ScreenRecorder extends EventEmitter {
         }
 
         throw new Error(
-            'Audio devices not ready after maximum wait time - virtual_speaker.monitor unavailable',
+            `Audio devices not ready after maximum wait time - ${VIRTUAL_SPEAKER_MONITOR} unavailable`,
         )
     }
 
@@ -215,7 +219,7 @@ export class ScreenRecorder extends EventEmitter {
                 '-f',
                 'pulse',
                 '-i',
-                'virtual_speaker.monitor',
+                VIRTUAL_SPEAKER_MONITOR,
 
                 // === VIDEO INPUT FOR SCREENSHOTS ===
                 '-f',
@@ -289,7 +293,7 @@ export class ScreenRecorder extends EventEmitter {
                 '-f',
                 'pulse',
                 '-i',
-                'virtual_speaker.monitor',
+                VIRTUAL_SPEAKER_MONITOR,
 
                 // === OUTPUT 1: RAW VIDEO (no audio) ===
                 '-map',
