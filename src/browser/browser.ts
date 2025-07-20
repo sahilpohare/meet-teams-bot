@@ -9,10 +9,14 @@ export async function openBrowser(
     try {
         console.log('Launching persistent context with exact extension args...')
 
+        // Get Chrome path from environment variable or use default
+        const chromePath = process.env.CHROME_PATH || '/usr/bin/google-chrome'
+        console.log(`🔍 Using Chrome path: ${chromePath}`)
+
         const context = await chromium.launchPersistentContext('', {
             headless: false,
             viewport: { width, height },
-            executablePath: '/usr/bin/google-chrome',
+            executablePath: chromePath,
             args: [
                 // Security configurations
                 '--no-sandbox',
