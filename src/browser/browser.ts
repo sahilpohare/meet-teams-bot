@@ -1,4 +1,5 @@
 import { BrowserContext, chromium } from '@playwright/test'
+import { GLOBAL } from '../singleton'
 
 export async function openBrowser(
     slowMo: boolean = false,
@@ -7,28 +8,19 @@ export async function openBrowser(
     const height = 720 // 480
 
     // Log additional debugging information
-    console.error('Environment at start up:', {
+    console.log('Environment at start up:', {
         DISPLAY: process.env.DISPLAY,
         HOME: process.env.HOME,
-        USER: process.env.USER,
         CHROME_PATH: process.env.CHROME_PATH,
-        CHROME_DEVEL_SANDBOX: process.env.CHROME_DEVEL_SANDBOX,
         PWD: process.env.PWD,
         PATH: process.env.PATH,
         VIRTUAL_MIC: process.env.VIRTUAL_MIC,
         VIDEO_DEVICE: process.env.VIDEO_DEVICE,
-        ALLOWED_ORIGIN: process.env.ALLOWED_ORIGIN,
+        // ALLOWED_ORIGIN: process.env.ALLOWED_ORIGIN,
         S3_ARGS: process.env.S3_ARGS,
-        S3_BUCKET: process.env.S3_BUCKET,
-        S3_ENDPOINT: process.env.S3_ENDPOINT,
-        S3_ACCESS_KEY: process.env.S3_ACCESS_KEY,
-        S3_SECRET_KEY: process.env.S3_SECRET_KEY,
-        S3_REGION: process.env.S3_REGION,
-        VIRTUAL_SPEAKER_MONITOR: process.env.VIRTUAL_SPEAKER_MONITOR,
-        AWS_S3_VIDEO_BUCKET: process.env.AWS_S3_VIDEO_BUCKET,
-        AWS_S3_AUDIO_BUCKET: process.env.AWS_S3_AUDIO_BUCKET,
-        AWS_S3_TRANSCRIPTION_BUCKET: process.env.AWS_S3_TRANSCRIPTION_BUCKET,
-        AWS_S3_SCREENSHOT_BUCKET: process.env.AWS_S3_SCREENSHOT_BUCKET,
+        remote: {
+            ...GLOBAL.get().remote,
+        },
     })
 
     try {
@@ -85,14 +77,6 @@ export async function openBrowser(
                 '--disable-blink-features=TrustedDOMTypes',
                 '--disable-features=TrustedScriptTypes',
                 '--disable-features=TrustedHTML',
-
-                // Kubernetes-specific arguments for containerized environments
-                '--disable-dev-shm-usage', // Critical: Disable /dev/shm usage (Kubernetes has small limits)
-                '--disable-gpu', // Disable GPU acceleration for containers
-                '--disable-extensions', // Disable extensions for stability
-                '--disable-plugins', // Disable plugins
-                '--disable-web-security', // Disable web security for meeting platforms
-                '--allow-running-insecure-content', // Allow insecure content
 
                 // Additional audio debugging (remove in production)
                 '--enable-logging=stderr',
