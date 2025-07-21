@@ -28,6 +28,26 @@ export class S3Uploader {
         }
     }
 
+    private getS3Args(s3Args?: string[]): string[] {
+        // Order of precedence for s3Args:
+        // 1. Provided s3Args argument (if non-empty)
+        // 2. GLOBAL.get().remote?.s3_args (if non-empty)
+        // 3. process.env.S3_ARGS (if set)
+        // 4. []
+        let finalS3Args: string[] = []
+        if (s3Args && s3Args.length > 0) {
+            finalS3Args = s3Args
+        } else if (
+            GLOBAL.get().remote?.s3_args &&
+            GLOBAL.get().remote.s3_args.length > 0
+        ) {
+            finalS3Args = GLOBAL.get().remote.s3_args
+        } else if (process.env.S3_ARGS) {
+            finalS3Args = process.env.S3_ARGS.split(' ')
+        }
+        return finalS3Args
+    }
+
     public async uploadFile(
         filePath: string,
         bucketName: string,
@@ -45,9 +65,7 @@ export class S3Uploader {
 
             const s3FullPath = `s3://${bucketName}/${s3Path}`
 
-            if (isAudio || !s3Args) {
-                s3Args = []
-            }
+            s3Args = this.getS3Args(s3Args)
 
             s3Args.push(
                 's3',
@@ -138,9 +156,7 @@ export class S3Uploader {
         try {
             const s3FullPath = `s3://${bucketName}/${s3Path}`
 
-            if (!s3Args) {
-                s3Args = []
-            }
+            s3Args = this.getS3Args(s3Args)
 
             s3Args.push(
                 's3',
