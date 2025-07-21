@@ -86,7 +86,7 @@ export class S3Uploader {
 
                 awsProcess.on('close', (code) => {
                     if (code === 0) {
-                        const publicUrl = `https://${bucketName}.fr-par.scw.cloud/${s3Path}`
+                        const publicUrl = `https://${bucketName}.s3.fr-par.scw.cloud/${s3Path}`
                         resolve(publicUrl)
                     } else {
                         const errorMessage = `S3 upload failed (${code}): ${errorOutput || output}`
@@ -180,7 +180,7 @@ export class S3Uploader {
 
                 awsProcess.on('close', (code) => {
                     if (code === 0) {
-                        const publicUrl = `https://${bucketName}.fr-par.scw.cloud/${s3Path}`
+                        const publicUrl = `https://${bucketName}.s3.fr-par.scw.cloud/${s3Path}`
                         resolve(publicUrl)
                     } else {
                         const errorMessage = `S3 sync failed (${code}): ${errorOutput || output}`
