@@ -7,37 +7,12 @@ export async function openBrowser(
     const width = 1280 // 640
     const height = 720 // 480
 
-    // Log additional debugging information
-    console.log('Environment at start up:', {
-        DISPLAY: process.env.DISPLAY,
-        HOME: process.env.HOME,
-        CHROME_PATH: process.env.CHROME_PATH,
-        PWD: process.env.PWD,
-        PATH: process.env.PATH,
-        VIRTUAL_MIC: process.env.VIRTUAL_MIC,
-        VIRTUAL_SPEAKER: process.env.VIRTUAL_SPEAKER,
-        VIRTUAL_SPEAKER_MONITOR: process.env.VIRTUAL_SPEAKER_MONITOR,
-        VIDEO_DEVICE: process.env.VIDEO_DEVICE,
-        // ALLOWED_ORIGIN: process.env.ALLOWED_ORIGIN,
-        S3_ARGS: process.env.S3_ARGS,
-        remote: {
-            ...GLOBAL.get().remote,
-        },
-    })
-
     try {
         console.log('Launching persistent context with exact extension args...')
 
         // Get Chrome path from environment variable or use default
         const chromePath = process.env.CHROME_PATH || '/usr/bin/google-chrome'
         console.log(`🔍 Using Chrome path: ${chromePath}`)
-
-        // Get audio device configurations from environment
-        const virtualMic = process.env.VIRTUAL_MIC || 'pulse:virtual_mic'
-        const virtualSpeaker = process.env.VIRTUAL_SPEAKER || 'virtual_speaker'
-
-        console.log(`🎤 Using virtual microphone: ${virtualMic}`)
-        console.log(`🔊 Using virtual speaker: ${virtualSpeaker}`)
 
         const context = await chromium.launchPersistentContext('', {
             headless: false,
@@ -56,14 +31,6 @@ export async function openBrowser(
                 '--audio-buffer-size=2048', // Set buffer size for better audio handling
                 '--disable-features=AudioServiceSandbox', // Additional sandbox disable
                 '--autoplay-policy=no-user-gesture-required', // Allow autoplay for meeting platforms
-
-                // Audio device selection and fake media stream handling
-                ...(process.env.VIRTUAL_MIC
-                    ? [`--use-audio-device=${virtualMic}`]
-                    : []),
-                ...(process.env.VIRTUAL_SPEAKER
-                    ? [`--use-audio-output-device=${virtualSpeaker}`]
-                    : []),
 
                 // WebRTC optimizations (required for meeting audio/video capture)
                 '--disable-rtc-smoothness-algorithm',

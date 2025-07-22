@@ -67,17 +67,21 @@ export class S3Uploader {
 
             s3Args = this.getS3Args(s3Args)
 
-            s3Args.push(
+            // Create the full command array
+            const fullArgs = [
+                ...s3Args,
                 's3',
                 'cp',
                 filePath,
                 s3FullPath,
                 '--acl',
                 'public-read',
-            )
+            ]
+
+            console.log('🔍 S3 upload command:', 'aws', fullArgs.join(' '))
 
             return new Promise((resolve, reject) => {
-                const awsProcess = spawn('aws', s3Args)
+                const awsProcess = spawn('aws', fullArgs)
                 let output = ''
                 let errorOutput = ''
 
@@ -158,7 +162,9 @@ export class S3Uploader {
 
             s3Args = this.getS3Args(s3Args)
 
-            s3Args.push(
+            // Create the full command array
+            const fullArgs = [
+                ...s3Args,
                 's3',
                 'sync',
                 localDir,
@@ -166,10 +172,12 @@ export class S3Uploader {
                 '--acl',
                 'public-read',
                 '--delete', // Remove files in S3 that don't exist locally
-            )
+            ]
+
+            console.log('🔍 S3 sync command:', 'aws', fullArgs.join(' '))
 
             return new Promise((resolve, reject) => {
-                const awsProcess = spawn('aws', s3Args)
+                const awsProcess = spawn('aws', fullArgs)
                 let output = ''
                 let errorOutput = ''
 
