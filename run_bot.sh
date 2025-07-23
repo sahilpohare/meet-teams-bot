@@ -52,9 +52,21 @@ check_docker() {
 
 # Build Docker image
 build_image() {
+    local image_name=${1:-meet-teams-bot}
+    local date_tag=$(date +%Y%m%d-%H%M)
+    local full_tag="${image_name}:${date_tag}"
+    
     print_info "Building Meet Teams Bot Docker image..."
-    docker build -t meet-teams-bot .
-    print_success "Docker image built successfully"
+    print_info "Tagging as: ${full_tag}"
+    docker build -t "${full_tag}" .
+    print_success "Docker image built successfully: ${full_tag}"
+    
+    # Also tag as latest for convenience
+    docker tag "${full_tag}" "${image_name}:latest"
+    print_info "Also tagged as: ${image_name}:latest"
+    
+    # Update the image name for the rest of the script
+    export DOCKER_IMAGE_NAME="${full_tag}"
 }
 
 # Create output directory
@@ -62,6 +74,22 @@ create_output_dir() {
     local output_dir="./recordings"
     mkdir -p "$output_dir"
     echo "$output_dir"
+}
+
+# Get the current Docker image name
+get_docker_image() {
+    local image_name=${DOCKER_IMAGE_NAME:-meet-teams-bot:latest}
+    echo "$image_name"
+}
+
+# Find available port
+find_available_port() {
+    local start_port=${1:-3000}
+    local port=$start_port
+    while lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; do
+        port=$((port + 1))
+    done
+    echo "$port"
 }
 
 # Mask sensitive information in JSON
