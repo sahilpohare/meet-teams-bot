@@ -53,7 +53,8 @@ check_docker() {
 # Build Docker image
 build_image() {
     local image_name=${1:-meet-teams-bot}
-    local date_tag=$(date +%Y%m%d-%H%M)
+    local date_tag
+    date_tag=$(date +%Y%m%d-%H%M)
     local full_tag="${image_name}:${date_tag}"
     
     print_info "Building Meet Teams Bot Docker image..."
@@ -87,6 +88,10 @@ find_available_port() {
     local start_port=${1:-3000}
     local port=$start_port
     while lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; do
+        if [ "$port" -ge 65535 ]; then
+            print_error "No free TCP port found below 65535"
+            return 1
+        fi
         port=$((port + 1))
     done
     echo "$port"
@@ -222,7 +227,7 @@ run_with_config() {
         -e RECORDING="$recording_mode" \
         $debug_env \
         -v "$(pwd)/$output_dir:/app/data" \
-        meet-teams-bot 2>&1 | while IFS= read -r line; do
+        "$(get_docker_image)" 2>&1 | while IFS= read -r line; do
             if [[ $line == *"Starting virtual display"* ]]; then
                 print_info "${ICON_DISPLAY} $line"
             elif [[ $line == *"Virtual display started"* ]]; then
@@ -321,7 +326,7 @@ run_with_config_and_overrides() {
         -e RECORDING="$recording_mode" \
         $debug_env \
         -v "$(pwd)/$output_dir:/app/data" \
-        meet-teams-bot 2>&1 | while IFS= read -r line; do
+        "$(get_docker_image)" 2>&1 | while IFS= read -r line; do
             if [[ $line == *"Starting virtual display"* ]]; then
                 print_info "${ICON_DISPLAY} $line"
             elif [[ $line == *"Virtual display started"* ]]; then
@@ -417,7 +422,7 @@ run_with_json() {
         -e RECORDING="$recording_mode" \
         $debug_env \
         -v "$(pwd)/$output_dir:/app/data" \
-        meet-teams-bot
+        "$(get_docker_image)"
     
     print_success "Bot execution completed"
     print_info "Recordings saved to: $output_dir"
@@ -474,7 +479,7 @@ test_recording() {
     fi
     
     # Construire l'image si nécessaire
-    if ! docker images | grep -q meet-teams-bot; then
+    if ! docker images | grep -q "$(get_docker_image | cut -d: -f1)"; then
         print_info "Docker image not found, building..."
         build_image
     fi
@@ -634,7 +639,7 @@ test_api_request() {
     fi
     
     # Build image if necessary
-    if ! docker images | grep -q meet-teams-bot; then
+    if ! docker images | grep -q "$(get_docker_image | cut -d: -f1)"; then
         print_info "Docker image not found, building..."
         build_image
     fi
@@ -663,7 +668,7 @@ test_api_request() {
         -p 8080:8080 \
         -e RECORDING=true \
         -v "$(pwd)/$output_dir:/app/data" \
-        meet-teams-bot 2>&1 | tee "$log_file" &
+        "$(get_docker_image)" 2>&1 | tee "$log_file" &
     
     local docker_pid=$!
     
@@ -674,7 +679,7 @@ test_api_request() {
     # Send API stop request
     print_info "🛑 Sending API stop request..."
     local api_response
-    api_response=$(docker exec "$(docker ps -q --filter ancestor=meet-teams-bot)" curl -s -X POST http://localhost:8080/stop_record \
+    api_response=$(docker exec "$(docker ps -q --filter ancestor=$(get_docker_image))" curl -s -X POST http://localhost:8080/stop_record \
         -H "Content-Type: application/json" \
         -d "{\"bot_id\": \"$bot_uuid\"}")
     
