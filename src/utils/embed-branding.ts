@@ -37,7 +37,7 @@ async function embedBrandingWithRetry(
     imageUrl: string,
 ): Promise<void> {
     const maxRetries = 3
-    const retryDelayMs = 30000 // 30 seconds
+    const retryDelayMs = 2000 // 2 seconds
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
