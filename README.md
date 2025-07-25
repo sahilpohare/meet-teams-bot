@@ -35,7 +35,7 @@
 <p align="center">
   <b>🔥 Be among the first to support and star 🔥</b><br>
   <a href="https://github.com/Meeting-Baas/meet-teams-bot/stargazers">
-    <b>Current: <img src="https://img.shields.io/github/stars/Meeting-Baas/meet-teams-bot?style=social" /> → Goal: 50 ⭐️</b>
+    <b>Current: <img src="https://img.shields.io/github/stars/Meeting-Baas/meet-teams-bot?style=social" /> → Goal: 100 ⭐️</b>
   </a>
 </p>
 
