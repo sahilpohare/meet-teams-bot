@@ -62,6 +62,9 @@ export async function openBrowser(
                 '--disable-features=TrustedScriptTypes',
                 '--disable-features=TrustedHTML',
 
+                // Disable CORS for cross-origin requests. Used for branding images as they are loaded directly in the browser now.
+                '--disable-web-security',
+
                 // Additional audio debugging (remove in production)
                 '--enable-logging=stderr',
                 '--log-level=1',
