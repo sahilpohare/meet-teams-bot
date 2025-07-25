@@ -16,9 +16,12 @@ declare global {
 /**
  * Main function to embed branding - runs asynchronously without blocking
  */
-export function embedBranding(page: Page, imageUrl: string): void {
+export async function embedBranding(
+    page: Page,
+    imageUrl: string,
+): Promise<void> {
     // Start the branding process in the background without waiting
-    embedBrandingWithRetry(page, imageUrl).catch((error) => {
+    await embedBrandingWithRetry(page, imageUrl).catch((error) => {
         console.warn(
             'Branding injection failed, continuing without branding:',
             error instanceof Error ? error.message : String(error),
@@ -155,8 +158,12 @@ async function injectVirtualCamera(
                         error,
                     )
                 }
-                brandingImage.src = imageUrl
-                console.log('🎥 🔄 WAITING-ROOM Image loading started...')
+
+                // Add a small delay to ensure proper initialization timing
+                setTimeout(() => {
+                    brandingImage.src = imageUrl
+                    console.log('🎥 🔄 WAITING-ROOM Image loading started...')
+                }, 10)
             } else {
                 console.log('🎥 ⚠️ No imageUrl provided')
             }

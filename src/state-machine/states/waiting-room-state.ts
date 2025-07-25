@@ -112,12 +112,12 @@ export class WaitingRoomState extends BaseState {
                 )
             console.info('Meeting page opened successfully')
 
-            // Inject virtual camera immediately if enabled - before page loads (non-blocking)
+            // Inject virtual camera immediately if enabled - before page loads
             if (
                 GLOBAL.get().custom_branding_bot_path &&
                 this.context.playwrightPage
             ) {
-                embedBranding(
+                await embedBranding(
                     this.context.playwrightPage,
                     GLOBAL.get().custom_branding_bot_path,
                 )
