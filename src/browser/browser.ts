@@ -1,5 +1,4 @@
 import { BrowserContext, chromium } from '@playwright/test'
-import { GLOBAL } from '../singleton'
 
 export async function openBrowser(
     slowMo: boolean = false,
@@ -61,9 +60,6 @@ export async function openBrowser(
                 '--disable-blink-features=TrustedDOMTypes',
                 '--disable-features=TrustedScriptTypes',
                 '--disable-features=TrustedHTML',
-
-                // Disable CORS for cross-origin requests. Used for branding images as they are loaded directly in the browser now.
-                '--disable-web-security',
 
                 // Additional audio debugging (remove in production)
                 '--enable-logging=stderr',

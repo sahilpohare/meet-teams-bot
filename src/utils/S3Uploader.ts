@@ -5,6 +5,9 @@ import { GLOBAL } from '../singleton'
 // Singleton instance
 let instance: S3Uploader | null = null
 
+// Default S3 endpoint for Scaleway in fr-par region
+const S3_ENDPOINT = process.env.S3_ENDPOINT || 's3.fr-par.scw.cloud'
+
 export class S3Uploader {
     private constructor() {}
 
@@ -108,7 +111,7 @@ export class S3Uploader {
 
                 awsProcess.on('close', (code) => {
                     if (code === 0) {
-                        const publicUrl = `https://${bucketName}.s3.fr-par.scw.cloud/${s3Path}`
+                        const publicUrl = `https://${bucketName}.${S3_ENDPOINT}/${s3Path}`
                         resolve(publicUrl)
                     } else {
                         const errorMessage = `S3 upload failed (${code}): ${errorOutput || output}`
@@ -204,7 +207,7 @@ export class S3Uploader {
 
                 awsProcess.on('close', (code) => {
                     if (code === 0) {
-                        const publicUrl = `https://${bucketName}.s3.fr-par.scw.cloud/${s3Path}`
+                        const publicUrl = `https://${bucketName}.${S3_ENDPOINT}/${s3Path}`
                         resolve(publicUrl)
                     } else {
                         const errorMessage = `S3 sync failed (${code}): ${errorOutput || output}`
