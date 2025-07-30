@@ -1,4 +1,5 @@
 import { BrowserContext, Page } from '@playwright/test'
+import { BrandingHandle } from '../branding'
 import { SimpleDialogObserver } from '../services/dialog-observer/simple-dialog-observer'
 import { Streaming } from '../streaming'
 import { MeetingProviderInterface } from '../types'
@@ -84,6 +85,7 @@ export interface MeetingContext {
     firstUserJoined?: boolean
 
     // Processus et ressources
+    brandingProcess?: BrandingHandle
 
     // PathManager
     pathManager?: PathManager
