@@ -22,8 +22,8 @@ const AUDIO_SAMPLE_RATE = 44_100 // Improved audio quality
 const AUDIO_BITRATE = '192k' // Improved audio bitrate
 const FLASH_SCREEN_SLEEP_TIME = 4500 // Increased from 4200 for better stability in prod
 const SCREENSHOT_PERIOD = 5 // every 5 seconds instead of 2
-const SCREENSHOT_WIDTH = 1280 // Increased for better OCR quality
-const SCREENSHOT_HEIGHT = 720 // Increased for better OCR quality (16:9 ratio)
+const SCREENSHOT_WIDTH = 480 // reduced for smaller file size
+const SCREENSHOT_HEIGHT = 270 // reduced for smaller file size (16:9 ratio)
 
 // Environment variables for display and virtual speaker monitor
 const DISPLAY = process.env.DISPLAY || ':99'
@@ -314,9 +314,9 @@ export class ScreenRecorder extends EventEmitter {
                 '-map',
                 '1:v:0',
                 '-vf',
-                `fps=${1 / SCREENSHOT_PERIOD},crop=1280:720:0:160,scale=${SCREENSHOT_WIDTH}:${SCREENSHOT_HEIGHT}:flags=lanczos`,
-                '-pix_fmt',
-                'rgb24',
+                `fps=${1 / SCREENSHOT_PERIOD},crop=1280:720:0:160,scale=${SCREENSHOT_WIDTH}:${SCREENSHOT_HEIGHT}`,
+                '-q:v',
+                '3', // High quality JPEG compression
                 '-f',
                 'image2',
                 '-y',
@@ -411,9 +411,9 @@ export class ScreenRecorder extends EventEmitter {
                 '-map',
                 '0:v:0',
                 '-vf',
-                `fps=${1 / SCREENSHOT_PERIOD},crop=1280:720:0:160,scale=${SCREENSHOT_WIDTH}:${SCREENSHOT_HEIGHT}:flags=lanczos`,
-                '-pix_fmt',
-                'rgb24',
+                `fps=${1 / SCREENSHOT_PERIOD},crop=1280:720:0:160,scale=${SCREENSHOT_WIDTH}:${SCREENSHOT_HEIGHT}`,
+                '-q:v',
+                '3', // High quality JPEG compression
                 '-f',
                 'image2',
                 '-y',

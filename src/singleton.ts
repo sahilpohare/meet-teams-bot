@@ -1,3 +1,4 @@
+import { NORMAL_END_REASONS } from './state-machine/constants'
 import {
     getErrorMessageFromCode,
     MeetingEndReason,
@@ -56,19 +57,8 @@ class Global {
     public setEndReason(reason: MeetingEndReason): void {
         console.log(`🔵 Setting global end reason: ${reason}`)
         this.endReason = reason
-        
-        // Clear any error state if this is a normal termination
-        // These are expected outcomes that should not be treated as errors
-        const normalReasons = [
-            MeetingEndReason.ApiRequest, // User intentionally stopped recording via API
-            MeetingEndReason.BotRemoved, // Bot was removed by meeting participants (expected behavior)
-            MeetingEndReason.BotRemovedTooEarly, // Bot removed before minimum time but recording still completed
-            MeetingEndReason.NoAttendees, // No participants joined the meeting (common scenario)
-            MeetingEndReason.NoSpeaker, // No audio activity detected (silent meeting)
-            MeetingEndReason.RecordingTimeout, // Maximum recording duration reached (time limit hit)
-        ]
-        
-        if (normalReasons.includes(reason)) {
+
+        if (NORMAL_END_REASONS.includes(reason)) {
             console.log(`🔵 Clearing error state for normal termination: ${reason}`)
             // This ensures that an error message isn't propagated to the client for normal termination
             this.clearError()
