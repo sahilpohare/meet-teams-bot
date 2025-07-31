@@ -1,3 +1,5 @@
+import { MeetingEndReason } from "./types";
+
 export const MEETING_CONSTANTS = {
     // Durées
     CHUNKS_PER_TRANSCRIPTION: 18,
@@ -16,3 +18,12 @@ export const MEETING_CONSTANTS = {
     FIND_END_MEETING_SLEEP: 250,
     MAX_RETRIES: 3,
 } as const
+
+export const NORMAL_END_REASONS = [
+    MeetingEndReason.ApiRequest, // User intentionally stopped recording via API
+    MeetingEndReason.BotRemoved, // Bot was removed by meeting participants (expected behavior)
+    MeetingEndReason.BotRemovedTooEarly, // Bot removed before minimum time but recording still completed
+    MeetingEndReason.NoAttendees, // No participants joined the meeting (common scenario)
+    MeetingEndReason.NoSpeaker, // No audio activity detected (silent meeting)
+    MeetingEndReason.RecordingTimeout, // Maximum recording duration reached (time limit hit)
+]

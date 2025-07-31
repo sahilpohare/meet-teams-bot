@@ -13,6 +13,7 @@ import { PathManager } from '../utils/PathManager'
 import { S3Uploader } from '../utils/S3Uploader'
 import { sleep } from '../utils/sleep'
 import { generateSyncSignal } from '../utils/SyncSignal'
+import { normalizeRecordingMode } from '../types'
 
 const TRANSCRIPTION_CHUNK_DURATION = 3600
 const GRACE_PERIOD_SECONDS = 3
@@ -23,6 +24,57 @@ const FLASH_SCREEN_SLEEP_TIME = 4500 // Increased from 4200 for better stability
 const SCREENSHOT_PERIOD = 5 // every 5 seconds instead of 2
 const SCREENSHOT_WIDTH = 480 // reduced for smaller file size
 const SCREENSHOT_HEIGHT = 270 // reduced for smaller file size (16:9 ratio)
+
+// Environment variables for display and virtual speaker monitor
+const DISPLAY = process.env.DISPLAY || ':99'
+const VIRTUAL_SPEAKER_MONITOR = process.env.VIRTUAL_SPEAKER_MONITOR || 'virtual_speaker.monitor'
+
+// Dynamic timeout configuration
+const FFMPEG_TIMEOUTS = {
+    SIMPLE_OPERATIONS: 5 * 60 * 1000, // 5 minutes
+    COMPLEX_OPERATIONS: 30 * 60 * 1000, // 30 minutes
+    CRITICAL_OPERATIONS: 45 * 60 * 1000, // 45 minutes
+    MAX_CEILING: 60 * 60 * 1000, // 60 minutes (1 hour ceiling)
+}
+
+/**
+ * Calculate dynamic timeout for FFmpeg operations based on operation type and file size
+ */
+const calculateFFmpegTimeout = (
+    operation: string,
+    fileSizeMB?: number,
+): number => {
+    const baseTimeout = 60000 // 1 minute base
+
+    let timeout = baseTimeout
+
+    switch (operation) {
+        case 'mergeWithSync':
+        case 'finalTrimFromOffset':
+        case 'extractAudioFromVideo':
+        case 'createAudioChunks':
+            // Critical operations: Dynamic scaling based on file size with ceiling
+            timeout = Math.max(
+                FFMPEG_TIMEOUTS.COMPLEX_OPERATIONS,
+                (fileSizeMB || 100) * 1000,
+            )
+            return Math.min(timeout, FFMPEG_TIMEOUTS.MAX_CEILING)
+        case 'addSilencePadding':
+        case 'trimAudioStart':
+            // Simple audio operations
+            return FFMPEG_TIMEOUTS.SIMPLE_OPERATIONS
+        case 'getDuration':
+            // Metadata operations
+            return 30 * 1000 // 30 seconds
+        default:
+            // Default to complex operations timeout
+            return Math.min(
+                FFMPEG_TIMEOUTS.COMPLEX_OPERATIONS,
+                FFMPEG_TIMEOUTS.MAX_CEILING,
+            )
+    }
+}
+
 interface ScreenRecordingConfig {
     display: string
     audioDevice?: string
@@ -43,20 +95,29 @@ export class ScreenRecorder extends EventEmitter {
         super()
 
         this.config = {
-            display: ':99',
+            display: DISPLAY,
             audioDevice: 'pulse',
             ...config,
         }
     }
 
     private generateOutputPaths(): void {
-        if (GLOBAL.get().recording_mode === 'audio_only') {
-            this.audioOutputPath =
-                PathManager.getInstance().getOutputPath() + '.wav'
-        } else {
-            this.outputPath = PathManager.getInstance().getOutputPath() + '.mp4'
-            this.audioOutputPath =
-                PathManager.getInstance().getOutputPath() + '.wav'
+        try {
+            if (
+                normalizeRecordingMode(GLOBAL.get().recording_mode) ===
+                'audio_only'
+            ) {
+                this.audioOutputPath =
+                    PathManager.getInstance().getOutputPath() + '.wav'
+            } else {
+                this.outputPath =
+                    PathManager.getInstance().getOutputPath() + '.mp4'
+                this.audioOutputPath =
+                    PathManager.getInstance().getOutputPath() + '.wav'
+            }
+        } catch (error) {
+            console.error('Failed to generate output paths:', error)
+            throw new Error('Failed to generate output paths')
         }
     }
 
@@ -97,7 +158,9 @@ export class ScreenRecorder extends EventEmitter {
             console.log('Native recording started successfully')
             this.emit('started', {
                 outputPath: this.outputPath,
-                isAudioOnly: GLOBAL.get().recording_mode === 'audio_only',
+                isAudioOnly:
+                    normalizeRecordingMode(GLOBAL.get().recording_mode) ===
+                    'audio_only',
             })
         } catch (error) {
             console.error('Failed to start native recording:', error)
@@ -114,7 +177,9 @@ export class ScreenRecorder extends EventEmitter {
 
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
-                // Check if virtual_speaker.monitor exists
+                // Get the assigned virtual speaker monitor from environment
+                
+                // Check if the assigned virtual speaker monitor exists
                 const { spawn } = await import('child_process')
                 const checkProcess = spawn('pactl', [
                     'list',
@@ -133,7 +198,7 @@ export class ScreenRecorder extends EventEmitter {
 
                 if (
                     exitCode === 0 &&
-                    output.includes('virtual_speaker.monitor')
+                    output.includes(VIRTUAL_SPEAKER_MONITOR)
                 ) {
                     console.log(
                         `✅ Audio device ready after ${attempt} attempt(s)`,
@@ -164,7 +229,7 @@ export class ScreenRecorder extends EventEmitter {
                 '-f',
                 'pulse',
                 '-i',
-                'virtual_speaker.monitor',
+                VIRTUAL_SPEAKER_MONITOR,
                 '-t',
                 '0.1',
                 '-f',
@@ -187,7 +252,7 @@ export class ScreenRecorder extends EventEmitter {
         }
 
         throw new Error(
-            'Audio devices not ready after maximum wait time - virtual_speaker.monitor unavailable',
+            `Audio devices not ready after maximum wait time - ${VIRTUAL_SPEAKER_MONITOR} unavailable`,
         )
     }
 
@@ -205,7 +270,9 @@ export class ScreenRecorder extends EventEmitter {
             `${timestamp}_%4d.png`,
         )
 
-        if (GLOBAL.get().recording_mode === 'audio_only') {
+        if (
+            normalizeRecordingMode(GLOBAL.get().recording_mode) === 'audio_only'
+        ) {
             // Audio-only recording with screenshots
             const tempDir = PathManager.getInstance().getTempPath()
             const rawAudioPath = path.join(tempDir, 'raw.wav')
@@ -215,7 +282,7 @@ export class ScreenRecorder extends EventEmitter {
                 '-f',
                 'pulse',
                 '-i',
-                'virtual_speaker.monitor',
+                VIRTUAL_SPEAKER_MONITOR,
 
                 // === VIDEO INPUT FOR SCREENSHOTS ===
                 '-f',
@@ -253,7 +320,7 @@ export class ScreenRecorder extends EventEmitter {
                 '-f',
                 'image2',
                 '-y',
-                screenshotPattern.replace('.png', '.jpg'),
+                screenshotPattern,
 
                 // === OUTPUT 3: STREAMING AUDIO ===
                 '-map',
@@ -289,7 +356,7 @@ export class ScreenRecorder extends EventEmitter {
                 '-f',
                 'pulse',
                 '-i',
-                'virtual_speaker.monitor',
+                VIRTUAL_SPEAKER_MONITOR,
 
                 // === OUTPUT 1: RAW VIDEO (no audio) ===
                 '-map',
@@ -350,7 +417,7 @@ export class ScreenRecorder extends EventEmitter {
                 '-f',
                 'image2',
                 '-y',
-                screenshotPattern.replace('.png', '.jpg'),
+                screenshotPattern,
 
                 // === OUTPUT 4: STREAMING AUDIO ===
                 '-map',
@@ -423,13 +490,18 @@ export class ScreenRecorder extends EventEmitter {
 
         try {
             this.ffmpegProcess.stdout?.on('data', (data: Buffer) => {
-                if (Streaming.instance) {
-                    const float32Array = new Float32Array(
-                        data.buffer,
-                        data.byteOffset,
-                        data.length / 4,
-                    )
-                    Streaming.instance.processAudioChunk(float32Array)
+                try {
+                    if (Streaming.instance) {
+                        const float32Array = new Float32Array(
+                            data.buffer,
+                            data.byteOffset,
+                            data.length / 4,
+                        )
+                        Streaming.instance.processAudioChunk(float32Array)
+                    }
+                } catch (error) {
+                    console.error('Failed to process audio chunk:', error)
+                    // Don't throw - continue processing other chunks
                 }
             })
         } catch (error) {
@@ -443,45 +515,50 @@ export class ScreenRecorder extends EventEmitter {
     ): Promise<void> {
         if (!S3Uploader.getInstance()) return
 
-        const files = fs.readdirSync(chunksDir)
-        const chunkFiles = files.filter(
-            (file) => file.startsWith(`${botUuid}-`) && file.endsWith('.wav'),
-        )
+        try {
+            const files = fs.readdirSync(chunksDir)
+            const chunkFiles = files.filter(
+                (file) =>
+                    file.startsWith(`${botUuid}-`) && file.endsWith('.wav'),
+            )
 
-        console.log(`📤 Uploading ${chunkFiles.length} audio chunks...`)
+            console.log(`📤 Uploading ${chunkFiles.length} audio chunks...`)
 
-        for (const filename of chunkFiles) {
-            const chunkPath = path.join(chunksDir, filename)
+            for (const filename of chunkFiles) {
+                const chunkPath = path.join(chunksDir, filename)
 
-            if (!fs.existsSync(chunkPath)) {
-                console.warn(`Chunk file not found: ${chunkPath}`)
-                continue
-            }
-
-            try {
-                const stats = fs.statSync(chunkPath)
-                if (stats.size === 0) {
-                    console.warn(`Chunk file is empty: ${filename}`)
+                if (!fs.existsSync(chunkPath)) {
+                    console.warn(`Chunk file not found: ${chunkPath}`)
                     continue
                 }
 
-                const s3Key = `${botUuid}/${filename}`
-                console.log(
-                    `📤 Uploading chunk: ${filename} (${stats.size} bytes)`,
-                )
+                try {
+                    const stats = fs.statSync(chunkPath)
+                    if (stats.size === 0) {
+                        console.warn(`Chunk file is empty: ${filename}`)
+                        continue
+                    }
 
-                await S3Uploader.getInstance().uploadFile(
-                    chunkPath,
-                    GLOBAL.get().aws_s3_temporary_audio_bucket,
-                    s3Key,
-                    [],
-                    true,
-                )
+                    const s3Key = `${botUuid}/${filename}`
+                    console.log(
+                        `📤 Uploading chunk: ${filename} (${stats.size} bytes)`,
+                    )
 
-                console.log(`✅ Chunk uploaded: ${filename}`)
-            } catch (error) {
-                console.error(`Failed to upload chunk ${filename}:`, error)
+                    await S3Uploader.getInstance().uploadFile(
+                        chunkPath,
+                        GLOBAL.get().aws_s3_temporary_audio_bucket,
+                        s3Key,
+                        [],
+                        true,
+                    )
+
+                    console.log(`✅ Chunk uploaded: ${filename}`)
+                } catch (error) {
+                    console.error(`Failed to upload chunk ${filename}:`, error)
+                }
             }
+        } catch (error) {
+            console.error('Failed to read chunks directory:', error)
         }
     }
 
@@ -492,28 +569,40 @@ export class ScreenRecorder extends EventEmitter {
 
         const identifier = PathManager.getInstance().getIdentifier()
 
-        if (fs.existsSync(this.audioOutputPath)) {
-            console.log(
-                `📤 Uploading WAV audio to video bucket: ${GLOBAL.get().remote?.aws_s3_video_bucket}`,
-            )
-            await S3Uploader.getInstance().uploadFile(
-                this.audioOutputPath,
-                GLOBAL.get().remote?.aws_s3_video_bucket!,
-                `${identifier}.wav`,
-            )
-            fs.unlinkSync(this.audioOutputPath)
+        try {
+            if (fs.existsSync(this.audioOutputPath)) {
+                console.log(
+                    `📤 Uploading WAV audio to video bucket: ${GLOBAL.get().remote?.aws_s3_video_bucket}`,
+                )
+                await S3Uploader.getInstance().uploadFile(
+                    this.audioOutputPath,
+                    GLOBAL.get().remote?.aws_s3_video_bucket!,
+                    `${identifier}.wav`,
+                )
+                fs.unlinkSync(this.audioOutputPath)
+            }
+        } catch (error) {
+            console.error('Failed to upload audio file:', error)
+            // Don't throw - continue with video upload
         }
-        if (fs.existsSync(this.outputPath)) {
-            console.log(
-                `📤 Uploading MP4 to video bucket: ${GLOBAL.get().remote?.aws_s3_video_bucket}`,
-            )
-            await S3Uploader.getInstance().uploadFile(
-                this.outputPath,
-                GLOBAL.get().remote?.aws_s3_video_bucket!,
-                `${identifier}.mp4`,
-            )
-            fs.unlinkSync(this.outputPath)
+
+        try {
+            if (fs.existsSync(this.outputPath)) {
+                console.log(
+                    `📤 Uploading MP4 to video bucket: ${GLOBAL.get().remote?.aws_s3_video_bucket}`,
+                )
+                await S3Uploader.getInstance().uploadFile(
+                    this.outputPath,
+                    GLOBAL.get().remote?.aws_s3_video_bucket!,
+                    `${identifier}.mp4`,
+                )
+                fs.unlinkSync(this.outputPath)
+            }
+        } catch (error) {
+            console.error('Failed to upload video file:', error)
+            // Don't throw - mark as uploaded to allow process completion
         }
+
         this.filesUploaded = true
     }
 
@@ -641,7 +730,9 @@ export class ScreenRecorder extends EventEmitter {
     }
 
     private async syncAndMergeFiles(): Promise<void> {
-        if (GLOBAL.get().recording_mode === 'audio_only') {
+        if (
+            normalizeRecordingMode(GLOBAL.get().recording_mode) === 'audio_only'
+        ) {
             // Audio-only mode: just copy raw audio to final output
             const tempDir = PathManager.getInstance().getTempPath()
             const rawAudioPath = path.join(tempDir, 'raw.wav')
@@ -782,13 +873,26 @@ export class ScreenRecorder extends EventEmitter {
         )
 
         // 7. Extract audio from the final trimmed video (ensures perfect sync)
-        await this.extractAudioFromVideo(this.outputPath, this.audioOutputPath)
-        console.log(
-            `✅ Audio extracted from final video: ${this.audioOutputPath}`,
-        )
+        try {
+            await this.extractAudioFromVideo(
+                this.outputPath,
+                this.audioOutputPath,
+            )
+            console.log(
+                `✅ Audio extracted from final video: ${this.audioOutputPath}`,
+            )
 
-        // 8. Create audio chunks from the extracted audio
-        await this.createAudioChunks(this.audioOutputPath)
+            // 8. Create audio chunks from the extracted audio
+            await this.createAudioChunks(this.audioOutputPath)
+        } catch (error) {
+            console.warn(
+                `⚠️ Audio extraction failed (likely due to bot removal): ${error}`,
+            )
+            console.warn(
+                `⚠️ Continuing without audio extraction to prevent bot hang`,
+            )
+            // Don't throw - allow cleanup to continue
+        }
 
         // 9. Cleanup temporary files
         await this.cleanupTempFiles([
@@ -827,7 +931,7 @@ export class ScreenRecorder extends EventEmitter {
         ]
 
         console.log(`🔇 Creating ${paddingSeconds.toFixed(3)}s silence file`)
-        await this.runFFmpeg(silenceArgs)
+        await this.runFFmpeg(silenceArgs, 'addSilencePadding', paddingSeconds)
 
         // Create concat list with absolute paths (no escaping needed)
         const absoluteSilencePath = path.resolve(silenceFile)
@@ -862,7 +966,7 @@ file '${absoluteInputPath}'`
         console.log(
             `🔇 Concatenating with demuxer (re-encoding for clean timestamps)`,
         )
-        await this.runFFmpeg(concatArgs)
+        await this.runFFmpeg(concatArgs, 'addSilencePadding', paddingSeconds)
 
         // Cleanup temp files
         if (fs.existsSync(silenceFile)) {
@@ -898,7 +1002,7 @@ file '${absoluteInputPath}'`
         console.log(
             `✂️ Trimming ${trimSeconds.toFixed(3)}s from audio start (re-encoding for clean timestamps)`,
         )
-        await this.runFFmpeg(args)
+        await this.runFFmpeg(args, 'trimAudioStart', trimSeconds)
     }
 
     private async mergeWithSync(
@@ -927,7 +1031,13 @@ file '${absoluteInputPath}'`
         console.log(
             `🎬 Merging video and audio (ultra-fast copy + AAC audio - keyframes already optimized)`,
         )
-        await this.runFFmpeg(args)
+
+        // Estimate file size for timeout calculation
+        const videoSizeMB = this.estimateFileSizeMB(videoPath)
+        const audioSizeMB = this.estimateFileSizeMB(audioPath)
+        const estimatedSizeMB = videoSizeMB + audioSizeMB
+
+        await this.runFFmpeg(args, 'mergeWithSync', estimatedSizeMB)
     }
 
     private async finalTrimFromOffset(
@@ -960,7 +1070,11 @@ file '${absoluteInputPath}'`
         console.log(
             `✂️ Final trim: ultra-fast copy mode ${duration.toFixed(2)}s from ${calcOffset.toFixed(3)}s (frequent keyframes = no freeze)`,
         )
-        await this.runFFmpeg(args)
+
+        // Estimate file size for timeout calculation
+        const estimatedSizeMB = this.estimateFileSizeMB(inputPath)
+
+        await this.runFFmpeg(args, 'finalTrimFromOffset', estimatedSizeMB)
     }
 
     private async extractAudioFromVideo(
@@ -984,7 +1098,11 @@ file '${absoluteInputPath}'`
         console.log(
             '🎵 Extracting audio from video (converting to WAV PCM 16kHz mono)',
         )
-        await this.runFFmpeg(args)
+
+        // Estimate file size for timeout calculation
+        const estimatedSizeMB = this.estimateFileSizeMB(videoPath)
+
+        await this.runFFmpeg(args, 'extractAudioFromVideo', estimatedSizeMB)
     }
 
     private async createAudioChunks(audioPath: string): Promise<void> {
@@ -1025,10 +1143,40 @@ file '${absoluteInputPath}'`
         console.log(
             `🎵 Creating audio chunks (${chunkDuration}s each) from ${duration.toFixed(1)}s audio`,
         )
-        await this.runFFmpeg(args)
+        try {
+            // Estimate file size for timeout calculation
+            const estimatedSizeMB = this.estimateFileSizeMB(audioPath)
 
-        // Upload created chunks
-        await this.uploadAudioChunks(chunksDir, botUuid)
+            await this.runFFmpeg(args, 'createAudioChunks', estimatedSizeMB)
+            // Upload created chunks
+            await this.uploadAudioChunks(chunksDir, botUuid)
+        } catch (error) {
+            console.warn(
+                `⚠️ Audio chunking failed (likely due to bot removal): ${error}`,
+            )
+            console.warn(
+                `⚠️ Continuing without audio chunks to prevent bot hang`,
+            )
+            // Don't throw - allow cleanup to continue
+        }
+    }
+
+    /**
+     * Estimate file size in MB for timeout calculation
+     */
+    private estimateFileSizeMB(filePath: string): number {
+        try {
+            if (fs.existsSync(filePath)) {
+                const stats = fs.statSync(filePath)
+                return Math.round(stats.size / (1024 * 1024))
+            }
+        } catch (error) {
+            console.warn(
+                'Could not estimate file size for timeout calculation:',
+                error,
+            )
+        }
+        return 100 // Default estimate
     }
 
     private async getDuration(filePath: string): Promise<number> {
@@ -1054,20 +1202,60 @@ file '${absoluteInputPath}'`
         // }
     }
 
-    private async runFFmpeg(args: string[]): Promise<void> {
+    private async runFFmpeg(
+        args: string[],
+        operation: string = 'unknown',
+        fileSizeMB?: number,
+    ): Promise<void> {
+        const timeout = calculateFFmpegTimeout(operation, fileSizeMB)
+
+        console.log(
+            `⏱️ FFmpeg ${operation}: timeout set to ${timeout / 1000}s${fileSizeMB ? ` (estimated file size: ${fileSizeMB}MB)` : ''}`,
+        )
+
         return new Promise((resolve, reject) => {
             const process = spawn('ffmpeg', args)
+            let stderr = ''
+
+            // Capture stderr for better error reporting
+            process.stderr?.on('data', (data) => {
+                stderr += data.toString()
+            })
 
             process.on('close', (code) => {
                 if (code === 0) {
                     resolve()
                 } else {
-                    reject(new Error(`FFmpeg failed with code ${code}`))
+                    // Provide more specific error information
+                    const errorMsg = `FFmpeg failed with code ${code}`
+                    const stderrPreview = stderr
+                        .split('\n')
+                        .slice(-3)
+                        .join('\n') // Last 3 lines
+                    console.error(`❌ ${errorMsg}`)
+                    if (stderrPreview) {
+                        console.error(`❌ FFmpeg stderr: ${stderrPreview}`)
+                    }
+                    reject(new Error(errorMsg))
                 }
             })
 
             process.on('error', (error) => {
+                console.error(`❌ FFmpeg process error: ${error.message}`)
                 reject(error)
+            })
+
+            // Add dynamic timeout to prevent hanging
+            const timeoutId = setTimeout(() => {
+                console.error(
+                    `❌ FFmpeg timeout after ${timeout / 1000}s for ${operation}, killing process`,
+                )
+                process.kill('SIGKILL')
+                reject(new Error(`FFmpeg timeout for ${operation}`))
+            }, timeout)
+
+            process.on('close', () => {
+                clearTimeout(timeoutId)
             })
         })
     }
@@ -1091,6 +1279,17 @@ file '${absoluteInputPath}'`
 
             process.on('error', (error) => {
                 reject(error)
+            })
+
+            // Add timeout for metadata operations
+            const timeoutId = setTimeout(() => {
+                console.error(`❌ FFprobe timeout after 30s, killing process`)
+                process.kill('SIGKILL')
+                reject(new Error('FFprobe timeout'))
+            }, 30000)
+
+            process.on('close', () => {
+                clearTimeout(timeoutId)
             })
         })
     }

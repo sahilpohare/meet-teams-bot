@@ -1,7 +1,7 @@
 import { BrowserContext, Page } from '@playwright/test'
 
 import { MeetingEndReason } from '../state-machine/types'
-import { MeetingProviderInterface } from '../types'
+import { MeetingProviderInterface, normalizeRecordingMode } from '../types'
 
 import { GLOBAL } from '../singleton'
 import { parseMeetingUrlFromJoinInfos } from '../urlParser/meetUrlParser'
@@ -208,7 +208,7 @@ export class MeetProvider implements MeetingProviderInterface {
 
             await clickOutsideModal(page)
             const maxAttempts = 3
-            if (GLOBAL.get().recording_mode !== 'audio_only') {
+            if (normalizeRecordingMode(GLOBAL.get().recording_mode) !== 'audio_only') {
                 for (let attempt = 1; attempt <= maxAttempts; attempt++) {
                     if (await changeLayout(page, attempt)) {
                         console.log(
@@ -222,7 +222,7 @@ export class MeetProvider implements MeetingProviderInterface {
                 }
             }
 
-            if (GLOBAL.get().recording_mode !== 'gallery_view') {
+            if (normalizeRecordingMode(GLOBAL.get().recording_mode) !== 'gallery_view') {
                 await findShowEveryOne(page, true, cancelCheck)
             }
         } catch (error) {
@@ -616,10 +616,10 @@ async function changeLayout(
             return false
         }
 
-        // 2. Cliquer sur "Change layout"
-        console.log('Looking for Change layout menu item...')
+        // 2. Cliquer sur "Change layout" ou "Adjust view"
+        console.log('Looking for Change layout/Adjust view menu item...')
         const changeLayoutItem = page.locator(
-            '[role="menu"] [role="menuitem"]:has(span:has-text("Change layout"))',
+            '[role="menu"] [role="menuitem"]:has(span:has-text("Change layout"), span:has-text("Adjust view"))',
         )
         await changeLayoutItem.waitFor({ state: 'visible', timeout: 3000 })
         await changeLayoutItem.click()

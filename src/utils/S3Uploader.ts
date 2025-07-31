@@ -5,6 +5,9 @@ import { GLOBAL } from '../singleton'
 // Singleton instance
 let instance: S3Uploader | null = null
 
+// Default S3 endpoint for Scaleway in fr-par region
+const S3_ENDPOINT = process.env.S3_ENDPOINT || 's3.fr-par.scw.cloud'
+
 export class S3Uploader {
     private constructor() {}
 
@@ -28,6 +31,26 @@ export class S3Uploader {
         }
     }
 
+    private getS3Args(s3Args?: string[]): string[] {
+        // Order of precedence for s3Args:
+        // 1. Provided s3Args argument (if non-empty)
+        // 2. GLOBAL.get().remote?.s3_args (if non-empty)
+        // 3. process.env.S3_ARGS (if set)
+        // 4. []
+        let finalS3Args: string[] = []
+        if (s3Args && s3Args.length > 0) {
+            finalS3Args = s3Args
+        } else if (
+            GLOBAL.get().remote?.s3_args &&
+            GLOBAL.get().remote.s3_args.length > 0
+        ) {
+            finalS3Args = GLOBAL.get().remote.s3_args
+        } else if (process.env.S3_ARGS) {
+            finalS3Args = process.env.S3_ARGS.split(' ')
+        }
+        return finalS3Args
+    }
+
     public async uploadFile(
         filePath: string,
         bucketName: string,
@@ -45,21 +68,23 @@ export class S3Uploader {
 
             const s3FullPath = `s3://${bucketName}/${s3Path}`
 
-            if (isAudio || !s3Args) {
-                s3Args = []
-            }
+            s3Args = this.getS3Args(s3Args)
 
-            s3Args.push(
+            // Create the full command array
+            const fullArgs = [
+                ...s3Args,
                 's3',
                 'cp',
                 filePath,
                 s3FullPath,
                 '--acl',
                 'public-read',
-            )
+            ]
+
+            console.log('🔍 S3 upload command:', 'aws', fullArgs.join(' '))
 
             return new Promise((resolve, reject) => {
-                const awsProcess = spawn('aws', s3Args)
+                const awsProcess = spawn('aws', fullArgs)
                 let output = ''
                 let errorOutput = ''
 
@@ -86,7 +111,7 @@ export class S3Uploader {
 
                 awsProcess.on('close', (code) => {
                     if (code === 0) {
-                        const publicUrl = `https://${bucketName}.s3.amazonaws.com/${s3Path}`
+                        const publicUrl = `https://${bucketName}.${S3_ENDPOINT}/${s3Path}`
                         resolve(publicUrl)
                     } else {
                         const errorMessage = `S3 upload failed (${code}): ${errorOutput || output}`
@@ -138,11 +163,11 @@ export class S3Uploader {
         try {
             const s3FullPath = `s3://${bucketName}/${s3Path}`
 
-            if (!s3Args) {
-                s3Args = []
-            }
+            s3Args = this.getS3Args(s3Args)
 
-            s3Args.push(
+            // Create the full command array
+            const fullArgs = [
+                ...s3Args,
                 's3',
                 'sync',
                 localDir,
@@ -150,10 +175,12 @@ export class S3Uploader {
                 '--acl',
                 'public-read',
                 '--delete', // Remove files in S3 that don't exist locally
-            )
+            ]
+
+            console.log('🔍 S3 sync command:', 'aws', fullArgs.join(' '))
 
             return new Promise((resolve, reject) => {
-                const awsProcess = spawn('aws', s3Args)
+                const awsProcess = spawn('aws', fullArgs)
                 let output = ''
                 let errorOutput = ''
 
@@ -180,7 +207,7 @@ export class S3Uploader {
 
                 awsProcess.on('close', (code) => {
                     if (code === 0) {
-                        const publicUrl = `https://${bucketName}.s3.amazonaws.com/${s3Path}`
+                        const publicUrl = `https://${bucketName}.${S3_ENDPOINT}/${s3Path}`
                         resolve(publicUrl)
                     } else {
                         const errorMessage = `S3 sync failed (${code}): ${errorOutput || output}`

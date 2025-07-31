@@ -3,8 +3,8 @@ import internal from 'stream'
 
 // sudo apt install linux-modules-extra-`uname -r`
 // const MICRO_DEVICE: string = 'hw:Loopback,1' // sndloop module
-const MICRO_DEVICE: string = 'pulse:virtual_mic' // pulseaudio virtual mic
-const CAMERA_DEVICE: string = '/dev/video10'
+const MICRO_DEVICE: string = process.env.VIRTUAL_MIC || 'pulse:virtual_mic' // pulseaudio virtual mic
+const CAMERA_DEVICE: string = process.env.VIDEO_DEVICE || '/dev/video10'
 
 // This abstract claas contains the current ffmpeg process
 // A derived class must implement play and stop methods

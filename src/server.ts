@@ -8,6 +8,7 @@ import { SoundContext, VideoContext } from './media_context'
 import { MeetingStateMachine } from './state-machine/machine'
 import { MeetingEndReason } from './state-machine/types'
 import { StopRecordParams } from './types'
+import { GLOBAL } from './singleton'
 
 import axios from 'axios'
 
@@ -72,7 +73,29 @@ export async function server() {
         const data: StopRecordParams = req.body
         console.log('end meeting from api server :', data)
 
-        stop_record(res, MeetingEndReason.ApiRequest)
+        // Validate meeting URL with the one stored in Singleton
+        try {
+            const globalParams = GLOBAL.get()
+            if (data.meeting_url !== globalParams.meeting_url) {
+                console.log('Meeting URL mismatch:', {
+                    requested: data.meeting_url,
+                    stored: globalParams.meeting_url,
+                })
+                return res.status(400).json({
+                    error: 'Meeting URL mismatch',
+                    details:
+                        'The provided meeting URL does not match the active meeting',
+                })
+            }
+        } catch (error) {
+            console.log('No active meeting found in Singleton')
+            return res.status(404).json({
+                error: 'No active meeting found',
+                details: 'No meeting parameters are currently set',
+            })
+        }
+
+        return stop_record(res, MeetingEndReason.ApiRequest)
     })
 
     async function stop_record(res: any, reason: MeetingEndReason) {

@@ -1,3 +1,4 @@
+import { NORMAL_END_REASONS } from './state-machine/constants'
 import {
     getErrorMessageFromCode,
     MeetingEndReason,
@@ -56,6 +57,12 @@ class Global {
     public setEndReason(reason: MeetingEndReason): void {
         console.log(`🔵 Setting global end reason: ${reason}`)
         this.endReason = reason
+
+        if (NORMAL_END_REASONS.includes(reason)) {
+            console.log(`🔵 Clearing error state for normal termination: ${reason}`)
+            // This ensures that an error message isn't propagated to the client for normal termination
+            this.clearError()
+        }
     }
 
     public getEndReason(): MeetingEndReason | null {
@@ -67,11 +74,14 @@ class Global {
     }
 
     public hasError(): boolean {
-        return this.endReason !== null
+        // Only return true if we have an error message (indicating an actual error)
+        // Having an end reason alone doesn't mean there's an error
+        return this.errorMessage !== null
     }
 
     public clearError(): void {
-        this.endReason = null
+        // Only clear the error message, keep the end reason
+        // This allows normal termination reasons to be preserved
         this.errorMessage = null
     }
 }

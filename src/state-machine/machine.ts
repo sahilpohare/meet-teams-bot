@@ -7,6 +7,7 @@ import { GLOBAL } from '../singleton'
 import { MeetingProviderInterface } from '../types'
 import { getStateInstance } from './states'
 import { MeetingContext } from './types'
+import { NORMAL_END_REASONS } from './constants'
 
 export class MeetingStateMachine {
     static instance: MeetingStateMachine | null = null
@@ -162,15 +163,7 @@ export class MeetingStateMachine {
             return false
         }
 
-        const normalReasons = [
-            MeetingEndReason.ApiRequest,
-            MeetingEndReason.BotRemoved,
-            MeetingEndReason.NoAttendees,
-            MeetingEndReason.NoSpeaker,
-            MeetingEndReason.RecordingTimeout,
-        ]
-
-        return normalReasons.includes(endReason)
+        return NORMAL_END_REASONS.includes(endReason)
     }
 
     public getEndReason(): MeetingEndReason | undefined {
