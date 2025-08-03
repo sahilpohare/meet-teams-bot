@@ -2,8 +2,8 @@ import { ChildProcess, spawn } from 'child_process'
 import internal from 'stream'
 
 // sudo apt install linux-modules-extra-`uname -r`
-// const MICRO_DEVICE: string = 'hw:Loopback,1' // sndloop module
-const MICRO_DEVICE: string = process.env.VIRTUAL_MIC || 'pulse:virtual_mic' // pulseaudio virtual mic
+// The env variable VIRTUAL_MIC is used to set the virtual mic name. It needs to be prefixed with 'pulse:'
+const MICRO_DEVICE: string = `pulse:${process.env.VIRTUAL_MIC || 'virtual_mic'}` // pulseaudio virtual mic
 const CAMERA_DEVICE: string = process.env.VIDEO_DEVICE || '/dev/video10'
 
 // This abstract claas contains the current ffmpeg process
