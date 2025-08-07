@@ -248,51 +248,53 @@ export class RecordingState extends BaseState {
         const startTime = this.context.startTime || 0
         const firstUserJoined = this.context.firstUserJoined || false
 
-        // If participants are present, no need to end and reset silence timer
+        // If participants are present, reset timer and exit
         if (attendeesCount > 0) {
             this.noAttendeesWithSilenceStartTime = 0
             return false
         }
 
-        // True if we've exceeded the initial 7 minutes without any participants
+        // Check if we should consider ending due to no attendees
         const noAttendeesTimeout =
             startTime + MEETING_CONSTANTS.INITIAL_WAIT_TIME < now
+        const shouldConsiderEnding = noAttendeesTimeout || firstUserJoined
 
-        // True if at least one user joined and then left
-        const noAttendeesAfterJoin = firstUserJoined
-
-        // Check if we should consider ending due to no attendees
-        const shouldConsiderEnding = noAttendeesTimeout || noAttendeesAfterJoin
-
-        // If we should consider ending, check for silence confirmation
-        if (shouldConsiderEnding) {
-            // If this is the first time we're detecting no attendees, start the silence timer
-            if (this.noAttendeesWithSilenceStartTime === 0) {
-                this.noAttendeesWithSilenceStartTime = now
-                return false
-            }
-
-            // Check if we've had silence for long enough
-            const silenceDuration = now - this.noAttendeesWithSilenceStartTime
-            const hasEnoughSilence =
-                silenceDuration >= this.SILENCE_CONFIRMATION_MS
-
-            // If we're tracking silence but haven't reached the threshold, log the progress
-            if (
-                !hasEnoughSilence &&
-                silenceDuration % 5000 < this.CHECK_INTERVAL
-            ) {
-                console.log(
-                    `[checkNoAttendees] Waiting for silence confirmation: ${Math.floor(silenceDuration / 1000)}s / ${this.SILENCE_CONFIRMATION_MS / 1000}s`,
-                )
-            }
-
-            return hasEnoughSilence
+        // If we shouldn't consider ending, reset timer and exit
+        if (!shouldConsiderEnding) {
+            this.noAttendeesWithSilenceStartTime = 0
+            return false
         }
 
-        // Reset silence timer if we're not considering ending
-        this.noAttendeesWithSilenceStartTime = 0
-        return false
+        // Check for sound activity - if detected, reset timer and exit
+        if (Streaming.instance) {
+            const currentSoundLevel = Streaming.instance.getCurrentSoundLevel()
+            if (currentSoundLevel > SOUND_LEVEL_ACTIVITY_THRESHOLD) {
+                console.log(
+                    `[checkNoAttendees] Sound activity detected (${currentSoundLevel.toFixed(2)}), resetting silence timer`,
+                )
+                this.noAttendeesWithSilenceStartTime = 0
+                return false
+            }
+        }
+
+        // Start silence timer if not already started
+        if (this.noAttendeesWithSilenceStartTime === 0) {
+            this.noAttendeesWithSilenceStartTime = now
+            return false
+        }
+
+        // Check if we've had silence for long enough
+        const silenceDuration = now - this.noAttendeesWithSilenceStartTime
+        const hasEnoughSilence = silenceDuration >= this.SILENCE_CONFIRMATION_MS
+
+        // Log progress if we're still waiting
+        if (!hasEnoughSilence && silenceDuration % 5000 < this.CHECK_INTERVAL) {
+            console.log(
+                `[checkNoAttendees] Waiting for silence confirmation: ${Math.floor(silenceDuration / 1000)}s / ${this.SILENCE_CONFIRMATION_MS / 1000}s`,
+            )
+        }
+
+        return hasEnoughSilence
     }
 
     /**
@@ -321,6 +323,8 @@ export class RecordingState extends BaseState {
                     `[checkNoSpeaker] Sound activity detected (${currentSoundLevel.toFixed(2)}), resetting silence timer`,
                 )
                 this.context.noSpeakerDetectedTime = 0
+                // Also reset the noAttendees silence timer to ensure consistency
+                this.noAttendeesWithSilenceStartTime = 0
                 return false
             }
         } else {
