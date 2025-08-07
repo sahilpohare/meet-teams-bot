@@ -89,7 +89,9 @@ export class SpeakerManager {
             attendeesCount: speakers.length,
             firstUserJoined: speakers.length > 0,
             lastSpeakerTime: this.lastSpeakerTime,
-            noSpeakerDetectedTime: speakersCount === 0 ? Date.now() : null,
+            // Only set noSpeakerDetectedTime when there are no attendees AND no speakers
+            // This prevents ending meetings when people are present but not speaking
+            noSpeakerDetectedTime: (speakers.length === 0 && speakersCount === 0) ? Date.now() : null,
         }
 
         MeetingStateMachine.instance.updateParticipantState(participantState)
