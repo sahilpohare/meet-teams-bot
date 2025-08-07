@@ -102,10 +102,17 @@ export class RecordingState extends BaseState {
     }
 
     private async setupEventListeners(): Promise<void> {
-        console.info('Setting up event listeners...')
+        console.info('Setting up event listeners...');
 
-        // Note: ScreenRecorder event listeners are handled internally
-        // No additional setup needed for the silence detection fix
+        // Configure event listeners for screen recorder
+        (ScreenRecorderManager.getInstance() as any).on('error', async (error) => {
+            console.error('ScreenRecorder error:', error)
+            GLOBAL.setError(
+                MeetingEndReason.StreamingSetupFailed,
+                error.message,
+            )
+            this.isProcessing = false
+        })
 
         console.info('Event listeners setup complete')
     }
@@ -306,17 +313,9 @@ export class RecordingState extends BaseState {
      */
     private checkNoSpeaker(now: number): boolean {
         const noSpeakerDetectedTime = this.context.noSpeakerDetectedTime || 0
-        const attendeesCount = this.context.attendeesCount || 0
 
         // If no silence period has been detected, no need to end
         if (noSpeakerDetectedTime <= 0) {
-            return false
-        }
-
-        // If there are attendees present, don't end due to no speaker
-        // This prevents ending meetings when people are present but not speaking
-        if (attendeesCount > 0) {
-            console.log('[checkNoSpeaker] Attendees present, not ending due to no speaker')
             return false
         }
 
