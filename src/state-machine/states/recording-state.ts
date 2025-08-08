@@ -102,17 +102,35 @@ export class RecordingState extends BaseState {
     }
 
     private async setupEventListeners(): Promise<void> {
-        console.info('Setting up event listeners...');
+        console.info('Setting up event listeners...')
 
         // Configure event listeners for screen recorder
-        (ScreenRecorderManager.getInstance() as any).on('error', async (error) => {
-            console.error('ScreenRecorder error:', error)
-            GLOBAL.setError(
-                MeetingEndReason.StreamingSetupFailed,
-                error.message,
-            )
-            this.isProcessing = false
-        })
+        ;(ScreenRecorderManager.getInstance() as any).on(
+            'error',
+            async (error) => {
+                console.error('ScreenRecorder error:', error)
+                GLOBAL.setError(
+                    MeetingEndReason.StreamingSetupFailed,
+                    error.message,
+                )
+                this.isProcessing = false
+            },
+        )
+
+        // Handle audio warnings (non-critical audio issues) - just log them
+        ;(ScreenRecorderManager.getInstance() as any).on(
+            'audioWarning',
+            async (warningInfo: {
+                type: string
+                errorCount: number
+                message: string
+                timestamp: number
+            }) => {
+                console.warn('ScreenRecorder audio warning:', warningInfo)
+                console.log(`⚠️ Audio quality warning: ${warningInfo.message}`)
+                // Don't terminate recording - just log the warning and continue
+            },
+        )
 
         console.info('Event listeners setup complete')
     }
@@ -146,7 +164,8 @@ export class RecordingState extends BaseState {
 
             // Check for sound activity first - if detected, reset all silence timers
             if (Streaming.instance) {
-                const currentSoundLevel = Streaming.instance.getCurrentSoundLevel()
+                const currentSoundLevel =
+                    Streaming.instance.getCurrentSoundLevel()
                 if (currentSoundLevel > SOUND_LEVEL_ACTIVITY_THRESHOLD) {
                     console.log(
                         `[checkEndConditions] Sound activity detected (${currentSoundLevel.toFixed(2)}), resetting all silence timers`,
@@ -282,7 +301,9 @@ export class RecordingState extends BaseState {
         // Start silence timer if not already started
         if (this.noAttendeesWithSilenceStartTime === 0) {
             this.noAttendeesWithSilenceStartTime = now
-            console.log('[checkNoAttendees] Starting silence confirmation timer')
+            console.log(
+                '[checkNoAttendees] Starting silence confirmation timer',
+            )
             return false
         }
 
@@ -330,7 +351,8 @@ export class RecordingState extends BaseState {
             )
         } else {
             // Log progress periodically
-            if (silenceDuration % 30000 < this.CHECK_INTERVAL) { // Log every 30 seconds
+            if (silenceDuration % 30000 < this.CHECK_INTERVAL) {
+                // Log every 30 seconds
                 console.log(
                     `[checkNoSpeaker] No speaker detected for ${silenceDuration}s / ${MEETING_CONSTANTS.SILENCE_TIMEOUT / 1000}s`,
                 )

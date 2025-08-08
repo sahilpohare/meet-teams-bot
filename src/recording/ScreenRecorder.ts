@@ -8,12 +8,12 @@ import { Page } from 'playwright'
 import { GLOBAL } from '../singleton'
 import { MeetingEndReason } from '../state-machine/types'
 
+import { normalizeRecordingMode } from '../types'
 import { calculateVideoOffset } from '../utils/CalculVideoOffset'
 import { PathManager } from '../utils/PathManager'
 import { S3Uploader } from '../utils/S3Uploader'
 import { sleep } from '../utils/sleep'
 import { generateSyncSignal } from '../utils/SyncSignal'
-import { normalizeRecordingMode } from '../types'
 
 const TRANSCRIPTION_CHUNK_DURATION = 3600
 const GRACE_PERIOD_SECONDS = 3
@@ -27,7 +27,8 @@ const SCREENSHOT_HEIGHT = 270 // reduced for smaller file size (16:9 ratio)
 
 // Environment variables for display and virtual speaker monitor
 const DISPLAY = process.env.DISPLAY || ':99'
-const VIRTUAL_SPEAKER_MONITOR = process.env.VIRTUAL_SPEAKER_MONITOR || 'virtual_speaker.monitor'
+const VIRTUAL_SPEAKER_MONITOR =
+    process.env.VIRTUAL_SPEAKER_MONITOR || 'virtual_speaker.monitor'
 
 // Dynamic timeout configuration
 const FFMPEG_TIMEOUTS = {
@@ -178,7 +179,7 @@ export class ScreenRecorder extends EventEmitter {
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
                 // Get the assigned virtual speaker monitor from environment
-                
+
                 // Check if the assigned virtual speaker monitor exists
                 const { spawn } = await import('child_process')
                 const checkProcess = spawn('pactl', [
@@ -281,6 +282,8 @@ export class ScreenRecorder extends EventEmitter {
                 // === AUDIO INPUT ===
                 '-f',
                 'pulse',
+                '-thread_queue_size',
+                '2048', // Increased from 1024 for better buffering
                 '-i',
                 VIRTUAL_SPEAKER_MONITOR,
 
@@ -355,6 +358,8 @@ export class ScreenRecorder extends EventEmitter {
                 // === AUDIO INPUT ===
                 '-f',
                 'pulse',
+                '-thread_queue_size',
+                '2048', // Increased from 1024 for better buffering
                 '-i',
                 VIRTUAL_SPEAKER_MONITOR,
 
@@ -477,12 +482,65 @@ export class ScreenRecorder extends EventEmitter {
             this.emit('stopped')
         })
 
+        // Enhanced error monitoring for PulseAudio issues
+        let errorCount = 0
+        const maxErrors = 10 // Increased from 5 to be less aggressive
+        const errorWindowMs = 60000 // Increased to 60 seconds for better tolerance
+        let lastErrorTime = 0
+        const errorCooldownMs = 5000 // 5 second cooldown between error handling
+
         this.ffmpegProcess.stderr?.on('data', (data) => {
             const output = data.toString()
             if (output.includes('error')) {
                 console.error('FFmpeg stderr:', output.trim())
+
+                // Check for specific PulseAudio errors that indicate audio input failure
+                if (
+                    output.includes('Error during demuxing') ||
+                    output.includes('Error retrieving a packet from demuxer') ||
+                    output.includes('Generic error in an external library')
+                ) {
+                    const now = Date.now()
+                    errorCount++
+                    console.warn(
+                        `⚠️ PulseAudio error detected (${errorCount}/${maxErrors})`,
+                    )
+
+                    // Only handle errors if enough time has passed since last handling
+                    if (
+                        errorCount >= maxErrors &&
+                        now - lastErrorTime > errorCooldownMs
+                    ) {
+                        lastErrorTime = now
+                        console.warn(
+                            '⚠️ Multiple PulseAudio errors detected, continuing recording...',
+                        )
+
+                        // Emit a warning event for monitoring purposes
+                        this.emit('audioWarning', {
+                            type: 'pulseAudioWarning',
+                            errorCount,
+                            message:
+                                'PulseAudio input stream experiencing issues - continuing recording',
+                            timestamp: Date.now(),
+                        })
+
+                        // Don't reset error count immediately - let it accumulate
+                    }
+                }
             }
         })
+
+        // Reset error count periodically but less frequently
+        setInterval(() => {
+            if (errorCount > 0) {
+                console.log(
+                    `🔄 Resetting PulseAudio error count (was ${errorCount})`,
+                )
+                errorCount = 0
+                lastErrorTime = 0
+            }
+        }, errorWindowMs)
     }
 
     private setupStreamingAudio(): void {
