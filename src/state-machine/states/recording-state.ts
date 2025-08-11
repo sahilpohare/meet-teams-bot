@@ -109,9 +109,36 @@ export class RecordingState extends BaseState {
             'error',
             async (error) => {
                 console.error('ScreenRecorder error:', error)
+
+                // Handle different error shapes safely
+                let errorMessage: string
+                if (error instanceof Error) {
+                    // Direct Error instance
+                    errorMessage = error.message
+                } else if (
+                    error &&
+                    typeof error === 'object' &&
+                    'type' in error &&
+                    error.type === 'startError' &&
+                    'error' in error
+                ) {
+                    // Object with type 'startError' and nested error
+                    const nestedError = (error as any).error
+                    errorMessage =
+                        nestedError instanceof Error
+                            ? nestedError.message
+                            : String(nestedError)
+                } else {
+                    // Fallback for unknown error shapes
+                    errorMessage =
+                        error && typeof error === 'object' && 'message' in error
+                            ? String(error.message)
+                            : String(error)
+                }
+
                 GLOBAL.setError(
                     MeetingEndReason.StreamingSetupFailed,
-                    error.message,
+                    errorMessage,
                 )
                 this.isProcessing = false
             },

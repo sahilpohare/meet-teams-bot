@@ -491,14 +491,17 @@ export class ScreenRecorder extends EventEmitter {
 
         this.ffmpegProcess.stderr?.on('data', (data) => {
             const output = data.toString()
-            if (output.includes('error')) {
+            const outputLower = output.toLowerCase()
+            if (outputLower.includes('error')) {
                 console.error('FFmpeg stderr:', output.trim())
 
                 // Check for specific PulseAudio errors that indicate audio input failure
                 if (
-                    output.includes('Error during demuxing') ||
-                    output.includes('Error retrieving a packet from demuxer') ||
-                    output.includes('Generic error in an external library')
+                    outputLower.includes('error during demuxing') ||
+                    outputLower.includes(
+                        'error retrieving a packet from demuxer',
+                    ) ||
+                    outputLower.includes('generic error in an external library')
                 ) {
                     const now = Date.now()
                     errorCount++
