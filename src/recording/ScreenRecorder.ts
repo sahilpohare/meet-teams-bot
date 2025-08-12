@@ -81,6 +81,13 @@ interface ScreenRecordingConfig {
     audioDevice?: string
 }
 
+export interface AudioWarningEvent {
+    type: 'pulseAudioWarning'
+    errorCount: number
+    message: string
+    timestamp: number
+}
+
 export class ScreenRecorder extends EventEmitter {
     private ffmpegProcess: ChildProcess | null = null
     private outputPath: string = ''
@@ -520,13 +527,14 @@ export class ScreenRecorder extends EventEmitter {
                         )
 
                         // Emit a warning event for monitoring purposes
-                        this.emit('audioWarning', {
+                        const audioWarning: AudioWarningEvent = {
                             type: 'pulseAudioWarning',
                             errorCount,
                             message:
                                 'PulseAudio input stream experiencing issues - continuing recording',
                             timestamp: Date.now(),
-                        })
+                        }
+                        this.emit('audioWarning', audioWarning)
 
                         // Don't reset error count immediately - let it accumulate
                     }

@@ -9,7 +9,7 @@ import {
 } from '../types'
 import { BaseState } from './base-state'
 
-import { ScreenRecorderManager } from '../../recording/ScreenRecorder'
+import { ScreenRecorderManager, AudioWarningEvent } from '../../recording/ScreenRecorder'
 import { GLOBAL } from '../../singleton'
 import { sleep } from '../../utils/sleep'
 
@@ -104,60 +104,52 @@ export class RecordingState extends BaseState {
     private async setupEventListeners(): Promise<void> {
         console.info('Setting up event listeners...')
 
+        // Get recorder instance once to avoid repeated getInstance() calls
+        const recorder = ScreenRecorderManager.getInstance()
+
         // Configure event listeners for screen recorder
-        ;(ScreenRecorderManager.getInstance() as any).on(
-            'error',
-            async (error) => {
-                console.error('ScreenRecorder error:', error)
+        recorder.on('error', async (error) => {
+            console.error('ScreenRecorder error:', error)
 
-                // Handle different error shapes safely
-                let errorMessage: string
-                if (error instanceof Error) {
-                    // Direct Error instance
-                    errorMessage = error.message
-                } else if (
-                    error &&
-                    typeof error === 'object' &&
-                    'type' in error &&
-                    error.type === 'startError' &&
-                    'error' in error
-                ) {
-                    // Object with type 'startError' and nested error
-                    const nestedError = (error as any).error
-                    errorMessage =
-                        nestedError instanceof Error
-                            ? nestedError.message
-                            : String(nestedError)
-                } else {
-                    // Fallback for unknown error shapes
-                    errorMessage =
-                        error && typeof error === 'object' && 'message' in error
-                            ? String(error.message)
-                            : String(error)
-                }
+            // Handle different error shapes safely
+            let errorMessage: string
+            if (error instanceof Error) {
+                // Direct Error instance
+                errorMessage = error.message
+            } else if (
+                error &&
+                typeof error === 'object' &&
+                'type' in error &&
+                error.type === 'startError' &&
+                'error' in error
+            ) {
+                // Object with type 'startError' and nested error
+                const nestedError = (error as any).error
+                errorMessage =
+                    nestedError instanceof Error
+                        ? nestedError.message
+                        : String(nestedError)
+            } else {
+                // Fallback for unknown error shapes
+                errorMessage =
+                    error && typeof error === 'object' && 'message' in error
+                        ? String(error.message)
+                        : String(error)
+            }
 
-                GLOBAL.setError(
-                    MeetingEndReason.StreamingSetupFailed,
-                    errorMessage,
-                )
-                this.isProcessing = false
-            },
-        )
+            GLOBAL.setError(
+                MeetingEndReason.StreamingSetupFailed,
+                errorMessage,
+            )
+            this.isProcessing = false
+        })
 
         // Handle audio warnings (non-critical audio issues) - just log them
-        ;(ScreenRecorderManager.getInstance() as any).on(
-            'audioWarning',
-            async (warningInfo: {
-                type: string
-                errorCount: number
-                message: string
-                timestamp: number
-            }) => {
-                console.warn('ScreenRecorder audio warning:', warningInfo)
-                console.log(`⚠️ Audio quality warning: ${warningInfo.message}`)
-                // Don't terminate recording - just log the warning and continue
-            },
-        )
+        recorder.on('audioWarning', (warningInfo: AudioWarningEvent) => {
+            console.warn('ScreenRecorder audio warning:', warningInfo)
+            console.log(`⚠️ Audio quality warning: ${warningInfo.message}`)
+            // Non-fatal: keep recording
+        })
 
         console.info('Event listeners setup complete')
     }
