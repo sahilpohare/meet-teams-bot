@@ -9,7 +9,7 @@ import {
 } from '../types'
 import { BaseState } from './base-state'
 
-import { ScreenRecorderManager } from '../../recording/ScreenRecorder'
+import { ScreenRecorderManager, AudioWarningEvent } from '../../recording/ScreenRecorder'
 import { GLOBAL } from '../../singleton'
 import { sleep } from '../../utils/sleep'
 
@@ -102,16 +102,53 @@ export class RecordingState extends BaseState {
     }
 
     private async setupEventListeners(): Promise<void> {
-        console.info('Setting up event listeners...');
+        console.info('Setting up event listeners...')
+
+        // Get recorder instance once to avoid repeated getInstance() calls
+        const recorder = ScreenRecorderManager.getInstance()
 
         // Configure event listeners for screen recorder
-        (ScreenRecorderManager.getInstance() as any).on('error', async (error) => {
+        recorder.on('error', async (error) => {
             console.error('ScreenRecorder error:', error)
+
+            // Handle different error shapes safely
+            let errorMessage: string
+            if (error instanceof Error) {
+                // Direct Error instance
+                errorMessage = error.message
+            } else if (
+                error &&
+                typeof error === 'object' &&
+                'type' in error &&
+                error.type === 'startError' &&
+                'error' in error
+            ) {
+                // Object with type 'startError' and nested error
+                const nestedError = (error as any).error
+                errorMessage =
+                    nestedError instanceof Error
+                        ? nestedError.message
+                        : String(nestedError)
+            } else {
+                // Fallback for unknown error shapes
+                errorMessage =
+                    error && typeof error === 'object' && 'message' in error
+                        ? String(error.message)
+                        : String(error)
+            }
+
             GLOBAL.setError(
                 MeetingEndReason.StreamingSetupFailed,
-                error.message,
+                errorMessage,
             )
             this.isProcessing = false
+        })
+
+        // Handle audio warnings (non-critical audio issues) - just log them
+        recorder.on('audioWarning', (warningInfo: AudioWarningEvent) => {
+            console.warn('ScreenRecorder audio warning:', warningInfo)
+            console.log(`⚠️ Audio quality warning: ${warningInfo.message}`)
+            // Non-fatal: keep recording
         })
 
         console.info('Event listeners setup complete')
@@ -146,7 +183,8 @@ export class RecordingState extends BaseState {
 
             // Check for sound activity first - if detected, reset all silence timers
             if (Streaming.instance) {
-                const currentSoundLevel = Streaming.instance.getCurrentSoundLevel()
+                const currentSoundLevel =
+                    Streaming.instance.getCurrentSoundLevel()
                 if (currentSoundLevel > SOUND_LEVEL_ACTIVITY_THRESHOLD) {
                     console.log(
                         `[checkEndConditions] Sound activity detected (${currentSoundLevel.toFixed(2)}), resetting all silence timers`,
@@ -282,7 +320,9 @@ export class RecordingState extends BaseState {
         // Start silence timer if not already started
         if (this.noAttendeesWithSilenceStartTime === 0) {
             this.noAttendeesWithSilenceStartTime = now
-            console.log('[checkNoAttendees] Starting silence confirmation timer')
+            console.log(
+                '[checkNoAttendees] Starting silence confirmation timer',
+            )
             return false
         }
 
@@ -330,7 +370,8 @@ export class RecordingState extends BaseState {
             )
         } else {
             // Log progress periodically
-            if (silenceDuration % 30000 < this.CHECK_INTERVAL) { // Log every 30 seconds
+            if (silenceDuration % 30000 < this.CHECK_INTERVAL) {
+                // Log every 30 seconds
                 console.log(
                     `[checkNoSpeaker] No speaker detected for ${silenceDuration}s / ${MEETING_CONSTANTS.SILENCE_TIMEOUT / 1000}s`,
                 )
