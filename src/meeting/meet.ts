@@ -598,9 +598,9 @@ async function changeLayout(
     )
 
     try {
-        // Capture DOM state before layout change operation
+        // Capture DOM state before layout change operation (first attempt only)
+        const htmlSnapshot = HtmlSnapshotService.getInstance()
         if (currentAttempt === 1) {
-            const htmlSnapshot = HtmlSnapshotService.getInstance()
             await htmlSnapshot.captureSnapshot(page, 'meet_layout_change_operation_start_attempt_1')
         }
 
@@ -623,8 +623,7 @@ async function changeLayout(
         console.log('Looking for More options button in call controls...')
         
         // Capture DOM state before clicking More options
-        const htmlSnapshot = HtmlSnapshotService.getInstance()
-        await htmlSnapshot.captureSnapshot(page, 'meet_layout_change_before_more_options')
+        await htmlSnapshot.captureSnapshot(page, `meet_layout_change_before_more_options_attempt_${currentAttempt}`)
         
         const moreOptionsButton = page.locator(
             'div[role="region"][aria-label="Call controls"] button[aria-label="More options"]',
@@ -645,13 +644,13 @@ async function changeLayout(
         console.log('Looking for Change layout/Adjust view menu item...')
         
         // Capture DOM state after More options menu opens
-        await htmlSnapshot.captureSnapshot(page, 'meet_layout_change_more_options_menu_open')
+        await htmlSnapshot.captureSnapshot(page, `meet_layout_change_more_options_menu_open_attempt_${currentAttempt}`)
         
         const changeLayoutItem = page.locator(
             '[role="menu"] [role="menuitem"]:has(span:has-text("Change layout"), span:has-text("Adjust view"))',
         )
         await changeLayoutItem.waitFor({ state: 'visible', timeout: 3000 })
-        await htmlSnapshot.captureSnapshot(page, 'meet_layout_change_change_layout_menu_item_found')
+        await htmlSnapshot.captureSnapshot(page, `meet_layout_change_change_layout_menu_item_found_attempt_${currentAttempt}`)
         
         await changeLayoutItem.click()
         await page.waitForTimeout(500)
@@ -700,7 +699,7 @@ async function changeLayout(
         
         
         const htmlSnapshot = HtmlSnapshotService.getInstance()
-        await htmlSnapshot.captureSnapshot(page, 'meet_layout_change_operation_failure')
+        await htmlSnapshot.captureSnapshot(page, `meet_layout_change_operation_failure_attempt_${currentAttempt}`)
         
         if (currentAttempt < maxAttempts) {
             console.log(

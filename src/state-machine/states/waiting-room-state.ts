@@ -38,10 +38,10 @@ export class WaitingRoomState extends BaseState {
             // Open the meeting page
             await this.openMeetingPage(meetingLink)
 
-            // Capture DOM state after meeting page is opened
+            // Capture DOM state after meeting page is opened (void to avoid blocking)
             if (this.context.playwrightPage) {
                 const htmlSnapshot = HtmlSnapshotService.getInstance()
-                await htmlSnapshot.captureSnapshot(this.context.playwrightPage, 'waiting_room_page_opened')
+                void htmlSnapshot.captureSnapshot(this.context.playwrightPage, 'waiting_room_page_opened')
             }
 
             this.context.streamingService = new Streaming(

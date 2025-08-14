@@ -39,10 +39,6 @@ export class MeetSpeakersObserver {
         // EXACT SAME AS EXTENSION: Ensure People panel is open
         await this.ensurePeoplePanelOpen()
 
-        // Capture DOM state after people panel is opened
-        const htmlSnapshot = HtmlSnapshotService.getInstance()
-        await htmlSnapshot.captureSnapshot(this.page, 'meet_speaker_observer_people_panel_opened')
-
         // Expose callback function to the page
         await this.page.exposeFunction(
             'meetSpeakersChanged',
@@ -751,6 +747,11 @@ export class MeetSpeakersObserver {
 
         this.isObserving = true
         console.log('[Meet] ✅ Observer started successfully')
+
+        // Capture DOM state after Speakers Observer is started
+        const htmlSnapshot = HtmlSnapshotService.getInstance()
+        await htmlSnapshot.captureSnapshot(this.page, 'meet_speaker_observer_started')
+
     }
 
     public stopObserving(): void {

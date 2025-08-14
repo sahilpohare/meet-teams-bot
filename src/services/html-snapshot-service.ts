@@ -27,23 +27,26 @@ export class HtmlSnapshotService {
     /**
      * Capture HTML snapshot before DOM manipulation
      */
-    public async captureSnapshot(
-        page: Page,
-        context: string
-    ): Promise<HtmlSnapshotResult> {
-        // Wrap entire operation with 10-second timeout using Promise.race
-        // This is necessary because page.content() doesn't support timeout/AbortController
-        return Promise.race([
-            this.performSnapshot(page, context),
-            new Promise<HtmlSnapshotResult>((_, reject) =>
-                setTimeout(() => reject(new Error(`Snapshot operation timeout after ${SNAPSHOT_TIMEOUT/1000} seconds`)), SNAPSHOT_TIMEOUT)
-            )
-        ]).catch((error) => {
-            console.error(`[HtmlSnapshot] Failed to capture snapshot for ${context}, skipping:`, error.message)
-            return {
-                success: false
-            }
+    public async captureSnapshot(page: Page, context: string): Promise<HtmlSnapshotResult> {
+        // Ensure the snapshot promise cannot cause unhandled rejections if it loses the race
+        const snapshotPromise = this.performSnapshot(page, context).catch((error) => {
+            console.error(`[HtmlSnapshot] Snapshot error for ${context}:`, error?.message ?? error)
+            return { success: false }
         })
+        
+        // Create cancellable timeout to avoid warnings when snapshot succeeds
+        let timeoutId: NodeJS.Timeout
+        const timeoutPromise = new Promise<HtmlSnapshotResult>((resolve) => {
+            timeoutId = setTimeout(() => {
+                console.warn(`[HtmlSnapshot] Snapshot operation timeout after ${SNAPSHOT_TIMEOUT / 1000}s for ${context}`)
+                resolve({ success: false })
+            }, SNAPSHOT_TIMEOUT)
+        })
+        
+        // Race the promises and clear timeout when done
+        const result = await Promise.race([snapshotPromise, timeoutPromise])
+        clearTimeout(timeoutId) // Cancel timeout regardless of which promise won
+        return result
     }
 
     /**
@@ -63,12 +66,14 @@ export class HtmlSnapshotService {
 
         // Additional page state checks
         try {
-            await page.evaluate(() => document.readyState, { timeout: 1000 })
+            await page.waitForFunction(
+                () => document.readyState === 'complete' || document.readyState === 'interactive',
+                undefined,
+                { timeout: 1000 }
+            )
         } catch (evalError) {
             console.warn(`[HtmlSnapshot] Page not responsive for ${context}, skipping snapshot`)
-            return {
-                success: false
-            }
+            return { success: false }
         }
 
         console.log(`[HtmlSnapshot] Capturing snapshot for ${context}`)
@@ -99,7 +104,8 @@ export class HtmlSnapshotService {
      */
     private generateFilename(context: string): string {
         const timestamp = Date.now()
-        return `${context}_${timestamp}.html`
+        const safeContext = context.replace(/[^\w.-]+/g, '_').slice(0, 100)
+        return `${safeContext}_${timestamp}.html`
     }
 
 }

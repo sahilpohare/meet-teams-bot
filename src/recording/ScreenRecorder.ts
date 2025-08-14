@@ -139,9 +139,9 @@ export class ScreenRecorder extends EventEmitter {
             throw new Error('Recording is already in progress')
         }
 
-        // Capture DOM state before starting screen recording
+        // Capture DOM state before starting screen recording (void to avoid blocking)
         const htmlSnapshot = HtmlSnapshotService.getInstance()
-        await htmlSnapshot.captureSnapshot(page, 'screen_recording_start')
+        void htmlSnapshot.captureSnapshot(page, 'screen_recording_start')
 
         this.generateOutputPaths()
 

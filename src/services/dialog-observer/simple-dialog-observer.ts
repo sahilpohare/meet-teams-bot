@@ -180,7 +180,7 @@ export class SimpleDialogObserver {
 
                     // Capture DOM state before attempting to dismiss modal
                     const htmlSnapshot = HtmlSnapshotService.getInstance()
-                    await htmlSnapshot.captureSnapshot(page, 'dialog_observer_before_dismiss_attempt')
+                    await htmlSnapshot.captureSnapshot(page,  `dialog_observer_before_dismiss_attempt_${pattern.name}`)
 
                     // Try to dismiss the modal by clicking appropriate buttons
                     const dismissed = await this.tryDismissModal(

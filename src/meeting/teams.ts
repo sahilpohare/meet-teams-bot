@@ -333,14 +333,14 @@ export class TeamsProvider implements MeetingProviderInterface {
 
         console.log('Successfully confirmed we are in the meeting')
 
-        // Capture DOM state after successfully joining Teams meeting
-        await htmlSnapshot.captureSnapshot(page, 'teams_join_meeting_success')
-
         // 🎯 CRITICAL: Notify that join was successful (fixes waiting room timeout)
         onJoinSuccess()
         console.log(
             '✅ onJoinSuccess callback called - no more waiting room timeout!',
         )
+
+        // Capture DOM state after successfully joining Teams meeting
+        await htmlSnapshot.captureSnapshot(page, 'teams_join_meeting_success')
 
         // Check for "Continue without audio or video" that might appear AFTER joining (light interface)
         try {
