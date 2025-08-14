@@ -1,5 +1,6 @@
 import { Page } from '@playwright/test'
 import { RecordingMode, SpeakerData } from '../../types'
+import { HtmlSnapshotService } from '../../services/html-snapshot-service'
 
 export class MeetSpeakersObserver {
     private page: Page
@@ -37,6 +38,10 @@ export class MeetSpeakersObserver {
 
         // EXACT SAME AS EXTENSION: Ensure People panel is open
         await this.ensurePeoplePanelOpen()
+
+        // Capture DOM state after people panel is opened
+        const htmlSnapshot = HtmlSnapshotService.getInstance()
+        await htmlSnapshot.captureSnapshot(this.page, 'meet_speaker_observer_people_panel_opened')
 
         // Expose callback function to the page
         await this.page.exposeFunction(

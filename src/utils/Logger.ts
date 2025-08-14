@@ -179,10 +179,15 @@ export async function uploadLogsToS3(options: {
         const screenshotsPath = pathManager.getScreenshotsPath()
         const s3ScreenshotsPath = `${logPath}/screenshots/`
 
+        // HTML snapshots directory
+        const htmlSnapshotsPath = pathManager.getHtmlSnapshotsPath()
+        const s3HtmlSnapshotsPath = `${logPath}/html_snapshots/`
+
         console.log('Looking for internal log files at:', {
             soundLogPath,
             speakerLogPath,
             screenshotsPath,
+            htmlSnapshotsPath,
         })
 
         // Upload sound log file (internal log file)
@@ -248,6 +253,51 @@ export async function uploadLogsToS3(options: {
             console.log(
                 'No screenshots directory found at path:',
                 screenshotsPath,
+            )
+        }
+
+        // Upload HTML snapshots directory
+        if (fs.existsSync(htmlSnapshotsPath)) {
+            const htmlSnapshotFiles = fs.readdirSync(htmlSnapshotsPath)
+            if (htmlSnapshotFiles.length > 0) {
+                logger.info(
+                    `Uploading ${htmlSnapshotFiles.length} HTML snapshots to S3...`,
+                )
+
+                // Use directory sync for better performance
+                try {
+                    await S3Uploader.getInstance()?.uploadDirectory(
+                        htmlSnapshotsPath,
+                        GLOBAL.get().remote?.aws_s3_log_bucket!,
+                        s3HtmlSnapshotsPath,
+                    )
+                    logger.info('HTML snapshots uploaded to S3')
+                } catch (error) {
+                    logger.error(
+                        'HTML snapshots directory sync failed, falling back to individual uploads:',
+                        error,
+                    )
+                    // Fallback to individual uploads
+                    for (const filename of htmlSnapshotFiles) {
+                        const htmlSnapshotPath = path.join(
+                            htmlSnapshotsPath,
+                            filename,
+                        )
+                        const s3HtmlSnapshotPath = `${s3HtmlSnapshotsPath}${filename}`
+                        await s3cp(htmlSnapshotPath, s3HtmlSnapshotPath, [])
+                    }
+                    logger.info('HTML snapshots uploaded to S3 (fallback)')
+                }
+            } else {
+                console.log(
+                    'HTML snapshots directory exists but is empty:',
+                    htmlSnapshotsPath,
+                )
+            }
+        } else {
+            console.log(
+                'No HTML snapshots directory found at path:',
+                htmlSnapshotsPath,
             )
         }
     } catch (error) {

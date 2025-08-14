@@ -1,5 +1,6 @@
 import { Page } from '@playwright/test'
 import { RecordingMode, SpeakerData } from '../../types'
+import { HtmlSnapshotService } from '../../services/html-snapshot-service'
 
 export class TeamsSpeakersObserver {
     private page: Page
@@ -33,6 +34,10 @@ export class TeamsSpeakersObserver {
         }
 
         console.log('[Teams] Starting speaker observation...')
+
+        // Capture DOM state before starting Teams speaker observation
+        const htmlSnapshot = HtmlSnapshotService.getInstance()
+        await htmlSnapshot.captureSnapshot(this.page, 'teams_speaker_observer_start')
 
         // Browser console logs are handled by centralized page-logger in base-state.ts
 

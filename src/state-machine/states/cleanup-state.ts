@@ -1,5 +1,6 @@
 import { SoundContext, VideoContext } from '../../media_context'
 import { ScreenRecorderManager } from '../../recording/ScreenRecorder'
+import { HtmlSnapshotService } from '../../services/html-snapshot-service'
 
 import { MEETING_CONSTANTS } from '../constants'
 import { MeetingStateType, StateExecuteResult } from '../types'
@@ -41,7 +42,7 @@ export class CleanupState extends BaseState {
         try {
             // 0. Stop the dialog observer
             console.info(
-                '🧹 Step 0/5: Stopping dialog observer. It would not block the cleanup',
+                '🧹 Step 0/6: Stopping dialog observer. It would not block the cleanup',
             )
             try {
                 this.stopDialogObserver()
@@ -53,17 +54,24 @@ export class CleanupState extends BaseState {
             }
 
             // 🎬 PRIORITY 1: Stop video recording immediately to avoid data loss
-            console.info('🧹 Step 1/5: Stopping ScreenRecorder (PRIORITY)')
+            console.info('🧹 Step 1/6: Stopping ScreenRecorder (PRIORITY)')
             await this.stopScreenRecorder()
+
+            // 2. Capture final DOM state before cleanup
+            if (this.context.playwrightPage) {
+                console.info('🧹 Step 2/6: Capturing final DOM state')
+                const htmlSnapshot = HtmlSnapshotService.getInstance()
+                await htmlSnapshot.captureSnapshot(this.context.playwrightPage, 'cleanup_final_dom_state')
+            }
 
             // 🚀 PARALLEL CLEANUP: Independent steps that can run simultaneously
             console.info(
-                '🧹 Steps 2-4: Running parallel cleanup (streaming + speakers + HTML)',
+                '🧹 Steps 3-5: Running parallel cleanup (streaming + speakers + HTML)',
             )
             await Promise.allSettled([
                 // 2. Stop the streaming (fast, no await needed)
                 (async () => {
-                    console.info('🧹 Step 2/5: Stopping streaming service')
+                    console.info('🧹 Step 3/6: Stopping streaming service')
                     if (this.context.streamingService) {
                         this.context.streamingService.stop()
                     }
@@ -71,20 +79,20 @@ export class CleanupState extends BaseState {
 
                 // 3. Stop speakers observer (with 3s timeout)
                 (async () => {
-                    console.info('🧹 Step 3/5: Stopping speakers observer')
+                    console.info('🧹 Step 4/6: Stopping speakers observer')
                     await this.stopSpeakersObserver()
                 })(),
 
                 // 4. Stop HTML cleaner (with 3s timeout)
                 (async () => {
-                    console.info('🧹 Step 4/5: Stopping HTML cleaner')
+                    console.info('🧹 Step 5/6: Stopping HTML cleaner')
                     await this.stopHtmlCleaner()
                 })(),
             ])
 
             console.info('🧹 Parallel cleanup completed')
 
-            console.info('🧹 Step 5/5: Cleaning up browser resources')
+            console.info('🧹 Step 6/6: Cleaning up browser resources')
             // 5. Clean up browser resources (must be sequential after others)
             await this.cleanupBrowserResources()
 
