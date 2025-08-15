@@ -1,5 +1,6 @@
 import { Page } from '@playwright/test'
 import { RecordingMode } from '../../types'
+import { HtmlSnapshotService } from '../../services/html-snapshot-service'
 
 export class TeamsHtmlCleaner {
     private page: Page
@@ -12,6 +13,10 @@ export class TeamsHtmlCleaner {
 
     public async start(): Promise<void> {
         console.log('[Teams] Starting HTML cleaner')
+
+        // Capture DOM state before starting Teams HTML cleaning
+        const htmlSnapshot = HtmlSnapshotService.getInstance()
+        await htmlSnapshot.captureSnapshot(this.page, 'teams_html_cleaner_before_cleaning')
 
         // Wait 1 second like in original extension
         await this.page.waitForTimeout(1000)

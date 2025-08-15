@@ -33,6 +33,7 @@ export class PathManager {
             this.getTempPath(),
             this.getAudioTmpPath(),
             this.getScreenshotsPath(),
+            this.getHtmlSnapshotsPath(),
         ]
 
         for (const p of paths) {
@@ -86,6 +87,10 @@ export class PathManager {
 
     public getScreenshotsPath(): string {
         return path.join(this.getBasePath(), 'screenshots')
+    }
+
+    public getHtmlSnapshotsPath(): string {
+        return path.join(this.getBasePath(), 'html_snapshots')
     }
 
     public getS3Paths(): { bucketName: string; s3Path: string } {

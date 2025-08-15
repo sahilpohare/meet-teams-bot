@@ -6,6 +6,7 @@ import { MeetingProviderInterface, normalizeRecordingMode } from '../types'
 import { GLOBAL } from '../singleton'
 import { parseMeetingUrlFromJoinInfos } from '../urlParser/teamsUrlParser'
 import { sleep } from '../utils/sleep'
+import { HtmlSnapshotService } from '../services/html-snapshot-service'
 
 export class TeamsProvider implements MeetingProviderInterface {
     constructor() {}
@@ -102,6 +103,10 @@ export class TeamsProvider implements MeetingProviderInterface {
         onJoinSuccess: () => void,
     ): Promise<void> {
         console.log('joining meeting')
+
+        // Capture DOM state before starting Teams join process
+        const htmlSnapshot = HtmlSnapshotService.getInstance()
+        await htmlSnapshot.captureSnapshot(page, 'teams_join_meeting_start')
 
         try {
             await ensurePageLoaded(page)
@@ -334,6 +339,9 @@ export class TeamsProvider implements MeetingProviderInterface {
             '✅ onJoinSuccess callback called - no more waiting room timeout!',
         )
 
+        // Capture DOM state after successfully joining Teams meeting
+        await htmlSnapshot.captureSnapshot(page, 'teams_join_meeting_success')
+
         // Check for "Continue without audio or video" that might appear AFTER joining (light interface)
         try {
             console.log(
@@ -367,6 +375,9 @@ export class TeamsProvider implements MeetingProviderInterface {
 
         // Once in the meeting, configure the view
         try {
+            // Capture DOM state before configuring Teams view
+            await htmlSnapshot.captureSnapshot(page, 'teams_configure_view_start')
+            
             if (await clickWithInnerText(page, 'button', 'View', 10, false)) {
                 if (normalizeRecordingMode(GLOBAL.get().recording_mode) !== 'gallery_view') {
                     await clickWithInnerText(page, 'button', 'View', 10)

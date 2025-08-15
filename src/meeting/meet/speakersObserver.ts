@@ -1,5 +1,6 @@
 import { Page } from '@playwright/test'
 import { RecordingMode, SpeakerData } from '../../types'
+import { HtmlSnapshotService } from '../../services/html-snapshot-service'
 
 export class MeetSpeakersObserver {
     private page: Page
@@ -746,6 +747,11 @@ export class MeetSpeakersObserver {
 
         this.isObserving = true
         console.log('[Meet] ✅ Observer started successfully')
+
+        // Capture DOM state after Speakers Observer is started
+        const htmlSnapshot = HtmlSnapshotService.getInstance()
+        await htmlSnapshot.captureSnapshot(this.page, 'meet_speaker_observer_started')
+
     }
 
     public stopObserving(): void {

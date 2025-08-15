@@ -2,6 +2,7 @@ import type { Locator, Page } from '@playwright/test'
 import { GLOBAL } from '../../singleton'
 import { MeetingContext } from '../../state-machine/types'
 import { DialogObserverResult } from './types'
+import { HtmlSnapshotService } from '../html-snapshot-service'
 
 interface DismissTimeouts {
     VISIBLE_TIMEOUT: number
@@ -176,6 +177,10 @@ export class SimpleDialogObserver {
                     console.info(
                         `[SimpleDialogObserver] Found modal: ${pattern.name}`,
                     )
+
+                    // Capture DOM state before attempting to dismiss modal
+                    const htmlSnapshot = HtmlSnapshotService.getInstance()
+                    await htmlSnapshot.captureSnapshot(page,  `dialog_observer_before_dismiss_attempt_${pattern.name}`)
 
                     // Try to dismiss the modal by clicking appropriate buttons
                     const dismissed = await this.tryDismissModal(

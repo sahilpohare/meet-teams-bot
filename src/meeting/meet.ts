@@ -7,6 +7,7 @@ import { GLOBAL } from '../singleton'
 import { parseMeetingUrlFromJoinInfos } from '../urlParser/meetUrlParser'
 import { sleep } from '../utils/sleep'
 import { closeMeeting } from './meet/closeMeeting'
+import { HtmlSnapshotService } from '../services/html-snapshot-service'
 
 export class MeetProvider implements MeetingProviderInterface {
     async parseMeetingUrl(meeting_url: string) {
@@ -62,6 +63,10 @@ export class MeetProvider implements MeetingProviderInterface {
         onJoinSuccess: () => void,
     ): Promise<void> {
         try {
+            // Capture DOM state before starting join process
+            const htmlSnapshot = HtmlSnapshotService.getInstance()
+            await htmlSnapshot.captureSnapshot(page, 'meet_join_meeting_start')
+
             await clickDismiss(page)
             await sleep(300)
 
@@ -200,6 +205,9 @@ export class MeetProvider implements MeetingProviderInterface {
             // Once in the meeting, execute all post-join actions
             // WITHOUT checking cancelCheck since we are already in the meeting
 
+            // Capture DOM state after successfully joining meeting
+            await htmlSnapshot.captureSnapshot(page, 'meet_join_meeting_success')
+
             if (GLOBAL.get().enter_message) {
                 console.log('Sending entry message...')
                 await sendEntryMessage(page, GLOBAL.get().enter_message)
@@ -209,6 +217,9 @@ export class MeetProvider implements MeetingProviderInterface {
             await clickOutsideModal(page)
             const maxAttempts = 3
             if (normalizeRecordingMode(GLOBAL.get().recording_mode) !== 'audio_only') {
+                // Capture DOM state before layout change attempts
+                await htmlSnapshot.captureSnapshot(page, 'meet_layout_change_before_attempts')
+
                 for (let attempt = 1; attempt <= maxAttempts; attempt++) {
                     if (await changeLayout(page, attempt)) {
                         console.log(
@@ -223,6 +234,9 @@ export class MeetProvider implements MeetingProviderInterface {
             }
 
             if (normalizeRecordingMode(GLOBAL.get().recording_mode) !== 'gallery_view') {
+                // Capture DOM state before opening people panel
+                await htmlSnapshot.captureSnapshot(page, 'meet_people_panel_before_open')
+                
                 await findShowEveryOne(page, true, cancelCheck)
             }
         } catch (error) {
@@ -584,6 +598,12 @@ async function changeLayout(
     )
 
     try {
+        // Capture DOM state before layout change operation (first attempt only)
+        const htmlSnapshot = HtmlSnapshotService.getInstance()
+        if (currentAttempt === 1) {
+            await htmlSnapshot.captureSnapshot(page, 'meet_layout_change_operation_start_attempt_1')
+        }
+
         // First check if we are still in the meeting
         if (!(await isInMeeting(page))) {
             console.log(
@@ -601,6 +621,10 @@ async function changeLayout(
 
         // 1. Cliquer sur le bouton "More options"
         console.log('Looking for More options button in call controls...')
+        
+        // Capture DOM state before clicking More options
+        await htmlSnapshot.captureSnapshot(page, `meet_layout_change_before_more_options_attempt_${currentAttempt}`)
+        
         const moreOptionsButton = page.locator(
             'div[role="region"][aria-label="Call controls"] button[aria-label="More options"]',
         )
@@ -618,10 +642,16 @@ async function changeLayout(
 
         // 2. Cliquer sur "Change layout" ou "Adjust view"
         console.log('Looking for Change layout/Adjust view menu item...')
+        
+        // Capture DOM state after More options menu opens
+        await htmlSnapshot.captureSnapshot(page, `meet_layout_change_more_options_menu_open_attempt_${currentAttempt}`)
+        
         const changeLayoutItem = page.locator(
             '[role="menu"] [role="menuitem"]:has(span:has-text("Change layout"), span:has-text("Adjust view"))',
         )
         await changeLayoutItem.waitFor({ state: 'visible', timeout: 3000 })
+        await htmlSnapshot.captureSnapshot(page, `meet_layout_change_change_layout_menu_item_found_attempt_${currentAttempt}`)
+        
         await changeLayoutItem.click()
         await page.waitForTimeout(500)
 
@@ -666,6 +696,11 @@ async function changeLayout(
             message: (error as Error).message,
             stack: (error as Error).stack,
         })
+        
+        
+        const htmlSnapshot = HtmlSnapshotService.getInstance()
+        await htmlSnapshot.captureSnapshot(page, `meet_layout_change_operation_failure_attempt_${currentAttempt}`)
+        
         if (currentAttempt < maxAttempts) {
             console.log(
                 `Retrying layout change (attempt ${currentAttempt + 1}/${maxAttempts})...`,

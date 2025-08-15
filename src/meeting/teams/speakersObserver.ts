@@ -1,5 +1,6 @@
 import { Page } from '@playwright/test'
 import { RecordingMode, SpeakerData } from '../../types'
+import { HtmlSnapshotService } from '../../services/html-snapshot-service'
 
 export class TeamsSpeakersObserver {
     private page: Page
@@ -629,6 +630,10 @@ export class TeamsSpeakersObserver {
 
         this.isObserving = true
         console.log('[Teams] ✅ Observer started successfully')
+
+        // Capture DOM state after Speakers Observer is started
+        const htmlSnapshot = HtmlSnapshotService.getInstance()
+        await htmlSnapshot.captureSnapshot(this.page, 'teams_speaker_observer_started')
     }
 
     public stopObserving(): void {

@@ -1,5 +1,6 @@
 import { Page } from '@playwright/test'
 import { RecordingMode } from '../../types'
+import { HtmlSnapshotService } from '../../services/html-snapshot-service'
 
 export class MeetHtmlCleaner {
     private page: Page
@@ -12,6 +13,10 @@ export class MeetHtmlCleaner {
 
     public async start(): Promise<void> {
         console.log('[Meet] Starting HTML cleaner')
+
+        // Capture DOM state before starting HTML cleaning
+        const htmlSnapshot = HtmlSnapshotService.getInstance()
+        await htmlSnapshot.captureSnapshot(this.page, 'meet_html_cleaner_before_cleaning')
 
         // Inject Meet provider logic into browser context
         await this.page.evaluate(async (recordingMode) => {

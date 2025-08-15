@@ -14,6 +14,7 @@ import { PathManager } from '../utils/PathManager'
 import { S3Uploader } from '../utils/S3Uploader'
 import { sleep } from '../utils/sleep'
 import { generateSyncSignal } from '../utils/SyncSignal'
+import { HtmlSnapshotService } from '../services/html-snapshot-service'
 
 const TRANSCRIPTION_CHUNK_DURATION = 3600
 const GRACE_PERIOD_SECONDS = 3
@@ -137,6 +138,10 @@ export class ScreenRecorder extends EventEmitter {
         if (this.isRecording) {
             throw new Error('Recording is already in progress')
         }
+
+        // Capture DOM state before starting screen recording (void to avoid blocking)
+        const htmlSnapshot = HtmlSnapshotService.getInstance()
+        void htmlSnapshot.captureSnapshot(page, 'screen_recording_start')
 
         this.generateOutputPaths()
 

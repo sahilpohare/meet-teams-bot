@@ -1,5 +1,6 @@
 import { Events } from '../../events'
 import { GLOBAL } from '../../singleton'
+import { HtmlSnapshotService } from '../../services/html-snapshot-service'
 
 import {
     MeetingEndReason,
@@ -32,6 +33,12 @@ export class ErrorState extends BaseState {
     private async logError(): Promise<void> {
         const errorMessage = GLOBAL.getErrorMessage()
         const endReason = GLOBAL.getEndReason()
+
+        // Capture DOM state on error if page is available (void to avoid blocking)
+        if (this.context.playwrightPage) {
+            const htmlSnapshot = HtmlSnapshotService.getInstance()
+            void htmlSnapshot.captureSnapshot(this.context.playwrightPage, 'error_state_dom_capture')
+        }
 
         if (!endReason) {
             console.error('Unknown error occurred')
