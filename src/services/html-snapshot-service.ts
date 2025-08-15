@@ -105,7 +105,7 @@ export class HtmlSnapshotService {
     private generateFilename(context: string): string {
         const timestamp = Date.now()
         const safeContext = context.replace(/[^\w.-]+/g, '_').slice(0, 100)
-        return `${safeContext}_${timestamp}.html`
+        return `${timestamp}_${safeContext}.html`
     }
 
 }
