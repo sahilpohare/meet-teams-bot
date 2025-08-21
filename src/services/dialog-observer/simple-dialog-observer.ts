@@ -123,9 +123,9 @@ export class SimpleDialogObserver {
             const modalPatterns = [
                 // Transcription/notes modal
                 {
-                    name: 'transcription_notification',
+                    name: 'gemini_notification',
                     selector:
-                        'div[role="dialog"]:has-text("transcribed"):has-text("Gemini"):has(button)',
+                        'div[role="dialog"]:has-text("Gemini"):has-text("taking notes"):has(button)',
                     buttonTexts: ['Join now'],
                 },
                 // Privacy/notification modals
