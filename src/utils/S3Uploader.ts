@@ -1,4 +1,4 @@
-import { spawn } from 'child_process'
+import { DeleteObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import * as fs from 'fs'
 import { GLOBAL } from '../singleton'
 
@@ -9,7 +9,30 @@ let instance: S3Uploader | null = null
 const S3_ENDPOINT = process.env.S3_ENDPOINT || 's3.fr-par.scw.cloud'
 
 export class S3Uploader {
-    private constructor() {}
+    private s3Client: S3Client
+
+    private constructor() {
+        // Initialize S3 client with configuration
+        const config: any = {
+            region: process.env.AWS_REGION || 'fr-par',
+        }
+
+        // If using custom endpoint (like Scaleway), configure it
+        if (S3_ENDPOINT !== 's3.amazonaws.com') {
+            config.endpoint = `https://${S3_ENDPOINT}`
+            config.forcePathStyle = true // Required for custom endpoints
+        }
+
+        // Add credentials if provided
+        if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
+            config.credentials = {
+                accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+                secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+            }
+        }
+
+        this.s3Client = new S3Client(config)
+    }
 
     public static getInstance(): S3Uploader {
         if (GLOBAL.isServerless()) {
@@ -81,43 +104,20 @@ export class S3Uploader {
 
             console.log('🔍 S3 upload command:', 'aws', fullArgs.join(' '))
 
-            return new Promise((resolve, reject) => {
-                const awsProcess = spawn('aws', fullArgs)
-                let output = ''
-                let errorOutput = ''
-
-                awsProcess.stdout.on('data', (data) => {
-                    output += data.toString()
-                })
-
-                awsProcess.stderr.on('data', (data) => {
-                    errorOutput += data.toString()
-                    console.error('S3 upload error:', data.toString().trim())
-                })
-
-                awsProcess.on('error', (error) => {
-                    console.error(
-                        'Failed to start AWS CLI process:',
-                        error.message,
-                    )
-                    reject(
-                        new Error(
-                            `AWS CLI process failed to start: ${error.message}`,
-                        ),
-                    )
-                })
-
-                awsProcess.on('close', (code) => {
-                    if (code === 0) {
-                        const publicUrl = `https://${bucketName}.${S3_ENDPOINT}/${s3Path}`
-                        resolve(publicUrl)
-                    } else {
-                        const errorMessage = `S3 upload failed (${code}): ${errorOutput || output}`
-                        console.error(errorMessage)
-                        reject(new Error(errorMessage))
-                    }
-                })
+            // Use AWS SDK
+            const fileContent = await fs.promises.readFile(filePath)
+            
+            const command = new PutObjectCommand({
+                Bucket: bucketName,
+                Key: s3Path,
+                Body: fileContent,
+                ACL: 'public-read',
             })
+
+            await this.s3Client.send(command)
+            
+            const publicUrl = `https://${bucketName}.${S3_ENDPOINT}/${s3Path}`
+            return publicUrl
         } catch (error: any) {
             console.error('S3 upload error:', error.message)
             throw error
@@ -175,46 +175,86 @@ export class S3Uploader {
 
             console.log('🔍 S3 sync command:', 'aws', fullArgs.join(' '))
 
-            return new Promise((resolve, reject) => {
-                const awsProcess = spawn('aws', fullArgs)
-                let output = ''
-                let errorOutput = ''
+            // Use AWS SDK
+            // Get list of files in local directory
+            const files = await this.getFilesRecursively(localDir)
+            
+            // Upload each file
+            for (const file of files) {
+                const relativePath = file.replace(localDir, '').replace(/^\/+/, '')
+                const s3Key = `${s3Path}/${relativePath}`.replace(/\/+/g, '/')
+                
+                await this.uploadFile(file, bucketName, s3Key, s3Args)
+            }
 
-                awsProcess.stdout.on('data', (data) => {
-                    output += data.toString()
-                })
+            // Handle deletion of files in S3 that don't exist locally (if --delete was specified)
+            if (s3Args?.includes('--delete')) {
+                await this.cleanupS3Directory(bucketName, s3Path, files, localDir)
+            }
 
-                awsProcess.stderr.on('data', (data) => {
-                    errorOutput += data.toString()
-                    console.error('S3 sync error:', data.toString().trim())
-                })
-
-                awsProcess.on('error', (error) => {
-                    console.error(
-                        'Failed to start AWS CLI process:',
-                        error.message,
-                    )
-                    reject(
-                        new Error(
-                            `AWS CLI process failed to start: ${error.message}`,
-                        ),
-                    )
-                })
-
-                awsProcess.on('close', (code) => {
-                    if (code === 0) {
-                        const publicUrl = `https://${bucketName}.${S3_ENDPOINT}/${s3Path}`
-                        resolve(publicUrl)
-                    } else {
-                        const errorMessage = `S3 sync failed (${code}): ${errorOutput || output}`
-                        console.error(errorMessage)
-                        reject(new Error(errorMessage))
-                    }
-                })
-            })
+            const publicUrl = `https://${bucketName}.${S3_ENDPOINT}/${s3Path}`
+            return publicUrl
         } catch (error: any) {
             console.error('S3 sync error:', error.message)
             throw error
+        }
+    }
+
+    private async getFilesRecursively(dir: string): Promise<string[]> {
+        const files: string[] = []
+        
+        const items = await fs.promises.readdir(dir, { withFileTypes: true })
+        
+        for (const item of items) {
+            const fullPath = `${dir}/${item.name}`
+            
+            if (item.isDirectory()) {
+                files.push(...(await this.getFilesRecursively(fullPath)))
+            } else {
+                files.push(fullPath)
+            }
+        }
+        
+        return files
+    }
+
+    private async cleanupS3Directory(
+        bucketName: string, 
+        s3Path: string, 
+        localFiles: string[], 
+        localDir: string
+    ): Promise<void> {
+        try {
+            // List objects in S3 directory
+            const command = new ListObjectsV2Command({
+                Bucket: bucketName,
+                Prefix: s3Path,
+            })
+            
+            const response = await this.s3Client.send(command)
+            
+            if (!response.Contents) return
+            
+            for (const object of response.Contents) {
+                if (!object.Key) continue
+                
+                // Check if this S3 object corresponds to a local file
+                const relativeS3Path = object.Key.replace(s3Path, '').replace(/^\/+/, '')
+                const correspondingLocalFile = `${localDir}/${relativeS3Path}`
+                
+                if (!localFiles.includes(correspondingLocalFile)) {
+                    // Delete S3 object that doesn't exist locally
+                    const deleteCommand = new DeleteObjectCommand({
+                        Bucket: bucketName,
+                        Key: object.Key,
+                    })
+                    
+                    await this.s3Client.send(deleteCommand)
+                    console.log(`🗑️ Deleted S3 object: ${object.Key}`)
+                }
+            }
+        } catch (error) {
+            console.warn('Warning: Could not cleanup S3 directory:', error)
         }
     }
 }
