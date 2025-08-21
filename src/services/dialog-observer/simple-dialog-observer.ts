@@ -1,8 +1,8 @@
 import type { Locator, Page } from '@playwright/test'
 import { GLOBAL } from '../../singleton'
 import { MeetingContext } from '../../state-machine/types'
-import { DialogObserverResult } from './types'
 import { HtmlSnapshotService } from '../html-snapshot-service'
+import { DialogObserverResult } from './types'
 
 interface DismissTimeouts {
     VISIBLE_TIMEOUT: number
@@ -121,6 +121,13 @@ export class SimpleDialogObserver {
         try {
             // Google Meet specific modal patterns
             const modalPatterns = [
+                // Transcription/notes modal
+                {
+                    name: 'transcription_notification',
+                    selector:
+                        'div[role="dialog"]:has-text("transcribed"):has-text("Gemini"):has(button)',
+                    buttonTexts: ['Join now'],
+                },
                 // Privacy/notification modals
                 {
                     name: 'privacy_notification',
@@ -180,7 +187,10 @@ export class SimpleDialogObserver {
 
                     // Capture DOM state before attempting to dismiss modal
                     const htmlSnapshot = HtmlSnapshotService.getInstance()
-                    await htmlSnapshot.captureSnapshot(page,  `dialog_observer_before_dismiss_attempt_${pattern.name}`)
+                    await htmlSnapshot.captureSnapshot(
+                        page,
+                        `dialog_observer_before_dismiss_attempt_${pattern.name}`,
+                    )
 
                     // Try to dismiss the modal by clicking appropriate buttons
                     const dismissed = await this.tryDismissModal(
