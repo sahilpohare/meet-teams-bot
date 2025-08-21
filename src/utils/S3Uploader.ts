@@ -76,9 +76,7 @@ export class S3Uploader {
                 's3',
                 'cp',
                 filePath,
-                s3FullPath,
-                '--acl',
-                'public-read',
+                s3FullPath
             ]
 
             console.log('🔍 S3 upload command:', 'aws', fullArgs.join(' '))
@@ -172,8 +170,6 @@ export class S3Uploader {
                 'sync',
                 localDir,
                 s3FullPath,
-                '--acl',
-                'public-read',
                 '--delete', // Remove files in S3 that don't exist locally
             ]
 
