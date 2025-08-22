@@ -620,8 +620,6 @@ export class ScreenRecorder extends EventEmitter {
                         chunkPath,
                         GLOBAL.get().aws_s3_temporary_audio_bucket,
                         s3Key,
-                        [],
-                        true,
                     )
 
                     console.log(`✅ Chunk uploaded: ${filename}`)
