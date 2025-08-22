@@ -284,7 +284,7 @@ export async function uploadLogsToS3(options: {
                             filename,
                         )
                         const s3HtmlSnapshotPath = `${s3HtmlSnapshotsPath}${filename}`
-                        await s3cp(htmlSnapshotPath, s3HtmlSnapshotPath, [])
+                        await s3cp(htmlSnapshotPath, s3HtmlSnapshotPath)
                     }
                     logger.info('HTML snapshots uploaded to S3 (fallback)')
                 }

@@ -144,6 +144,9 @@ export class S3Uploader {
             
             console.log(`Total upload summary: ${successful} successful, ${failed} failed`)
 
+            if (failed > 0) {
+                throw new Error(`Bulk upload completed with ${failed} failures`)
+            }
         } catch (error) {
             console.error('S3 sync error:', error)
             throw error
