@@ -15,6 +15,7 @@ import { getErrorMessageFromCode } from './state-machine/types'
 import { MeetingParams } from './types'
 
 import { exit } from 'process'
+import { enablePrintPageLogs } from './browser/page-logger'
 
 // ========================================
 // CONFIGURATION
@@ -31,6 +32,7 @@ export const DEBUG_LOGS =
     process.argv.includes('--debug') || process.env.DEBUG_LOGS === 'true'
 if (DEBUG_LOGS) {
     console.log('🐛 DEBUG mode activated - speakers debug logs will be shown')
+    enablePrintPageLogs()
 }
 
 // ========================================

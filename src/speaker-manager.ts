@@ -7,6 +7,7 @@ import { ParticipantState } from './state-machine/types'
 import { SpeakerData } from './types'
 import { uploadTranscriptTask } from './uploadTranscripts'
 import { PathManager } from './utils/PathManager'
+import { enablePrintPageLogs } from './browser/page-logger'
 
 export class SpeakerManager {
     private static instance: SpeakerManager | null = null
@@ -83,6 +84,9 @@ export class SpeakerManager {
 
         if (speakersCount > 0) {
             this.lastSpeakerTime = Date.now()
+        } else {
+            // If no speaker is detected, enable page logs to debug the issue
+            enablePrintPageLogs()
         }
 
         const participantState: ParticipantState = {
