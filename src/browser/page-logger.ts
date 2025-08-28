@@ -1,8 +1,8 @@
 import { Page } from '@playwright/test'
 import { DEBUG_LOGS } from '../main'
 
-// This will be turned on conditionally based on how the bot is performing
-// It will initially be based on the DEBUG_LOGS flag
+// Controlled via enablePrintPageLogs()/disablePrintPageLogs()
+// Enabled when DEBUG_LOGS is true OR when debugging specific scenarios (e.g., no speakers detected)
 let PRINT_PAGE_LOGS = false
 
 const formatValue = (value: any): string => {

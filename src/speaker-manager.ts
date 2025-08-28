@@ -84,8 +84,8 @@ export class SpeakerManager {
 
         if (speakersCount > 0) {
             this.lastSpeakerTime = Date.now()
-        } else {
-            // If no speaker is detected, enable page logs to debug the issue
+        } else if (speakers.length === 0) {
+            // Only enable page logs when NO participants are found (SpeakerObserver failure)
             enablePrintPageLogs()
         }
 
