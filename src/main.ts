@@ -31,6 +31,11 @@ export const DEBUG_LOGS =
     process.argv.includes('--debug') || process.env.DEBUG_LOGS === 'true'
 if (DEBUG_LOGS) {
     console.log('🐛 DEBUG mode activated - speakers debug logs will be shown')
+    // Dynamically import page-logger to enable page logs only when DEBUG_LOGS is true
+    // This is done to avoid circular dependency issues
+    import('./browser/page-logger')
+        .then(({ enablePrintPageLogs }) => enablePrintPageLogs())
+        .catch((e) => console.error('Failed to enable page logs dynamically:', e))
 }
 
 // ========================================

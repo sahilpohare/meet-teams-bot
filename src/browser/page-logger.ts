@@ -1,6 +1,10 @@
 import { Page } from '@playwright/test'
 import { DEBUG_LOGS } from '../main'
 
+// Controlled via enablePrintPageLogs()/disablePrintPageLogs()
+// Enabled when DEBUG_LOGS is true OR when debugging specific scenarios (e.g., no speakers detected)
+let PRINT_PAGE_LOGS = false
+
 const formatValue = (value: any): string => {
     if (value === null) return 'null'
     if (value === undefined) return 'undefined'
@@ -14,6 +18,21 @@ const formatValue = (value: any): string => {
     return String(value)
 }
 
+/**
+ * Enable printing page logs
+ */
+export const enablePrintPageLogs = () => {
+    PRINT_PAGE_LOGS = true
+}
+
+/**
+ * Disable printing page logs.
+ * This hasn't been used yet but could be implemented if we need to turn off page logs for some reason
+ */
+export const disablePrintPageLogs = () => {
+    PRINT_PAGE_LOGS = false
+}
+
 export function listenPage(page: Page) {
     page.on('console', async (message) => {
         try {
@@ -23,7 +42,8 @@ export function listenPage(page: Page) {
             // Only show DEBUG logs when --debug flag is used
             const isDebugLog = text.includes('DEBUG')
 
-            if (!DEBUG_LOGS || !isDebugLog) {
+            // Print page logs only if PRINT_PAGE_LOGS is true or if DEBUG_LOGS is true and the log contains DEBUG
+            if (!PRINT_PAGE_LOGS && (!DEBUG_LOGS || !isDebugLog)) {
                 return // Skip all logs unless --debug is enabled and log contains DEBUG
             }
 
