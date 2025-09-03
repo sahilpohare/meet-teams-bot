@@ -102,18 +102,20 @@ async function handleFailedRecording(): Promise<void> {
     const endReason = GLOBAL.getEndReason()
     console.log(`Recording failed with reason: ${endReason || 'Unknown'}`)
 
+    // Send failure webhook to user before sending to backend
+    const errorMessage =
+        (GLOBAL.hasError() && GLOBAL.getErrorMessage()) ||
+        (endReason
+            ? getErrorMessageFromCode(endReason)
+            : 'Recording did not complete successfully')
+    await Events.recordingFailed(errorMessage)
+
     console.log(`📤 Sending error to backend`)
 
     // Notify backend of recording failure (function deduces errorCode and message automatically)
     if (!GLOBAL.isServerless() && Api.instance) {
         await Api.instance.notifyRecordingFailure()
     }
-
-    // Send failure webhook to user
-    const errorMessage = endReason
-        ? getErrorMessageFromCode(endReason)
-        : 'Recording did not complete successfully'
-    await Events.recordingFailed(errorMessage)
     console.log(`✅ Error sent to backend successfully`)
 }
 
@@ -192,6 +194,9 @@ async function handleFailedRecording(): Promise<void> {
               ? error.message
               : 'Recording failed to complete'
 
+        // Send failure webhook to user before sending to backend
+        await Events.recordingFailed(errorMessage)
+
         console.log(`📤 Sending error to backend: ${errorMessage}`)
 
         // Notify backend of recording failure
@@ -199,7 +204,6 @@ async function handleFailedRecording(): Promise<void> {
             await Api.instance.notifyRecordingFailure()
         }
 
-        await Events.recordingFailed(errorMessage)
         console.log(`✅ Error sent to backend successfully`)
     } finally {
         if (!GLOBAL.isServerless()) {
