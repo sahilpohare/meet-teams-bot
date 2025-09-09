@@ -71,7 +71,7 @@ export class S3Uploader {
             return
         }
         
-        const bucket = GLOBAL.get().remote.aws_s3_log_bucket
+        const bucket = GLOBAL.get().remote?.aws_s3_log_bucket
         if (!bucket) {
             console.warn('Skipping S3 upload - aws_s3_log_bucket not configured')
             return
