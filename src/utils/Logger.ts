@@ -177,11 +177,11 @@ export async function uploadLogsToS3(options: {
 
         // Screenshots directory
         const screenshotsPath = pathManager.getScreenshotsPath()
-        const s3ScreenshotsPath = `${logPath}/screenshots/`
+        const s3ScreenshotsPath = `${logPath}/screenshots`
 
         // HTML snapshots directory
         const htmlSnapshotsPath = pathManager.getHtmlSnapshotsPath()
-        const s3HtmlSnapshotsPath = `${logPath}/html_snapshots/`
+        const s3HtmlSnapshotsPath = `${logPath}/html_snapshots`
 
         console.log('Looking for internal log files at:', {
             soundLogPath,
