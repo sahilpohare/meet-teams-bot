@@ -9,7 +9,10 @@ import {
 } from '../types'
 import { BaseState } from './base-state'
 
-import { ScreenRecorderManager, AudioWarningEvent } from '../../recording/ScreenRecorder'
+import {
+    AudioWarningEvent,
+    ScreenRecorderManager,
+} from '../../recording/ScreenRecorder'
 import { GLOBAL } from '../../singleton'
 import { sleep } from '../../utils/sleep'
 
@@ -19,8 +22,7 @@ const SOUND_LEVEL_ACTIVITY_THRESHOLD = 5
 export class RecordingState extends BaseState {
     private isProcessing: boolean = true
     private readonly CHECK_INTERVAL = 250
-    private noAttendeesWithSilenceStartTime: number = 0
-    private readonly SILENCE_CONFIRMATION_MS = 45000 // 45 seconds of silence before confirming no attendees
+    private noAttendeesConfirmationStartTime: number = 0
 
     async execute(): StateExecuteResult {
         try {
@@ -137,10 +139,7 @@ export class RecordingState extends BaseState {
                         : String(error)
             }
 
-            GLOBAL.setError(
-                MeetingEndReason.StreamingSetupFailed,
-                errorMessage,
-            )
+            GLOBAL.setError(MeetingEndReason.StreamingSetupFailed, errorMessage)
             this.isProcessing = false
         })
 
@@ -190,7 +189,7 @@ export class RecordingState extends BaseState {
                         `[checkEndConditions] Sound activity detected (${currentSoundLevel.toFixed(2)}), resetting all silence timers`,
                     )
                     // Reset both silence timers when sound is detected
-                    this.noAttendeesWithSilenceStartTime = 0
+                    this.noAttendeesConfirmationStartTime = 0
                     this.context.noSpeakerDetectedTime = 0
                     return { shouldEnd: false }
                 }
@@ -302,7 +301,7 @@ export class RecordingState extends BaseState {
 
         // If participants are present, reset timer and exit
         if (attendeesCount > 0) {
-            this.noAttendeesWithSilenceStartTime = 0
+            this.noAttendeesConfirmationStartTime = 0
             return false
         }
 
@@ -313,37 +312,44 @@ export class RecordingState extends BaseState {
 
         // If we shouldn't consider ending, reset timer and exit
         if (!shouldConsiderEnding) {
-            this.noAttendeesWithSilenceStartTime = 0
+            this.noAttendeesConfirmationStartTime = 0
             return false
         }
 
-        // Start silence timer if not already started
-        if (this.noAttendeesWithSilenceStartTime === 0) {
-            this.noAttendeesWithSilenceStartTime = now
+        // Start confirmation timer if not already started
+        if (this.noAttendeesConfirmationStartTime === 0) {
+            this.noAttendeesConfirmationStartTime = now
             console.log(
-                '[checkNoAttendees] Starting silence confirmation timer',
+                '[checkNoAttendees] Starting empty meeting confirmation timer',
             )
             return false
         }
 
-        // Check if we've had silence for long enough
-        const silenceDuration = now - this.noAttendeesWithSilenceStartTime
-        const hasEnoughSilence = silenceDuration >= this.SILENCE_CONFIRMATION_MS
+        // Check if we've had no attendees for long enough
+        const noAttendeesDuration = now - this.noAttendeesConfirmationStartTime
+        const hasEnoughConfirmation: boolean =
+            noAttendeesDuration >=
+            MEETING_CONSTANTS.EMPTY_MEETING_CONFIRMATION_MS
 
         // Log progress if we're still waiting
-        if (!hasEnoughSilence && silenceDuration % 5000 < this.CHECK_INTERVAL) {
+        if (
+            !hasEnoughConfirmation &&
+            noAttendeesDuration % 5000 < this.CHECK_INTERVAL
+        ) {
             console.log(
-                `[checkNoAttendees] Waiting for silence confirmation: ${Math.floor(silenceDuration / 1000)}s / ${this.SILENCE_CONFIRMATION_MS / 1000}s`,
+                `[checkNoAttendees] Waiting for empty meeting confirmation: ${Math.floor(noAttendeesDuration / 1000)}s / ${MEETING_CONSTANTS.EMPTY_MEETING_CONFIRMATION_MS / 1000}s`,
             )
         }
 
-        if (hasEnoughSilence) {
+        if (hasEnoughConfirmation) {
             console.log(
-                `[checkNoAttendees] Silence confirmation reached (${Math.floor(silenceDuration / 1000)}s), ending meeting due to no attendees`,
+                `[checkNoAttendees] Empty meeting confirmation reached (${Math.floor(noAttendeesDuration / 1000)}s), checking for sound activity`,
             )
+            // Check if there's sound activity before ending due to no attendees
+            return this.checkNoSpeaker(now)
         }
 
-        return hasEnoughSilence
+        return false
     }
 
     /**
@@ -360,20 +366,20 @@ export class RecordingState extends BaseState {
         }
 
         // Check if the silence period has exceeded the timeout
-        const silenceDuration = Math.floor((now - noSpeakerDetectedTime) / 1000)
+        const silenceDurationSeconds = Math.floor((now - noSpeakerDetectedTime) / 1000)
         const shouldEnd =
             noSpeakerDetectedTime + MEETING_CONSTANTS.SILENCE_TIMEOUT < now
 
         if (shouldEnd) {
             console.log(
-                `[checkNoSpeaker] No sound activity detected for ${silenceDuration} seconds, ending meeting`,
+                `[checkNoSpeaker] No sound activity detected for ${silenceDurationSeconds} seconds, ending meeting`,
             )
         } else {
             // Log progress periodically
-            if (silenceDuration % 30000 < this.CHECK_INTERVAL) {
+            if (silenceDurationSeconds % 30 === 0) {
                 // Log every 30 seconds
                 console.log(
-                    `[checkNoSpeaker] No speaker detected for ${silenceDuration}s / ${MEETING_CONSTANTS.SILENCE_TIMEOUT / 1000}s`,
+                    `[checkNoSpeaker] No speaker detected for ${silenceDurationSeconds}s / ${MEETING_CONSTANTS.SILENCE_TIMEOUT / 1000}s`,
                 )
             }
         }
