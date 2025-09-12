@@ -238,7 +238,7 @@ export async function uploadLogsToS3(options: {
                             screenshotsPath,
                             filename,
                         )
-                        const s3ScreenshotPath = `${s3ScreenshotsPath}${filename}`
+                        const s3ScreenshotPath = `${s3ScreenshotsPath}/${filename}`
                         await s3cp(screenshotPath, s3ScreenshotPath)
                     }
                     logger.info('Screenshots uploaded to S3 (fallback)')
@@ -283,7 +283,7 @@ export async function uploadLogsToS3(options: {
                             htmlSnapshotsPath,
                             filename,
                         )
-                        const s3HtmlSnapshotPath = `${s3HtmlSnapshotsPath}${filename}`
+                        const s3HtmlSnapshotPath = `${s3HtmlSnapshotsPath}/${filename}`
                         await s3cp(htmlSnapshotPath, s3HtmlSnapshotPath)
                     }
                     logger.info('HTML snapshots uploaded to S3 (fallback)')
