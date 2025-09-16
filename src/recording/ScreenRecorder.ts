@@ -287,7 +287,7 @@ export class ScreenRecorder extends EventEmitter {
                 '-f',
                 'pulse',
                 '-thread_queue_size',
-                '2048', // Increased from 1024 for better buffering
+                '16384',
                 '-i',
                 VIRTUAL_SPEAKER_MONITOR,
 
@@ -363,7 +363,7 @@ export class ScreenRecorder extends EventEmitter {
                 '-f',
                 'pulse',
                 '-thread_queue_size',
-                '2048', // Increased from 1024 for better buffering
+                '16384',
                 '-i',
                 VIRTUAL_SPEAKER_MONITOR,
 
@@ -486,69 +486,13 @@ export class ScreenRecorder extends EventEmitter {
             this.emit('stopped')
         })
 
-        // Enhanced error monitoring for PulseAudio issues
-        let errorCount = 0
-        const maxErrors = 10 // Increased from 5 to be less aggressive
-        const errorWindowMs = 60000 // Increased to 60 seconds for better tolerance
-        let lastErrorTime = 0
-        const errorCooldownMs = 5000 // 5 second cooldown between error handling
-
         this.ffmpegProcess.stderr?.on('data', (data) => {
             const output = data.toString()
-            const outputLower = output.toLowerCase()
-            if (outputLower.includes('error')) {
-                console.error('FFmpeg stderr:', output.trim())
-
-                // Check for specific PulseAudio errors that indicate audio input failure
-                if (
-                    outputLower.includes('error during demuxing') ||
-                    outputLower.includes(
-                        'error retrieving a packet from demuxer',
-                    ) ||
-                    outputLower.includes('generic error in an external library')
-                ) {
-                    const now = Date.now()
-                    errorCount++
-                    console.warn(
-                        `⚠️ PulseAudio error detected (${errorCount}/${maxErrors})`,
-                    )
-
-                    // Only handle errors if enough time has passed since last handling
-                    if (
-                        errorCount >= maxErrors &&
-                        now - lastErrorTime > errorCooldownMs
-                    ) {
-                        lastErrorTime = now
-                        console.warn(
-                            '⚠️ Multiple PulseAudio errors detected, continuing recording...',
-                        )
-
-                        // Emit a warning event for monitoring purposes
-                        const audioWarning: AudioWarningEvent = {
-                            type: 'pulseAudioWarning',
-                            errorCount,
-                            message:
-                                'PulseAudio input stream experiencing issues - continuing recording',
-                            timestamp: Date.now(),
-                        }
-                        this.emit('audioWarning', audioWarning)
-
-                        // Don't reset error count immediately - let it accumulate
-                    }
-                }
+            console.log('FFmpeg stderr:', output.trim()) // Log ALL stderr for complete context
+            if (output.includes('error')) {
+                console.error('FFmpeg ERROR:', output.trim())
             }
         })
-
-        // Reset error count periodically but less frequently
-        setInterval(() => {
-            if (errorCount > 0) {
-                console.log(
-                    `🔄 Resetting PulseAudio error count (was ${errorCount})`,
-                )
-                errorCount = 0
-                lastErrorTime = 0
-            }
-        }, errorWindowMs)
     }
 
     private setupStreamingAudio(): void {
