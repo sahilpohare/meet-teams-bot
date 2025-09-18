@@ -352,7 +352,8 @@ export class RecordingState extends BaseState {
                 `[checkNoAttendees] Empty meeting confirmation reached (${Math.floor(noAttendeesDuration / 1000)}s), ending meeting due to no attendees`,
             )
             // End meeting due to no attendees - don't wait for sound activity
-            return this.checkNoSpeaker(now)
+            // return this.checkNoSpeaker(now)
+            return true
         }
 
         return false
