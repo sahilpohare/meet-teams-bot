@@ -23,6 +23,7 @@ export class RecordingState extends BaseState {
     private isProcessing: boolean = true
     private readonly CHECK_INTERVAL = 250
     private noAttendeesConfirmationStartTime: number = 0
+    private lastSoundActivity: number = Date.now()
 
     async execute(): StateExecuteResult {
         try {
@@ -190,12 +191,13 @@ export class RecordingState extends BaseState {
                 const currentSoundLevel =
                     Streaming.instance.getCurrentSoundLevel()
                 if (currentSoundLevel > SOUND_LEVEL_ACTIVITY_THRESHOLD) {
-                    console.log(
-                        `[checkEndConditions] Sound activity detected (${currentSoundLevel.toFixed(2)}), resetting all silence timers`,
-                    )
-                    // Reset both silence timers when sound is detected
-                    this.noAttendeesConfirmationStartTime = 0
-                    this.context.noSpeakerDetectedTime = 0
+                    // Only log once per 2 seconds to avoid spam
+                    if (now - this.lastSoundActivity >= 2000) {
+                        console.log(
+                            `[checkEndConditions] Sound activity detected (${currentSoundLevel.toFixed(2)}), resetting lastSoundActivity silence timer`,
+                        )
+                    }
+                    this.lastSoundActivity = now
                     return { shouldEnd: false }
                 }
             }
@@ -312,7 +314,7 @@ export class RecordingState extends BaseState {
 
         // Check if we should consider ending due to no attendees
         const nooneJoinedTimeoutMs = GLOBAL.get().automatic_leave.noone_joined_timeout * 1000
-        const noAttendeesTimeout =
+        const noAttendeesTimeout:boolean =
             startTime + nooneJoinedTimeoutMs < now
         const shouldConsiderEnding = noAttendeesTimeout || firstUserJoined
 
@@ -352,8 +354,7 @@ export class RecordingState extends BaseState {
                 `[checkNoAttendees] Empty meeting confirmation reached (${Math.floor(noAttendeesDuration / 1000)}s), ending meeting due to no attendees`,
             )
             // End meeting due to no attendees - don't wait for sound activity
-            // return this.checkNoSpeaker(now)
-            return true
+            return this.checkNoSpeaker(now)
         }
 
         return false
@@ -365,20 +366,10 @@ export class RecordingState extends BaseState {
      * @returns true if the meeting should end due to absence of sound
      */
     private checkNoSpeaker(now: number): boolean {
-        const noSpeakerDetectedTime = this.context.noSpeakerDetectedTime
-
-        // If no silence period has been detected, no need to end
-        if (!noSpeakerDetectedTime || noSpeakerDetectedTime <= 0) {
-            return false
-        }
 
         // Check if the silence period has exceeded the timeout
-        const silenceDurationSeconds = Math.floor(
-            (now - noSpeakerDetectedTime) / 1000,
-        )
-        const shouldEnd =
-            noSpeakerDetectedTime + MEETING_CONSTANTS.SILENCE_TIMEOUT < now
-
+        const silenceDurationSeconds = Math.floor((now - this.lastSoundActivity) / 1000)
+        const shouldEnd = silenceDurationSeconds >= MEETING_CONSTANTS.SILENCE_TIMEOUT / 1000
         if (shouldEnd) {
             console.log(
                 `[checkNoSpeaker] No sound activity detected for ${silenceDurationSeconds} seconds, ending meeting`,
@@ -392,7 +383,6 @@ export class RecordingState extends BaseState {
                 )
             }
         }
-
         return shouldEnd
     }
 }
