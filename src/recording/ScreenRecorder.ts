@@ -90,6 +90,8 @@ export interface AudioWarningEvent {
 
 export class ScreenRecorder extends EventEmitter {
     private ffmpegProcess: ChildProcess | null = null
+    private errorMonitorIntervalId: NodeJS.Timeout | null = null
+    private forceKillTimeoutId: NodeJS.Timeout | null = null
     private outputPath: string = ''
     private audioOutputPath: string = ''
     private config: ScreenRecordingConfig
@@ -154,6 +156,7 @@ export class ScreenRecorder extends EventEmitter {
             this.isRecording = true
             this.recordingStartTime = Date.now()
             this.gracePeriodActive = false
+            this.logMemoryUsage('Starting recording')
             this.setupProcessMonitoring()
             this.setupStreamingAudio()
 
@@ -483,6 +486,7 @@ export class ScreenRecorder extends EventEmitter {
             }
 
             this.isRecording = false
+            this.cleanupProcess()
             this.emit('stopped')
         })
 
@@ -516,9 +520,24 @@ export class ScreenRecorder extends EventEmitter {
                     const now = Date.now()
                     errorCount++
                     consecutiveErrors++
-                    console.warn(
-                        `⚠️ PulseAudio error detected (${errorCount}/${maxErrors}, consecutive: ${consecutiveErrors}/${maxConsecutiveErrors})`,
+
+                    // Enhanced error logging with context
+                    const memoryUsage = process.memoryUsage()
+                    const memoryMB = Math.round(memoryUsage.rss / 1024 / 1024)
+                    const uptime = Math.round(
+                        (Date.now() - this.recordingStartTime) / 1000,
                     )
+
+                    console.warn(
+                        `⚠️ PulseAudio demuxing error detected (${errorCount}/${maxErrors}, consecutive: ${consecutiveErrors}/${maxConsecutiveErrors})`,
+                    )
+                    console.warn(
+                        `   📊 Context: Memory=${memoryMB}MB, Uptime=${uptime}s, Process=${this.ffmpegProcess?.pid}`,
+                    )
+                    console.warn(`   🔍 Error details: ${output.trim()}`)
+
+                    // Log system resource status
+                    this.logSystemResources()
 
                     // Only emit warning if enough errors accumulate
                     if (
@@ -551,7 +570,7 @@ export class ScreenRecorder extends EventEmitter {
         })
 
         // Reset error count periodically but less frequently
-        setInterval(() => {
+        this.errorMonitorIntervalId = setInterval(() => {
             if (errorCount > 0) {
                 console.log(
                     `🔄 Resetting PulseAudio error count (was ${errorCount})`,
@@ -710,7 +729,7 @@ export class ScreenRecorder extends EventEmitter {
             // Wait for the 'stopped' event instead of 'exit' to ensure upload is complete
             this.once('stopped', () => {
                 this.gracePeriodActive = false
-                this.ffmpegProcess = null
+                this.cleanupProcess()
                 resolve()
             })
 
@@ -720,7 +739,7 @@ export class ScreenRecorder extends EventEmitter {
                     error instanceof Error ? error.message : error,
                 )
                 this.gracePeriodActive = false
-                this.ffmpegProcess = null
+                this.cleanupProcess()
                 reject(error)
             })
 
@@ -728,13 +747,87 @@ export class ScreenRecorder extends EventEmitter {
             this.ffmpegProcess!.kill('SIGINT')
 
             // Fallback force kill after timeout
-            setTimeout(() => {
+            this.forceKillTimeoutId = setTimeout(() => {
                 if (this.ffmpegProcess && !this.ffmpegProcess.killed) {
                     console.warn('⚠️ Force killing FFmpeg process')
                     this.ffmpegProcess.kill('SIGKILL')
                 }
+                this.forceKillTimeoutId = null
             }, 8000)
         })
+    }
+
+    private cleanupProcess(): void {
+        // Log memory usage before cleanup
+        this.logMemoryUsage('Before cleanup')
+
+        // Clear error monitor interval to prevent memory leaks
+        if (this.errorMonitorIntervalId) {
+            clearInterval(this.errorMonitorIntervalId)
+            this.errorMonitorIntervalId = null
+        }
+
+        // Clear force kill timeout to prevent memory leaks
+        if (this.forceKillTimeoutId) {
+            clearTimeout(this.forceKillTimeoutId)
+            this.forceKillTimeoutId = null
+        }
+
+        // Remove all event listeners from stdout/stderr and process to prevent memory leaks
+        if (this.ffmpegProcess) {
+            // Remove listeners from stdout if it exists
+            if (this.ffmpegProcess.stdout) {
+                this.ffmpegProcess.stdout.removeAllListeners()
+            }
+            // Remove listeners from stderr if it exists
+            if (this.ffmpegProcess.stderr) {
+                this.ffmpegProcess.stderr.removeAllListeners()
+            }
+            // Remove all listeners from the process itself
+            this.ffmpegProcess.removeAllListeners()
+            this.ffmpegProcess = null
+        }
+
+        // Log memory usage after cleanup
+        this.logMemoryUsage('After cleanup')
+    }
+
+    private logMemoryUsage(context: string): void {
+        const usage = process.memoryUsage()
+        console.log(
+            `💾 Memory usage ${context}: RSS=${Math.round(usage.rss / 1024 / 1024)}MB, Heap=${Math.round(usage.heapUsed / 1024 / 1024)}MB`,
+        )
+    }
+
+    private logSystemResources(): void {
+        try {
+            // Log FFmpeg process count
+            const { execSync } = require('child_process')
+            const ffmpegCount = execSync('pgrep -c ffmpeg || echo 0', {
+                encoding: 'utf8',
+            }).trim()
+            const pulseCount = execSync('pgrep -c pulseaudio || echo 0', {
+                encoding: 'utf8',
+            }).trim()
+
+            console.warn(
+                `   🔍 System status: FFmpeg processes=${ffmpegCount}, PulseAudio processes=${pulseCount}`,
+            )
+
+            // Log file descriptor count if available
+            try {
+                const fdCount = execSync(`lsof -p ${process.pid} | wc -l`, {
+                    encoding: 'utf8',
+                }).trim()
+                console.warn(`   📁 File descriptors: ${fdCount}`)
+            } catch (e) {
+                // Ignore if lsof not available
+            }
+        } catch (error) {
+            console.warn(
+                `   ⚠️ Could not gather system resource info: ${error}`,
+            )
+        }
     }
 
     public isCurrentlyRecording(): boolean {
@@ -784,7 +877,7 @@ export class ScreenRecorder extends EventEmitter {
                     if (
                         GLOBAL.hasError() &&
                         GLOBAL.getEndReason() ===
-                        MeetingEndReason.BotNotAccepted
+                            MeetingEndReason.BotNotAccepted
                     ) {
                         console.log(
                             'Preserving existing BotNotAccepted error instead of creating BotRemovedTooEarly',
@@ -880,7 +973,7 @@ export class ScreenRecorder extends EventEmitter {
             (this.meetingStartTime -
                 this.recordingStartTime -
                 FLASH_SCREEN_SLEEP_TIME) /
-            1000
+                1000
 
         console.log(`📊 Debug values:`)
         console.log(
