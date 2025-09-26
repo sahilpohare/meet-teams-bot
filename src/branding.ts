@@ -25,8 +25,11 @@ export function generateBranding(
                 )
             }
         })()
-        command.stderr.addListener('data', (data) => {
+        command.stdout.addListener('data', (data) => {
             console.log(data.toString())
+        })
+        command.stderr.addListener('data', (data) => {
+            console.error(data.toString())
         })
 
         return {
