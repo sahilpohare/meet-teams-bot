@@ -4,7 +4,7 @@
 # This script provides an easy way to run the bot in serverless mode
 
 set -e
-alias docker='podman'  # Use podman if docker is not available
+alias docker='podman'  # Use podman if podman is not available
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -41,29 +41,29 @@ generate_uuid() {
     fi
 }
 
-# Check if Docker is available
+# Check if podman is available
 check_docker() {
-    if ! command -v docker &> /dev/null; then
+    if ! command -v podman &> /dev/null; then
         print_error "Docker is not installed or not in PATH"
         print_info "Please install Docker: https://docs.docker.com/get-docker/"
         exit 1
     fi
 }
 
-# Build Docker image
+# Build podman image
 build_image() {
     local image_name=${1:-meet-teams-bot}
     local date_tag
     date_tag=$(date +%Y%m%d-%H%M)
     local full_tag="${image_name}:${date_tag}"
     
-    print_info "Building Meet Teams Bot Docker image..."
+    print_info "Building Meet Teams Bot podman image..."
     print_info "Tagging as: ${full_tag}"
-    docker build -t "${full_tag}" .
+    podman build -t "${full_tag}" .
     print_success "Docker image built successfully: ${full_tag}"
     
     # Also tag as latest for convenience
-    docker tag "${full_tag}" "${image_name}:latest"
+    podman tag "${full_tag}" "${image_name}:latest"
     print_info "Also tagged as: ${image_name}:latest"
     
     # Update the image name for the rest of the script
@@ -77,7 +77,7 @@ create_output_dir() {
     echo "$output_dir"
 }
 
-# Get the current Docker image name
+# Get the current podman image name
 get_docker_image() {
     local image_name=${DOCKER_IMAGE_NAME:-meet-teams-bot:latest}
     echo "$image_name"
@@ -196,7 +196,7 @@ run_with_config() {
         print_info "📱 On Mac, you can use: open vnc://localhost:5900"
     fi
     
-    # Debug: Show what we're sending to Docker (first 200 chars)
+    # Debug: Show what we're sending to podman (first 200 chars)
     local preview=$(echo "$processed_config" | head -c 200)
     print_info "Config preview: ${preview}..."
     
@@ -222,7 +222,7 @@ run_with_config() {
     fi
     
     # Run the bot
-    echo "$processed_config" | docker run -i \
+    echo "$processed_config" | podman run -i \
         $docker_args \
         -e RECORDING="$recording_mode" \
         $debug_env \
@@ -295,7 +295,7 @@ run_with_config_and_overrides() {
         print_info "📱 On Mac, you can use: open vnc://localhost:5900"
     fi
     
-    # Debug: Show what we're sending to Docker (first 200 chars)
+    # Debug: Show what we're sending to podman (first 200 chars)
     local preview=$(echo "$processed_config" | head -c 200)
     print_info "Config preview: ${preview}..."
     
@@ -321,7 +321,7 @@ run_with_config_and_overrides() {
     fi
     
     # Run the bot
-    echo "$processed_config" | docker run -i \
+    echo "$processed_config" | podman run -i \
         $docker_args \
         -e RECORDING="$recording_mode" \
         $debug_env \
@@ -399,7 +399,7 @@ run_with_json() {
         print_info "📱 On Mac, you can use: open vnc://localhost:5900"
     fi
     
-    # Debug: Show what we're sending to Docker (first 200 chars)
+    # Debug: Show what we're sending to podman (first 200 chars)
     local preview=$(echo "$processed_config" | head -c 200)
     print_info "Config preview: ${preview}..."
     
@@ -417,7 +417,7 @@ run_with_json() {
         print_info "🐛 DEBUG logs enabled - verbose speakers logging activated"
     fi
     
-    echo "$processed_config" | docker run -i \
+    echo "$processed_config" | podman run -i \
         $docker_args \
         -e RECORDING="$recording_mode" \
         $debug_env \
@@ -468,7 +468,7 @@ test_recording() {
         print_info "💻 Connect with: open vnc://localhost:5900"
     fi
     
-    # Vérifier que Docker est disponible
+    # Vérifier que podman est disponible
     check_docker
     
     # Vérifier que params.json existe
@@ -479,7 +479,7 @@ test_recording() {
     fi
     
     # Construire l'image si nécessaire
-    if ! docker images | grep -q "$(get_docker_image | cut -d: -f1)"; then
+    if ! podman images | grep -q "$(get_docker_image | cut -d: -f1)"; then
         print_info "Docker image not found, building..."
         build_image
     fi
@@ -628,7 +628,7 @@ test_api_request() {
     print_info "🧪 Testing API request stop functionality"
     print_info "🛑 Will send API stop request after 2 minutes"
     
-    # Check if Docker is available
+    # Check if podman is available
     check_docker
     
     # Check if bot.config.json exists
@@ -639,7 +639,7 @@ test_api_request() {
     fi
     
     # Build image if necessary
-    if ! docker images | grep -q "$(get_docker_image | cut -d: -f1)"; then
+    if ! podman images | grep -q "$(get_docker_image | cut -d: -f1)"; then
         print_info "Docker image not found, building..."
         build_image
     fi
@@ -664,7 +664,7 @@ test_api_request() {
     
     # Start the bot and capture logs
     local log_file="/tmp/api-test-$(date +%s).log"
-    echo "$processed_config" | docker run -i \
+    echo "$processed_config" | podman run -i \
         -p 8080:8080 \
         -e RECORDING=true \
         -v "$(pwd)/$output_dir:/app/data" \
@@ -773,7 +773,7 @@ show_help() {
     echo -e "${BLUE}Meet Teams Bot - Serverless Runner${NC}"
     echo
     echo "Usage:"
-    echo "  $0 build                     - Build the Docker image"
+    echo "  $0 build                     - Build the podman image"
     echo "  $0 run <config_file> [url]   - Run bot with configuration file (optional meeting URL override)"
     echo "  $0 debug <config_file> [url] - Run bot in DEBUG mode (speakers logs + VNC enabled)"
     echo "  $0 run-json '<json>'         - Run bot with JSON configuration"
