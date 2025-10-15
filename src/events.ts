@@ -135,7 +135,7 @@ export class Events {
                     event: 'bot.status_change',
                     data: {
                         bot_id: this.botId,
-                        event_uuid: eventUuid,
+                        event_uuid: eventUuid || null,
                         status: {
                             code,
                             created_at: new Date().toISOString(),
