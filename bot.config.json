@@ -30,5 +30,8 @@
     "aws_s3_temporary_audio_bucket": "local-audio-bucket",
     "remote": null,
     "start_time": 0,
-    "secret": "your-secret-key"
+    "secret": "your-secret-key",
+    "event": {
+        "uuid": "123e4567-e89b-12d3-a456-426614174000"
+    }
 }

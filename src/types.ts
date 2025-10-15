@@ -46,7 +46,9 @@ export type MeetingParams = {
     session_id: string
     email: string
     meetingProvider: MeetingProvider
-    event?: { id: number }
+    event?: {
+        uuid: string
+    }
     agenda?: any
     custom_branding_bot_path?: string
     vocabulary: string[]

@@ -472,6 +472,7 @@ async function notAcceptedInMeeting(page: Page): Promise<boolean> {
         'we encountered a problem joining',
         "You can't join",
         'You left the meeting', // Happens if the bot first entered in the waiting room of the meeting (not the entry page) and then it was denied entry
+        'Your sign-in credentials might have changed',
     ]
 
     // Google Meet itself has denied entry
