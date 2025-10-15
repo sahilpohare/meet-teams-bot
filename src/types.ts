@@ -47,16 +47,7 @@ export type MeetingParams = {
     email: string
     meetingProvider: MeetingProvider
     event?: {
-        id: number
         uuid: string
-        account_id: number
-        title: string
-        start_time: string
-        end_time: string
-        meeting_url: string
-        bot_param_id?: number
-        created_at: string
-        updated_at: string
     }
     agenda?: any
     custom_branding_bot_path?: string
