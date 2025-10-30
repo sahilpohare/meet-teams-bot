@@ -1,0 +1,45 @@
+# Azure Functions on Container Apps - Bot Scheduler
+# Optimized for Azure Functions runtime on Container Apps
+#
+# This is the SCHEDULER that triggers jobs, not the bot itself
+# Bot image: meet-teams-bot
+# Scheduler image: bot-scheduler
+
+FROM mcr.microsoft.com/azure-functions/node:4-node20-slim
+
+# Set working directory
+WORKDIR /home/site/wwwroot
+
+# Install Bun for better performance
+RUN apt-get update && apt-get install -y curl bash && \
+    curl -fsSL https://bun.sh/install | bash && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+ENV PATH="/root/.bun/bin:${PATH}"
+
+# Copy package files
+COPY package.json bun.lock* package-lock.json* ./
+
+# Install production dependencies
+RUN bun install --frozen-lockfile --production
+
+# Copy application files
+COPY . .
+
+# Build TypeScript
+RUN bun run build
+
+# Copy Functions host configuration
+COPY host.json ./
+COPY local.settings.json ./
+
+# Environment variables for Azure Functions
+ENV AzureWebJobsScriptRoot=/home/site/wwwroot \
+    AzureFunctionsJobHost__Logging__Console__IsEnabled=true \
+    FUNCTIONS_WORKER_RUNTIME=node \
+    PLATFORM=azure
+
+# Expose the default Azure Functions port
+EXPOSE 80
+
+CMD [ "node", "/azure-functions-host/Microsoft.Azure.WebJobs.Script.WebHost" ]

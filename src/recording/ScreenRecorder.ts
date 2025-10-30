@@ -12,6 +12,7 @@ import { HtmlSnapshotService } from '../services/html-snapshot-service'
 import { calculateVideoOffset } from '../utils/CalculVideoOffset'
 import { PathManager } from '../utils/PathManager'
 import { S3Uploader } from '../utils/S3Uploader'
+import { StorageUploader } from '../utils/StorageUploader'
 import { sleep } from '../utils/sleep'
 import { generateSyncSignal } from '../utils/SyncSignal'
 
@@ -610,7 +611,8 @@ export class ScreenRecorder extends EventEmitter {
         chunksDir: string,
         botUuid: string,
     ): Promise<void> {
-        if (!S3Uploader.getInstance()) return
+        const storageUploader = StorageUploader.getInstance()
+        if (!storageUploader) return
 
         try {
             const files = fs.readdirSync(chunksDir)
@@ -620,6 +622,9 @@ export class ScreenRecorder extends EventEmitter {
             )
 
             console.log(`📤 Uploading ${chunkFiles.length} audio chunks...`)
+
+            // Ensure audio container exists (for Azure)
+            await storageUploader.ensureContainerExists()
 
             for (const filename of chunkFiles) {
                 const chunkPath = path.join(chunksDir, filename)
@@ -636,15 +641,14 @@ export class ScreenRecorder extends EventEmitter {
                         continue
                     }
 
-                    const s3Key = `${botUuid}/${filename}`
                     console.log(
                         `📤 Uploading chunk: ${filename} (${stats.size} bytes)`,
                     )
 
-                    await S3Uploader.getInstance().uploadFile(
+                    await storageUploader.uploadFile(
                         chunkPath,
-                        GLOBAL.get().aws_s3_temporary_audio_bucket,
-                        s3Key,
+                        'chunk',
+                        filename,
                     )
 
                     console.log(`✅ Chunk uploaded: ${filename}`)

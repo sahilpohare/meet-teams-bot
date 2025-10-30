@@ -1,0 +1,19 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "NODE_ENV": "development",
+    "PLATFORM": "azure",
+    "SCHEDULER_MAX_CONCURRENT_JOBS": "100",
+    "SCHEDULER_CONTAINER_IMAGE": "your-acr.azurecr.io/meet-teams-bot:latest",
+    "AZURE_RESOURCE_GROUP": "your-resource-group",
+    "AZURE_JOB_NAME": "your-container-job-name",
+    "AZURE_LOCATION": "eastus"
+  },
+  "Host": {
+    "LocalHttpPort": 7071,
+    "CORS": "*",
+    "CORSCredentials": false
+  }
+}

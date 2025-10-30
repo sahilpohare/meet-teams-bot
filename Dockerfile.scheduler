@@ -1,0 +1,85 @@
+# Meeting Bot Scheduler - Docker Image
+# Lightweight API server for job scheduling and orchestration
+FROM ubuntu:24.04
+
+# Install Bun
+RUN apt-get update && apt-get install -y curl ca-certificates unzip && \
+    curl -fsSL https://bun.sh/install | bash && \
+    rm -rf /var/lib/apt/lists/*
+
+ENV PATH="/root/.bun/bin:${PATH}"
+
+# Install Docker/Podman CLI (for local container management)
+RUN apt-get update && apt-get install -y \
+    docker.io \
+    && rm -rf /var/lib/apt/lists/*
+
+# Optional: Install kubectl for Kubernetes support
+# Uncomment if deploying to Kubernetes
+# RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && \
+#     install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl && \
+#     rm kubectl
+
+# Optional: Install Azure CLI for Azure Container Jobs support
+# Uncomment if using Azure Container Jobs
+# RUN curl -sL https://aka.ms/InstallAzureCLIDeb | bash
+
+# Optional: Install gcloud CLI for GCP Cloud Run support
+# Uncomment if using GCP Cloud Run
+# RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | \
+#     tee -a /etc/apt/sources.list.d/google-cloud-sdk.list && \
+#     curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | \
+#     apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - && \
+#     apt-get update && apt-get install -y google-cloud-cli
+
+# Application setup
+WORKDIR /app
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile
+
+# Build application
+COPY . .
+RUN bun run build
+
+# Environment configuration
+ENV NODE_ENV=production
+ENV PORT=3000
+ENV PLATFORM=podman
+ENV SCHEDULER_MAX_CONCURRENT_JOBS=10
+ENV SCHEDULER_CONTAINER_IMAGE=meet-teams-bot:latest
+
+# Expose scheduler API port
+EXPOSE 3000
+
+# Create entrypoint script
+RUN echo '#!/bin/bash\n\
+set -e\n\
+\n\
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"\n\
+echo "   🤖 Meeting Bot Scheduler"\n\
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"\n\
+echo ""\n\
+echo "Configuration:"\n\
+echo "  Platform:        ${PLATFORM}"\n\
+echo "  Port:            ${PORT}"\n\
+echo "  Max Jobs:        ${SCHEDULER_MAX_CONCURRENT_JOBS}"\n\
+echo "  Container Image: ${SCHEDULER_CONTAINER_IMAGE}"\n\
+echo ""\n\
+\n\
+# Check if running with Docker socket mount\n\
+if [ -S /var/run/docker.sock ]; then\n\
+    echo "✅ Docker socket detected at /var/run/docker.sock"\n\
+elif [ "${PLATFORM}" = "podman" ] || [ "${PLATFORM}" = "docker" ]; then\n\
+    echo "⚠️  Warning: Docker/Podman platform selected but no socket found"\n\
+    echo "   Mount Docker socket: -v /var/run/docker.sock:/var/run/docker.sock"\n\
+fi\n\
+\n\
+# Start scheduler server\n\
+echo ""\n\
+echo "🚀 Starting scheduler server..."\n\
+echo ""\n\
+cd /app/\n\
+exec bun run build/src/scheduler-server.js\n\
+' > /start.sh && chmod +x /start.sh
+
+ENTRYPOINT ["/start.sh"]

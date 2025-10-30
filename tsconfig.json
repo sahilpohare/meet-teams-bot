@@ -17,6 +17,7 @@
     "resolveJsonModule": true,
     "strictNullChecks": false,
     "esModuleInterop": true,
+    "skipLibCheck": true,
     "types": ["jest", "node"],
     "outDir": "./build"
   },
@@ -24,8 +25,9 @@
     "src/**/*",
     "__tests__/**/*",
     "jest.config.js",
-    "jest.setup.ts"
-, "sandbox/SystemDiagnostic.ts"  ],
+    "jest.setup.ts",
+    "sandbox/SystemDiagnostic.ts"
+  ],
   "exclude": ["node_modules"]
 }
   

@@ -81,6 +81,11 @@ export type MeetingParams = {
     // ----------------- TODO -------------------- SECTION RAJOUTEE
     environ: string // local, prod or preprod
     aws_s3_temporary_audio_bucket: string
+    azure_storage?: {
+        container_name: string
+        blob_path_template: string // e.g., "/project_id/meetings/{meeting_id}"
+    }
+    storage_provider?: 'aws' | 'azure'
     remote: {
         api_server_baseurl: string
         aws_s3_video_bucket: string

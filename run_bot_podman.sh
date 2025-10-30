@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# Meet Teams Bot - Serverless Runner
-# This script provides an easy way to run the bot in serverless mode
-
 set -e
 alias docker='podman'  # Use podman if podman is not available
 # Colors for output
