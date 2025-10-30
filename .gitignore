@@ -34,3 +34,4 @@ yarn.lock
 .DS_Store
 buildInfo.json
 .env
+.env.scheduler
