@@ -91,7 +91,13 @@ if ! pactl list sources short | grep -q "virtual_speaker.monitor"; then\n\
     echo "❌ virtual_speaker.monitor not found - audio setup failed"\n\
     exit 1\n\
 fi\n\
-\necho "✅ Virtual display and audio ready"\n\necho "🔍 VNC available at localhost:5900 (password: debug)"\n\n# Start application\ncd /app/\nbun run build/src/main.js\n\n# Cleanup on exit\ntrap "kill $PULSE_PID $VNC_PID $XVFB_PID 2>/dev/null || true" EXIT\n' > /start.sh && chmod +x /start.sh
+\necho "✅ Virtual display and audio ready"\n\necho "🔍 VNC available at localhost:5900 (password: debug)"\n\n# Start application\ncd /app/\n\n# Check if BOT_CONFIG env var is set (for Azure/serverless deployment)\nif [ -n "$BOT_CONFIG" ]; then\n\
+    echo "🤖 Starting bot with BOT_CONFIG from environment variable"\n\
+    echo "$BOT_CONFIG" | bun run build/src/main.js\n\
+else\n\
+    echo "🤖 Starting bot (expecting config from stdin)"\n\
+    bun run build/src/main.js\n\
+fi\n\n# Cleanup on exit\ntrap "kill $PULSE_PID $VNC_PID $XVFB_PID 2>/dev/null || true" EXIT\n' > /start.sh && chmod +x /start.sh
 
 # Expose VNC port for debugging
 EXPOSE 5900
