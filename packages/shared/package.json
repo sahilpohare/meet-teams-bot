@@ -1,0 +1,18 @@
+{
+  "name": "@meet-teams-bot/shared",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Shared utilities and types for meeting bot monorepo",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "tslib": "^2.8.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.4"
+  }
+}

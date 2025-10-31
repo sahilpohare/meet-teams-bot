@@ -13,6 +13,11 @@ coverage
 
 # Transpiled files
 build/
+dist/
+dist-deploy/
+apps/*/dist/
+apps/*/dist-deploy/
+packages/*/dist/
 
 # VS Code
 .vscode
@@ -24,8 +29,9 @@ build/
 # Optional npm cache directory
 .npm
 
-# Prevent yarn usage (project uses npm)
+# Prevent yarn/npm usage (project uses bun)
 yarn.lock
+package-lock.json
 
 # Optional eslint cache
 .eslintcache
@@ -34,4 +40,9 @@ yarn.lock
 .DS_Store
 buildInfo.json
 .env
-.env.scheduler
+.env.*
+!.env.example
+
+# Recordings and data
+recordings/
+data/

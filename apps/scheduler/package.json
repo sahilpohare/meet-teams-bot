@@ -1,0 +1,31 @@
+{
+  "name": "@meet-teams-bot/scheduler",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Azure Functions scheduler for meeting bot",
+  "main": "dist/functions/scheduler.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "func host start",
+    "start": "func host start",
+    "clean": "rimraf dist",
+    "deploy": "node scripts/deploy.js"
+  },
+  "dependencies": {
+    "@azure/arm-appcontainers": "^3.0.0",
+    "@azure/functions": "^4.8.0",
+    "@azure/identity": "^4.13.0",
+    "@hono/node-server": "^1.19.5",
+    "@hono/swagger-ui": "^0.5.2",
+    "@hono/zod-openapi": "^1.1.4",
+    "hono": "^4.10.4",
+    "tslib": "^2.8.1",
+    "winston": "^3.17.0",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/node": "~14.14.45",
+    "typescript": "^5.4"
+  },
+  "packageManager": "bun@1.3.1"
+}

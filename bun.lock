@@ -13,11 +13,12 @@
         "@hono/node-server": "^1.19.5",
         "@hono/swagger-ui": "^0.5.2",
         "@hono/zod-openapi": "^1.1.4",
+        "@marplex/hono-azurefunc-adapter": "^1.0.1",
         "@playwright/test": "^1.53.0",
         "async": "^3.2.6",
         "axios": "0.21.1",
         "express": "4.17.1",
-        "hono": "^4.9.12",
+        "hono": "^4.10.4",
         "retry-axios": "^2.5.0",
         "tslib": "^2.8.1",
         "uuid": "^13.0.0",
@@ -33,13 +34,71 @@
         "@types/uuid": "^11.0.0",
         "@types/ws": "8.5.12",
         "depcheck": "^1.4.7",
+        "pnpm": "^10.20.0",
         "prettier": "3.3.3",
         "rimraf": "~3.0.2",
         "ts-jest": "^29.2.5",
         "ts-node-dev": "^2.0.0",
         "ts-unused-exports": "^11.0.1",
+        "turbo": "^2.5.8",
         "typescript": "^5.4",
         "unimported": "^1.31.0",
+      },
+    },
+    "apps/bot": {
+      "name": "@meet-teams-bot/bot",
+      "version": "1.0.0",
+      "dependencies": {
+        "@aws-sdk/client-s3": "^3.873.0",
+        "@aws-sdk/lib-storage": "^3.873.0",
+        "@azure/storage-blob": "^12.29.1",
+        "@playwright/test": "^1.53.0",
+        "async": "^3.2.6",
+        "axios": "0.21.1",
+        "express": "4.17.1",
+        "retry-axios": "^2.5.0",
+        "tslib": "^2.8.1",
+        "uuid": "^13.0.0",
+        "winston": "^3.17.0",
+        "ws": "8.18.0",
+      },
+      "devDependencies": {
+        "@types/async": "^3.2.24",
+        "@types/express": "^4.17.11",
+        "@types/node": "~14.14.45",
+        "@types/uuid": "^11.0.0",
+        "@types/ws": "8.5.12",
+        "typescript": "^5.4",
+      },
+    },
+    "apps/scheduler": {
+      "name": "@meet-teams-bot/scheduler",
+      "version": "1.0.0",
+      "dependencies": {
+        "@azure/arm-appcontainers": "^3.0.0",
+        "@azure/functions": "^4.8.0",
+        "@azure/identity": "^4.13.0",
+        "@hono/node-server": "^1.19.5",
+        "@hono/swagger-ui": "^0.5.2",
+        "@hono/zod-openapi": "^1.1.4",
+        "hono": "^4.10.4",
+        "tslib": "^2.8.1",
+        "winston": "^3.17.0",
+        "zod": "^4.1.12",
+      },
+      "devDependencies": {
+        "@types/node": "~14.14.45",
+        "typescript": "^5.4",
+      },
+    },
+    "packages/shared": {
+      "name": "@meet-teams-bot/shared",
+      "version": "1.0.0",
+      "dependencies": {
+        "tslib": "^2.8.1",
+      },
+      "devDependencies": {
+        "typescript": "^5.4",
       },
     },
   },
@@ -307,6 +366,14 @@
     "@kwsites/file-exists": ["@kwsites/file-exists@1.1.1", "", { "dependencies": { "debug": "^4.1.1" } }, "sha512-m9/5YGR18lIwxSFDwfE3oA7bWuq9kdau6ugN4H2rJeyhFQZcG9AgSHkQtSD15a8WvTgfz9aikZMrKPHvbpqFiw=="],
 
     "@kwsites/promise-deferred": ["@kwsites/promise-deferred@1.1.1", "", {}, "sha512-GaHYm+c0O9MjZRu0ongGBRbinu8gVAMd2UZjji6jVmqKtZluZnptXGWhz1E8j8D2HJ3f/yMxKAUC0b+57wncIw=="],
+
+    "@marplex/hono-azurefunc-adapter": ["@marplex/hono-azurefunc-adapter@1.0.1", "", {}, "sha512-2hW13KsHj7SYLJ7sjfkenPVLmJZrDnHwhTmN+1KtS8nou7MhSqNNdnd3eIMSA7O6rk7d+tupWGso0Tz69nIbnw=="],
+
+    "@meet-teams-bot/bot": ["@meet-teams-bot/bot@workspace:apps/bot"],
+
+    "@meet-teams-bot/scheduler": ["@meet-teams-bot/scheduler@workspace:apps/scheduler"],
+
+    "@meet-teams-bot/shared": ["@meet-teams-bot/shared@workspace:packages/shared"],
 
     "@nodelib/fs.scandir": ["@nodelib/fs.scandir@2.1.5", "", { "dependencies": { "@nodelib/fs.stat": "2.0.5", "run-parallel": "^1.1.9" } }, "sha512-vq24Bq3ym5HEQm2NKCr3yXDwjc7vTsEThRDnkp2DK9p1uqLR+DHurm/NOTo0KG7HYHU7eppKZj3MyqYuMBf62g=="],
 
@@ -832,7 +899,7 @@
 
     "homedir-polyfill": ["homedir-polyfill@1.0.3", "", { "dependencies": { "parse-passwd": "^1.0.0" } }, "sha512-eSmmWE5bZTK2Nou4g0AI3zZ9rswp7GRKoKXS1BLUkvPviOqs4YTN1djQIqrXy9k5gEtdLPy86JjRwsNM9tnDcA=="],
 
-    "hono": ["hono@4.10.3", "", {}, "sha512-2LOYWUbnhdxdL8MNbNg9XZig6k+cZXm5IjHn2Aviv7honhBMOHb+jxrKIeJRZJRmn+htUCKhaicxwXuUDlchRA=="],
+    "hono": ["hono@4.10.4", "", {}, "sha512-YG/fo7zlU3KwrBL5vDpWKisLYiM+nVstBQqfr7gCPbSYURnNEP9BDxEMz8KfsDR9JX0lJWDRNc6nXX31v7ZEyg=="],
 
     "hosted-git-info": ["hosted-git-info@2.8.9", "", {}, "sha512-mxIDAb9Lsm6DoOJ7xH+5+X4y1LU/4Hi50L9C5sIswK3JzULS4bwk1FvjdBgvYR4bzT4tuUQiC15FE2f5HbLvYw=="],
 
@@ -1140,6 +1207,8 @@
 
     "please-upgrade-node": ["please-upgrade-node@3.2.0", "", { "dependencies": { "semver-compare": "^1.0.0" } }, "sha512-gQR3WpIgNIKwBMVLkpMUeR3e1/E1y42bqDQZfql+kDeXd8COYfM8PQA4X6y7a8u9Ua9FHmsrrmirW2vHs45hWg=="],
 
+    "pnpm": ["pnpm@10.20.0", "", { "bin": { "pnpm": "bin/pnpm.cjs", "pnpx": "bin/pnpx.cjs" } }, "sha512-z5mYIiFi3YWGTQqBAueJLnukzq3rv1ox+cL85I384xepxTufZGTR75BCy6LgKuAqn3wUOitDjNk8kYQPAZK53Q=="],
+
     "postcss": ["postcss@8.5.6", "", { "dependencies": { "nanoid": "^3.3.11", "picocolors": "^1.1.1", "source-map-js": "^1.2.1" } }, "sha512-3Ybi1tAuwAP9s0r1UQ2J4n5Y0G05bJkpUIO0/bI9MhwmD70S5aTWbXGBwxHrelT+XM1k6dM0pk+SwNkpTRN7Pg=="],
 
     "prelude-ls": ["prelude-ls@1.2.1", "", {}, "sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g=="],
@@ -1307,6 +1376,20 @@
     "tsconfig-paths": ["tsconfig-paths@3.15.0", "", { "dependencies": { "@types/json5": "^0.0.29", "json5": "^1.0.2", "minimist": "^1.2.6", "strip-bom": "^3.0.0" } }, "sha512-2Ac2RgzDe/cn48GvOe3M+o82pEFewD3UPbyoUHHdKasHwJKjds4fLXWf/Ux5kATBKN20oaFGu+jbElp1pos0mg=="],
 
     "tslib": ["tslib@2.8.1", "", {}, "sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w=="],
+
+    "turbo": ["turbo@2.5.8", "", { "optionalDependencies": { "turbo-darwin-64": "2.5.8", "turbo-darwin-arm64": "2.5.8", "turbo-linux-64": "2.5.8", "turbo-linux-arm64": "2.5.8", "turbo-windows-64": "2.5.8", "turbo-windows-arm64": "2.5.8" }, "bin": { "turbo": "bin/turbo" } }, "sha512-5c9Fdsr9qfpT3hA0EyYSFRZj1dVVsb6KIWubA9JBYZ/9ZEAijgUEae0BBR/Xl/wekt4w65/lYLTFaP3JmwSO8w=="],
+
+    "turbo-darwin-64": ["turbo-darwin-64@2.5.8", "", { "os": "darwin", "cpu": "x64" }, "sha512-Dh5bCACiHO8rUXZLpKw+m3FiHtAp2CkanSyJre+SInEvEr5kIxjGvCK/8MFX8SFRjQuhjtvpIvYYZJB4AGCxNQ=="],
+
+    "turbo-darwin-arm64": ["turbo-darwin-arm64@2.5.8", "", { "os": "darwin", "cpu": "arm64" }, "sha512-f1H/tQC9px7+hmXn6Kx/w8Jd/FneIUnvLlcI/7RGHunxfOkKJKvsoiNzySkoHQ8uq1pJnhJ0xNGTlYM48ZaJOQ=="],
+
+    "turbo-linux-64": ["turbo-linux-64@2.5.8", "", { "os": "linux", "cpu": "x64" }, "sha512-hMyvc7w7yadBlZBGl/bnR6O+dJTx3XkTeyTTH4zEjERO6ChEs0SrN8jTFj1lueNXKIHh1SnALmy6VctKMGnWfw=="],
+
+    "turbo-linux-arm64": ["turbo-linux-arm64@2.5.8", "", { "os": "linux", "cpu": "arm64" }, "sha512-LQELGa7bAqV2f+3rTMRPnj5G/OHAe2U+0N9BwsZvfMvHSUbsQ3bBMWdSQaYNicok7wOZcHjz2TkESn1hYK6xIQ=="],
+
+    "turbo-windows-64": ["turbo-windows-64@2.5.8", "", { "os": "win32", "cpu": "x64" }, "sha512-3YdcaW34TrN1AWwqgYL9gUqmZsMT4T7g8Y5Azz+uwwEJW+4sgcJkIi9pYFyU4ZBSjBvkfuPZkGgfStir5BBDJQ=="],
+
+    "turbo-windows-arm64": ["turbo-windows-arm64@2.5.8", "", { "os": "win32", "cpu": "arm64" }, "sha512-eFC5XzLmgXJfnAK3UMTmVECCwuBcORrWdewoiXBnUm934DY6QN8YowC/srhNnROMpaKaqNeRpoB5FxCww3eteQ=="],
 
     "type-check": ["type-check@0.4.0", "", { "dependencies": { "prelude-ls": "^1.2.1" } }, "sha512-XleUoc9uwGXqjWwXaUTZAmzMcFZ5858QA2vvx1Ur5xIcixXIP+8LnFDgRplU30us6teqdlskFfu+ae4K79Ooew=="],
 
