@@ -46,7 +46,7 @@ ENV DISPLAY=:99
 ENV PULSE_RUNTIME_PATH=/tmp/pulse
 ENV XDG_RUNTIME_DIR=/tmp/pulse
 
-# Create optimized startup script
+# Create optimized startup script with Xvfb monitoring
 RUN echo '#!/bin/bash\n\
 set -e\n\
 \necho "🖥️ Starting virtual display and audio..."\n\
@@ -54,14 +54,77 @@ export DISPLAY=:99\n\
 export PULSE_RUNTIME_PATH=/tmp/pulse\n\
 export XDG_RUNTIME_DIR=/tmp/pulse\n\
 mkdir -p $PULSE_RUNTIME_PATH\n\
-\n# Start virtual display with enhanced cursor hiding\n\
-Xvfb :99 -screen 0 1280x880x24 -ac +extension GLX +render -noreset -nocursor -nolisten tcp &\n\
-XVFB_PID=$!\n\
+\n# Function to start Xvfb with monitoring\n\
+start_xvfb() {\n\
+    echo "🔄 Starting Xvfb on display :99..."\n\
+    # Clean up any stale lock files\n\
+    rm -f /tmp/.X99-lock /tmp/.X11-unix/X99 2>/dev/null || true\n\
+    \n\
+    # Start Xvfb with proper logging\n\
+    Xvfb :99 -screen 0 1280x880x24 -ac +extension GLX +render -noreset \\\n\
+        -nocursor -nolisten tcp > /tmp/xvfb.log 2>&1 &\n\
+    XVFB_PID=$!\n\
+    \n\
+    # Wait for X server to be ready\n\
+    local max_attempts=30\n\
+    local attempt=0\n\
+    while [ $attempt -lt $max_attempts ]; do\n\
+        if xdpyinfo -display :99 >/dev/null 2>&1; then\n\
+            echo "✅ Xvfb started successfully (PID: $XVFB_PID)"\n\
+            return 0\n\
+        fi\n\
+        attempt=$((attempt + 1))\n\
+        sleep 0.5\n\
+    done\n\
+    \n\
+    echo "❌ Xvfb failed to start after $max_attempts attempts"\n\
+    cat /tmp/xvfb.log\n\
+    return 1\n\
+}\n\
+\n# Xvfb watchdog - monitors and restarts Xvfb if it dies\n\
+xvfb_watchdog() {\n\
+    local restart_count=0\n\
+    local max_restarts=10\n\
+    \n\
+    while true; do\n\
+        sleep 10\n\
+        \n\
+        # Check if Xvfb process is still running\n\
+        if ! kill -0 $XVFB_PID 2>/dev/null; then\n\
+            restart_count=$((restart_count + 1))\n\
+            echo "⚠️  Xvfb died (restart $restart_count/$max_restarts)"\n\
+            \n\
+            if [ $restart_count -ge $max_restarts ]; then\n\
+                echo "❌ Xvfb crashed too many times, giving up"\n\
+                exit 1\n\
+            fi\n\
+            \n\
+            # Restart Xvfb\n\
+            start_xvfb || exit 1\n\
+        fi\n\
+        \n\
+        # Also verify X display is actually responsive\n\
+        if ! xdpyinfo -display :99 >/dev/null 2>&1; then\n\
+            echo "⚠️  Xvfb unresponsive, restarting..."\n\
+            kill $XVFB_PID 2>/dev/null || true\n\
+            sleep 1\n\
+            start_xvfb || exit 1\n\
+        fi\n\
+    done\n\
+}\n\
+\n# Start Xvfb with initial setup\n\
+start_xvfb || exit 1\n\
+\n# Start watchdog in background\n\
+xvfb_watchdog &\n\
+WATCHDOG_PID=$!\n\
 \n# Hide cursor completely at X11 level\n\
 sleep 2\n\
 unclutter -display :99 -idle 0 -root &\n\
+UNCLUTTER_PID=$!\n\
 \n# Start VNC server for debugging with cursor disabled\n\
-x11vnc -display :99 -forever -passwd debug -listen 0.0.0.0 -rfbport 5900 \\\n    -shared -noxdamage -noxfixes -noscr -fixscreen 3 -bg -o /tmp/x11vnc.log \\\n    -nocursor -noxfixes -nomodtweak &\n\
+x11vnc -display :99 -forever -passwd debug -listen 0.0.0.0 -rfbport 5900 \\\n\
+    -shared -noxdamage -noxfixes -noscr -fixscreen 3 -bg -o /tmp/x11vnc.log \\\n\
+    -nocursor -noxfixes -nomodtweak &\n\
 VNC_PID=$!\n\
 \n# Initialize PulseAudio\n\
 pulseaudio --start --log-target=stderr --log-level=notice &\n\
@@ -93,13 +156,15 @@ if ! pactl list sources short | grep -q "virtual_speaker.monitor"; then\n\
     echo "❌ virtual_speaker.monitor not found - audio setup failed"\n\
     exit 1\n\
 fi\n\
-\necho "✅ Virtual display and audio ready"\n\necho "🔍 VNC available at localhost:5900 (password: debug)"\n\n# Start application\ncd /app/\n\n# Check if BOT_CONFIG env var is set (for Azure/serverless deployment)\nif [ -n "$BOT_CONFIG" ]; then\n\
+\necho "✅ Virtual display and audio ready"\n\
+echo "🔍 VNC available at localhost:5900 (password: debug)"\n\
+echo "🛡️  Xvfb watchdog monitoring enabled"\n\n# Start application\ncd /app/\n\n# Check if BOT_CONFIG env var is set (for Azure/serverless deployment)\nif [ -n "$BOT_CONFIG" ]; then\n\
     echo "🤖 Starting bot with BOT_CONFIG from environment variable"\n\
     echo "$BOT_CONFIG" | bun run dist/main.js\n\
 else\n\
     echo "🤖 Starting bot (expecting config from stdin)"\n\
     bun run dist/main.js\n\
-fi\n\n# Cleanup on exit\ntrap "kill $PULSE_PID $VNC_PID $XVFB_PID 2>/dev/null || true" EXIT\n' > /start.sh && chmod +x /start.sh
+fi\n\n# Cleanup on exit\ntrap "kill $WATCHDOG_PID $PULSE_PID $VNC_PID $UNCLUTTER_PID $XVFB_PID 2>/dev/null || true" EXIT\n' > /start.sh && chmod +x /start.sh
 
 # Expose VNC port for debugging
 EXPOSE 5900

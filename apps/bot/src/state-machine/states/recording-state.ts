@@ -34,9 +34,13 @@ export class RecordingState extends BaseState {
 
             // Meeting start time should already be set in InCallState
             // Just verify it's set, and use current time as fallback
+            const startTime = Date.now()
+            // Note: startTime is already set in in-call state to prevent race conditions
+            // Only set it here if it wasn't set earlier (fallback)
             if (!this.context.startTime) {
-                console.warn('startTime not set in context, using current time as fallback')
-                this.context.startTime = Date.now()
+                this.context.startTime = startTime
+                ScreenRecorderManager.getInstance().setMeetingStartTime(startTime)
+                console.log('Fallback: Meeting start time set in recording state')
             }
 
             // Initialize noSpeakerDetectedTime if not already set (for meetings with no participants)
@@ -316,7 +320,7 @@ export class RecordingState extends BaseState {
 
         // Check if we should consider ending due to no attendees
         const nooneJoinedTimeoutMs = GLOBAL.get().automatic_leave.noone_joined_timeout * 1000
-        const noAttendeesTimeout:boolean =
+        const noAttendeesTimeout: boolean =
             startTime + nooneJoinedTimeoutMs < now
         const shouldConsiderEnding = noAttendeesTimeout || firstUserJoined
 

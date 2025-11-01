@@ -1,6 +1,7 @@
 import { Events } from '../../events'
 import { HtmlCleaner } from '../../meeting/htmlCleaner'
 import { SpeakersObserver } from '../../meeting/speakersObserver'
+import { ScreenRecorderManager } from '../../recording/ScreenRecorder'
 import { GLOBAL } from '../../singleton'
 import { SpeakerManager } from '../../speaker-manager'
 import { MEETING_CONSTANTS } from '../constants'
@@ -70,6 +71,13 @@ export class InCallState extends BaseState {
                 'Setting up browser components with integrated HTML cleanup...',
             )
 
+            // fix: Set meeting start time BEFORE starting speakers observation
+            // This prevents race condition where speakers are detected before startTime is set
+            const startTime = Date.now()
+            this.context.startTime = startTime
+            ScreenRecorderManager.getInstance().setMeetingStartTime(startTime)
+            console.log(`Meeting start time set to: ${startTime} (${new Date(startTime).toISOString()})`)
+
             // Start HTML cleanup first to clean the interface
             await this.startHtmlCleaning()
         } catch (error) {
@@ -94,7 +102,6 @@ export class InCallState extends BaseState {
 
         // Set meeting start time for audio sync calculations
         // This should be set when bot actually joins the call, not in RecordingState
-        const { ScreenRecorderManager } = await import('../../recording/ScreenRecorder')
         const meetingJoinTime = Date.now()
         this.context.startTime = meetingJoinTime
         ScreenRecorderManager.getInstance().setMeetingStartTime(meetingJoinTime)

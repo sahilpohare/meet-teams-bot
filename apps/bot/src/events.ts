@@ -95,7 +95,7 @@ export class Events {
         private botId: string,
         private apiKey: string,
         private webhookUrl: string,
-    ) {}
+    ) { }
 
     /**
      * Send an event only once - prevents duplicate webhooks
@@ -120,6 +120,9 @@ export class Events {
         additionalData: Record<string, any> = {},
     ): Promise<void> {
         try {
+            const eventUuid = GLOBAL.get().event?.uuid
+
+
             await axios({
                 method: 'POST',
                 url: this.webhookUrl,
@@ -132,6 +135,7 @@ export class Events {
                     event: 'bot.status_change',
                     data: {
                         bot_id: this.botId,
+                        event_uuid: eventUuid || null,
                         status: {
                             code,
                             created_at: new Date().toISOString(),

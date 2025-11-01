@@ -113,10 +113,10 @@ export class SimpleDialogObserver {
             customTimeout === 0
                 ? TIMEOUTS
                 : {
-                      VISIBLE_TIMEOUT: customTimeout,
-                      CLICK_TIMEOUT: customTimeout,
-                      PAGE_TIMEOUT: customTimeout,
-                  }
+                    VISIBLE_TIMEOUT: customTimeout,
+                    CLICK_TIMEOUT: customTimeout,
+                    PAGE_TIMEOUT: customTimeout,
+                }
 
         try {
             // Google Meet specific modal patterns
@@ -161,6 +161,12 @@ export class SimpleDialogObserver {
                     name: 'recording_notification',
                     selector:
                         'div[role="dialog"]:has-text("video call is being recorded"):has(button)',
+                    buttonTexts: ['Join now'],
+                },
+                {
+                    name: 'transcribe_notification',
+                    selector:
+                        'div[role="dialog"]:has-text("This video call is being transcribed"):has(button)',
                     buttonTexts: ['Join now'],
                 },
                 // Generic dismiss modals (fallback)

@@ -46,7 +46,9 @@ export type MeetingParams = {
     session_id: string
     email: string
     meetingProvider: MeetingProvider
-    event?: { id: number }
+    event?: {
+        uuid: string
+    }
     agenda?: any
     custom_branding_bot_path?: string
     vocabulary: string[]
@@ -95,6 +97,8 @@ export type MeetingParams = {
     extra?: any
     zoom_sdk_id?: string
     zoom_sdk_pwd?: string
+    start_time?: number
+    exit_time?: number
 }
 
 export type StopRecordParams = {

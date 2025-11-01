@@ -1,7 +1,7 @@
 {
     "id": "meeting-bot-session",
     "use_my_vocabulary": false,
-    "meeting_url": "https://meet.google.com/qho-egyq-osd",
+    "meeting_url": "https://meet.google.com/nfv-hupd-bnr",
     "user_token": "dummy-token-for-production",
     "bot_name": "Recording Bot",
     "user_id": 1243,
@@ -34,5 +34,9 @@
         "blob_path_template": "/testing/meetings/{meeting_id}"
     },
     "remote": null,
-    "secret": "your-secret-key"
+    "start_time": 0,
+    "secret": "your-secret-key",
+    "event": {
+        "uuid": "123e4567-e89b-12d3-a456-426614174000"
+    }
 }

@@ -710,6 +710,10 @@ export class ScreenRecorder extends EventEmitter {
             return
         }
 
+        const exitTime = Math.floor(Date.now() / 1000)
+        console.log(`Bot exit time captured as ${exitTime}`)
+        GLOBAL.setExitTime(exitTime)
+
         console.log('🛑 Stop recording requested - starting grace period...')
         this.gracePeriodActive = true
 
@@ -881,7 +885,7 @@ export class ScreenRecorder extends EventEmitter {
                     if (
                         GLOBAL.hasError() &&
                         GLOBAL.getEndReason() ===
-                            MeetingEndReason.BotNotAccepted
+                        MeetingEndReason.BotNotAccepted
                     ) {
                         console.log(
                             'Preserving existing BotNotAccepted error instead of creating BotRemovedTooEarly',
@@ -977,7 +981,7 @@ export class ScreenRecorder extends EventEmitter {
             (this.meetingStartTime -
                 this.recordingStartTime -
                 FLASH_SCREEN_SLEEP_TIME) /
-                1000
+            1000
 
         console.log(`📊 Debug values:`)
         console.log(

@@ -9,7 +9,7 @@ class Global {
     private meetingParams: MeetingParams | null = null
     private endReason: MeetingEndReason | null = null
     private errorMessage: string | null = null
-    public constructor() {}
+    public constructor() { }
 
     /**
      * Normalizes recording mode values to snake_case format.
@@ -87,6 +87,20 @@ class Global {
             throw new Error('Meeting params are not set')
         }
         return this.meetingParams.remote === null
+    }
+
+    public setStartTime(startTime: number): void {
+        if (this.meetingParams === null) {
+            throw new Error('Meeting params are not set')
+        }
+        this.meetingParams.start_time = startTime
+    }
+
+    public setExitTime(exitTime: number): void {
+        if (this.meetingParams === null) {
+            throw new Error('Meeting params are not set')
+        }
+        this.meetingParams.exit_time = exitTime
     }
 
     public setError(reason: MeetingEndReason, message?: string): void {
