@@ -101,7 +101,11 @@ if podman ps --filter "name=meeting-bot-scheduler" --format "{{.Names}}" | grep 
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         print_info "Stopping existing scheduler..."
-        podman compose -f podman-compose.yml down
+        if command -v podman-compose &> /dev/null; then
+            podman-compose -f podman-compose.yml down
+        else
+            podman compose -f podman-compose.yml down
+        fi
     else
         print_info "Exiting without changes"
         exit 0
@@ -110,7 +114,13 @@ fi
 
 # Start the scheduler
 print_info "Starting meeting bot scheduler..."
-podman compose -f podman-compose.yml up -d
+
+# Use podman-compose if available, otherwise try podman compose
+if command -v podman-compose &> /dev/null; then
+    podman-compose -f podman-compose.yml up -d
+else
+    podman compose -f podman-compose.yml up -d
+fi
 
 # Wait for health check (via Nginx)
 print_info "Waiting for scheduler to be healthy..."
@@ -129,7 +139,11 @@ echo
 
 if [ $WAITED -eq $MAX_WAIT ]; then
     print_warning "Health check timeout - scheduler may still be starting"
-    print_info "Check logs with: podman compose -f podman-compose.yml logs -f"
+    if command -v podman-compose &> /dev/null; then
+        print_info "Check logs with: podman-compose -f podman-compose.yml logs -f"
+    else
+        print_info "Check logs with: podman compose -f podman-compose.yml logs -f"
+    fi
 else
     print_success "Meeting Bot Scheduler is running!"
     echo
@@ -139,7 +153,13 @@ else
     echo "  - API Base:      http://localhost/meeting-bot/api"
     echo
     print_info "Useful commands:"
-    echo "  - View logs:     podman compose -f podman-compose.yml logs -f"
-    echo "  - Check status:  podman compose -f podman-compose.yml ps"
-    echo "  - Stop:          podman compose -f podman-compose.yml down"
+    if command -v podman-compose &> /dev/null; then
+        echo "  - View logs:     podman-compose -f podman-compose.yml logs -f"
+        echo "  - Check status:  podman-compose -f podman-compose.yml ps"
+        echo "  - Stop:          podman-compose -f podman-compose.yml down"
+    else
+        echo "  - View logs:     podman compose -f podman-compose.yml logs -f"
+        echo "  - Check status:  podman compose -f podman-compose.yml ps"
+        echo "  - Stop:          podman compose -f podman-compose.yml down"
+    fi
 fi
