@@ -6,6 +6,10 @@
 
 set -e
 
+# Get the directory where this script is located
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$SCRIPT_DIR"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -43,6 +47,7 @@ print_info "Loading environment variables from ~/.env"
 set -a
 source ~/.env
 set +a
+export $(grep -v '^#' ~/.env | xargs)
 
 print_success "Environment variables loaded"
 
@@ -72,10 +77,9 @@ fi
 
 print_success "All required environment variables are set"
 
-# Check if podman-compose is installed
-if ! command -v podman compose &> /dev/null; then
-    print_error "podman compose not found"
-    print_info "Install with: pip install podman compose"
+# Check if compose file exists
+if [ ! -f "podman-compose.yml" ]; then
+    print_error "podman-compose.yml not found in current directory"
     exit 1
 fi
 
@@ -97,7 +101,7 @@ if podman ps --filter "name=meeting-bot-scheduler" --format "{{.Names}}" | grep 
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         print_info "Stopping existing scheduler..."
-        podman compose down
+        podman compose -f podman-compose.yml down
     else
         print_info "Exiting without changes"
         exit 0
@@ -106,7 +110,7 @@ fi
 
 # Start the scheduler
 print_info "Starting meeting bot scheduler..."
-podman compose up -d
+podman compose -f podman-compose.yml up -d
 
 # Wait for health check (via Nginx)
 print_info "Waiting for scheduler to be healthy..."
@@ -125,17 +129,17 @@ echo
 
 if [ $WAITED -eq $MAX_WAIT ]; then
     print_warning "Health check timeout - scheduler may still be starting"
-    print_info "Check logs with: podman compose logs -f"
+    print_info "Check logs with: podman compose -f podman-compose.yml logs -f"
 else
     print_success "Meeting Bot Scheduler is running!"
     echo
     print_info "API Endpoints (via Nginx on port 80):"
-    echo "  - Health:        http://localhost/health"
-    echo "  - Documentation: http://localhost/ui"
-    echo "  - API Base:      http://localhost/api"
+    echo "  - Health:        http://localhost/meeting-bot/health"
+    echo "  - Documentation: http://localhost/meeting-bot/ui"
+    echo "  - API Base:      http://localhost/meeting-bot/api"
     echo
     print_info "Useful commands:"
-    echo "  - View logs:     podman-compose logs -f"
-    echo "  - Check status:  podman-compose ps"
-    echo "  - Stop:          podman-compose down"
+    echo "  - View logs:     podman compose -f podman-compose.yml logs -f"
+    echo "  - Check status:  podman compose -f podman-compose.yml ps"
+    echo "  - Stop:          podman compose -f podman-compose.yml down"
 fi

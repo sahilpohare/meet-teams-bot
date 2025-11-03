@@ -34,12 +34,15 @@ services:
       - AZURE_TENANT_ID=${AZURE_TENANT_ID}
       - AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
       - AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}
+      # Azure Container App Job configuration
+      - AZURE_CONTAINER_APP_JOB_NAME=${AZURE_CONTAINER_APP_JOB_NAME}
+      - AZURE_LOCATION=${AZURE_LOCATION:-uksouth}
       # Azure Container Registry credentials
       - ACR_LOGIN_SERVER=${ACR_LOGIN_SERVER:-skyfernaic01.azurecr.io}
       - ACR_USERNAME=${ACR_USERNAME}
       - ACR_PASSWORD=${ACR_PASSWORD}
       # Bot container image to deploy on Azure
-      - CONTAINER_IMAGE=skyfernaic01.azurecr.io/meet-teams-bot:latest
+      - CONTAINER_IMAGE=${CONTAINER_IMAGE:-skyfernaic01.azurecr.io/meet-teams-bot:latest}
     volumes:
       # Persistent storage for job data
       - ./data:/app/data
