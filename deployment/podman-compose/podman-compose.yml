@@ -27,24 +27,23 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - HOST=0.0.0.0
-      - CONTAINER_ADAPTER=podman
-      - CONTAINER_IMAGE=skyfernaic01.azurecr.io/meet-teams-bot:latest
-      # Azure credentials for container management
+      - CONTAINER_ADAPTER=azure
+      # Azure credentials for Azure Container Jobs
       - AZURE_SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID}
       - AZURE_RESOURCE_GROUP=${AZURE_RESOURCE_GROUP}
       - AZURE_TENANT_ID=${AZURE_TENANT_ID}
       - AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
       - AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}
-      # Optional: Azure Container Registry credentials if using managed identity
+      # Azure Container Registry credentials
       - ACR_LOGIN_SERVER=${ACR_LOGIN_SERVER:-skyfernaic01.azurecr.io}
       - ACR_USERNAME=${ACR_USERNAME}
       - ACR_PASSWORD=${ACR_PASSWORD}
+      # Bot container image to deploy on Azure
+      - CONTAINER_IMAGE=skyfernaic01.azurecr.io/meet-teams-bot:latest
     volumes:
-      # Mount podman socket for container management
-      - /var/run/podman/podman.sock:/var/run/podman/podman.sock
-      # Optional: Persistent storage for job data
+      # Persistent storage for job data
       - ./data:/app/data
-      # Optional: Logs directory
+      # Logs directory
       - ./logs:/app/logs
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
