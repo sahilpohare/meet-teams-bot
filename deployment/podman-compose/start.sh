@@ -73,9 +73,9 @@ fi
 print_success "All required environment variables are set"
 
 # Check if podman-compose is installed
-if ! command -v podman-compose &> /dev/null; then
-    print_error "podman-compose not found"
-    print_info "Install with: pip install podman-compose"
+if ! command -v podman compose &> /dev/null; then
+    print_error "podman compose not found"
+    print_info "Install with: pip install podman compose"
     exit 1
 fi
 
@@ -97,7 +97,7 @@ if podman ps --filter "name=meeting-bot-scheduler" --format "{{.Names}}" | grep 
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         print_info "Stopping existing scheduler..."
-        podman-compose down
+        podman compose down
     else
         print_info "Exiting without changes"
         exit 0
@@ -106,7 +106,7 @@ fi
 
 # Start the scheduler
 print_info "Starting meeting bot scheduler..."
-podman-compose up -d
+podman compose up -d
 
 # Wait for health check (via Nginx)
 print_info "Waiting for scheduler to be healthy..."
@@ -125,7 +125,7 @@ echo
 
 if [ $WAITED -eq $MAX_WAIT ]; then
     print_warning "Health check timeout - scheduler may still be starting"
-    print_info "Check logs with: podman-compose logs -f"
+    print_info "Check logs with: podman compose logs -f"
 else
     print_success "Meeting Bot Scheduler is running!"
     echo
