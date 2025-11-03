@@ -1,42 +1,74 @@
 # Meeting Bot - Docker Image for Screen Recording
 FROM ubuntu:24.04
 
-# Install Bun
-RUN apt-get update && apt-get install -y curl ca-certificates gnupg unzip
-RUN curl -fsSL https://bun.sh/install | bash
-ENV PATH="/root/.bun/bin:${PATH}"
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    # Core browser dependencies
+# Combine all system installations in one layer to reduce image size
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Bun dependencies
+    curl ca-certificates gnupg unzip \
+    # Core browser dependencies (minimal set)
     wget libnss3 libatk-bridge2.0-0 libdrm2 libxkbcommon0 \
     libxcomposite1 libxdamage1 libxrandr2 libgbm1 libxss1 libxshmfence1 \
-    # Virtual display and audio
+    # Virtual display and audio (KEEP ALL - needed for bot functionality)
     xvfb x11vnc x11-utils pulseaudio pulseaudio-utils unclutter \
-    # Media processing
+    # Media processing (only what's needed for recording)
     ffmpeg \
-    # Utilities
-    curl unzip \
-    && rm -rf /var/lib/apt/lists/*
+    # AWS CLI dependencies (aggressive cleanup to save ~60MB)
+    && curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" \
+    && unzip -q awscliv2.zip \
+    && ./aws/install \
+    && rm -rf awscliv2.zip aws \
+    # Remove AWS CLI bloat - keep only S3 commands
+    && rm -rf /usr/local/aws-cli/v2/*/dist/aws_completer \
+    && rm -rf /usr/local/aws-cli/v2/*/dist/awscli/data/ac.index \
+    && rm -rf /usr/local/aws-cli/v2/*/dist/awscli/examples \
+    && rm -rf /usr/local/aws-cli/v2/*/dist/awscli/botocore/data/[a-r]* \
+    && rm -rf /usr/local/aws-cli/v2/*/dist/awscli/botocore/data/[t-z]* \
+    # Install Bun
+    && curl -fsSL https://bun.sh/install | bash \
+    # Aggressive cleanup to reduce layer size
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /var/cache/* \
+    && rm -rf /root/.cache /usr/share/doc /usr/share/man \
+    # Remove unnecessary font files to save ~30MB
+    && rm -rf /usr/share/fonts/truetype/noto /usr/share/fonts/truetype/dejavu
 
-# Install AWS CLI v2
-RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" \
-    && unzip awscliv2.zip && ./aws/install && rm -rf awscliv2.zip aws
+ENV PATH="/root/.bun/bin:${PATH}"
 
 # Application setup
 WORKDIR /app
 
 # Copy package files (bun.lock might not exist in monorepo app)
 COPY package.json ./
-RUN bun install
 
-# Install Playwright's Chromium + create symlink for browser.ts compatibility
-RUN bunx playwright install chromium && \
-    find /root/.cache/ms-playwright -name chrome -type f -executable | head -1 | xargs -I {} ln -sf {} /usr/bin/google-chrome
+# Install all dependencies (including devDependencies for build)
+RUN bun install --no-cache
+
+# Install Playwright's Chromium + aggressive cleanup to save ~200-300MB
+RUN bunx playwright install chromium --with-deps \
+    && find /root/.cache/ms-playwright -name chrome -type f -executable | head -1 | xargs -I {} ln -sf {} /usr/bin/google-chrome \
+    # Remove unnecessary Playwright files to save space
+    && rm -rf /root/.cache/ms-playwright/chromium-*/chrome-linux/swiftshader \
+    && rm -rf /root/.cache/ms-playwright/chromium-*/chrome-linux/locales \
+    && find /root/.cache/ms-playwright -name "*.pak" -type f ! -name "en-US.pak" -delete \
+    # Remove chromium_headless_shell (not needed if we have full chromium)
+    && rm -rf /root/.cache/ms-playwright/chromium_headless_shell-* \
+    # Strip debug symbols from chromium binary to save ~100-150MB
+    && find /root/.cache/ms-playwright -type f -executable -exec strip --strip-unneeded {} \; 2>/dev/null || true \
+    # Remove Playwright FFMPEG (we already have system ffmpeg)
+    && rm -rf /root/.cache/ms-playwright/ffmpeg-*
 
 # Build application
 COPY . .
-RUN bun run build
+RUN bun run build \
+    # Remove devDependencies and source files after build to reduce image size
+    && bun install --production \
+    && rm -rf src tests *.md .git* node_modules/@types \
+    && rm -rf /root/.bun/install/cache /tmp/* /var/tmp/* \
+    # Remove unnecessary node_modules folders (docs, examples, tests)
+    && find node_modules -type d -name "test" -o -name "tests" -o -name "*.md" -o -name "example" -o -name "examples" -o -name "docs" | xargs rm -rf \
+    && find node_modules -name "*.ts" ! -name "*.d.ts" -delete \
+    # Cleanup Bun cache and temporary files
+    && rm -rf /root/.cache/* /root/.npm /root/.bun/install
 
 # Environment configuration
 ENV NODE_OPTIONS="--max-old-space-size=2048"

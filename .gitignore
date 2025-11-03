@@ -20,7 +20,7 @@ apps/*/dist-deploy/
 packages/*/dist/
 
 # VS Code
-.vscode
+
 !.vscode/tasks.js
 
 # JetBrains IDEs
