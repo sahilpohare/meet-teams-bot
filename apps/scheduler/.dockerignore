@@ -1,0 +1,71 @@
+# Only package.json and dist/ should be copied to the container
+# Everything else is excluded
+
+# Source files
+src/
+*.ts
+*.tsx
+tsconfig.json
+tsconfig.*.json
+
+# Dependencies (will be installed fresh in container)
+node_modules/
+bun.lockb
+
+# Build artifacts and cache
+*.tsbuildinfo
+.turbo/
+.cache/
+
+# Development and documentation
+*.md
+README*
+CHANGELOG*
+LICENSE*
+
+# Git
+.git/
+.gitignore
+.github/
+.gitattributes
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Testing
+*.test.ts
+*.test.js
+*.spec.ts
+*.spec.js
+__tests__/
+test/
+tests/
+coverage/
+
+# Environment and config files
+.env
+.env.*
+.envrc
+local.settings.json
+
+# Azure Functions specific (not needed for standalone server)
+.funcignore
+host.json
+functions/
+function.json
+
+# Scripts (build scripts not needed in runtime)
+scripts/
+
+# Logs and temp files
+*.log
+logs/
+tmp/
+temp/
+
+# Map files (optional, remove if you don't want them)
+*.map
